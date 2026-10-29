@@ -6,6 +6,14 @@
 failures, and time spent waiting for you. It never changes the records, and
 nothing leaves the machine.
 
+**Until it exists,** `@twkrash/pi-session-inspector` shows cost, tokens and
+tool errors per session from Pi's own session files (see
+[Reuse](../../docs/reuse.md)). `jig-lens` adds what only Jig's records hold:
+- rule decisions;
+- approvals and time waited;
+- tickets;
+- checks.
+
 ## What it shows
 
 | View | Questions it answers |

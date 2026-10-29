@@ -26,9 +26,26 @@ in Pi.
 A rule can choose which kind its calls use. For example, Jira comments use
 the review screen with a rendered preview.
 
-The form will be built on an existing Pi package rather than from scratch. The
-candidates are being compared (see [Reuse](reuse.md)), starting with
-`@juicesharp/rpiv-ask-user-question`, which you already use.
+The form is built on `@adeildo/pi-ask-questions`, on trial. It is a deliberate
+port of `@juicesharp/rpiv-ask-user-question`'s question format into a framed
+dialog, and its README says other packages can open it. If it does not hold up,
+Pi's own select and input dialogs take its place (see [Reuse](reuse.md)).
+
+Browser forms are not used for approvals: they answer through a local server,
+which the agent's shell can reach.
+
+## Answers beyond yes and no
+
+- **Decline with a reason.** After `n` you can type why, and the model reads
+  it.
+- **Allow for this session.** An ask for that tool and action becomes allow
+  until the session ends. It never reaches past the floor.
+
+## One dialog at a time
+
+Pi has a single dialog slot and does not arbitrate between packages. `jig-core`
+queues its own questions. A clash with another package's dialog, such as a
+question the model asks while a call waits, is a known limit.
 
 ## Rendered previews
 

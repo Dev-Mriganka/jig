@@ -41,6 +41,7 @@ Pi's own tools have defaults built in:
 | `read`, `ls`, `find`, `grep` | local | read | allow |
 | `write`, `edit` | local | write | allow |
 | `bash` | local, inside the sandbox | write | allow (the sandbox is the protection, see Architecture) |
+| question tools: `ask_user_question`, `ask_questions` | local | read | allow, so a question never asks first |
 
 ## The rules table
 

@@ -42,6 +42,25 @@ The contract for every plugin is:
 
 Plugins import only this contract, never each other.
 
+## What it borrows
+
+`jig-core` is its own code; it does not run on top of another permission
+package. It borrows these patterns from `@gotgenes/pi-permission-system`:
+- **`bash` split with tree-sitter,** so each command in a chain or a
+  substitution is judged on its own, and anything that cannot be parsed asks;
+- **the ask flow:** an inline dialog, a select-and-input fallback for RPC
+  hosts, a timeout, and deny when there is no screen;
+- **hiding a tool the rules deny completely,** so the model does not try it;
+- **decision events** on Pi's event bus.
+
+It is not a dependency, for three reasons:
+- environments are that package's stated non-goal;
+- it judges another package's tool by name only, while Jig decides per action
+  and per argument;
+- it has moved through about 30 major versions since June 2026.
+
+See [Reuse](../../docs/reuse.md).
+
 ## Prerequisites
 
 - Pi 1.4 or later.

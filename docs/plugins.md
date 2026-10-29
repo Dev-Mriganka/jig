@@ -11,7 +11,7 @@ parts live in a private company plugin kept at the company.
 | `read`, `ls`, `find`, `grep` | Pi | `jig-core` default: local read, allowed |
 | `write`, `edit` | Pi | `jig-core` default: local write, allowed |
 | `bash` | Pi | runs in the sandbox; `jig-core` default: allowed, with optional command rules |
-| `ask_user_question` | `@juicesharp/rpiv-ask-user-question` | governed like any tool; candidate for the approval forms |
+| `ask_user_question` | `@juicesharp/rpiv-ask-user-question` | allowed by default, so a question never asks first. `@adeildo/pi-ask-questions` is the nicer-looking alternative, and Jig's forms build on it |
 | tools from any other package | that package | `jig-core` classifies them from the tool's hints or your rules; unknown tools ask |
 
 ## Generic plugins (this repository)
