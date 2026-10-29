@@ -4,8 +4,8 @@ Jig is a set of plugins for the [Pi](https://pi.dev) coding agent. They decide
 what the agent may do, ask you when it matters, keep secrets out of its reach,
 and record what happened so you can see it later.
 
-**Status: design only.** This repository holds Markdown documents, no code yet.
-Each plugin's README is the specification that its code will follow.
+**Status:** `jig-core` is built; the other plugins are still design. Each
+plugin's README is the specification that its code follows.
 
 ## The plugins
 

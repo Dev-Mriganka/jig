@@ -1,8 +1,8 @@
 # Jig agent guide
 
-This repository is design only for now. Plugin READMEs are the
-specifications. Code follows them, and when either changes, the other changes in
-the same commit.
+`jig-core` is built; the other plugins are design only for now. Plugin READMEs
+are the specifications. Code follows them, and when either changes, the other
+changes in the same commit.
 
 - **Read first:** [docs/architecture.md](docs/architecture.md) and
   [docs/permissions.md](docs/permissions.md).
@@ -15,5 +15,6 @@ the same commit.
   not add settings that lower it.
 - **Approvals happen inside the waiting tool call.** Never add a web endpoint
   that approves.
+- **Checks:** `npm run check` (types) and `npm test` must pass before a commit.
 - **Git:** clear commit messages, no `Co-Authored-By` lines. Push only when
   asked.

@@ -31,6 +31,9 @@ port of `@juicesharp/rpiv-ask-user-question`'s question format into a framed
 dialog, and its README says other packages can open it. If it does not hold up,
 Pi's own select and input dialogs take its place (see [Reuse](reuse.md)).
 
+In the first version the form kind is shown with Pi's own selector, like a
+dialog. The dedicated form screen comes later.
+
 Browser forms are not used for approvals: they answer through a local server,
 which the agent's shell can reach.
 
