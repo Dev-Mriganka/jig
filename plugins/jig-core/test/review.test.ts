@@ -101,6 +101,14 @@ describe("opening the browser", () => {
         assert.ok(rendered.count >= 2, "the screen asked to be drawn again");
     });
 
+    test("a page that cannot even be written is a failure too, not an unhandled error", async () => {
+        const { component, answers } = screen({ summary: "s" }, { open: async () => { throw new Error("no space left on device"); } });
+        component.handleInput?.("o");
+        await new Promise((resolve) => setImmediate(resolve));
+        assert.match(component.render(80).join("\n"), /could not open the browser: no space left on device/);
+        assert.deepEqual(answers, []);
+    });
+
     test("a failure is shown, and the question stays open", async () => {
         const { component, answers } = screen({ summary: "s" }, { open: async () => "could not open the browser: nothing to open it with" });
         component.handleInput?.("o");

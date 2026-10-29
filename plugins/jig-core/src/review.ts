@@ -12,6 +12,7 @@ import { matchesKey, truncateToWidth, wrapTextWithAnsi } from "@earendil-works/p
 import type { Component, TUI } from "@earendil-works/pi-tui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { Preview } from "./contract.ts";
+import { errorMessage } from "./errors.ts";
 import type { Answer } from "./records.ts";
 
 export interface ReviewOptions {
@@ -116,10 +117,17 @@ export function createReviewScreen(options: ReviewOptions, tui: Screen, theme: S
             if (matchesKey(data, "o")) {
                 status = "opening the preview in the browser...";
                 tui.requestRender();
-                void options.openInBrowser().then((message) => {
-                    status = message;
-                    tui.requestRender();
-                });
+                void options.openInBrowser().then(
+                    (message) => {
+                        status = message;
+                        tui.requestRender();
+                    },
+                    // Writing the page can fail too (a full disk, say). The question stays open.
+                    (error: unknown) => {
+                        status = `could not open the browser: ${errorMessage(error)}`;
+                        tui.requestRender();
+                    },
+                );
                 return;
             }
             const { summary, body } = cached ?? { summary: [], body: [] };
