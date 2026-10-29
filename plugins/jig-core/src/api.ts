@@ -13,9 +13,15 @@ export function buildApi(state: JigState): JigApi {
         declareTool(declaration) {
             // A declaration is code from another package. Check its shape here, so a mistake fails where it is made
             // and not in the middle of somebody's tool call.
-            if (typeof declaration?.tool !== "string" || declaration.tool === "") throw new TypeError("declareTool: the tool needs a name");
-            if (typeof declaration.plugin !== "string" || declaration.plugin === "") throw new TypeError(`declareTool(${declaration.tool}): the plugin needs a name`);
-            if (typeof declaration.classify !== "function") throw new TypeError(`declareTool(${declaration.tool}): classify must be a function`);
+            if (typeof declaration?.tool !== "string" || declaration.tool === "") {
+                throw new TypeError("declareTool: the tool needs a name");
+            }
+            if (typeof declaration.plugin !== "string" || declaration.plugin === "") {
+                throw new TypeError(`declareTool(${declaration.tool}): the plugin needs a name`);
+            }
+            if (typeof declaration.classify !== "function") {
+                throw new TypeError(`declareTool(${declaration.tool}): classify must be a function`);
+            }
             state.declarations.set(declaration.tool, declaration);
         },
 
@@ -59,7 +65,9 @@ export function buildApi(state: JigState): JigApi {
                 if (typeof name !== "string" || name === "") throw new TypeError("registerSection: the section needs a name");
                 if (typeof validate !== "function") throw new TypeError(`registerSection(${name}): validate must be a function`);
                 // The names jig-core reads itself stay its own: a plugin could otherwise take over `rules`.
-                if (OWN_SECTIONS.includes(name)) throw new Error(`registerSection: "${name}" is a jig-core field, so a plugin cannot use it for a section`);
+                if (OWN_SECTIONS.includes(name)) {
+                    throw new Error(`registerSection: "${name}" is a jig-core field, so a plugin cannot use it for a section`);
+                }
                 state.sectionChecks.set(name, validate);
                 // A section registered after the file was read is checked now, so the order plugins load in does not matter.
                 if (state.configLoaded) loadPersonalConfig(state, state.personal.file);

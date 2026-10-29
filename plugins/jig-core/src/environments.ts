@@ -53,9 +53,14 @@ export function buildEnvironments(layers: readonly EnvironmentLayer[]): { enviro
             }
             const before = defined.get(name);
             if (before === undefined) {
-                defined.set(name, { kind: config.kind, mask: config.kind === "production" || config.mask === true, source: layer.source });
+                const mask = config.kind === "production" || config.mask === true;
+                defined.set(name, { kind: config.kind, mask, source: layer.source });
             } else if (before.kind === "production" && config.kind === "test") {
-                problems.push({ source: layer.source, key: `${key}.kind`, message: `"${name}" is production (set by ${before.source}); configuration cannot lower it to a test environment` });
+                problems.push({
+                    source: layer.source,
+                    key: `${key}.kind`,
+                    message: `"${name}" is production (set by ${before.source}); configuration cannot lower it to a test environment`,
+                });
             } else if (before.kind === "test" && config.kind === "production") {
                 defined.set(name, { kind: "production", mask: true, source: layer.source });
             } else {

@@ -139,7 +139,11 @@ async function askUser(
     // The tool can read this back with `approvedPreview()` and refuse to run if what it would do has changed.
     call.approvedPreview = preview;
     if (approval.answer === "allow-session") {
-        state.sessionAllows.add(sessionKey({ tool: call.tool, ...(classification.action === undefined ? {} : { action: classification.action }), environment: classification.environment }));
+        state.sessionAllows.add(sessionKey({
+            tool: call.tool,
+            ...(classification.action === undefined ? {} : { action: classification.action }),
+            environment: classification.environment,
+        }));
     }
     announce(state, call, approval.answer);
     return undefined;

@@ -72,7 +72,8 @@ export function refusalFromList(listing: string, cwd: string): string | undefine
         if (!isDangerousKey(key, value)) continue;
         const origin = parts[index + 1] as string;
         const file = origin.startsWith("file:") ? path.resolve(cwd, origin.slice(5)) : origin;
-        return `${file} sets ${key}, which would run with your credentials: remove it (git config --unset ${unsetHint(key)}) or ask the user`;
+        return `${file} sets ${key}, which would run with your credentials: ` +
+            `remove it (git config --unset ${unsetHint(key)}) or ask the user`;
     }
     return undefined;
 }
@@ -181,7 +182,9 @@ export function gitConfigRefusal(cwd: string, list: (cwd: string) => string | un
     // The stamp is taken before the configuration is read, so an edit during the read changes it and the next call
     // looks again.
     const key = where === "unknown" ? undefined : `${where.commonDir}\0${where.gitDir}`;
-    const now = where === "unknown" ? undefined : `${stamp(path.join(where.commonDir, "config"))}|${stamp(path.join(where.gitDir, "config.worktree"))}`;
+    const now = where === "unknown"
+        ? undefined
+        : `${stamp(path.join(where.commonDir, "config"))}|${stamp(path.join(where.gitDir, "config.worktree"))}`;
     if (key !== undefined && now !== undefined) {
         const cached = known.get(key);
         if (cached?.stamp === now) return cached.refusal;

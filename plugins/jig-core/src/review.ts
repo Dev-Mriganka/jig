@@ -46,7 +46,8 @@ export function createReviewScreen(options: ReviewOptions, tui: Screen, theme: S
     function style(line: string, inFence: { open: boolean }): string {
         const format = options.preview.format;
         if (format === "diff") {
-            if (line.startsWith("+++") || line.startsWith("---") || line.startsWith("diff ") || line.startsWith("index ")) return theme.fg("muted", line);
+            const header = ["+++", "---", "diff ", "index "].some((prefix) => line.startsWith(prefix));
+            if (header) return theme.fg("muted", line);
             if (line.startsWith("@@")) return theme.fg("accent", line);
             if (line.startsWith("+")) return theme.fg("success", line);
             if (line.startsWith("-")) return theme.fg("error", line);
@@ -93,6 +94,7 @@ export function createReviewScreen(options: ReviewOptions, tui: Screen, theme: S
             const shown = body.slice(top, top + height);
             const position = body.length > height ? ` ${top + 1}-${top + shown.length} of ${body.length} ` : "";
             const rule = (extra = ""): string => theme.fg("border", `${"─".repeat(Math.max(0, width - extra.length))}${extra}`);
+            const key = (letter: string): string => theme.fg("accent", letter);
             const lines = [
                 rule(),
                 ` ${theme.bold(theme.fg("accent", "Approve this call?"))} ${theme.fg("muted", options.header)}`,
@@ -100,7 +102,8 @@ export function createReviewScreen(options: ReviewOptions, tui: Screen, theme: S
                 rule(position),
                 ...shown.map((line) => ` ${line}`),
                 rule(),
-                ` ${theme.fg("accent", "y")} allow  ${theme.fg("accent", "s")} allow for this session  ${theme.fg("accent", "n")}/Esc decline  ${theme.fg("accent", "o")} open in browser  ${theme.fg("muted", "up/down PgUp/PgDn scroll")}`,
+                ` ${key("y")} allow  ${key("s")} allow for this session  ${key("n")}/Esc decline  ${key("o")} open in browser  ` +
+                    theme.fg("muted", "up/down PgUp/PgDn scroll"),
                 ` ${theme.fg("muted", status)}`,
             ];
             return lines.map((line) => truncateToWidth(line, width));

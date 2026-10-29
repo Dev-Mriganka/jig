@@ -48,8 +48,17 @@ function renderDiff(text: string): string {
 }
 
 const STYLE = `
-:root { color-scheme: light dark; --bg: #ffffff; --fg: #1f2328; --muted: #656d76; --line: #d0d7de; --add: #dafbe1; --del: #ffebe9; --hunk: #ddf4ff; --code: #f6f8fa; }
-@media (prefers-color-scheme: dark) { :root { --bg: #0d1117; --fg: #e6edf3; --muted: #8b949e; --line: #30363d; --add: #12261e; --del: #2d1517; --hunk: #0c2d6b; --code: #161b22; } }
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff; --fg: #1f2328; --muted: #656d76; --line: #d0d7de;
+  --add: #dafbe1; --del: #ffebe9; --hunk: #ddf4ff; --code: #f6f8fa;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1117; --fg: #e6edf3; --muted: #8b949e; --line: #30363d;
+    --add: #12261e; --del: #2d1517; --hunk: #0c2d6b; --code: #161b22;
+  }
+}
 body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, sans-serif; }
 main { max-width: 56rem; margin: 0 auto; padding: 1.5rem 16px 4rem; }
 .note { color: var(--muted); border-bottom: 1px solid var(--line); padding-bottom: .75rem; margin: 0 0 1rem; }
@@ -60,7 +69,10 @@ pre { padding: .75rem 1rem; overflow-x: auto; white-space: pre-wrap; overflow-wr
 code { padding: .1rem .3rem; }
 pre code { padding: 0; background: none; }
 .diff span { display: block; }
-.d-add { background: var(--add); } .d-del { background: var(--del); } .d-hunk { background: var(--hunk); } .d-meta { color: var(--muted); }
+.d-add { background: var(--add); }
+.d-del { background: var(--del); }
+.d-hunk { background: var(--hunk); }
+.d-meta { color: var(--muted); }
 blockquote { margin: 0; padding-left: 1rem; border-left: 3px solid var(--line); color: var(--muted); }
 table { border-collapse: collapse; } td, th { border: 1px solid var(--line); padding: .25rem .5rem; }
 `;
@@ -109,8 +121,13 @@ export function cleanupPreviews(maxAgeDays: number, now: number = Date.now()): n
 
 /** The program and arguments that open `url`: `$BROWSER` when set (a program name, optionally followed by plain
  *  arguments, with `%s` standing for the address), else `open` on macOS and `xdg-open` elsewhere. */
-export function browserCommand(url: string, env: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform): { program: string; args: string[] } {
-    const chosen = env.BROWSER !== undefined && env.BROWSER.trim() !== "" ? env.BROWSER.trim().split(/\s+/) : [platform === "darwin" ? "open" : "xdg-open"];
+export function browserCommand(
+    url: string,
+    env: NodeJS.ProcessEnv = process.env,
+    platform: NodeJS.Platform = process.platform,
+): { program: string; args: string[] } {
+    const configured = env.BROWSER?.trim();
+    const chosen = configured !== undefined && configured !== "" ? configured.split(/\s+/) : [platform === "darwin" ? "open" : "xdg-open"];
     const [program, ...rest] = chosen as [string, ...string[]];
     const args = rest.some((arg) => arg.includes("%s")) ? rest.map((arg) => arg.replaceAll("%s", url)) : [...rest, url];
     return { program, args };
@@ -130,7 +147,11 @@ const launchDetached: Launch = (program, args) =>
     });
 
 /** Opens a page in the browser and says how it went, in a line the review screen can show. */
-export async function openInBrowser(file: string, launch: Launch = launchDetached, env: NodeJS.ProcessEnv = process.env): Promise<string> {
+export async function openInBrowser(
+    file: string,
+    launch: Launch = launchDetached,
+    env: NodeJS.ProcessEnv = process.env,
+): Promise<string> {
     const { program, args } = browserCommand(pathToFileURL(file).href, env);
     try {
         await launch(program, args);

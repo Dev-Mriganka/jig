@@ -76,7 +76,8 @@ export function createApprovals(options: ApprovalsOptions = {}): Approvals {
         if (request.preview.body !== undefined) {
             const excerpt = request.preview.body.split("\n").slice(0, EXCERPT_LINES).join("\n");
             lines.push("", excerpt.length > EXCERPT_CHARS ? `${excerpt.slice(0, EXCERPT_CHARS)}...` : excerpt);
-            if (request.preview.body.split("\n").length > EXCERPT_LINES || excerpt.length > EXCERPT_CHARS) lines.push("(the rest is not shown here)");
+            const cut = request.preview.body.split("\n").length > EXCERPT_LINES || excerpt.length > EXCERPT_CHARS;
+            if (cut) lines.push("(the rest is not shown here)");
         }
         return lines.join("\n");
     }

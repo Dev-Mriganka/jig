@@ -45,7 +45,12 @@ function head(text: string, length: number): string {
  * Returns the capped content, or undefined when the result is short enough (or the tool cuts its own output).
  * The file is `<state>/spill/<session>/<tool call id>.txt`; a nested call id such as `call_1/2` becomes `call_1_2`.
  */
-export function capContent(input: { tool: string; toolCallId: string; sessionId: string; content: readonly Content[] }): Capped | undefined {
+export function capContent(input: {
+    tool: string;
+    toolCallId: string;
+    sessionId: string;
+    content: readonly Content[];
+}): Capped | undefined {
     if (SELF_TRUNCATING_TOOLS.has(input.tool)) return undefined;
     const full = textOf(input.content);
     if (full.length <= CAP_CHARS) return undefined;
@@ -53,9 +58,10 @@ export function capContent(input: { tool: string; toolCallId: string; sessionId:
     const shown = head(full, HEAD_CHARS);
     const images = input.content.filter((block) => block.type !== "text");
     const spill = writeSpill(input.sessionId, input.toolCallId, full);
+    const cut = `Output cut: ${full.length} characters in total, the first ${shown.length} shown.`;
     const note = spill === undefined
-        ? `[Output cut: ${full.length} characters in total, the first ${shown.length} shown. The full text could not be saved.]`
-        : `[Output cut: ${full.length} characters in total, the first ${shown.length} shown. The full text is in ${spill}: read it with the read tool.]`;
+        ? `[${cut} The full text could not be saved.]`
+        : `[${cut} The full text is in ${spill}: read it with the read tool.]`;
     return {
         content: [{ type: "text", text: `${shown}\n\n${note}` }, ...images],
         ...(spill === undefined ? {} : { spill }),

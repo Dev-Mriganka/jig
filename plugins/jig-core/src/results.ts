@@ -6,7 +6,9 @@
 //
 // Pi ignores an error thrown by a `tool_result` hook and lets the unchanged result through. That would leak, so every
 // failure in here replaces the result with a short error instead: a result is withheld, never passed unchecked.
-import type { ExtensionContext, ToolExecutionEndEvent, ToolResultEvent, ToolResultEventResult, TurnEndEvent } from "@earendil-works/pi-coding-agent";
+import type {
+    ExtensionContext, ToolExecutionEndEvent, ToolResultEvent, ToolResultEventResult, TurnEndEvent,
+} from "@earendil-works/pi-coding-agent";
 import { capContent, textOf } from "./cap.ts";
 import type { Content } from "./cap.ts";
 import { errorMessage } from "./errors.ts";
@@ -87,7 +89,8 @@ function protect(state: JigState, event: ToolResultEvent, ctx: ExtensionContext)
             parts = transform(parts, (text) => masker.text(text), (value) => masker.value(value), changed);
             // An image cannot be masked, so it does not pass.
             if (parts.content.some((block) => block.type === "image")) {
-                parts = { ...parts, content: parts.content.map((block): Content => block.type === "image" ? { type: "text", text: "[image withheld: images cannot be masked]" } : block) };
+                const note: Content = { type: "text", text: "[image withheld: images cannot be masked]" };
+                parts = { ...parts, content: parts.content.map((block) => (block.type === "image" ? note : block)) };
                 changed.content = true;
             }
         } catch {
@@ -156,7 +159,11 @@ export function finishCall(state: JigState, event: ToolExecutionEndEvent, ctx: E
                     decision: call.decision,
                     decisionSource: call.decisionSource,
                 }),
-                ...(call?.approval === undefined ? {} : { approval: call.approval.kind, answer: call.approval.answer, waitedMs: call.approval.waitedMs }),
+                ...(call?.approval === undefined ? {} : {
+                    approval: call.approval.kind,
+                    answer: call.approval.answer,
+                    waitedMs: call.approval.waitedMs,
+                }),
                 outcome,
                 ...(errorKind === undefined ? {} : { errorKind }),
                 ...(error === undefined ? {} : { error }),
@@ -173,7 +180,11 @@ export function finishCall(state: JigState, event: ToolExecutionEndEvent, ctx: E
     }
 }
 
-function outcomeOf(state: JigState, event: ToolExecutionEndEvent, call: CallState | undefined): { outcome: Outcome; errorKind?: ErrorKind; error?: string } {
+function outcomeOf(
+    state: JigState,
+    event: ToolExecutionEndEvent,
+    call: CallState | undefined,
+): { outcome: Outcome; errorKind?: ErrorKind; error?: string } {
     if (call?.blocked !== undefined) return { outcome: "blocked", errorKind: call.blocked.kind, error: call.blocked.line };
     if (call?.withheld !== undefined) return { outcome: "error", errorKind: "withheld", error: oneLine(call.withheld) };
     if (!event.isError) return { outcome: "ok" };

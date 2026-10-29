@@ -27,7 +27,10 @@ function compactArguments(input: Readonly<Record<string, unknown>>): string {
 }
 
 /** The summary for a tool that gave no preview of its own. */
-export function defaultSummary(call: { tool: string; action?: string; environment: EnvironmentName; effect: Effect; unknown: boolean }, input: Readonly<Record<string, unknown>>): string {
+export function defaultSummary(
+    call: { tool: string; action?: string; environment: EnvironmentName; effect: Effect; unknown: boolean },
+    input: Readonly<Record<string, unknown>>,
+): string {
     const what = call.action === undefined ? call.tool : `${call.tool} ${call.action}`;
     const note = call.unknown ? " (not classified, so treated as a write outside this machine)" : "";
     return `${what}${note}: ${compactArguments(input)}`;

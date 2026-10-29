@@ -61,10 +61,12 @@ function actionsOf(tool: ToolInfo | undefined): string[] {
     const schema = (tool?.parameters as { properties?: { action?: unknown } } | undefined)?.properties?.action;
     if (typeof schema !== "object" || schema === null) return [];
     const { enum: values, anyOf, oneOf } = schema as { enum?: unknown; anyOf?: unknown; oneOf?: unknown };
-    const strings = (list: unknown): string[] => (Array.isArray(list) ? list.filter((item): item is string => typeof item === "string") : []);
+    const strings = (list: unknown): string[] =>
+        Array.isArray(list) ? list.filter((item): item is string => typeof item === "string") : [];
     if (Array.isArray(values)) return strings(values);
     const options = Array.isArray(anyOf) ? anyOf : Array.isArray(oneOf) ? oneOf : [];
-    return options.flatMap((option: { const?: unknown; enum?: unknown }) => (typeof option?.const === "string" ? [option.const] : strings(option?.enum)));
+    return options.flatMap((option: { const?: unknown; enum?: unknown }) =>
+        typeof option?.const === "string" ? [option.const] : strings(option?.enum));
 }
 
 const CLASS_LABEL: Record<ClassSource, string> = {
@@ -89,10 +91,15 @@ export function statusLines(state: JigState): string[] {
         `Plugins: ${[...plugins].join(", ")}`,
         `Tools on the unknown default (they ask until classified): ${unclassified.length === 0 ? "none" : unclassified.join(", ")}`,
         `Open watches: ${state.watches.list().length}`,
-        state.personal.found ? `Configuration: ${state.personal.file}` : `Configuration: none found (${state.personal.file || "not loaded yet"}), defaults apply`,
+        state.personal.found
+            ? `Configuration: ${state.personal.file}`
+            : `Configuration: none found (${state.personal.file || "not loaded yet"}), defaults apply`,
     ];
     const sections = [...state.sectionChecks.keys()];
-    if (sections.length > 0) lines.push(`Plugin sections in the file: ${sections.map((name) => `${name} (${state.personal.sections.has(name) ? "loaded" : "not set or invalid"})`).join(", ")}`);
+    if (sections.length > 0) {
+        const shown = sections.map((name) => `${name} (${state.personal.sections.has(name) ? "loaded" : "not set or invalid"})`);
+        lines.push(`Plugin sections in the file: ${shown.join(", ")}`);
+    }
     if (problems.length > 0) lines.push(`Configuration problems (${problems.length}):`, ...problems.map((problem) => `  ${problem}`));
     if (state.recordsProblem !== undefined) lines.push(`Records: the last write failed: ${state.recordsProblem}`);
     return lines;
@@ -132,7 +139,9 @@ export function ruleLines(state: JigState, only: string | undefined, hasUI: bool
                 hasUI,
             });
             const flag = classification.source === "unknown" ? "  <- not classified: add a classify rule, or a rule that names it" : "";
-            lines.push(`${label}: ${classification.environment} ${classification.effect} -> ${verdict.decision} (decision: ${verdict.source}; classified by: ${CLASS_LABEL[classification.source]})${flag}`);
+            const where = `${classification.environment} ${classification.effect} -> ${verdict.decision}`;
+            const because = `decision: ${verdict.source}; classified by: ${CLASS_LABEL[classification.source]}`;
+            lines.push(`${label}: ${where} (${because})${flag}`);
         }
     }
     if (lines.length === 0) return [only === undefined ? "No tools are registered." : `No tool named ${only}.`];
@@ -151,6 +160,7 @@ export function recordsLines(state: JigState): string[] {
     if (!summary.exists) return [`Today's records: ${summary.file}`, "Nothing recorded yet today."];
     return [
         `Today's records: ${summary.file}`,
-        `${summary.calls} calls (${summary.errors} errors, ${summary.blocked} blocked), ${summary.questions} questions asked, ${formatDuration(summary.waitedMs)} waited for you, ${summary.turns} model turns`,
+        `${summary.calls} calls (${summary.errors} errors, ${summary.blocked} blocked), ${summary.questions} questions asked, ` +
+            `${formatDuration(summary.waitedMs)} waited for you, ${summary.turns} model turns`,
     ];
 }

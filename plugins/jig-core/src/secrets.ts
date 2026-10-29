@@ -77,7 +77,12 @@ export function createSecrets(options: SecretsOptions): Secrets {
         return turn;
     }
 
-    async function ask(program: string, args: string[], programEnv: Record<string, string>, signal: AbortSignal | undefined): Promise<RunResult> {
+    async function ask(
+        program: string,
+        args: string[],
+        programEnv: Record<string, string>,
+        signal: AbortSignal | undefined,
+    ): Promise<RunResult> {
         return inTurn(program, () => run(program, args, {
             env: programEnv,
             timeoutMs,
@@ -87,7 +92,9 @@ export function createSecrets(options: SecretsOptions): Secrets {
     }
 
     function fromEnvironment(name: string): string {
-        if (!ENV_NAME.test(name)) throw new SecretError("invalid_ref", "an env: reference names an environment variable with letters, digits and _ only");
+        if (!ENV_NAME.test(name)) {
+            throw new SecretError("invalid_ref", "an env: reference names an environment variable with letters, digits and _ only");
+        }
         const value = env[name];
         if (value === undefined || value === "") throw new SecretError("missing", `the environment variable ${name} is not set`);
         return value;
@@ -110,7 +117,10 @@ export function createSecrets(options: SecretsOptions): Secrets {
         }
         if (/is not in the password store/i.test(result.stderr)) throw new SecretError("missing", "the pass entry does not exist");
         if (/pinentry|inappropriate ioctl|passphrase|cancelled|decryption failed|no secret key/i.test(result.stderr)) {
-            throw new SecretError("locked", "the pass store is locked: unlock it (for example run `pass show` in a terminal) and try again");
+            throw new SecretError(
+                "locked",
+                "the pass store is locked: unlock it (for example run `pass show` in a terminal) and try again",
+            );
         }
         throw new SecretError("unavailable", "pass failed: check that pass and gpg work");
     }
@@ -122,7 +132,9 @@ export function createSecrets(options: SecretsOptions): Secrets {
         const account = slash < 0 ? "" : rest.slice(slash + 1);
         // Control characters and a leading dash do not belong in a service or account name; the dash would read as an option.
         const fine = (part: string) => part !== "" && !part.startsWith("-") && !/[\u0000-\u001f\u007f]/.test(part);
-        if (!fine(service) || !fine(account)) throw new SecretError("invalid_ref", "a keychain: reference is keychain:<service>/<account>");
+        if (!fine(service) || !fine(account)) {
+            throw new SecretError("invalid_ref", "a keychain: reference is keychain:<service>/<account>");
+        }
         const result = await runBackend("security", ["find-generic-password", "-s", service, "-a", account, "-w"], {}, signal);
         if (result.code !== 0) throw new SecretError("missing", "the keychain has no such item, or it is locked");
         return withoutFinalNewline(result.stdout);
@@ -138,7 +150,12 @@ export function createSecrets(options: SecretsOptions): Secrets {
     }
 
     /** Starts a backend program and turns "could not run" and "took too long" into one clear error each. */
-    async function runBackend(program: string, args: string[], backendEnv: Record<string, string>, signal: AbortSignal | undefined): Promise<RunResult> {
+    async function runBackend(
+        program: string,
+        args: string[],
+        backendEnv: Record<string, string>,
+        signal: AbortSignal | undefined,
+    ): Promise<RunResult> {
         let result: RunResult;
         try {
             result = await ask(program, args, backendEnv, signal);
@@ -153,10 +170,16 @@ export function createSecrets(options: SecretsOptions): Secrets {
         const parsed = parse(ref);
         if (parsed === undefined) {
             // The reference is not echoed: a pasted secret value must not end up in an error.
-            throw new SecretError("invalid_ref", "not a secret reference: use pass:<entry>, env:<NAME>, keychain:<service>/<account> or op://<vault>/<item>/<field>");
+            throw new SecretError(
+                "invalid_ref",
+                "not a secret reference: use pass:<entry>, env:<NAME>, keychain:<service>/<account> or op://<vault>/<item>/<field>",
+            );
         }
         if (!options.backends().includes(parsed.backend)) {
-            throw new SecretError("backend_disabled", `the ${parsed.backend} secret backend is not enabled: add "${parsed.backend}" to secrets.backends in jig.json`);
+            throw new SecretError(
+                "backend_disabled",
+                `the ${parsed.backend} secret backend is not enabled: add "${parsed.backend}" to secrets.backends in jig.json`,
+            );
         }
         let value: string;
         switch (parsed.backend) {
@@ -187,7 +210,8 @@ function parse(ref: string): { backend: SecretBackend; rest: string } | undefine
     const match = /^(pass|env|keychain):([\s\S]+)$/.exec(ref);
     if (match === null) return undefined;
     const backend = match[1] as string;
-    return (SECRET_BACKENDS as readonly string[]).includes(backend) ? { backend: backend as SecretBackend, rest: match[2] as string } : undefined;
+    if (!(SECRET_BACKENDS as readonly string[]).includes(backend)) return undefined;
+    return { backend: backend as SecretBackend, rest: match[2] as string };
 }
 
 function firstLine(text: string): string {

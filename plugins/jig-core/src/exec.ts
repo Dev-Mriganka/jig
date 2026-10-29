@@ -27,7 +27,11 @@ export const TIMEOUT_CODE = 124;
  * - `core.hooksPath`: hooks planted in `.git/hooks` run with the user's credentials; `/dev/null` has none. Hooks a
  *   team keeps on purpose (husky, git-lfs) do not run either.
  */
-export const GIT_FIXED_FLAGS: readonly string[] = ["-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "-c", "color.ui=false"];
+export const GIT_FIXED_FLAGS: readonly string[] = [
+    "-c", "core.fsmonitor=false",
+    "-c", "core.hooksPath=/dev/null",
+    "-c", "color.ui=false",
+];
 
 // ---- the environment ------------------------------------------------------------------------------------------------
 
@@ -38,7 +42,10 @@ const BASE_ENV = [
 ];
 
 /** What git also inherits: the user's own ssh agent and ssh command, so a push signs in the way the user set up. */
-const GIT_ENV = ["SSH_AUTH_SOCK", "GIT_SSH", "GIT_SSH_COMMAND", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM", "GIT_CONFIG_NOSYSTEM", "DBUS_SESSION_BUS_ADDRESS"];
+const GIT_ENV = [
+    "SSH_AUTH_SOCK", "GIT_SSH", "GIT_SSH_COMMAND", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM", "GIT_CONFIG_NOSYSTEM",
+    "DBUS_SESSION_BUS_ADDRESS",
+];
 
 /** Set for every git call. The values keep git from waiting for a person or running a pager, and a repository-local
  *  remote URL cannot pick a transport that runs commands (`ext::`). */
@@ -268,14 +275,22 @@ async function spawnProgram(
         child.stdout.on("data", (chunk: Buffer) => stdout.add(chunk));
         child.stderr.on("data", (chunk: Buffer) => stderr.add(chunk));
         child.once("error", (error: NodeJS.ErrnoException) => finish(() => {
-            if (error.code === "ENOENT") reject(new ExecError(existsSync(options.cwd ?? ".") ? `${what} is not installed or not on PATH` : `the working folder ${options.cwd} does not exist`));
-            else reject(new ExecError(`${what} could not start: ${error.message}`));
+            if (error.code === "ENOENT") {
+                // The same error code says the program is missing or the working folder is.
+                const folderExists = existsSync(options.cwd ?? ".");
+                reject(new ExecError(
+                    folderExists ? `${what} is not installed or not on PATH` : `the working folder ${options.cwd} does not exist`,
+                ));
+            } else {
+                reject(new ExecError(`${what} could not start: ${error.message}`));
+            }
         }));
         child.once("close", (code, signal) => finish(() => {
             if (stop === "aborted") return reject(new ExecError(`${what} was aborted`));
             if (stop === "timeout") return resolve({ code: TIMEOUT_CODE, stdout: stdout.text(), stderr: stderr.text(), timedOut: true });
             if (typeof code === "number") return resolve({ code, stdout: stdout.text(), stderr: stderr.text(), timedOut: false });
-            resolve({ code: 1, stdout: stdout.text(), stderr: stderr.text() || `${what} was stopped by ${signal ?? "a signal"}`, timedOut: false });
+            const stopped = `${what} was stopped by ${signal ?? "a signal"}`;
+            resolve({ code: 1, stdout: stdout.text(), stderr: stderr.text() || stopped, timedOut: false });
         }));
 
         timer = setTimeout(() => kill("timeout"), timeoutMs);

@@ -75,7 +75,8 @@ export interface LoadedConfig {
 /** Reads and checks the file. Never throws: every failure becomes a problem, and the defaults apply. `checks` holds the
  *  sections plugins registered, by name. */
 export function loadConfigFile(file: string, checks: ReadonlyMap<string, SectionCheck> = new Map()): LoadedConfig {
-    const failed = (problems: Problem[], found = true): LoadedConfig => ({ file, found, config: defaultConfig(), problems, sections: new Map() });
+    const failed = (problems: Problem[], found = true): LoadedConfig =>
+        ({ file, found, config: defaultConfig(), problems, sections: new Map() });
     let text: string;
     try {
         // A byte-order mark, which some editors add, is not part of the JSON.
@@ -183,7 +184,14 @@ function text(object: Record<string, unknown>, key: string, path: string, fail: 
     return value;
 }
 
-function choice<T extends string>(object: Record<string, unknown>, key: string, allowed: readonly T[], path: string, fail: Fail, required: boolean): T | undefined {
+function choice<T extends string>(
+    object: Record<string, unknown>,
+    key: string,
+    allowed: readonly T[],
+    path: string,
+    fail: Fail,
+    required: boolean,
+): T | undefined {
     const value = object[key];
     if (value === undefined) {
         if (required) fail(at(path, key), `is required: ${allowed.join(", ")}`);
@@ -408,7 +416,8 @@ export function floorViolation(rule: Rule, environments: Environments): string |
     const why = environments.isKnown(rule.environment)
         ? `"${rule.environment}" is production`
         : `"${rule.environment}" is not a defined environment, so it counts as production`;
-    return `"${rule.decision}" would let this rule decide production writes, which are always denied (${why}); give the rule effect "read", or decision "deny"`;
+    return `"${rule.decision}" would let this rule decide production writes, which are always denied (${why}); ` +
+        `give the rule effect "read", or decision "deny"`;
 }
 
 export function buildPolicy(personal: LoadedConfig, company: CompanyAdditions): Policy {
