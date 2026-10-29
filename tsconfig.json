@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "lib": ["ESNext"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "typeRoots": ["./.pi-host/node_modules/@types"],
+    "paths": {
+      "typebox": ["./.pi-host/node_modules/typebox/build/index.d.mts"],
+      "typebox/value": ["./.pi-host/node_modules/typebox/build/value/index.d.mts"],
+      "@earendil-works/pi-coding-agent": ["./.pi-host/dist/index.d.ts"],
+      "@earendil-works/pi-ai": ["./.pi-host/node_modules/@earendil-works/pi-ai/dist/index.d.ts"],
+      "@earendil-works/pi-tui": ["./.pi-host/node_modules/@earendil-works/pi-tui/dist/index.d.ts"],
+      "@earendil-works/pi-agent-core": ["./.pi-host/node_modules/@earendil-works/pi-agent-core/dist/index.d.ts"]
+    },
+    "baseUrl": "."
+  },
+  "include": ["plugins/**/*.ts", "test/**/*.ts"]
+}

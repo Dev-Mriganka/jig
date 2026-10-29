@@ -1,0 +1,32 @@
+{
+  "name": "jig",
+  "version": "0.1.0",
+  "private": true,
+  "description": "One tool manager and a set of plugins for the Pi coding agent: permissions per tool and environment, approvals, secrets and records.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "keywords": [
+    "pi-package"
+  ],
+  "scripts": {
+    "test": "node --import ./test/support/host.mjs --test \"plugins/*/test/*.test.ts\"",
+    "check": "node test/support/link-host.mjs && tsc -p tsconfig.json"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./plugins/jig-core/src/index.ts"
+    ]
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}
