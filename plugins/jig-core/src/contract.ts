@@ -211,6 +211,12 @@ export interface JigApi {
         addEnvironments(environments: Readonly<Record<EnvironmentName, EnvironmentConfig>>): void;
         addRules(rules: readonly Rule[]): void;
         addClassifyRules(rules: readonly ClassifyRule[]): void;
+        /** A plugin's own section of jig.json, such as `git` or `lens`. jig-core reports a top-level key that
+         *  neither jig-core nor a plugin registered as an unknown field. `validate` returns error messages that
+         *  name the key; with errors, `section()` returns undefined and the plugin uses its defaults. */
+        registerSection(name: string, validate: (raw: unknown) => readonly string[]): void;
+        /** The section as loaded at the last session start, after validation. Undefined when absent or invalid. */
+        section(name: string): unknown;
     };
 
     /** Runs programs from an argument list, never a shell. */

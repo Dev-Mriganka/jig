@@ -102,6 +102,11 @@ environments and classification rules at start-up.
 An unknown field is an error. It names the file and the key, and the plugin
 starts with the defaults rather than guessing.
 
+A plugin can own a section of this file too, such as `memory` for
+`jig-memory`. It registers the section with a check function, and jig-core
+reports any top-level key that no plugin registered as unknown. A section with
+errors is reported with its keys named, and the plugin uses its defaults.
+
 ## What asks, what is blocked
 
 The default table:
