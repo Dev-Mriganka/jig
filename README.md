@@ -7,6 +7,18 @@ and record what happened so you can see it later.
 **Status: design only.** This repository holds Markdown documents, no code yet.
 Each plugin's README is the specification that its code will follow.
 
+## Where Jig sits
+
+![Jig is the harness you own, around Pi, which is the harness its builders made around the model; a dashed outer ring is a later team harness](docs/img/harnesses.svg)
+
+*Three harnesses, one inside the other, in [Birgitta Böckeler's](https://martinfowler.com/articles/harness-engineering.html) terms: the model is what gets harnessed, Pi's builders made the inner harness, and Jig is yours. A team harness would be the next ring if a team adopts Jig, and shared organizational memory would live there.*
+
+## How Jig steers the agent
+
+![Guides feed forward into Pi before it acts, sensors feed back after it acts, and you steer by changing both](docs/img/harness-at-a-glance.svg)
+
+*Guides go forward into Pi before it acts, sensors feed back after it acts, and you steer by changing both. A star marks a model deciding, a dot a program, a figure a person, and a dashed outline something planned for later.*
+
 ## The plugins
 
 | Plugin | What it does |
@@ -26,6 +38,10 @@ Each plugin's README is the specification that its code will follow.
 | [`jig-agents`](plugins/jig-agents/README.md) | Subagents in terminal panes |
 
 Every plugin needs `jig-core`; otherwise they work on their own.
+
+![Layers from Pi at the bottom, through jig-core, the generic plugins and other packages' tools, to your private company plugin on top](docs/img/what-lives-where.svg)
+
+*What lives where. Everything below the company plugin goes with you to any job; the company plugin stays private and only configures the generic plugins or adds backends and knowledge to them.*
 
 **Company parts never go into this repository.** These are a company's
 environment names, sign-in service, internal tools and backends. They live in

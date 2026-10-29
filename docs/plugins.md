@@ -4,6 +4,10 @@ This is the map of every tool the agent uses and the plugin it belongs to.
 Generic plugins live in this repository and go with you to any job. Company
 parts live in a private company plugin kept at the company.
 
+![Layers from Pi at the bottom, through jig-core, the generic plugins and other packages' tools, to your private company plugin on top](img/what-lives-where.svg)
+
+*What lives where. Everything below the company plugin goes with you to any job; the company plugin stays private and only configures the generic plugins or adds backends and knowledge to them.*
+
 ## Tools that need no plugin
 
 | Tool | Where it comes from | How Jig handles it |
@@ -31,6 +35,12 @@ parts live in a private company plugin kept at the company.
 | [`jig-scripts`](../plugins/jig-scripts/README.md) | `script`: list, run | the scripts themselves | 7 |
 | [`jig-review`](../plugins/jig-review/README.md) | `start_interactive_code_review`, `record_interactive_review_resolution` | none | 8 |
 | [`jig-agents`](../plugins/jig-agents/README.md) | `subagent`, `subagent_message`, `subagent_status`, `subagent_interrupt`, `subagent_done`, `caller_ping` | which model each role uses | 8, unless a store package replaces it |
+
+## How company parts plug in
+
+![The same generic jira tool set up by two companies, each with its own site, sign-in, ticket key pattern and overlay skill](img/company-plugs-in.svg)
+
+*The difference between companies is configuration and knowledge, not code: each company plugin supplies its own site, sign-in, ticket key pattern and an overlay skill, which is its own rules added to the plugin's skill. The `jira` tool stays the same.*
 
 ## What stays in the company plugin
 

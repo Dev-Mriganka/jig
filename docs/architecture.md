@@ -37,6 +37,13 @@ tool_execution_start → tool_call → tool_execution_update → tool_result →
 
 ## One call, end to end
 
+![Every tool call passes through jig-core's hooks before and after it runs](img/one-call.svg)
+
+*Every call passes through the same three hooks. A call that is denied, or that you decline, never runs; what does run has its result masked, redacted and capped, and every call is recorded.*
+
+<details>
+<summary>Text version</summary>
+
 ```text
  the model asks for a tool call        e.g. mongo find {env: "prod"}, or bash "git push"
         │
@@ -74,6 +81,8 @@ tool_execution_start → tool_call → tool_execution_update → tool_result →
         ▼
  the result goes to the model
 ```
+
+</details>
 
 ## What the tool manager can and cannot control
 

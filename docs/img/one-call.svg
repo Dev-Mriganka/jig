@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="800" viewBox="0 0 1000 800" role="img" aria-label="One tool call, end to end. The model asks for a call. The tool_call hook in jig-core identifies the tool, classifies its environment and effect, decides allow, ask or deny, asks you only when the rule says ask, and either blocks the call or lets it run. The tool runs. The tool_result hook masks, redacts and caps the result. The tool_execution_end hook records the call. The result goes to the model. A denied call, or one you decline, is blocked and never runs." font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">
+  <rect x="0.5" y="0.5" width="999" height="799" rx="10" fill="#FAFBFA" stroke="#D2D9D3"/>
+  <defs>
+    <marker id="onecall-head-1d3b4d-11" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#1D3B4D"/></marker>
+    <marker id="onecall-head-2c7a4b-11" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#2C7A4B"/></marker>
+    <marker id="onecall-head-c08326-11" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#C08326"/></marker>
+    <marker id="onecall-head-a93c27-11" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#A93C27"/></marker>
+  </defs>
+  <!-- the model asks -->
+  <rect x="40" y="20" width="920" height="56" fill="#5D4B7C"/>
+  <text x="500" y="44" font-size="16" fill="#FFFFFF" font-weight="700" text-anchor="middle">The model asks for a tool call</text>
+  <text x="500" y="63" font-size="13" fill="#E9E4F2" text-anchor="middle">for example  mongo find {env: &quot;prod&quot;},  or  bash &quot;git push&quot;</text>
+  <path d="M500 76 V98" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#onecall-head-1d3b4d-11)"/>
+  <!-- tool_call hook -->
+  <rect x="40" y="100" width="920" height="238" fill="#E8ECEE"/>
+  <rect x="40" y="100" width="920" height="32" fill="#1D3B4D"/>
+  <text x="56" y="122" font-size="15" fill="#FFFFFF"><tspan font-weight="700">tool_call hook</tspan><tspan fill="#D9E3E8">  ·  jig-core</tspan></text>
+  <text x="944" y="121" font-size="13" fill="#D9E3E8" text-anchor="end">before the tool runs</text>
+  <circle cx="70" cy="155" r="11" fill="#5C9CAB"/>
+  <text x="70" y="159.5" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">1</text>
+  <text x="92" y="160" font-size="14.5" fill="#1A1F1D" font-weight="700">identify</text>
+  <text x="200" y="160" font-size="13" fill="#3A4440">which tool, from which plugin</text>
+  <circle cx="70" cy="187" r="11" fill="#5C9CAB"/>
+  <text x="70" y="191.5" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">2</text>
+  <text x="92" y="192" font-size="14.5" fill="#1A1F1D" font-weight="700">classify</text>
+  <text x="200" y="192" font-size="13" fill="#3A4440">environment and effect, from the tool's declaration, a rule, its hints, or the default</text>
+  <circle cx="70" cy="219" r="11" fill="#5C9CAB"/>
+  <text x="70" y="223.5" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">3</text>
+  <text x="92" y="224" font-size="14.5" fill="#1A1F1D" font-weight="700">decide</text>
+  <text x="200" y="224" font-size="13" fill="#3A4440">the rules table gives allow, ask or deny; your configuration can only make it stricter</text>
+  <text x="60" y="254" font-size="13" fill="#1A1F1D" font-weight="700">4 ask, only when the rule says ask   ·   5 block, or let it run</text>
+  <rect x="60" y="264" width="270" height="62" rx="6" fill="#E2F1E7" stroke="#2C7A4B" stroke-width="1.6"/>
+  <text x="195" y="288" font-size="15" fill="#2C7A4B" font-weight="700" text-anchor="middle">allow</text>
+  <text x="195" y="308" font-size="13" fill="#3A4440" text-anchor="middle">the tool runs</text>
+  <rect x="365" y="264" width="270" height="62" rx="6" fill="#FBF5EA" stroke="#C08326" stroke-width="1.6"/>
+  <circle cx="390" cy="283" r="4.8" fill="#C08326"/>
+  <path d="M382.2 297.4 Q382.2 289 390 289 Q397.8 289 397.8 297.4 Z" fill="#C08326"/>
+  <text x="512" y="284" font-size="15" fill="#8A5A12" font-weight="700" text-anchor="middle">ask</text>
+  <text x="512" y="302" font-size="13" fill="#3A4440" text-anchor="middle">you answer y or n,</text>
+  <text x="512" y="318" font-size="13" fill="#3A4440" text-anchor="middle">inside this waiting call</text>
+  <rect x="670" y="264" width="270" height="62" rx="6" fill="#F7E4DF" stroke="#A93C27" stroke-width="1.6"/>
+  <text x="805" y="284" font-size="15" fill="#A93C27" font-weight="700" text-anchor="middle">deny</text>
+  <text x="805" y="302" font-size="13" fill="#3A4440" text-anchor="middle">block it. Always for production writes,</text>
+  <text x="805" y="318" font-size="13" fill="#3A4440" text-anchor="middle">and for ask when there is no screen</text>
+  <!-- the fork: allow, ask (y or n), deny -->
+  <path d="M195 330 V386" fill="none" stroke="#2C7A4B" stroke-width="2.4" marker-end="url(#onecall-head-2c7a4b-11)"/>
+  <path d="M440 330 V386" fill="none" stroke="#C08326" stroke-width="2.4" marker-end="url(#onecall-head-c08326-11)"/>
+  <text x="452" y="362" font-size="13" fill="#8A5A12" font-weight="700">y</text>
+  <path d="M585 330 V360 H820 V386" fill="none" stroke="#C08326" stroke-width="2.4" marker-end="url(#onecall-head-c08326-11)"/>
+  <text x="597" y="355" font-size="13" fill="#8A5A12" font-weight="700">n</text>
+  <path d="M880 330 V386" fill="none" stroke="#A93C27" stroke-width="2.4" marker-end="url(#onecall-head-a93c27-11)"/>
+  <!-- the tool runs, or the call is blocked -->
+  <rect x="60" y="390" width="500" height="62" rx="6" fill="#5C9CAB"/>
+  <text x="310" y="415" font-size="15" fill="#FFFFFF" font-weight="700" text-anchor="middle">the tool runs</text>
+  <text x="310" y="435" font-size="12.5" fill="#FFFFFF" text-anchor="middle">its own code; Jig tools get secrets from jig-core and mask their results</text>
+  <rect x="640" y="390" width="300" height="62" rx="6" fill="#F7E4DF" stroke="#A93C27" stroke-width="1.6"/>
+  <text x="790" y="415" font-size="15" fill="#A93C27" font-weight="700" text-anchor="middle">blocked</text>
+  <text x="790" y="435" font-size="12.5" fill="#3A4440" text-anchor="middle">the tool never runs; the model is told why</text>
+  <path d="M310 452 V482" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#onecall-head-1d3b4d-11)"/>
+  <!-- tool_result hook -->
+  <rect x="40" y="484" width="920" height="124" fill="#E8ECEE"/>
+  <rect x="40" y="484" width="920" height="32" fill="#1D3B4D"/>
+  <text x="56" y="506" font-size="15" fill="#FFFFFF"><tspan font-weight="700">tool_result hook</tspan><tspan fill="#D9E3E8">  ·  jig-core</tspan></text>
+  <text x="944" y="505" font-size="13" fill="#D9E3E8" text-anchor="end">after the tool runs</text>
+  <circle cx="70" cy="539" r="11" fill="#5C9CAB"/>
+  <text x="70" y="543.5" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">6</text>
+  <text x="92" y="544" font-size="14.5" fill="#1A1F1D" font-weight="700">mask</text>
+  <text x="200" y="544" font-size="13" fill="#3A4440">production results: personal data becomes tokens, the backstop for tools that do not mask</text>
+  <circle cx="70" cy="567" r="11" fill="#5C9CAB"/>
+  <text x="70" y="571.5" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">7</text>
+  <text x="92" y="572" font-size="14.5" fill="#1A1F1D" font-weight="700">redact</text>
+  <text x="200" y="572" font-size="13" fill="#3A4440">every known secret value is removed</text>
+  <circle cx="70" cy="595" r="11" fill="#5C9CAB"/>
+  <text x="70" y="599.5" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">8</text>
+  <text x="92" y="600" font-size="14.5" fill="#1A1F1D" font-weight="700">cap</text>
+  <text x="200" y="600" font-size="13" fill="#3A4440">long output is cut for the model, and the full result goes to a spill file</text>
+  <path d="M310 608 V640" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#onecall-head-1d3b4d-11)"/>
+  <path d="M790 452 V640" fill="none" stroke="#A93C27" stroke-width="2.4" stroke-dasharray="6 4" marker-end="url(#onecall-head-a93c27-11)"/>
+  <!-- tool_execution_end hook -->
+  <rect x="40" y="642" width="920" height="68" fill="#E8ECEE"/>
+  <rect x="40" y="642" width="920" height="32" fill="#1D3B4D"/>
+  <text x="56" y="664" font-size="15" fill="#FFFFFF"><tspan font-weight="700">tool_execution_end hook</tspan><tspan fill="#D9E3E8">  ·  jig-core</tspan></text>
+  <text x="944" y="663" font-size="13" fill="#D9E3E8" text-anchor="end">the call is over</text>
+  <circle cx="70" cy="691" r="11" fill="#5C9CAB"/>
+  <text x="70" y="695.5" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">9</text>
+  <text x="92" y="696" font-size="14.5" fill="#1A1F1D" font-weight="700">record</text>
+  <text x="200" y="696" font-size="13" fill="#3A4440">one line: tool, environment, effect, decision, your answer, time waited, outcome, duration</text>
+  <path d="M500 710 V732" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#onecall-head-1d3b4d-11)"/>
+  <!-- the result goes to the model -->
+  <rect x="40" y="734" width="920" height="50" fill="#5D4B7C"/>
+  <text x="500" y="756" font-size="16" fill="#FFFFFF" font-weight="700" text-anchor="middle">The result goes to the model</text>
+  <text x="500" y="774" font-size="13" fill="#E9E4F2" text-anchor="middle">or the refusal, if the call was blocked</text>
+</svg>

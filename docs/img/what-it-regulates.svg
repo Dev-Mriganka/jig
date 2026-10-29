@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560" role="img" aria-label="A harness frame with a guides row and a sensors row, crossed by four columns: maintainability, compatibility, behaviour and data safety, each with its own guides and sensors." font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">
+  <rect x="0.5" y="0.5" width="1199" height="559" rx="10" fill="#FAFBFA" stroke="#D2D9D3"/>
+  <!-- frame and rows -->
+  <rect x="30" y="70" width="1140" height="400" fill="#1D3B4D"/>
+  <text x="60" y="114" font-size="30" fill="#FFFFFF" font-weight="700">Harness</text>
+  <rect x="70" y="135" width="1060" height="130" fill="#E8ECEE"/>
+  <text x="88" y="174" font-size="22" fill="#1A1F1D" font-weight="700">Guides</text>
+  <rect x="70" y="295" width="1060" height="155" fill="#E8ECEE"/>
+  <text x="88" y="334" font-size="22" fill="#1A1F1D" font-weight="700">Sensors</text>
+  <!-- the four things it regulates -->
+  <rect x="200" y="40" width="56" height="470" fill="#1D3B4D" stroke="#FFFFFF" stroke-width="2.5"/>
+  <text x="236" y="275" font-size="21" fill="#FFFFFF" font-weight="700" text-anchor="middle" transform="rotate(-90 236 275)">Maintainability</text>
+  <rect x="430" y="40" width="56" height="470" fill="#1D3B4D" stroke="#FFFFFF" stroke-width="2.5"/>
+  <text x="466" y="275" font-size="21" fill="#FFFFFF" font-weight="700" text-anchor="middle" transform="rotate(-90 466 275)">Compatibility</text>
+  <rect x="660" y="40" width="56" height="470" fill="#1D3B4D" stroke="#FFFFFF" stroke-width="2.5"/>
+  <text x="696" y="275" font-size="21" fill="#E7B55B" font-weight="700" text-anchor="middle" transform="rotate(-90 696 275)">Behaviour</text>
+  <rect x="890" y="40" width="56" height="470" fill="#1D3B4D" stroke="#FFFFFF" stroke-width="2.5"/>
+  <text x="926" y="275" font-size="21" fill="#FFFFFF" font-weight="700" text-anchor="middle" transform="rotate(-90 926 275)">Data safety</text>
+  <!-- guides -->
+  <polygon points="266,160 404,160 416,176 404,192 266,192" fill="#DF6A7C"/>
+  <text x="338" y="180.55" font-size="13" fill="#FFFFFF" text-anchor="middle">AGENTS.md</text>
+  <polygon points="266,206 404,206 416,222 404,238 266,238" fill="#DF6A7C"/>
+  <text x="338" y="226.55" font-size="13" fill="#FFFFFF" text-anchor="middle">skills</text>
+  <polygon points="496,160 634,160 646,176 634,192 496,192" fill="#DF6A7C"/>
+  <text x="568" y="180.55" font-size="13" fill="#FFFFFF" text-anchor="middle">approved plan</text>
+  <polygon points="496,206 634,206 646,222 634,238 496,238" fill="#FFFFFF" stroke="#DF6A7C" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="568" y="226.55" font-size="13" fill="#B6475A" text-anchor="middle">related tickets</text>
+  <polygon points="726,160 864,160 876,176 864,192 726,192" fill="#DF6A7C"/>
+  <text x="798" y="180.55" font-size="13" fill="#FFFFFF" text-anchor="middle">scenarios in plan</text>
+  <polygon points="726,206 864,206 876,222 864,238 726,238" fill="#5C9CAB"/>
+  <text x="798" y="226.55" font-size="13" fill="#FFFFFF" text-anchor="middle">flow gates</text>
+  <polygon points="956,160 1094,160 1106,176 1094,192 956,192" fill="#5C9CAB"/>
+  <text x="1028" y="180.55" font-size="13" fill="#FFFFFF" text-anchor="middle">approved fields</text>
+  <polygon points="956,206 1094,206 1106,222 1094,238 956,238" fill="#5C9CAB"/>
+  <text x="1028" y="226.55" font-size="13" fill="#FFFFFF" text-anchor="middle">the floor</text>
+  <!-- sensors -->
+  <polygon points="278,318 416,318 416,350 278,350 266,334" fill="#FFFFFF" stroke="#5C9CAB" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="344" y="338.55" font-size="13" fill="#3B7C8A" text-anchor="middle">diff rules</text>
+  <polygon points="278,362 416,362 416,394 278,394 266,378" fill="#FFFFFF" stroke="#DF6A7C" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="344" y="382.55" font-size="13" fill="#B6475A" text-anchor="middle">checker agent</text>
+  <polygon points="508,318 646,318 646,350 508,350 496,334" fill="#FFFFFF" stroke="#5C9CAB" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="574" y="338.55" font-size="13" fill="#3B7C8A" text-anchor="middle">compile</text>
+  <polygon points="508,362 646,362 646,394 508,394 496,378" fill="#FFFFFF" stroke="#5C9CAB" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="574" y="382.55" font-size="13" fill="#3B7C8A" text-anchor="middle">affected tests</text>
+  <polygon points="738,318 876,318 876,350 738,350 726,334" fill="#5C9CAB"/>
+  <text x="804" y="338.55" font-size="13" fill="#FFFFFF" text-anchor="middle">tests at HEAD</text>
+  <polygon points="738,362 876,362 876,394 738,394 726,378" fill="#5C9CAB"/>
+  <text x="804" y="382.55" font-size="13" fill="#FFFFFF" text-anchor="middle">scenario results</text>
+  <polygon points="738,406 876,406 876,438 738,438 726,422" fill="#C08326"/>
+  <text x="804" y="426.55" font-size="13" fill="#FFFFFF" text-anchor="middle">you, in acceptance</text>
+  <polygon points="968,318 1106,318 1106,350 968,350 956,334" fill="#5C9CAB"/>
+  <text x="1034" y="338.55" font-size="13" fill="#FFFFFF" text-anchor="middle">masking</text>
+  <polygon points="968,362 1106,362 1106,394 968,394 956,378" fill="#5C9CAB"/>
+  <text x="1034" y="382.55" font-size="13" fill="#FFFFFF" text-anchor="middle">redaction</text>
+  <!-- legend -->
+  <rect x="30" y="523" width="14" height="14" rx="2" fill="#DF6A7C"/>
+  <text x="54" y="534.5" font-size="13" fill="#1A1F1D">a model decides</text>
+  <rect x="177.3" y="523" width="14" height="14" rx="2" fill="#5C9CAB"/>
+  <text x="201.3" y="534.5" font-size="13" fill="#1A1F1D">a program decides</text>
+  <rect x="338.51" y="523" width="14" height="14" rx="2" fill="#C08326"/>
+  <text x="362.51" y="534.5" font-size="13" fill="#1A1F1D">a person</text>
+  <rect x="438.64" y="524" width="17" height="12" fill="#FFFFFF" stroke="#1D3B4D" stroke-width="1.4" stroke-dasharray="3 2"/>
+  <text x="462.64" y="534.5" font-size="13" fill="#1A1F1D">planned for later</text>
+</svg>

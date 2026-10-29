@@ -30,6 +30,12 @@ The agent answers each comment, and a new round shows what changed.
 
 `/code-review settings` opens the review settings.
 
+## Later: after a checker agent
+
+![A fresh-context checker reviews the change first: a pass goes to your code review, a revise goes back to the maker, and after two rounds you decide](../../docs/img/fresh-checker.svg)
+
+*A read-only checker agent in a fresh context reviews the change before this review (see [`jig-flow`](../jig-flow/README.md)): a pass goes to your code review, a revise goes back to the maker with findings, and after two rounds the decision comes to you with both reports.*
+
 ## Security
 
 The page is served on `127.0.0.1`, on a random port. Its link carries a

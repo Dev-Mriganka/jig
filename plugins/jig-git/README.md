@@ -119,6 +119,10 @@ A watch runs on `jig-core`'s watch engine, outside the sandbox, and the call
 that starts it returns at once. `jig-git` supplies what to poll on GitHub and
 when the watch is done.
 
+![A push or checks watch starts a watch that polls GitHub until a finish line is reached; one message wakes the agent, and an artifact-ready event may lead a company plugin to deploy, only through jig-core](../../docs/img/ci-watch.svg)
+
+*From a push to a wake-up: the watch polls GitHub until its finish line, one message starts the agent's turn, and an artifact-ready event may lead a company plugin to deploy, but only through `ctx.executeTool`, so `jig-core` still asks for a test environment unless a rule allows it, and denies production.*
+
 1. **It starts by itself** after `git push` and `pr create` (setting
    `watch.auto`), or when the agent calls `checks watch`.
 2. **Its finish line is explicit, never "all checks".** It can be:

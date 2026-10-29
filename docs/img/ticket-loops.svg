@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1140" height="756" viewBox="0 0 1140 756" role="img" aria-label="A ticket over time. Feedforward guides on the left go into Pi before it writes code. Feedback comes back on the right at four points: the edit loop with its checks; the checker loop; your one approval; and after the pull request, where CI, reviews, teammates and the QA environment report back as new commits through the review ledger." font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">
+  <rect x="0.5" y="0.5" width="1139" height="755" rx="10" fill="#FAFBFA" stroke="#D2D9D3"/>
+  <defs>
+    <marker id="loops-head-5d4b7c-28" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="28" markerHeight="28" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#5D4B7C"/></marker>
+  </defs>
+  <text x="60" y="48" font-size="26" fill="#1A1F1D" font-weight="700">A ticket: feedforward and feedback over time</text>
+  <!-- time runs downward -->
+  <polygon points="14,84 44,84 44,692 29,724 14,692" fill="#6B6B6B"/>
+  <text x="37" y="410" font-size="20" fill="#FFFFFF" font-weight="700" text-anchor="middle" transform="rotate(-90 37 410)">Time</text>
+  <!-- column headers -->
+  <polygon points="60,84 466,84 496,104 466,124 60,124" fill="#6B6B6B"/>
+  <text x="263" y="112" font-size="22" fill="#FFFFFF" font-weight="700" text-anchor="middle">Feedforward</text>
+  <polygon points="642,104 672,84 1126,84 1126,124 672,124" fill="#6B6B6B"/>
+  <text x="900" y="112" font-size="22" fill="#FFFFFF" font-weight="700" text-anchor="middle">Feedback</text>
+  <!-- feedforward: the guides -->
+  <polygon points="60,134 470,134 496,222 470,310 60,310" fill="#E8ECEE"/>
+  <polygon points="72,146 186,146 196,165 186,184 72,184" fill="#DF6A7C"/>
+  <text x="131" y="169.38" font-size="12.5" fill="#FFFFFF" text-anchor="middle">AGENTS.md</text>
+  <polygon points="204,146 318,146 328,165 318,184 204,184" fill="#DF6A7C"/>
+  <text x="263" y="169.38" font-size="12.5" fill="#FFFFFF" text-anchor="middle">skills</text>
+  <polygon points="336,146 450,146 460,165 450,184 336,184" fill="#5C9CAB"/>
+  <text x="395" y="161.75" font-size="12.5" fill="#FFFFFF" text-anchor="middle">rules and</text>
+  <text x="395" y="177" font-size="12.5" fill="#FFFFFF" text-anchor="middle">the floor</text>
+  <polygon points="72,192 186,192 196,211 186,230 72,230" fill="#DF6A7C"/>
+  <text x="131" y="215.38" font-size="12.5" fill="#FFFFFF" text-anchor="middle">approved plan</text>
+  <polygon points="204,192 318,192 328,211 318,230 204,230" fill="#DF6A7C"/>
+  <text x="263" y="215.38" font-size="12.5" fill="#FFFFFF" text-anchor="middle">ticket notes</text>
+  <polygon points="336,192 450,192 460,211 450,230 336,230" fill="#5C9CAB"/>
+  <text x="395" y="215.38" font-size="12.5" fill="#FFFFFF" text-anchor="middle">flow gates</text>
+  <polygon points="72,238 186,238 196,257 186,276 72,276" fill="#FFFFFF" stroke="#DF6A7C" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="131" y="261.38" font-size="12.5" fill="#B6475A" text-anchor="middle">related tickets</text>
+  <polygon points="204,238 318,238 328,257 318,276 204,276" fill="#FFFFFF" stroke="#DF6A7C" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="263" y="253.75" font-size="12.5" fill="#B6475A" text-anchor="middle">organizational</text>
+  <text x="263" y="269" font-size="12.5" fill="#B6475A" text-anchor="middle">facts</text>
+  <polygon points="336,238 450,238 460,257 450,276 336,276" fill="#FFFFFF" stroke="#DF6A7C" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="395" y="261.38" font-size="12.5" fill="#B6475A" text-anchor="middle">personal facts</text>
+  <!-- Pi in the middle -->
+  <rect x="500" y="134" width="130" height="408" fill="#5D4B7C"/>
+  <text x="565" y="178" font-size="30" fill="#FFFFFF" font-weight="700" text-anchor="middle">Pi</text>
+  <text x="565" y="202" font-size="14" fill="#FFFFFF" text-anchor="middle">coding agent</text>
+  <path d="M579.72 255.5 A17 17 0 1 1 555.25 250.07" fill="none" stroke="#FFFFFF" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <polygon points="563.15,244.55 558.67,256.71 550.19,244.59" fill="#FFFFFF"/>
+  <path d="M579.72 350.5 A17 17 0 1 1 555.25 345.07" fill="none" stroke="#FFFFFF" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <polygon points="563.15,339.55 558.67,351.71 550.19,339.59" fill="#FFFFFF"/>
+  <path d="M579.72 440.5 A17 17 0 1 1 555.25 435.07" fill="none" stroke="#FFFFFF" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <polygon points="563.15,429.55 558.67,441.71 550.19,429.59" fill="#FFFFFF"/>
+  <polygon points="490,576 565,548 640,576 565,604" fill="#6B6B6B"/>
+  <text x="565" y="581" font-size="14" fill="#FFFFFF" font-weight="700" text-anchor="middle">open the PR</text>
+  <!-- initial generation -->
+  <polygon points="670,134 1126,134 1126,204 670,204 642,169" fill="#E8ECEE"/>
+  <text x="1112" y="176" font-size="18" fill="#1A1F1D" font-weight="700" text-anchor="end">Initial generation</text>
+  <!-- 1 the edit loop -->
+  <polygon points="670,214 1126,214 1126,314 670,314 642,264" fill="#E8ECEE"/>
+  <text x="1112" y="244" font-size="18" fill="#1A1F1D" font-weight="700" text-anchor="end">1 Edit loop</text>
+  <text x="1112" y="264" font-size="12.5" fill="#3A4440" text-anchor="end">before each commit</text>
+  <polygon points="696,226 816,226 816,260 696,260 686,243" fill="#FFFFFF" stroke="#5C9CAB" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="754" y="247.55" font-size="13" fill="#3B7C8A" text-anchor="middle">compile</text>
+  <polygon points="836,226 956,226 956,260 836,260 826,243" fill="#FFFFFF" stroke="#5C9CAB" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="894" y="247.55" font-size="13" fill="#3B7C8A" text-anchor="middle">affected tests</text>
+  <polygon points="696,270 816,270 816,304 696,304 686,287" fill="#FFFFFF" stroke="#5C9CAB" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="754" y="291.55" font-size="13" fill="#3B7C8A" text-anchor="middle">diff rules</text>
+  <polygon points="836,270 956,270 956,304 836,304 826,287" fill="#FFFFFF" stroke="#5C9CAB" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="894" y="291.55" font-size="13" fill="#3B7C8A" text-anchor="middle">full run</text>
+  <!-- 2 the checker loop -->
+  <polygon points="670,324 1126,324 1126,394 670,394 642,359" fill="#E8ECEE"/>
+  <text x="1112" y="354" font-size="18" fill="#1A1F1D" font-weight="700" text-anchor="end">2 Checker loop</text>
+  <text x="1112" y="374" font-size="12.5" fill="#3A4440" text-anchor="end">2 rounds at most</text>
+  <polygon points="696,336 816,336 816,370 696,370 686,353" fill="#FFFFFF" stroke="#DF6A7C" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="754" y="357.55" font-size="13" fill="#B6475A" text-anchor="middle">checker agent</text>
+  <polygon points="836,336 956,336 956,370 836,370 826,353" fill="#FFFFFF" stroke="#5C9CAB" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="894" y="357.55" font-size="13" fill="#3B7C8A" text-anchor="middle">scenarios on test</text>
+  <!-- 3 your review -->
+  <polygon points="670,404 1126,404 1126,494 670,494 642,449" fill="#E8ECEE"/>
+  <text x="1112" y="436" font-size="18" fill="#1A1F1D" font-weight="700" text-anchor="end">3 Your review</text>
+  <text x="1112" y="456" font-size="12.5" fill="#3A4440" text-anchor="end">one approval per change</text>
+  <circle cx="710" cy="435" r="9.6" fill="#C08326"/>
+  <path d="M694.4 463.8 Q694.4 447 710 447 Q725.6 447 725.6 463.8 Z" fill="#C08326"/>
+  <rect x="760" y="424" width="176" height="50" rx="4" fill="#FFFFFF" stroke="#DF6A7C" stroke-width="1.6"/>
+  <text x="848" y="446" font-size="13" fill="#B6475A" text-anchor="middle">all the evidence</text>
+  <text x="848" y="463" font-size="13" fill="#B6475A" text-anchor="middle">on one page</text>
+  <!-- 4 the delivery loop -->
+  <polygon points="670,560 1126,560 1126,710 670,710 642,635" fill="#E8ECEE"/>
+  <text x="1112" y="590" font-size="18" fill="#1A1F1D" font-weight="700" text-anchor="end">4 Delivery loop</text>
+  <text x="1112" y="610" font-size="12.5" fill="#3A4440" text-anchor="end">CI and reviews,</text>
+  <text x="1112" y="627" font-size="12.5" fill="#3A4440" text-anchor="end">comments go to</text>
+  <text x="1112" y="644" font-size="12.5" fill="#3A4440" text-anchor="end">the review ledger</text>
+  <polygon points="696,572 816,572 816,606 696,606 686,589" fill="#5C9CAB"/>
+  <text x="754" y="593.55" font-size="13" fill="#FFFFFF" text-anchor="middle">CI checks</text>
+  <polygon points="836,572 956,572 956,606 836,606 826,589" fill="#DF6A7C"/>
+  <text x="894" y="593.55" font-size="13" fill="#FFFFFF" text-anchor="middle">Copilot review</text>
+  <polygon points="696,616 816,616 816,650 696,650 686,633" fill="#5C9CAB"/>
+  <text x="754" y="637.55" font-size="13" fill="#FFFFFF" text-anchor="middle">deploy to QA</text>
+  <polygon points="836,616 956,616 956,650 836,650 826,633" fill="#FFFFFF" stroke="#5C9CAB" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="894" y="637.55" font-size="13" fill="#3B7C8A" text-anchor="middle">QA scenarios</text>
+  <polygon points="696,660 816,660 816,694 696,694 686,677" fill="#5C9CAB"/>
+  <text x="754" y="681.55" font-size="13" fill="#FFFFFF" text-anchor="middle">logs</text>
+  <polygon points="836,660 956,660 956,694 836,694 826,677" fill="#C08326"/>
+  <text x="894" y="681.55" font-size="13" fill="#FFFFFF" text-anchor="middle">teammates</text>
+  <!-- findings come back as new commits -->
+  <path d="M644 635 H440 V470 H494" fill="none" stroke="#5D4B7C" stroke-width="10" marker-end="url(#loops-head-5d4b7c-28)"/>
+  <text x="60" y="536" font-size="14" fill="#3A4440" font-style="italic">Review and CI findings come</text>
+  <text x="60" y="557" font-size="14" fill="#3A4440" font-style="italic">back through the review ledger</text>
+  <text x="60" y="578" font-size="14" fill="#3A4440" font-style="italic">and become new commits.</text>
+  <!-- legend -->
+  <rect x="60" y="646" width="270" height="76" fill="none" stroke="#8C979D" stroke-width="1.3" stroke-dasharray="5 4"/>
+  <rect x="74" y="661" width="14" height="14" rx="2" fill="#DF6A7C"/>
+  <text x="98" y="672.5" font-size="13" fill="#1A1F1D">a model</text>
+  <rect x="190" y="661" width="14" height="14" rx="2" fill="#5C9CAB"/>
+  <text x="214" y="672.5" font-size="13" fill="#1A1F1D">a program</text>
+  <rect x="74" y="691" width="14" height="14" rx="2" fill="#C08326"/>
+  <text x="98" y="702.5" font-size="13" fill="#1A1F1D">a person</text>
+  <rect x="190" y="692" width="17" height="12" fill="#FFFFFF" stroke="#1D3B4D" stroke-width="1.4" stroke-dasharray="3 2"/>
+  <text x="214" y="702.5" font-size="13" fill="#1A1F1D">planned for later</text>
+</svg>
