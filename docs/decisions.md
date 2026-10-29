@@ -53,6 +53,19 @@ its own safety pipeline.
   several containers; Phoenix's licence is not open source, and its dashboards
   are fixed. An export to MLflow can come later, as a copy.
 
+## 2026-10-30: jig-git has five tools, and a watch that knows when it is done
+
+- **Five tools:** `git`, `pr`, `checks`, `watch` and `release`. They come from an
+  inventory of two months of sessions plus standard needs. Most of `git` and
+  `pr` is ported from the existing harness.
+- **A watch has an explicit finish line,** never "all checks". In the
+  sessions, slow optional checks stayed pending for hours after the step that
+  mattered had passed.
+- **`jig-git` never deploys.** It publishes "artifact ready"; a company plugin
+  decides, within the rule above for automatic deploys.
+- **Left out:** starting workflows by hand, a raw API tool, approving pull
+  requests, and destructive commands such as `reset --hard`.
+
 ## 2026-10-30: built clean, beside the existing harness
 
 - **The existing harness is not modified for Jig work.** Its one security fix

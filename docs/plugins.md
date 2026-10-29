@@ -19,7 +19,7 @@ parts live in a private company plugin kept at the company.
 | Plugin | Tools and actions | What the company plugin supplies | Order |
 |---|---|---|---|
 | [`jig-core`](../plugins/jig-core/README.md) | no tools of its own; the tool manager and the `/jig` commands | environments, extra masking kinds, the sign-in service | 1 |
-| [`jig-git`](../plugins/jig-git/README.md) | `git`: status, log, diff, branches, clone, branch, commit, sync, push · `pr`: view, list, checks, comments, create, edit, comment, merge · new: watching CI until it finishes | the GitHub organization and branch naming | 2 |
+| [`jig-git`](../plugins/jig-git/README.md) | `git`: status, diff, log, show, blame, branches, fetch, clone, branch, worktree, commit, stash, sync, merge, rebase, cherry_pick, restore, push · `pr`: view, list, comments, create, edit, ready, comment, reply, resolve, review, merge · `checks`: status, runs, run, artifacts, log, rerun · `watch`: start, list, stop · `release`: tags, releases, tag_create, tag_push, release_create | the GitHub organization, branch names, protected branches, the pull request template, the "artifact ready" rules | 2 |
 | [`jig-lens`](../plugins/jig-lens/README.md) | none: the dashboard over `jig-core`'s records | none | 2 |
 | [`jig-flow`](../plugins/jig-flow/README.md) | `flow`: status, start, bind, submit-plan, test, scenario, advance, and the gates | ticket kinds, stage sets, acceptance environments | 3 |
 | [`jig-memory`](../plugins/jig-memory/README.md) | no tools today: ticket folders, notes, evidence; later cards and recall | ticket key patterns, folder location | 3 |

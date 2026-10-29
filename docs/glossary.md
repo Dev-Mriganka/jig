@@ -20,6 +20,7 @@
 | **Spill file** | Where the full result goes when the text shown to the model is cut. The model can open it on demand. |
 | **Record** | One line per tool call or model turn, written by `jig-core` and read by `jig-lens`. It never holds tool arguments or output. |
 | **Facts** | A few named numbers or short codes that a Jig tool adds to its own record, such as tests passed or a CI run's conclusion. Never free text. |
+| **Watch** | A background check on a pull request, a CI run or a tag. It tells the agent when its finish line is reached. |
 | **Lens index** | `jig-lens`'s SQLite copy of the records, which the dashboard reads. It can always be rebuilt from the records. |
 | **Sandbox** | Bubblewrap around the agent's own shell and file tools. It hides credentials and keeps the agent's own tooling read-only. Linux only. |
 | **Ticket** | A unit of work in an issue tracker, followed by `jig-flow` and remembered by `jig-memory`. |
