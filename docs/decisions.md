@@ -38,6 +38,21 @@ its own safety pipeline.
   to a test environment named in policy, and only if a policy setting allows
   it; never to production.
 
+## 2026-10-30: the lens reads a copy of the records
+
+- **The records stay JSON lines,** written only by `jig-core`. Appending a line
+  cannot break a tool call, and `jig-core` needs no database.
+- **`jig-lens` keeps a SQLite index** of them that it can always rebuild, and
+  the viewer reads only that index.
+- **The viewer is Grafana with a SQLite data source:** one local process, SQL
+  panels, and dashboards kept as files. Datasette is the fallback over the same
+  index.
+- **Grafana's sign-in stays on.** The agent's shell can reach `127.0.0.1`, and
+  a Grafana data source runs any SQL it is sent.
+- **Rejected: an LLM trace platform as the store.** Langfuse and Opik need
+  several containers; Phoenix's licence is not open source, and its dashboards
+  are fixed. An export to MLflow can come later, as a copy.
+
 ## 2026-10-30: built clean, beside the existing harness
 
 - **The existing harness is not modified for Jig work.** Its one security fix

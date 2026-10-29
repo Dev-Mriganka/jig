@@ -32,7 +32,8 @@ floor: [Permissions](../../docs/permissions.md).
 The contract for a Jig tool is:
 - how the tool declares the environment and effect of each action;
 - how it asks for a secret;
-- how it gives a preview for the review screen.
+- how it gives a preview for the review screen;
+- how it adds facts to its record.
 
 The contract for every plugin is:
 - the record format;
@@ -89,14 +90,21 @@ screen to ask on, "ask" becomes "deny".
 ## Records
 
 One JSON line per event, in `~/.local/state/jig/records/<YYYY-MM-DD>.jsonl`.
-The file is private to you, and only `jig-core` writes it.
+The file is private to you, and only `jig-core` writes it. Every line has its
+own `id`, so a reader that imports a line twice still counts it once.
 
-- **Tool call:** time, session, parent session (for a child agent), ticket
-  when one is active, tool, action, plugin, environment, effect, decision,
-  approval kind, your answer, time waited for you, outcome, error kind,
-  duration, tool call id, parent call id, spill path.
-- **Model turn:** time, session, model, input, output, cache-read and
-  cache-write tokens, and cost. These come from Pi's usage data.
+- **Tool call:** time, session, parent session and agent role (for a child
+  agent), ticket when one is active, tool, action, plugin, environment,
+  effect, decision, approval kind, your answer, time waited for you, outcome,
+  error kind, duration, tool call id, parent call id, spill path, and the
+  tool's facts.
+- **Model turn:** time, session, parent session, agent role, ticket, model,
+  input, output, cache-read and cache-write tokens, and cost. These come from
+  Pi's usage data.
+
+**Facts** are a few named numbers or short codes that a Jig tool adds to its
+own record, as declared in its contract: for example, tests passed and failed,
+or a CI run's conclusion. They are never free text.
 
 A record never contains tool arguments or tool output. An error is kept as its
 kind plus one masked line.
