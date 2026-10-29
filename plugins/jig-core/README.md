@@ -26,6 +26,7 @@ floor: [Permissions](../../docs/permissions.md).
 | Redact | Removes every resolved secret value from output |
 | Cap | Cuts long output for the model and saves the full result to a spill file |
 | Record | Writes one line per tool call and per model turn, for `jig-lens` |
+| Watch | Runs background watches for every plugin: polling, finish lines, saving and resuming, and one message per result |
 
 ## What other plugins get from it
 
@@ -36,11 +37,26 @@ The contract for a Jig tool is:
 - how it adds facts to its record.
 
 The contract for every plugin is:
+- the watch engine: what to poll, how often, and when the watch is done;
 - the record format;
 - the events published on Pi's event bus, so other plugins can react to
   calls, decisions and results.
 
 Plugins import only this contract, never each other.
+
+## Tool: `watch`
+
+Plugins start watches from their own tools, such as `jig-git`'s `checks watch`.
+This tool shows and stops all of them.
+
+| Action | What it does | Default |
+|---|---|---|
+| `list` | Open and finished watches of every plugin, with their finish lines | read |
+| `stop` | Cancels a watch | local write |
+
+A watch survives a restart of Pi: open watches are saved in the state folder
+and resume when Pi starts, and a result that arrived while Pi was closed comes
+in as "finished while you were away".
 
 ## What it borrows
 
@@ -102,7 +118,7 @@ screen to ask on, "ask" becomes "deny".
 
 | Command | What it does |
 |---|---|
-| `/jig` | Status: loaded plugins, number of tools governed, tools still on the unknown default, configuration errors |
+| `/jig` | Status: loaded plugins, number of tools governed, tools still on the unknown default, open watches, configuration errors |
 | `/jig rules [tool]` | Effective decision per tool and action, with where each came from: declaration, rule, hint or default |
 | `/jig records` | Where today's records are, and a one-line summary: calls, errors, questions asked, time waited |
 

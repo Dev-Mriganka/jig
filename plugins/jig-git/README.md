@@ -2,12 +2,14 @@
 
 **Status: design.** This README is the specification; there is no code yet.
 
-`jig-git` gives the agent five tools:
+`jig-git` gives the agent four tools:
 - `git`: the local repository;
 - `pr`: GitHub pull requests and reviews;
-- `checks`: GitHub checks and Actions;
-- `watch`: waiting for CI in the background;
+- `checks`: GitHub checks and Actions, and watching them in the background;
 - `release`: tags and releases.
+
+The watches run on `jig-core`'s watch engine, and `jig-core`'s `watch` tool
+lists and stops them.
 
 Every tool declares the environment and effect of each action to `jig-core`.
 Reads and local writes are allowed; writes to GitHub ask you.
@@ -82,17 +84,10 @@ A rule in your configuration can change any of them, within the floor.
 | `runs`, `run`, `artifacts` | Workflow runs by branch, commit or state; one run's jobs and steps; its artifacts | read |
 | `log` | A failed job's log: the tail, or the lines matching a search; capped and redacted | read |
 | `rerun` | The failed jobs, or the whole run | external write |
+| `watch` | Starts a background watch on a pull request, branch, run, tag or release, with a finish line. Returns its id at once | local write |
 
 `checks` covers GitHub only. Other CI systems belong in a company plugin (see
 [Plugins](../../docs/plugins.md)).
-
-### `watch`: waiting for CI without being asked
-
-| Action | What it does | Default |
-|---|---|---|
-| `start` | Starts a background watch and returns its id at once | local write |
-| `list` | Open and finished watches | read |
-| `stop` | Cancels a watch | local write |
 
 ### `release`: tags and releases
 
@@ -115,16 +110,17 @@ so these actions rest on standard practice.
 | Approving a pull request | Approval stays human |
 | Deleting tags, `reset --hard`, `clean` | They destroy work and are rarely needed; you can run them yourself |
 
-`git`, `pr`, `checks` and `watch` are always loaded. In the sessions, a "tool
-not found" cost the agent extra calls.
+`git`, `pr` and `checks` are always loaded, and so is `jig-core`'s `watch`.
+In the sessions, a "tool not found" cost the agent extra calls.
 
 ## Watching CI until it is done
 
-A watch runs inside the plugin, outside the sandbox, and the call that starts
-it returns at once.
+A watch runs on `jig-core`'s watch engine, outside the sandbox, and the call
+that starts it returns at once. `jig-git` supplies what to poll on GitHub and
+when the watch is done.
 
 1. **It starts by itself** after `git push` and `pr create` (setting
-   `watch.auto`), or when the agent calls `watch start`.
+   `watch.auto`), or when the agent calls `checks watch`.
 2. **Its finish line is explicit, never "all checks".** It can be:
    - the required checks;
    - a named check, such as the job that builds the image;
@@ -166,7 +162,8 @@ A version that does not contain the watched commit is ignored.
 ### Events
 
 On Pi's event bus, for other plugins:
-- `jig-git:watch-done`: a watch finished, with its result;
+- `jig:watch-done`, from `jig-core`'s engine: a watch finished, with its
+  result;
 - `jig-git:artifact-ready`: `{ repo, pr, sha, kind: image | tag | release, ref, source }`.
 
 ### `jig-git` never deploys
@@ -238,19 +235,11 @@ plugin can set them for its repositories.
 - **Which checks are required** depends on each repository's branch protection,
   which was not read. `required_only` relies on `gh pr checks --required`.
 
-## Open question: where the watch engine lives
-
-Company plugins need the same engine for other CI systems and deploy rollouts.
-**Recommended:** `jig-core` offers it, covering start, list, stop, saving,
-resuming and notices. Each plugin supplies what to poll and when it is done.
-Plugins share code only through `jig-core`, and the company plugin needs the
-engine from the start.
-
 ## Layout (planned)
 
 ```text
 jig-git/
-  src/      the five tools, the git runner and its config guard, the GitHub API client, the watch
+  src/      the four tools, the git runner and its config guard, the GitHub API client, the GitHub watch probes
   skills/   git/SKILL.md: how to use the tools (status before commit, watch after push)
   test/     against temporary local repositories and recorded GitHub API answers
 ```

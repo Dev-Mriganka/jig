@@ -100,7 +100,7 @@ What closes those gaps:
 
 ```text
 jig (this repository, generic)
-  jig-core   tool manager: classify, rules, approvals, secrets, mask, redact, cap, record
+  jig-core   tool manager: classify, rules, approvals, secrets, mask, redact, cap, record; watch engine
   jig-git    tools: local git, GitHub PRs and reviews, CI checks and watching
   jig-lens   observability: reads jig-core's records, local dashboard
   jig-flow, jig-memory, jig-mongo, jig-jira, jig-logs, jig-http, jig-k8s,

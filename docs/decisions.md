@@ -38,6 +38,19 @@ its own safety pipeline.
   to a test environment named in policy, and only if a policy setting allows
   it; never to production.
 
+## 2026-10-30: jig-core is our own code, and it runs the watches
+
+- **Our own code, not built on `@gotgenes/pi-permission-system`.** Jig borrows
+  its patterns (see [Reuse](reuse.md)). It is not a dependency because:
+  - environments are that package's stated non-goal;
+  - it judges another package's tools by name only;
+  - it releases a new major version almost every month.
+- **The watch engine lives in `jig-core`.** It covers polling, finish lines,
+  saving, resuming and notices. Plugins share code only through `jig-core`, and
+  a company plugin needs the same engine for its own CI and deploys.
+- **Who starts and who stops.** A plugin starts a watch from its own tool, such
+  as `checks watch`. The `watch` tool in `jig-core` lists and stops every watch.
+
 ## 2026-10-30: the lens reads a copy of the records
 
 - **The records stay JSON lines,** written only by `jig-core`. Appending a line
@@ -53,11 +66,12 @@ its own safety pipeline.
   several containers; Phoenix's licence is not open source, and its dashboards
   are fixed. An export to MLflow can come later, as a copy.
 
-## 2026-10-30: jig-git has five tools, and a watch that knows when it is done
+## 2026-10-30: jig-git's tools, and a watch that knows when it is done
 
-- **Five tools:** `git`, `pr`, `checks`, `watch` and `release`. They come from an
+- **Four tools:** `git`, `pr`, `checks` and `release`. They come from an
   inventory of two months of sessions plus standard needs. Most of `git` and
-  `pr` is ported from the existing harness.
+  `pr` is ported from the existing harness. `checks watch` starts a watch on
+  `jig-core`'s engine.
 - **A watch has an explicit finish line,** never "all checks". In the
   sessions, slow optional checks stayed pending for hours after the step that
   mattered had passed.
