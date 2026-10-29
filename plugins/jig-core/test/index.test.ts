@@ -96,3 +96,66 @@ describe("the factory", () => {
         withdrawJig(jig());
     });
 });
+
+describe("the API that plugins get", () => {
+    const load = (options: Parameters<typeof jigCore>[0] = {}) => {
+        const host = fakePi();
+        jigCore(options)(host.pi);
+        return { host, api: jig() };
+    };
+
+    test("mask uses the masker the factory was given, and makes one for each UTC day", () => {
+        let day = new Date("2026-10-30T12:00:00.000Z");
+        const made: Array<{ dir: string; day: string }> = [];
+        const { api } = load({
+            now: () => day,
+            createMasker: (dir, now) => {
+                made.push({ dir, day: now.toISOString().slice(0, 10) });
+                return { text: (input) => input.replaceAll("PERSONAL", "[masked]"), value: <T>(input: T): T => input };
+            },
+        });
+        assert.equal(api.mask.text("a PERSONAL b"), "a [masked] b");
+        assert.deepEqual(api.mask.value({ x: 1 }), { x: 1 });
+        assert.equal(made.length, 1, "the same day reuses the masker, so its tokens stay the same all day");
+        day = new Date("2026-10-30T23:59:59.999Z");
+        api.mask.text("again");
+        assert.equal(made.length, 1);
+        day = new Date("2026-10-31T00:00:00.000Z");
+        api.mask.text("next day");
+        assert.deepEqual(made, [{ dir: state.dir, day: "2026-10-30" }, { dir: state.dir, day: "2026-10-31" }]);
+        withdrawJig(api);
+    });
+
+    test("mask throws when it cannot mask, as the contract says, so the caller drops the result", () => {
+        const { api } = load();
+        assert.throws(() => api.mask.text("anything"), /masking is not built yet/);
+        assert.throws(() => api.mask.value({}), /masking is not built yet/);
+        withdrawJig(api);
+    });
+
+    test("watches are a placeholder: kinds are kept, nothing is listed, and starting or stopping says they are not built", () => {
+        const { api } = load();
+        assert.doesNotThrow(() => api.watches.registerKind({ kind: "k", plugin: "p", intervalMs: 1000, describe: () => "d", poll: async () => ({ state: 1 }) }));
+        assert.deepEqual(api.watches.list(), []);
+        assert.throws(() => api.watches.start({ kind: "k", spec: {}, title: "t" }), /watches are not built yet/);
+        assert.throws(() => api.watches.stop("any"), /watches are not built yet/);
+        withdrawJig(api);
+    });
+
+    test("declareTool checks what it is given, and declaring a tool again replaces it", () => {
+        const { api } = load();
+        assert.throws(() => api.declareTool({ tool: "", plugin: "p", classify: () => undefined }), TypeError);
+        assert.throws(() => api.declareTool({ tool: "t", plugin: "", classify: () => undefined }), TypeError);
+        assert.throws(() => api.declareTool({ tool: "t", plugin: "p" } as never), TypeError);
+        api.declareTool({ tool: "t", plugin: "p", classify: () => ({ environment: "local", effect: "read" }) });
+        assert.doesNotThrow(() => api.declareTool({ tool: "t", plugin: "p2", classify: () => ({ environment: "local", effect: "write" }) }));
+        withdrawJig(api);
+    });
+
+    test("setTicket accepts a key and clears it", () => {
+        const { api } = load();
+        assert.doesNotThrow(() => { api.setTicket("T-1"); api.setTicket(undefined); api.setTicket(""); });
+        withdrawJig(api);
+    });
+});
+

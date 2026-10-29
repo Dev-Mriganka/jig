@@ -310,11 +310,19 @@ If a line cannot be written, the call goes on, and `/jig` says so.
   that could approve.
 - **Anything that fails in jig-core blocks the call,** with "jig-core could not
   decide: ...". Nothing runs because jig-core could not tell whether it may.
-- **Programs run without a shell,** with a short allow-list of environment
-  variables, a timeout and an output cap. A program found only in a folder the
-  agent can write to is not run. Git runs with hooks and `core.fsmonitor` off
-  and prompts disabled, and refuses a repository whose own `.git/config` sets a
-  command or redirects a remote.
+- **Programs run without a shell,** with a timeout and an output cap. The
+  environment is a short allow-list (`PATH`, `HOME`, `USER`, `LANG`, `TZ`,
+  `TMPDIR` and the XDG folders), plus what the calling tool passes. Git also
+  gets the user's ssh agent and ssh command. A program found only in a folder
+  the agent can write to is not run, and such a folder is left out of `PATH`.
+  A program that takes too long is stopped with its whole process group, and
+  the result has `timedOut: true` and exit code 124. Output beyond the cap
+  (10 MiB unless the caller sets it) is cut, and ends with `[output cut at N
+  bytes]`.
+- **Git runs with hooks and `core.fsmonitor` off and prompts disabled,** and
+  refuses a repository whose own `.git/config` sets a command or redirects a
+  remote. `exec.run("git", ...)` and `exec.run("gh", ...)` get the same checks
+  as `exec.git`.
 - **Records stay on this machine,** and `jig-core` sends nothing anywhere.
 
 ## Not built yet
