@@ -267,6 +267,19 @@ describe("git", () => {
             await assert.rejects(run("git", ["status"], { ...options, cwd: repo }), /core\.sshcommand/);
         });
 
+        test("run() with the absolute path of a git uses that program, with the same checks", async () => {
+            const folder = path.join(root, `chosen${counter++}`);
+            mkdirSync(folder);
+            const chosen = path.join(folder, "git");
+            writeFileSync(chosen, '#!/bin/sh\necho "chosen git: $*"\n');
+            chmodSync(chosen, 0o755);
+            const repo = repository();
+            const result = await run(chosen, ["status"], { ...options, cwd: repo });
+            assert.match(result.stdout, /^chosen git: -c core\.fsmonitor=false -c core\.hooksPath=\/dev\/null -c color\.ui=false status/);
+            plant(repo, "[core]", "sshCommand", "evil");
+            await assert.rejects(run(chosen, ["status"], { ...options, cwd: repo }), /core\.sshcommand/);
+        });
+
         test("so does run('gh'), which starts git", async () => {
             const repo = repository();
             plant(repo, "[core]", "sshCommand", "evil");

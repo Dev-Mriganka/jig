@@ -295,7 +295,7 @@ async function spawnProgram(
  */
 export async function run(file: string, args: readonly string[], options: RunOptions = {}): Promise<RunResult> {
     const name = path.basename(file);
-    if (name === "git") return git(options.cwd ?? process.cwd(), args, options);
+    if (name === "git") return runGit(file, options.cwd ?? process.cwd(), args, options);
     if (name === "gh") {
         refuseUnsafeRepository(options.cwd ?? process.cwd(), args);
         return spawnProgram(file, args, options, childEnv(options, GIT_ENV, { ...GIT_FIXED_ENV, ...GH_FIXED_ENV }));
@@ -305,10 +305,15 @@ export async function run(file: string, args: readonly string[], options: RunOpt
 
 /** Runs git in `repo` with hooks, `core.fsmonitor` and prompts off. Refuses when the repository's own configuration
  *  would make git run a command. */
-export async function git(repo: string, args: readonly string[], options: RunOptions = {}): Promise<RunResult> {
+export function git(repo: string, args: readonly string[], options: RunOptions = {}): Promise<RunResult> {
+    return runGit("git", repo, args, options);
+}
+
+/** `program` is "git", or the absolute path of a git the caller chose. */
+async function runGit(program: string, repo: string, args: readonly string[], options: RunOptions): Promise<RunResult> {
     const withRepo: RunOptions = { ...options, cwd: repo };
     refuseUnsafeRepository(repo, args);
-    return spawnProgram("git", [...GIT_FIXED_FLAGS, ...args], withRepo, childEnv(withRepo, GIT_ENV, GIT_FIXED_ENV));
+    return spawnProgram(program, [...GIT_FIXED_FLAGS, ...args], withRepo, childEnv(withRepo, GIT_ENV, GIT_FIXED_ENV));
 }
 
 // ---- the repository's own configuration ----------------------------------------------------------------------------------
