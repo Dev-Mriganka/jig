@@ -18,7 +18,7 @@ parts live in a private company plugin kept at the company.
 
 | Plugin | Tools and actions | What the company plugin supplies | Order |
 |---|---|---|---|
-| [`jig-core`](../plugins/jig-core/README.md) | `watch`: list, stop; the tool manager, the watch engine and the `/jig` commands | environments, extra masking kinds, the sign-in service | 1 |
+| [`jig-core`](../plugins/jig-core/README.md) | `watch`: list, stop; the tool manager, the watch engine and the `/jig` commands | environments, extra personal-data field names for masking, the sign-in service | 1 |
 | [`jig-git`](../plugins/jig-git/README.md) | `git`: status, diff, log, show, blame, branches, fetch, clone, branch, worktree, commit, stash, sync, merge, rebase, cherry_pick, restore, push · `pr`: view, list, comments, create, edit, ready, comment, reply, resolve, review, merge · `checks`: status, runs, run, artifacts, log, rerun, watch · `release`: tags, releases, tag_create, tag_push, release_create | the GitHub organization, branch names, protected branches, the pull request template, the "artifact ready" rules | 2 |
 | [`jig-lens`](../plugins/jig-lens/README.md) | none: the dashboard over `jig-core`'s records | none | 2 |
 | [`jig-flow`](../plugins/jig-flow/README.md) | `flow`: status, start, bind, submit-plan, test, scenario, advance, and the gates | ticket kinds, stage sets, acceptance environments | 3 |

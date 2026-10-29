@@ -1,0 +1,122 @@
+{
+  "category": "network_device_ids",
+  "cases": [
+    {
+      "id": "network-ipv4",
+      "input": {
+        "clientIp": "192.0.2.10",
+        "orderId": "ord-8101"
+      },
+      "must_not_contain": [
+        "192.0.2.10"
+      ],
+      "must_keep": [
+        "ord-8101"
+      ],
+      "expect_tags": [
+        "ip"
+      ],
+      "notes": "RFC 5737 TEST-NET-1 IPv4 address."
+    },
+    {
+      "id": "network-ipv6",
+      "input": {
+        "sourceIPv6": "2001:db8::10",
+        "traceId": "trace-8102"
+      },
+      "must_not_contain": [
+        "2001:db8::10"
+      ],
+      "must_keep": [
+        "trace-8102"
+      ],
+      "expect_tags": [
+        "ip"
+      ],
+      "notes": "RFC 3849 documentation IPv6 address."
+    },
+    {
+      "id": "network-mac",
+      "input": {
+        "macAddress": "02:00:00:00:00:01",
+        "sku": "DEVICE-DEMO-3"
+      },
+      "must_not_contain": [],
+      "must_keep": [
+        "02:00:00:00:00:01",
+        "DEVICE-DEMO-3"
+      ],
+      "expect_tags": [],
+      "notes": "Locally administered example MAC address."
+    },
+    {
+      "id": "network-imei-iccid-imsi",
+      "input": {
+        "device": {
+          "imei": "000000000000000",
+          "iccid": "8999900000000000000",
+          "imsi": "001010000000001"
+        },
+        "accountId": "acct-demo-1104"
+      },
+      "must_not_contain": [],
+      "must_keep": [
+        "000000000000000",
+        "8999900000000000000",
+        "001010000000001",
+        "acct-demo-1104"
+      ],
+      "expect_tags": [],
+      "notes": "Synthetic invalid IMEI, dummy ICCID, and test-network IMSI."
+    },
+    {
+      "id": "network-free-text-log",
+      "input": "WARN src=192.0.2.11 peer=2001:db8::11 mac=02:00:00:00:00:02 trace=trace-8105",
+      "must_not_contain": [
+        "192.0.2.11",
+        "2001:db8::11"
+      ],
+      "must_keep": [
+        "02:00:00:00:00:02",
+        "trace-8105"
+      ],
+      "expect_tags": [
+        "ip"
+      ],
+      "notes": "Three network identifiers in one log line."
+    },
+    {
+      "id": "network-json-encoded-log",
+      "input": "INFO payload={\"clientIp\":\"192.0.2.12\",\"imei\":\"000000000000001\",\"orderId\":\"ord-8106\"}",
+      "must_not_contain": [
+        "192.0.2.12"
+      ],
+      "must_keep": [
+        "000000000000001",
+        "ord-8106"
+      ],
+      "expect_tags": [
+        "ip"
+      ],
+      "notes": "Network and device identifiers inside JSON-encoded text."
+    },
+    {
+      "id": "network-negative-controls",
+      "input": {
+        "version": "1.2.3.4",
+        "orderId": "192.0.2.13-ORDER",
+        "sku": "IPV6-2001-DB8",
+        "accountId": "acct-000000000000000"
+      },
+      "must_not_contain": [],
+      "must_keep": [
+        "1.2.3.4",
+        "192.0.2.13-ORDER",
+        "IPV6-2001-DB8",
+        "acct-000000000000000"
+      ],
+      "expect_tags": [],
+      "notes": "Version, order, SKU, and account IDs stay visible despite lookalike digits."
+    }
+  ]
+}

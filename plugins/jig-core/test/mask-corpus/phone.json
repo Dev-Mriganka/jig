@@ -1,0 +1,150 @@
+{
+  "category": "phone",
+  "cases": [
+    {
+      "id": "phone-us-dashes",
+      "input": {
+        "accountId": "acct-demo-101",
+        "contactPhone": "202-555-0101",
+        "status": "ACTIVE"
+      },
+      "must_not_contain": [
+        "202-555-0101"
+      ],
+      "must_keep": [
+        "acct-demo-101",
+        "ACTIVE",
+        "0101"
+      ],
+      "expect_tags": [
+        "phone"
+      ],
+      "notes": "US national format; token may expose only the final four digits."
+    },
+    {
+      "id": "phone-e164-spaces",
+      "input": {
+        "tn": "+1 202 555 0102",
+        "orderId": "ord-7102"
+      },
+      "must_not_contain": [
+        "+1 202 555 0102"
+      ],
+      "must_keep": [
+        "ord-7102",
+        "0102"
+      ],
+      "expect_tags": [
+        "phone"
+      ],
+      "notes": "E.164 country code with spaces."
+    },
+    {
+      "id": "phone-dots",
+      "input": "INFO callBack=202.555.0103 trace=trace-7103 version=3.2.1",
+      "must_not_contain": [
+        "202.555.0103"
+      ],
+      "must_keep": [
+        "trace-7103",
+        "3.2.1",
+        "0103"
+      ],
+      "expect_tags": [
+        "phone"
+      ],
+      "notes": "Dot-separated phone in a log line."
+    },
+    {
+      "id": "phone-parentheses-extension",
+      "input": {
+        "contact": {
+          "workPhone": "(202) 555-0104 ext. 234",
+          "accountId": "acct-demo-104"
+        }
+      },
+      "must_not_contain": [
+        "(202) 555-0104",
+        "234"
+      ],
+      "must_keep": [
+        "acct-demo-104",
+        "0104"
+      ],
+      "expect_tags": [
+        "phone"
+      ],
+      "notes": "An extension must not survive alongside the last four digits."
+    },
+    {
+      "id": "phone-e164-compact",
+      "input": {
+        "msisdn": "+12025550105",
+        "did": "+12025550106",
+        "orderId": "ord-7105"
+      },
+      "must_not_contain": [
+        "+12025550105",
+        "+12025550106"
+      ],
+      "must_keep": [
+        "ord-7105",
+        "0105",
+        "0106"
+      ],
+      "expect_tags": [
+        "phone"
+      ],
+      "notes": "Two compact E.164 numbers in fields named for telecom identifiers."
+    },
+    {
+      "id": "phone-free-text-and-json-log",
+      "input": "WARN payload={\"note\":\"Call the test line at 202-555-0107 x99\",\"sku\":\"SIP-DEMO-7\"}",
+      "must_not_contain": [
+        "202-555-0107",
+        "x99"
+      ],
+      "must_keep": [
+        "SIP-DEMO-7",
+        "0107"
+      ],
+      "expect_tags": [
+        "phone"
+      ],
+      "notes": "Phone and extension inside a JSON-encoded free-text note."
+    },
+    {
+      "id": "phone-url-query",
+      "input": "GET /port?tn=%2B12025550108&orderId=ord-7108",
+      "must_not_contain": [
+        "%2B12025550108"
+      ],
+      "must_keep": [
+        "ord-7108",
+        "0108"
+      ],
+      "expect_tags": [
+        "phone"
+      ],
+      "notes": "Percent-encoded plus sign in a query parameter."
+    },
+    {
+      "id": "phone-negative-controls",
+      "input": {
+        "orderId": "ORD-202-555-0109-X",
+        "sku": "PHONE-555-01XX",
+        "build": "2.0.2.555.0109",
+        "accountId": "acct-2025550109"
+      },
+      "must_not_contain": [],
+      "must_keep": [
+        "ORD-202-555-0109-X",
+        "PHONE-555-01XX",
+        "2.0.2.555.0109",
+        "acct-2025550109"
+      ],
+      "expect_tags": [],
+      "notes": "Identifier context prevents numeric false positives, even when an ID contains phone-shaped digits."
+    }
+  ]
+}

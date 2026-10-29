@@ -26,8 +26,8 @@ is split and retried.
 ## Backends
 
 The search runs through a backend interface. The first backend is
-Elasticsearch through Kibana, configured by the company plugin. Other backends
-are written when a job needs them, not in advance.
+Elasticsearch, configured by the company plugin. Other backends are written
+when a job needs them, not in advance.
 
 ## Company part (in the company plugin)
 
