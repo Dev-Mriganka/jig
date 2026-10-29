@@ -5,7 +5,7 @@
 import type { ImageContent, TextContent } from "@earendil-works/pi-ai";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
-import { createPrivateFile, privateDir, removeIfEmpty, removeOldFiles } from "./paths.ts";
+import { createPrivateFile, privateDir, removeIfEmpty, removeOldFiles, stateDir } from "./paths.ts";
 
 /** A result with more text than this is cut. */
 export const CAP_CHARS = 50_000;
@@ -85,9 +85,15 @@ function writeSpill(sessionId: string, toolCallId: string, text: string): string
 
 /** Deletes spill files older than `maxAgeDays`, and the session folders they leave empty. Returns how many files. */
 export function cleanupSpill(maxAgeDays: number, now: number = Date.now()): number {
+    const root = join(stateDir(), "spill");
+    let sessions: string[];
+    try {
+        sessions = readdirSync(root);
+    } catch {
+        return 0;
+    }
     let deleted = 0;
-    const root = privateDir("spill");
-    for (const session of readdirSync(root)) {
+    for (const session of sessions) {
         const dir = join(root, session);
         deleted += removeOldFiles(dir, maxAgeDays, now);
         removeIfEmpty(dir);

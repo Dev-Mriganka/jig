@@ -15,7 +15,7 @@ import type { Tokens } from "@earendil-works/pi-tui";
 import type { Preview } from "./contract.ts";
 import { errorMessage } from "./errors.ts";
 import { resolveProgram } from "./exec.ts";
-import { createPrivateFile, privateDir, removeOldFiles } from "./paths.ts";
+import { createPrivateFile, privateDir, removeOldFiles, stateDir } from "./paths.ts";
 
 export function escapeHtml(text: string): string {
     return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -104,7 +104,7 @@ export function writePreviewPage(preview: Preview, header: string): string {
 
 /** Deletes preview pages older than `maxAgeDays`. */
 export function cleanupPreviews(maxAgeDays: number, now: number = Date.now()): number {
-    return removeOldFiles(privateDir("previews"), maxAgeDays, now);
+    return removeOldFiles(join(stateDir(), "previews"), maxAgeDays, now);
 }
 
 /** The program and arguments that open `url`: `$BROWSER` when set (a program name, optionally followed by plain
