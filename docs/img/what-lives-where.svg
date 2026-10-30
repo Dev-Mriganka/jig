@@ -79,7 +79,7 @@
   <rect x="46" y="422" width="146" height="32" rx="4" fill="#5C9CAB"/>
   <text x="119" y="442.55" font-size="13" fill="#FFFFFF" text-anchor="middle">jig-logs</text>
   <rect x="202" y="422" width="146" height="32" rx="4" fill="#5C9CAB"/>
-  <text x="275" y="442.55" font-size="13" fill="#FFFFFF" text-anchor="middle">jig-http</text>
+  <text x="275" y="442.55" font-size="13" fill="#FFFFFF" text-anchor="middle">jig-api</text>
   <rect x="358" y="422" width="146" height="32" rx="4" fill="#5C9CAB"/>
   <text x="431" y="442.55" font-size="13" fill="#FFFFFF" text-anchor="middle">jig-ops</text>
   <rect x="514" y="422" width="146" height="32" rx="4" fill="#5C9CAB"/>

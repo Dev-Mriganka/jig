@@ -18,6 +18,36 @@ Dated so the reasons stay attached.
 - **A command is started once.** One that is cut short has an unknown outcome: the
   rollout is read once, and the model is told not to run it again.
 
+## 2026-10-30: jig-http becomes jig-api, and runs saved requests
+
+- **Renamed** from `jig-http` to `jig-api`, and its tool from `http` to `api`. The plugin still sends
+  HTTP, but the agent no longer types a host, a path or a header: it runs a request the team already
+  saved, by name, and fills its variables.
+- **Why.** Teams keep their requests in Postman, Bruno, `.http` files or an OpenAPI spec. A request
+  written by a model is a request to get wrong, and an environment to reach by accident. A saved
+  request cannot be mistyped, and its environment decides its host.
+- **What carries over:** the sending engine and its tests: sign-in, OAuth, transports, previews that
+  are tied to what is sent, and the rule that a lost reply is never resent.
+- **What changed:**
+  - the configuration is `api`: collections, the mapping of their environment names to `jig-core`'s,
+    secret references, requests that read although their method does not, and the environments where
+    an ad-hoc `call` is allowed;
+  - a call's action is the request's name, so a rule can name one request;
+  - a folder runs as its strictest request.
+- **Requests are sent by the tool, scripts never run.** Running an API client's own CLI would run its
+  scripts with the agent's variables. A request that needs a pre-request script is refused by name;
+  most need none.
+- **Hosts are pinned per environment,** and link-local and cloud-metadata addresses are never called.
+  The environment decides where a request goes, so a saved request that names another environment's
+  host cannot reach it. The agent can fill a variable, never the host.
+- **Secrets come from references only.** A variable the format marks secret needs a reference in
+  `api.secrets`. A plain value for it in an export is refused, with a warning that names the file,
+  because exports travel by email and git.
+- **Ad-hoc `call` is opt-in and never production,** asked of `jig-core`, so a company's own name for
+  production counts.
+- **Two parts.** Part 1 is Postman files and `.http` folders. Part 2 is Bruno, OpenAPI and a Postman
+  workspace, one adapter each behind the same interface.
+
 ## 2026-10-30: jig-ops, one plugin for build, deploy and run
 
 - **`jig-k8s` alone was too small.** The real use is the loop: the change

@@ -119,7 +119,7 @@ reads, `rerun` and `trigger` as external writes, and `watch` for a run.
 - **Docker Compose** for local stacks, with care: Docker access is root on the
   machine, so only the repository's compose files, with no host mounts.
 - **Argo CD and Flux,** ECS and Cloud Run; **Terraform plan,** as a read.
-- **One shared catalog** that `jig-logs`, `jig-http` and `jig-mongo` read too.
+- **One shared catalog** that `jig-logs`, `jig-api` and `jig-mongo` read too.
 
 ## Layout
 

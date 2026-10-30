@@ -1,0 +1,43 @@
+### Rebuild index
+< {%
+    request.variables.set("reason", "manual")
+%}
+POST {{baseUrl}}/admin/rebuild
+Authorization: Bearer {{token}}
+
+### Watch orders
+WEBSOCKET ws://stream.staging.acme.example.test/orders
+
+### Stream calls
+GRPC stream.staging.acme.example.test:443/acme.Orders/Watch
+
+### Orders by status
+GRAPHQL {{baseUrl}}/graphql
+Authorization: Bearer {{token}}
+
+query ($status: String!) {
+  orders(status: $status) { id total }
+}
+
+{ "status": "{{status}}" }
+
+### Orders by status (VS Code)
+POST {{baseUrl}}/graphql
+Content-Type: application/json
+X-Request-Type: GraphQL
+Authorization: Bearer {{token}}
+
+query { orders { id } }
+
+### Random number
+GET {{baseUrl}}/random/{{$random.integer(1, 10)}}
+
+### Chained
+GET {{baseUrl}}/orders/{{login.response.body.$.orderId}}
+
+### Other host
+GET https://api.other.example.test/orders
+
+### Digest status
+GET {{baseUrl}}/status
+Authorization: Digest {{serviceUser}} {{servicePassword}}
