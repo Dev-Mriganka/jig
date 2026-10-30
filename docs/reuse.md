@@ -46,6 +46,16 @@ about 10,600 a week, MIT licence. It offers:
 - **Two gates mean two dialogs** competing for Pi's single dialog slot, and Pi
   does not arbitrate between packages.
 
+What [`jig-core`](../plugins/jig-core/README.md) borrows:
+- **`bash` split with tree-sitter,** so each command in a chain or a
+  substitution is judged on its own, and anything that cannot be parsed asks;
+- **the ask flow:** an inline dialog, a select-and-input fallback for RPC
+  hosts, and deny when there is no screen;
+- **hiding a tool the rules deny completely,** so the model does not try it;
+- **decision events** on Pi's event bus.
+
+The first and third are not built yet.
+
 Also read, for patterns:
 
 | Package | Pattern |

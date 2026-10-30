@@ -53,6 +53,7 @@ tool_execution_start → tool_call → tool_execution_update → tool_result →
    2. classify   environment + effect (read or write)
                    from: the tool's own declaration (Jig tools)
                          or a rule in your configuration (any tool)
+                         or the built-in defaults for Pi's own tools
                          or the tool's hints (read-only, destructive, reaches outside)
                          or a default (unknown tools count as writes outside)
    3. decide     the rules table → allow / ask / deny
@@ -109,7 +110,7 @@ What closes those gaps:
 
 ```text
 jig (this repository, generic)
-  jig-core   tool manager: classify, rules, approvals, secrets, sign-in, mask, redact, cap, record; watch engine
+  jig-core   tool manager: classify, rules, approvals, secrets, sign-in, transports, mask, redact, cap, record; watch engine
   jig-git    tools: local git, GitHub PRs and reviews, CI checks and watching
   jig-lens   observability: reads jig-core's records, local dashboard
   jig-flow, jig-memory, jig-mongo, jig-jira, jig-logs, jig-http, jig-k8s,
