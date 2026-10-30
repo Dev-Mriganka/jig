@@ -361,6 +361,13 @@ before it gave:
 - **A preview** that a tool builds gets 15 seconds. If it fails you see
   "preview unavailable: <reason>" and can still decide. A tool without a
   preview gets a summary made from the call, with its arguments.
+- **Invalid input is not asked about.** A tool's preview that throws a
+  `TypeError` says the input is invalid: the call is blocked with the tool's
+  message, and nobody is asked.
+- **A tool's own page.** A tool can render its preview itself, such as Jira
+  wiki markup turned into HTML. `o` then opens that page. Tags that could run,
+  load or navigate are removed from it, and the page's policy blocks scripts
+  and requests as well.
 
 ## What happens to a result
 
@@ -485,7 +492,8 @@ unknown tool name, arguments that failed Pi's own checks) was never classified:
 it has no environment, effect or decision, and its error kind is `not-run`.
 
 Error kinds: `denied` and `no-screen` (a deny), `declined` and `dismissed` (the
-answer to a question), `internal` (jig-core could not decide, so it blocked),
+answer to a question), `invalid` (the tool's preview found the input invalid,
+so nobody was asked), `internal` (jig-core could not decide, so it blocked),
 `tool` (the tool ran and failed), `withheld` (the tool ran but its result could
 not be masked or redacted) and `not-run`.
 

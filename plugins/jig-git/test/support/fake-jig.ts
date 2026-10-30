@@ -201,6 +201,10 @@ export function installFakeJig(): FakeJig {
         approvedPreview: (id) => approved.get(id),
         addFacts: (id, added) => void facts.set(id, [...(facts.get(id) ?? []), added]),
         setTicket: () => {},
+        signIn: {
+            register: () => {},
+            headers: async () => ({}),
+        },
         secrets: {
             resolve: async () => {
                 throw new Error("no secrets in tests");
@@ -233,6 +237,7 @@ export function installFakeJig(): FakeJig {
             addEnvironments: () => {},
             addRules: () => {},
             addClassifyRules: () => {},
+            addMaskFields: () => {},
             registerSection: (name, validate) => void sections.set(name, validate),
             section: (name) => {
                 const value = values.get(name);

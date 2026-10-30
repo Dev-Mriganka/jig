@@ -39,6 +39,10 @@ export interface Preview {
     /** Long text for the review screen: a diff, a pull request body, a list of commits. */
     body?: string;
     format?: "markdown" | "diff" | "text";
+    /** A page the tool rendered itself, such as Jira wiki markup turned into HTML, opened with `o` instead of the
+     *  page jig-core would make from `body`. jig-core writes it with a policy that blocks scripts and network
+     *  requests, so the page can only show. */
+    html?: string;
     /** A digest of what was shown. The tool reads the approved preview with `approvedPreview()` and refuses to
      *  run if what it would do now has a different digest ("changed since the preview"). */
     fingerprint?: string;
@@ -53,7 +57,9 @@ export interface ToolDeclaration {
     /** Classifies one call from its input. Pure and fast: it runs before every call. Returning undefined makes
      *  the call unknown, and an unknown call asks. */
     classify(input: Readonly<Record<string, unknown>>): CallClass | undefined;
-    /** Builds what the user sees before a call that asks. Read-only work only. */
+    /** Builds what the user sees before a call that asks. Read-only work only. Throwing a `TypeError` says the
+     *  input is invalid: jig-core blocks the call with its message and does not ask. Any other failure shows
+     *  "preview unavailable" and still asks. */
     preview?(input: Readonly<Record<string, unknown>>, signal: AbortSignal): Promise<Preview>;
     /** True when the tool masks its own production results, so jig-core's backstop leaves them alone. */
     masksOwnResults?: boolean;

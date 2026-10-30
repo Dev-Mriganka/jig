@@ -193,8 +193,8 @@ when the watch is done.
    Notices are combined when they arrive together, sent at least 10 seconds
    apart, and only one waits at a time.
 5. **Open watches survive a restart.** They are saved in the state folder and
-   resume when Pi starts, so a result that came while Pi was closed arrives as
-   "finished while you were away".
+   resume when Pi starts. A result found by the first poll after a restart
+   begins "While Pi was closed: ".
 
 ### What each finish line means
 

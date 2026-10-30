@@ -209,6 +209,14 @@ describe("the preview", () => {
         assert.equal(seen, undefined);
     });
 
+    test("a TypeError from the tool's preview means invalid input: the call is blocked and nobody is asked", async () => {
+        const harness = await begin({ ui: ALLOW, plugins: (api) => declare(api, "fake", { preview: async () => { throw new TypeError("no transition named Done; there are: In Review"); } }) });
+        const outcome = await harness.call({ tool: "fake", input: { env: "external", effect: "write" } });
+        assert.equal(outcome.blocked, true);
+        assert.match(outcome.reason ?? "", /fake cannot run with this input: no transition named Done; there are: In Review/);
+        assert.equal(harness.ui.selects.length, 0, "nobody is asked about a call that cannot run");
+    });
+
     test("a preview that fails is shown as unavailable, and the user can still decide", async () => {
         const harness = await begin({ ui: ALLOW, plugins: (api) => declare(api, "fake", { preview: async () => { throw new Error("no network"); } }) });
         const outcome = await harness.call({ tool: "fake", input: { env: "external", effect: "write" } });
