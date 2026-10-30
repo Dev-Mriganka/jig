@@ -8,13 +8,18 @@ page says what an adapter must do, so that a contributor can add one. Back to th
 
 ## The built backends
 
-| `type` | Store | File | `query` is written in |
+| `type` | Store | Files | `query` is written in |
 |---|---|---|---|
 | `elasticsearch` (the default) | Elasticsearch and OpenSearch | `elasticsearch.ts` | Lucene (see [Query grammar](query-grammar.md)) |
+| `loki` | Grafana Loki | `loki.ts`, `logql.ts` | LogQL (see [Loki](loki.md)) |
 
-`phrase` means the same on every backend. `query` is in the language of the store,
-which the model learns from the logs skill and from the `Next:` line of a rejected
-query.
+`phrase`, `match` and `exclude` are portable. An adapter turns `phrase` into the
+store's own filter. `match` and `exclude` are applied to the hits fetched, and an
+adapter that can may send them to the store too (Loki does). `query` is in the
+language of the store, which the model learns from the logs skill and from the
+`Next:` line of a rejected query. Stores differ in what they can promise, and the
+result says so: Elasticsearch counts exactly, and Loki cannot count, so its totals
+are lower bounds ("at least").
 
 ## What is shared, and what an adapter owns
 
@@ -42,11 +47,11 @@ uses them:
 | `checkBackendFields`, `checkEnvironmentFields` | Report every problem in its own fields, one message each, each starting with the key (`logs.environments.staging.index must be ...`). Never repeat a value that may be a secret |
 | `environment` | Fill in the defaults and return the environment as the search reads it. `jigEnvironment` defaults to the environment's name. Add no key the settings did not need |
 | `limits` | Say the most hits one request returns (never below the tool's `size` limit, 200: a test fails if it is) and the longest time span one request may cover (`Number.POSITIVE_INFINITY` for none). Buckets are cut to the span |
-| `checkQuery` | Only when the language of `query` can reach beyond what configuration allows. Throw an `InputError`, a `TypeError`, so that `jig-core` blocks the call without asking. Omit it when the text can only ever be a value in the request |
-| `search` | Build the request for one bucket: the time range from `from` up to, not including, `to`; the environment's own scope; the phrase or the query; up to `size` hits in the call's order. With `size` 0 it only counts |
+| `checkQuery` | Only when the language of `query` can reach beyond what configuration allows (Loki's can name another stream selector). Throw an `InputError`, a `TypeError`: it is called when the call is classified, so `jig-core` blocks the call without asking, and when the request is built. Omit it when the text can only ever be a value in the request |
+| `search` | Build the request for one bucket: the time range from `from` up to, not including, `to`; the environment's own scope; the phrase or the query; up to `size` hits in the call's order. With `size` 0 it only counts; a store that cannot count asks for one hit |
 | `probe` | Build the check for data: the time range and the environment's scope, and nothing the model wrote |
 | `wire` | Say how a request of one environment travels: `GET` or `POST`, a path that starts with `/` (and may end in a query string), an optional JSON body, optional headers. The sender adds `backend.url` and the sign-in, so no address or credential belongs in it |
-| `parse` | Read the body of a successful reply into a page: how many hits there are, whether that count is exact or a lower bound (`gte`), the hits with their time, message and other fields, and `incomplete` when the store says it lost data. Return `undefined` for anything that is not a result. Never throw |
+| `parse` | Read the body of a successful reply into a page: how many hits there are, whether that count is exact or a lower bound (`gte`; a store that cannot count says `gte` whenever the request filled its limit), the hits with their time, message and other fields, and `incomplete` when the store says it lost data. Return `undefined` for anything that is not a result, even when only one part of it is wrong, so that no hit is dropped quietly. Never throw |
 | `classify` | Say what an error reply means in the store's words, as a `Failure` (see below). Return `undefined` to leave it to the HTTP rules, which cover sign-in, redirects, timeouts, busy and rejected |
 | `words` | Name the store in four messages: what a refused sign-in lacked access to, which settings to check after a 401, the `Next:` line for a rejected query, and for an HTTP 404 |
 
@@ -77,9 +82,13 @@ and does not invent a message.
    [Not verified yet](not-verified.md). What you could not source is listed there
    as unverified.
 2. Add the type to `BackendType` in `src/config.ts`, and the shape of its
-   environments next to `Target`.
-3. Write `src/backends/<name>.ts` and list it in `src/backends/index.ts`. Teach
-   `backendOf` to recognise its environments.
+   environments next to `Target`, which is a union told apart by `type` (an
+   Elasticsearch environment has none). The fields of the other kinds are
+   `undefined` on it, so that `index` or `selector` can be read on any target.
+3. Write `src/backends/<name>.ts` and list it in `src/backends/index.ts`; an
+   environment finds its backend by its `type`. Helpers for the store's language
+   go in a file of their own in the folder, as `logql.ts` does. `elasticsearch.ts`
+   and `loki.ts` are the two examples to read.
 4. Test configuration: every field valid and invalid, a field of another type
    reported by name, the defaults.
 5. Test requests with golden files in `test/golden/`: a phrase, a query, a bucket

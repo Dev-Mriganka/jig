@@ -1,7 +1,8 @@
 # Query grammar: what a search sends to Elasticsearch
 
 What a `logs` call asks an Elasticsearch or OpenSearch backend, and what the
-model's text can reach. Back to the [jig-logs overview](../README.md).
+model's text can reach. What it asks Loki is on the [Loki](loki.md) page. Back to
+the [jig-logs overview](../README.md).
 
 ## The request body
 

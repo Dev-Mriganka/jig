@@ -22,4 +22,11 @@ export interface LogQuery {
     /** asc: the oldest hits of the window. desc: the newest. */
     order: Order;
     range: Range;
+    /**
+     * Plain texts a hit must contain, and plain texts it must not. The view applies them to the hits fetched, whatever
+     * the backend does. A backend that can look for them itself may send them too, so that the hits fetched are the
+     * ones that pass (Loki does).
+     */
+    match?: string[];
+    exclude?: string[];
 }

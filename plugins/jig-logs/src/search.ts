@@ -153,14 +153,17 @@ export async function runSearch(query: LogQuery, environment: SearchEnvironment)
         }
     }
 
-    // One count without the phrase or query. It shows whether the window holds data at all, and says nothing about how
-    // long logs are kept.
+    // One request without the phrase or query, a count where the backend can count. It shows whether the window holds
+    // data at all, and says nothing about how long logs are kept.
     async function probeAvailability(): Promise<Availability> {
         const answer = await call(backend.probe(query, query.range));
         if (!answer.ok) return { state: "unknown", reason: answer.failure.reason };
         const page = backend.parse(answer.body, answer.request);
         if (page === undefined) return { state: "unknown", reason: "invalid_response" };
-        if (page.total > 0) return { state: "documents", count: page.total };
+        // A backend that cannot count says only that there is something, and then so does the result.
+        if (page.total > 0) {
+            return page.relation === "eq" ? { state: "documents", count: page.total } : { state: "documents" };
+        }
         if (page.incomplete !== undefined) return { state: "unknown", reason: page.incomplete };
         return { state: "none", count: 0 };
     }

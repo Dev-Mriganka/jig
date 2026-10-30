@@ -103,8 +103,8 @@ function gapLines(windows: WindowReport[], backend: LogBackend): string[] {
 function availabilityLine(availability: Availability): string {
     const caveat = "This only shows the window has data and proves nothing about retention.";
     if (availability.state === "documents") {
-        const holds = `the window holds ${plural(availability.count ?? 0, "document")} in this environment`;
-        return `Availability: ${holds} without your phrase or query. ${caveat}`;
+        const some = availability.count === undefined ? "documents" : plural(availability.count, "document");
+        return `Availability: the window holds ${some} in this environment without your phrase or query. ${caveat}`;
     }
     if (availability.state === "none") {
         return `Availability: no documents at all in this environment and window. ${caveat}`;

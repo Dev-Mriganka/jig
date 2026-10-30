@@ -19,11 +19,16 @@ import type { Json } from "./support/fake-search.ts";
 
 const FROM = Date.UTC(2026, 9, 13, 10, 0, 0);
 const range = { from: FROM, to: FROM + 2 * HOUR_MS };
-const connection: Backend = { kind: "direct", url: "https://logs.example.com", auth: { kind: "bearer", token: "env:T" } };
+const connection: Backend = {
+    kind: "direct",
+    url: "https://logs.example.com",
+    auth: { kind: "bearer", token: "env:T" },
+};
 
 /** What each backend's `environment` makes from the least a jig.json can say. */
 const MINIMAL: Record<string, Record<string, unknown>> = {
     elasticsearch: { index: "app-logs-*" },
+    loki: { selector: '{app="orders-api", env="staging"}' },
 };
 
 function queryFor(backend: LogBackend, over: Partial<LogQuery> = {}): LogQuery {
@@ -104,7 +109,10 @@ test("what a backend makes of an error never repeats the reply", () => {
     for (const backend of registered) {
         for (const status of [400, 404, 408, 413, 429, 500, 502, 504]) {
             const failure = backend.classify(status, "SECRET-QUERY-TEXT");
-            assert.ok(failure === undefined || !JSON.stringify(failure).includes("SECRET"), `${backend.type} ${status}`);
+            assert.ok(
+                failure === undefined || !JSON.stringify(failure).includes("SECRET"),
+                `${backend.type} ${status}`,
+            );
         }
     }
 });

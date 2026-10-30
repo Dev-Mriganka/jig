@@ -38,8 +38,8 @@ export function createLogsTool(deps: LogsDeps = {}): JigTool {
         name: "logs",
         label: "Logs",
         description:
-            "Search logs by exact phrase or Lucene query over at most 7 days: the number of hits, then one line per " +
-            "hit. match, exclude and around choose and shape the lines. It only reads.",
+            "Search logs by exact phrase, or by a Lucene or LogQL query, over at most 7 days: the number of hits, " +
+            "then one line per hit. match, exclude and around choose and shape the lines. It only reads.",
         promptSnippet: "Search logs by phrase or query in a time window",
         promptGuidelines: [
             "logs: search an exact identifier in a narrow window first (30m to 2h); widen the window step by step.",
@@ -79,7 +79,10 @@ export function createLogsTool(deps: LogsDeps = {}): JigTool {
         plugin: "jig-logs",
         classify(input: Input): CallClass {
             // An environment nobody configured is invalid input: the TypeError names the ones that exist.
-            return { environment: targetFor(requireSettings(), input.environment).jigEnvironment, effect: "read" };
+            const target = targetFor(requireSettings(), input.environment);
+            // So is a query that could reach beyond the selector, and jig-core blocks it here without asking.
+            if (typeof input.query === "string") backendOf(target).checkQuery?.(input.query);
+            return { environment: target.jigEnvironment, effect: "read" };
         },
     };
 

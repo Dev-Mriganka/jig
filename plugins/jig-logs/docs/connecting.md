@@ -13,13 +13,14 @@ name.
 
 | `auth` | What is sent |
 |---|---|
-| `{ "username": "reader", "password": "pass:logs/reader" }` | `Authorization: Basic ...`. The user name cannot hold a colon |
+| `{ "username": "reader", "password": "pass:logs/reader" }` | `Authorization: Basic ...`. The user name cannot hold a colon. Grafana Cloud's Loki takes this form, with the user of the stack and an API token |
 | `{ "apiKey": "pass:logs/api-key" }` | `Authorization: ApiKey <the secret>`. The secret is the key as Elasticsearch gives it (`encoded`) |
 | `{ "token": "pass:logs/token" }` | `Authorization: Bearer <the secret>` |
 | `{ "signIn": "<service name>" }` | The headers of the company sign-in service of that name (for example a single sign-on gateway), asked for on every request |
 
 The request carries `accept: application/json`, and `content-type:
-application/json` when it has a body. The adapter may add headers of its own; the
+application/json` when it has a body. The adapter may add headers of its own, such
+as Loki's tenant, `X-Scope-OrgID`, which is sent through a transport too; the
 sign-in's headers come last and win. A sign-in service is asked for the system
 `logs` and the full address of the request. The tool uses Node's certificate store, so
 `NODE_EXTRA_CA_CERTS` applies to a private certificate authority as it does to

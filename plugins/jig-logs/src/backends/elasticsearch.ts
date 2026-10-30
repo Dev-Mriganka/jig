@@ -7,7 +7,7 @@
 // The model's text only ever lands in one value: the phrase of a `match_phrase`, or the string of a `query_string`. It
 // never becomes a key, a field name or a clause of its own, so a call cannot ask the backend for anything else: no
 // scripts, aggregations or other indexes. Field names, the index and the environment filter come from configuration.
-import type { FilterValue, Target } from "../config.ts";
+import type { ElasticTarget, FilterValue, Target } from "../config.ts";
 import { final } from "../failure.ts";
 import type { LogQuery } from "../query.ts";
 import { parseBody } from "../response.ts";
@@ -30,9 +30,15 @@ export type SearchBody = Record<string, unknown>;
  */
 export const SEARCH_TIMEOUT = "25s";
 
+/** The environment as this backend made it. Only environments this backend made reach its functions. */
+function elastic(target: Target): ElasticTarget {
+    if (target.type === "loki") throw new Error("an Elasticsearch search was given a Loki environment");
+    return target;
+}
+
 /** The time range and the environment's own filter. Every request carries both. */
 function scope(query: LogQuery, range: Range): Clause[] {
-    const { timeField, filter } = query.target;
+    const { timeField, filter } = elastic(query.target);
     return [
         // `format` makes the bounds mean ISO instants whatever date format the field was mapped with.
         { range: { [timeField]: { gte: iso(range.from), lt: iso(range.to), format: "strict_date_optional_time" } } },
@@ -41,7 +47,7 @@ function scope(query: LogQuery, range: Range): Clause[] {
 }
 
 function messageClause(query: LogQuery): Clause {
-    const field = query.target.messageField;
+    const field = elastic(query.target).messageField;
     // `analyze_wildcard` lets `Timeout*` find the lower-cased terms a text field stores, as Kibana's own search does.
     return query.kind === "query"
         ? { query_string: { query: query.text, default_field: field, analyze_wildcard: true } }
@@ -53,7 +59,7 @@ function messageClause(query: LogQuery): Clause {
  * for 0 and only add their exact total.
  */
 export function searchBody(query: LogQuery, bucket: Range, size: number): SearchBody {
-    const { timeField, messageField } = query.target;
+    const { timeField, messageField } = elastic(query.target);
     const body: SearchBody = {
         size,
         timeout: SEARCH_TIMEOUT,
@@ -174,7 +180,7 @@ export const elasticsearch: LogBackend = {
         if (raw.filter !== undefined) checkFilter(raw.filter, `${key}.filter`, errors);
     },
 
-    environment(name, raw): Target {
+    environment(name, raw) {
         return {
             index: raw.index as string,
             timeField: (raw.timeField as string | undefined) ?? DEFAULT_TIME_FIELD,
@@ -193,7 +199,7 @@ export const elasticsearch: LogBackend = {
     wire(target) {
         return (request) => ({
             method: "POST",
-            path: `/${target.index}/_search`,
+            path: `/${elastic(target).index}/_search`,
             body: JSON.stringify(request),
         });
     },

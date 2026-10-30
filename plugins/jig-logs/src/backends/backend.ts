@@ -47,7 +47,10 @@ export interface Words {
     notFound: string;
 }
 
-/** What jig.json says for this store, beyond what every store has (`logs.backend.url`, `auth`, `transport` and each environment's `jigEnvironment`). */
+/**
+ * What jig.json says for this store, beyond what every store has: `logs.backend.url`, `auth` and `transport`, and the
+ * `jigEnvironment` of each environment.
+ */
 export interface ConfigShape {
     /** Names in `logs.backend` that only this store uses, such as Loki's `tenant`. */
     backendFields: readonly string[];

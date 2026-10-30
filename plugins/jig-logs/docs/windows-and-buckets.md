@@ -27,13 +27,17 @@ The window is searched in buckets, one request each, one after another:
 | Over 6 hours, up to 2 days | hour buckets | 7 to 48 |
 | Over 2 days, up to 7 days | day buckets | 3 to 7 |
 
-A week is 7 requests. The last bucket is what is left of the window.
+A week is 7 requests. The last bucket is what is left of the window. A backend
+that refuses a request over some length cuts every bucket to it (Loki says 721
+hours by default, which no bucket reaches).
 
 Buckets are searched from the end of the window that `order` names: `asc` starts
 with the oldest bucket and `desc` with the newest. A bucket asks for as many hits
 as are still wanted. Once `size` hits are collected, each bucket that remains asks
-for 0 hits and only adds its exact count to the total. The result lists the
-buckets in time order, whichever end was searched first.
+for 0 hits and only adds its exact count to the total. Loki cannot count, so there
+each remaining bucket asks for one line and adds that, and the total is a lower
+bound (see [Loki](loki.md#what-loki-cannot-give)). The result lists the buckets in
+time order, whichever end was searched first.
 
 ## When a bucket fails
 
@@ -44,7 +48,8 @@ again. That covers:
 - a request cut at 30 seconds;
 - a reply that reports lost shards;
 - an HTTP 408 or 5xx answer;
-- a connection that breaks.
+- a connection that breaks;
+- a window that Loki refuses as longer than its operator allows.
 
 [Failures](failures.md#gaps-and-their-reasons) lists every reason and says which
 ones are halved.
@@ -87,7 +92,8 @@ window is missing or partial, or when the backend counted only up to a limit.
 One more request counts the documents of the window that have the environment's
 filter, without the phrase or query. The `Availability:` line then says whether
 the window holds any documents at all. It proves nothing about how long logs are
-kept.
+kept. Loki has no count to give, so there the request asks the selector alone for
+one line, and the line says that the window holds documents, without a number.
 
 When the call has already used its 64 requests or its 150 seconds, the check is
 not made. When the check fails, or finds nothing and reports a timeout or lost

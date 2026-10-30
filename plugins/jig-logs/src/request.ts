@@ -45,27 +45,27 @@ function headersOf(wire: Wire): Record<string, string> {
 /** Network errors that mean the connection broke while the backend was working, as it does under load. */
 const CONNECTION_LOST = new Set(["ECONNRESET", "EPIPE", "UND_ERR_SOCKET"]);
 
-/** `wire` says how a request of the environment travels (see `LogBackend.wire`); the address and the sign-in are added. */
+/** `wire` says how a request of the environment travels (see `LogBackend.wire`); this adds the address and sign-in. */
 export function sender(backend: Backend, wire: (request: object) => Wire, options: SenderOptions = {}): Send {
     const timeoutMs = options.timeoutMs ?? REQUEST_TIMEOUT_MS;
 
     if (backend.kind === "transport") {
         const { transport } = backend;
         return (request) => {
-            const how = wire(request);
+            const http = wire(request);
             return timed(options.signal, timeoutMs, (signal) =>
-                viaTransport(transport, `${backend.url}${how.path}`, how, signal),
+                viaTransport(transport, `${backend.url}${http.path}`, http, signal),
             );
         };
     }
 
     const signIn = credentials(backend.auth);
     return async (request) => {
-        const how = wire(request);
-        const url = `${backend.url}${how.path}`;
+        const http = wire(request);
+        const url = `${backend.url}${http.path}`;
         // The timeout starts after the credential is in hand: unlocking a secret store may wait for the user.
         const auth = await signIn(url, options.signal);
-        return timed(options.signal, timeoutMs, (signal) => direct(url, how, auth, signal, options.fetch ?? fetch));
+        return timed(options.signal, timeoutMs, (signal) => direct(url, http, auth, signal, options.fetch ?? fetch));
     };
 }
 

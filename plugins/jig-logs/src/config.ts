@@ -15,22 +15,43 @@ import { CONTROL, isObject, printable, refuse, shown } from "./values.ts";
 /** The value a `filter` entry must equal. */
 export type FilterValue = string | number | boolean;
 
-/** Which kind of backend `logs.backend.url` is. */
-export type BackendType = "elasticsearch";
+/** Which kind of backend `logs.backend.url` is. A section without a type is Elasticsearch: it was the only one. */
+export type BackendType = "elasticsearch" | "loki";
 
-/** Where one Elasticsearch or OpenSearch environment's logs are, with the defaults filled in. */
-export interface Target {
-    /** An index pattern, such as `app-logs-*`. */
-    index: string;
-    /** The date field that windows and sorting use. */
+/** What every environment has, whatever the backend. */
+interface Common {
+    /** The field that hits show as their time. */
     timeField: string;
-    /** The text field that `phrase` and `query` search, and that hits show. */
+    /** The field that hits show as their text, and that `match` and `exclude` read. */
     messageField: string;
-    /** Fields that must equal a value, for an index that holds several environments. */
-    filter: Readonly<Record<string, FilterValue>>;
     /** The jig-core environment this search is classified in, which decides masking and rules. */
     jigEnvironment: string;
 }
+
+/** An Elasticsearch or OpenSearch environment, with the defaults filled in. It has no `type`: it was the only one. */
+export interface ElasticTarget extends Common {
+    type?: "elasticsearch";
+    /** An index pattern, such as `app-logs-*`. */
+    index: string;
+    /** Fields that must equal a value, for an index that holds several environments. */
+    filter: Readonly<Record<string, FilterValue>>;
+    selector?: undefined;
+}
+
+/** A Loki environment: the streams its selector names, and no other. */
+export interface LokiTarget extends Common {
+    type: "loki";
+    /** A LogQL stream selector, such as `{app="orders-api", env="staging"}`. */
+    selector: string;
+    index?: undefined;
+    filter?: undefined;
+}
+
+/**
+ * Where one environment's logs are. `type` tells the kinds apart. `index` and `selector` are each `undefined` on the
+ * other kind, so either can be read on any target.
+ */
+export type Target = ElasticTarget | LokiTarget;
 
 /** How a direct request signs in. Every value but `username` is a secret reference, resolved when the request is made,
  *  except `signIn`, which names a sign-in service. */
@@ -40,13 +61,15 @@ export type Auth =
     | { kind: "bearer"; token: string }
     | { kind: "signIn"; service: string };
 
+/** How requests reach the backend. `tenant` is Loki's, sent as the header `X-Scope-OrgID`. */
 export type Backend =
     /** Straight to the backend over HTTPS, signed in with `auth`. */
-    | { kind: "direct"; url: string; auth: Auth }
+    | { kind: "direct"; url: string; auth: Auth; tenant?: string }
     /** Through a transport a company plugin registered. The transport signs the request in, so there is no `auth`. */
-    | { kind: "transport"; url: string; transport: string };
+    | { kind: "transport"; url: string; transport: string; tenant?: string };
 
 export interface LogsSettings {
+    type: BackendType;
     backend: Backend;
     /** By the name the tool's `environment` parameter uses. */
     environments: ReadonlyMap<string, Target>;
@@ -62,6 +85,42 @@ function unknownFields(raw: Record<string, unknown>, known: readonly string[], k
     for (const field of Object.keys(raw)) {
         if (!known.includes(field)) errors.push(`${key}.${printable(field)} is not a known field`);
     }
+}
+
+/**
+ * Like `unknownFields`, for the two places where the fields depend on the type of backend: a field that another type
+ * uses is not "unknown", and the message names that type so the mistake is easy to see.
+ */
+function checkFields(
+    raw: Record<string, unknown>,
+    shared: readonly string[],
+    level: "backendFields" | "environmentFields",
+    key: string,
+    backend: LogBackend,
+    errors: string[],
+): void {
+    for (const field of Object.keys(raw)) {
+        if (shared.includes(field) || backend.config[level].includes(field)) continue;
+        const owner = Object.values(backends).find((other) => other.config[level].includes(field));
+        errors.push(
+            owner === undefined
+                ? `${key}.${printable(field)} is not a known field`
+                : `${key}.${printable(field)} is only used when logs.backend.type is "${owner.type}"`,
+        );
+    }
+}
+
+/**
+ * The backend that `logs.backend.type` names. A section without a type is Elasticsearch. A type that is none of ours is
+ * an error, and then the fields that depend on the type are not checked, so one mistake is not reported many times.
+ */
+function backendFor(raw: unknown, errors: string[]): LogBackend | undefined {
+    const type = isObject(raw) ? raw.type : undefined;
+    if (type === undefined) return backends.elasticsearch;
+    if (typeof type === "string" && Object.hasOwn(backends, type)) return backends[type as BackendType];
+    const types = Object.keys(backends).map((name) => `"${name}"`);
+    errors.push(`logs.backend.type must be ${types.join(" or ")}`);
+    return undefined;
 }
 
 /** The name of a transport or a sign-in service: text, as another package registered it. */
@@ -144,15 +203,18 @@ function checkAuth(raw: unknown, errors: string[]): void {
     }
 }
 
-function checkBackend(raw: unknown, backend: LogBackend, errors: string[]): void {
+function checkBackend(raw: unknown, backend: LogBackend | undefined, errors: string[]): void {
     if (!isObject(raw)) {
         errors.push("logs.backend must be an object");
         return;
     }
-    unknownFields(raw, ["url", "auth", "transport", ...backend.config.backendFields], "logs.backend", errors);
-    backend.checkBackendFields?.(raw, "logs.backend", errors);
+    if (backend !== undefined) {
+        checkFields(raw, ["type", "url", "auth", "transport"], "backendFields", "logs.backend", backend, errors);
+        backend.checkBackendFields?.(raw, "logs.backend", errors);
+    }
     const viaTransport = raw.transport !== undefined;
-    checkUrl(raw.url, "logs.backend.url", !viaTransport, backend.config.exampleUrl, errors);
+    const example = (backend ?? backends.elasticsearch).config.exampleUrl;
+    checkUrl(raw.url, "logs.backend.url", !viaTransport, example, errors);
     if (viaTransport) {
         if (!isServiceName(raw.transport)) errors.push("logs.backend.transport must be the name of a transport");
         if (raw.auth !== undefined)
@@ -172,7 +234,7 @@ function checkEnvironment(raw: unknown, key: string, backend: LogBackend, errors
         errors.push(`${key} must be an object with at least ${backend.config.needs}`);
         return;
     }
-    unknownFields(raw, ["jigEnvironment", ...backend.config.environmentFields], key, errors);
+    checkFields(raw, ["jigEnvironment"], "environmentFields", key, backend, errors);
     backend.checkEnvironmentFields(raw, key, errors);
     if (
         raw.jigEnvironment !== undefined &&
@@ -182,7 +244,7 @@ function checkEnvironment(raw: unknown, key: string, backend: LogBackend, errors
     }
 }
 
-function checkEnvironments(raw: unknown, backend: LogBackend, errors: string[]): void {
+function checkEnvironments(raw: unknown, backend: LogBackend | undefined, errors: string[]): void {
     if (!isObject(raw)) {
         errors.push("logs.environments must be an object that maps an environment name to its settings");
         return;
@@ -196,7 +258,7 @@ function checkEnvironments(raw: unknown, backend: LogBackend, errors: string[]):
             errors.push(
                 `logs.environments: ${shown(name)} is not a usable name: use letters, digits and . _ -, at most 64`,
             );
-        } else {
+        } else if (backend !== undefined) {
             checkEnvironment(raw[name], `logs.environments.${name}`, backend, errors);
         }
     }
@@ -207,7 +269,7 @@ export function validateLogsSection(raw: unknown): string[] {
     if (!isObject(raw)) return ["logs must be an object"];
     const errors: string[] = [];
     unknownFields(raw, ["backend", "environments"], "logs", errors);
-    const backend = backends.elasticsearch;
+    const backend = backendFor(raw.backend, errors);
     if (raw.backend === undefined) errors.push("logs.backend is needed: where the search backend is");
     else checkBackend(raw.backend, backend, errors);
     if (raw.environments === undefined) errors.push("logs.environments is needed: at least one environment to search");
@@ -226,20 +288,21 @@ function backendFrom(raw: Record<string, unknown>): Backend {
     // The request's path is added to the address, so it is kept as the parser reads it, without a trailing slash.
     const parsed = new URL(raw.url as string);
     const url = `${parsed.origin}${parsed.pathname}`.replace(/\/+$/, "");
-    if (raw.transport !== undefined) return { kind: "transport", url, transport: raw.transport as string };
-    return { kind: "direct", url, auth: authFrom(raw.auth as Record<string, unknown>) };
+    const tenant = raw.tenant === undefined ? {} : { tenant: raw.tenant as string };
+    if (raw.transport !== undefined) return { kind: "transport", url, transport: raw.transport as string, ...tenant };
+    return { kind: "direct", url, auth: authFrom(raw.auth as Record<string, unknown>), ...tenant };
 }
 
 /** The settings with every default filled in, or undefined when the section is absent or not valid. Pure, so tests can
  *  feed it any section. */
 export function settingsFrom(raw: unknown): LogsSettings | undefined {
     if (!isObject(raw) || validateLogsSection(raw).length > 0) return undefined;
-    const backend = backends.elasticsearch;
+    const backend = backendFor(raw.backend, []) as LogBackend;
     const environments = new Map<string, Target>();
     for (const [name, environment] of Object.entries(raw.environments as Record<string, Record<string, unknown>>)) {
         environments.set(name, backend.environment(name, environment));
     }
-    return { backend: backendFrom(raw.backend as Record<string, unknown>), environments };
+    return { type: backend.type, backend: backendFrom(raw.backend as Record<string, unknown>), environments };
 }
 
 /** The settings as jig-core loaded them at the last session start. Read per call, never kept. */

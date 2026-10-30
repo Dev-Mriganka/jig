@@ -5,6 +5,7 @@
 // from another tool, without passing through Pi's own validation.
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
+import { backendOf } from "./backends/index.ts";
 import type { Target } from "./config.ts";
 import { MAX_CHARS, MIN_CHARS } from "./line.ts";
 import type { LogQuery, Order } from "./query.ts";
@@ -50,7 +51,7 @@ export const logsParameters = Type.Object(
             Type.String({
                 minLength: 1,
                 maxLength: MAX_QUERY_CHARS,
-                description: "A Lucene query over the message: AND, OR, NOT, wildcards, quotes. Give phrase or query.",
+                description: "A query in the backend's language, Lucene or LogQL (logs skill). Give phrase or query.",
             }),
         ),
         environment: Type.String({
@@ -74,10 +75,8 @@ export const logsParameters = Type.Object(
                 description: "asc (default): the oldest hits of the window. desc: the newest.",
             }),
         ),
-        match: terms(
-            "Show only hits whose message contains all these plain texts (ignoring case). Picks among fetched hits.",
-        ),
-        exclude: terms("Hide hits whose message contains any of these plain texts. Picks among fetched hits."),
+        match: terms("Show only hits whose message contains all these plain texts (ignoring case)."),
+        exclude: terms("Hide hits whose message contains any of these plain texts."),
         around: Type.Optional(
             Type.String({
                 minLength: 1,
@@ -155,6 +154,8 @@ function checkTerms(input: Input, name: "match" | "exclude"): string[] | undefin
 export function resolveQuery(input: Input, environment: string, target: Target, now: number): LogQuery {
     const kind = input.phrase !== undefined ? "phrase" : "query";
     const text = printableText(input[kind], kind, kind === "phrase" ? MAX_PHRASE_CHARS : MAX_QUERY_CHARS);
+    // The backend refuses a query that its language lets reach beyond what the configuration allowed.
+    if (kind === "query") backendOf(target).checkQuery?.(text);
     const range = resolveRange(
         { window: optionalText(input, "window"), from: optionalText(input, "from"), to: optionalText(input, "to") },
         DEFAULT_WINDOW,
@@ -162,14 +163,20 @@ export function resolveQuery(input: Input, environment: string, target: Target, 
     );
     const order = input.order ?? "asc";
     if (order !== "asc" && order !== "desc") refuse(`logs: order must be asc or desc (got ${shown(order)})`);
+    const size = integer(input, "size", 1, MAX_SIZE) ?? DEFAULT_SIZE;
+    // The same texts the view applies to the hits fetched: a backend that can look for them itself may send them too.
+    const match = checkTerms(input, "match");
+    const exclude = checkTerms(input, "exclude");
     return {
         environment,
         target,
         kind,
         text,
-        size: integer(input, "size", 1, MAX_SIZE) ?? DEFAULT_SIZE,
+        size,
         order: order as Order,
         range,
+        ...(match === undefined ? {} : { match }),
+        ...(exclude === undefined ? {} : { exclude }),
     };
 }
 

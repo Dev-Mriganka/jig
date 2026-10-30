@@ -12,6 +12,7 @@ export type FailureReason =
     | "upstream_unavailable"
     | "rate_limited"
     | "response_too_large"
+    | "window_too_long"
     | "invalid_response"
     | "query_rejected"
     | "index_not_found"
@@ -58,9 +59,8 @@ const NOT_ACCEPTED = "The backend did not accept the sign-in";
 export function failureFromStatus(status: number, body: string, backend: LogBackend): Failure | undefined {
     if (status >= 200 && status < 300) return undefined;
     if (status === 401) {
-        throw new Error(
-            `${NOT_ACCEPTED} (HTTP 401): sign in again, or check ${backend.words.signIn} in the logs section of jig.json`,
-        );
+        const check = `check ${backend.words.signIn} in the logs section of jig.json`;
+        throw new Error(`${NOT_ACCEPTED} (HTTP 401): sign in again, or ${check}`);
     }
     if (status === 403) {
         throw new Error(
@@ -113,6 +113,8 @@ export function nextStep(reason: FailureReason, backend: LogBackend): string {
             return "The backend was unavailable or busy; retry once, then report the gap instead of guessing.";
         case "response_too_large":
             return "Lower size or narrow the window.";
+        case "window_too_long":
+            return "The backend does not search a window this long in one request; use a shorter window.";
         case "invalid_response":
             return "The backend sent a reply that is not a search result; retry once, then report the gap.";
         case "query_rejected":

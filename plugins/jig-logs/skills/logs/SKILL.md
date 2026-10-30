@@ -5,18 +5,19 @@ description: How to search logs with the logs tool - start from an exact identif
 
 # Searching logs
 
-The `logs` tool reads one search backend and never changes anything. A call names an `environment` from the
-configuration, what to find, and a time window. The result is a header (window, status, hits found, fetched and shown,
-buckets) and one line per hit.
+The `logs` tool reads one backend (Elasticsearch, OpenSearch or Loki) and never changes anything. A call names an
+`environment` from the configuration, what to find, and a time window. The result is a header (window, status, hits
+found, fetched and shown, buckets) and one line per hit.
 
 ## The order of work
 
 1. **Pin down the event.** Get the environment, an approximate time and the best identifier: a trace or request id, an
    account or order id, or the exact text of an error. Ask for what is missing. For production, start from a confirmed
    environment, time and identifier.
-2. **Search the strongest identifier first.** `phrase` finds an exact phrase in the message. `query` takes Lucene:
-   `AND`, `OR`, `NOT`, wildcards (`timeout*`), quotes and fields (`level:ERROR AND payment`). Use `phrase` when one
-   identifier will do.
+2. **Search the strongest identifier first.** `phrase` finds an exact phrase in the message; use it when one identifier
+   will do. `query` is in the backend's language: Lucene for Elasticsearch and OpenSearch (`AND`, `OR`, `NOT`,
+   `timeout*`, `level:ERROR AND payment`), a LogQL pipeline for Loki (`|= "timeout" | json | level="error"`). Loki's
+   stream selector is configured, so a query starts with `|` and never names one.
 3. **Start narrow.** `window: "30m"` or `"2h"` around the event, or `from` and `to` with a timezone (`to` is
    exclusive). Widen step by step (`1d`, then `7d`) instead of going straight to the widest. One call reads at most 7
    days; for older logs search consecutive slices.
@@ -27,8 +28,9 @@ buckets) and one line per hit.
 - `size` is how many hits are fetched (50 by default, at most 200); a page shows up to 20. `order: "asc"` fetches the
   oldest hits of the window, `"desc"` the newest. To see later events, use `desc` or narrow the window: raising `size`
   alone does not help.
-- `match` keeps the hits that contain all its texts, `exclude` drops the ones that contain any. Both look only at the
-  hits already fetched. To find a line by an identifier, put the identifier in `phrase`.
+- `match` keeps the hits that contain all its texts, `exclude` drops the ones that contain any. On Elasticsearch both
+  look only at the hits already fetched; Loki also gets them as line filters, with the case you give. To find a line by
+  an identifier, put the identifier in `phrase`.
 - `offset` pages through the hits; the line above them says which `offset` comes next.
 - `around` shows each hit around a term, for a long message. `chars` sets how wide a line is, up to 4000.
 - `{…}` or `[…]` is a JSON body cut for length, not hidden. Rerun with `chars: 4000`, or with `around` and a term from
@@ -38,7 +40,7 @@ buckets) and one line per hit.
 
 - `complete` means every part of the window was searched. `partial` means some parts were not: search the gaps again,
   narrower, and name them in your answer. `failed` means nothing was searched; the `Next:` line says what to change.
-- "at least N hits" is a lower bound.
+- "at least N hits" is a lower bound. Loki cannot count, so a search that fills `size` reads "at least".
 - No hits proves nothing about retention. Check the identifier, the environment and the window first. The availability
   line only says whether the window holds any documents at all.
 - Production results are masked: personal values become tokens (`email#3fa9c1`) and identifiers are kept. Never tell
