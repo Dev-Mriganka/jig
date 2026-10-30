@@ -3,13 +3,14 @@
 //
 // A new object is made every time Pi loads the extension (start-up, reload, a new session), so nothing here outlives
 // its runtime.
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 import { createApprovals } from "./approvals.ts";
 import type { Approvals } from "./approvals.ts";
 import type { Classification } from "./classify.ts";
 import { buildPolicy, defaultConfig, emptyAdditions, loadConfigFile } from "./config.ts";
 import type { CompanyAdditions, LoadedConfig, Policy, SectionCheck } from "./config.ts";
-import type { ApprovalKind, Decision, EnvironmentKind, JigApi, Preview, ToolDeclaration } from "./contract.ts";
+import { JIG_EVENTS } from "./contract.ts";
+import type { ApprovalKind, Decision, EnvironmentKind, Preview, ToolDeclaration } from "./contract.ts";
 import type { DecisionSource } from "./decide.ts";
 import { errorMessage } from "./errors.ts";
 import { createMasker, dailyMaskKey } from "./mask/index.ts";
@@ -23,7 +24,10 @@ import { createSecrets } from "./secrets.ts";
 import type { Secrets } from "./secrets.ts";
 import { createSignIn } from "./signin.ts";
 import type { SignIn } from "./signin.ts";
-import { createWatchPlaceholder } from "./watch-placeholder.ts";
+import { createWatchEngine } from "./watch/engine.ts";
+import type { WatchEngine } from "./watch/engine.ts";
+import { createWatchStore } from "./watch/store.ts";
+import type { Timers } from "./watch/timers.ts";
 
 /** What a test (or an embedding program) can replace. A real Pi session uses the defaults. */
 export interface JigCoreOptions {
@@ -33,6 +37,8 @@ export interface JigCoreOptions {
     /** Shows the rendered preview in the browser. The default writes the page under the state folder and opens it. */
     openPreview?: (preview: Preview, header: string) => Promise<string>;
     now?: () => Date;
+    /** The timers the watch engine uses. The default is Node's, none of which keeps the process alive. */
+    timers?: Timers;
 }
 
 /** What jig-core remembers about one call, from the moment it is decided until its record is written. */
@@ -76,6 +82,8 @@ export interface JigState {
     /** True once jig.json has been read in this runtime. */
     configLoaded: boolean;
     sessionId: string | undefined;
+    /** The screen of the running session, or undefined when it has none (print mode). Set when the session starts. */
+    screen: Pick<ExtensionUIContext, "notify"> | undefined;
     ticket: string | undefined;
     /** Keys from `sessionKey`, added when the user answers "Allow for this session". */
     sessionAllows: Set<string>;
@@ -85,7 +93,7 @@ export interface JigState {
     secrets: Secrets;
     signIn: SignIn;
     approvals: Approvals;
-    watches: JigApi["watches"];
+    watches: WatchEngine;
     /** Field names that company plugins added to the masker, in the order they came. */
     maskFields: string[];
     /** The masker for today. Throws if masking cannot be done. */
@@ -142,6 +150,7 @@ export function createState(pi: ExtensionAPI, options: JigCoreOptions = {}): Jig
         configPath: () => "",
         configLoaded: false,
         sessionId: undefined,
+        screen: undefined,
         ticket: undefined,
         sessionAllows: new Set(),
         calls: new Map(),
@@ -152,7 +161,25 @@ export function createState(pi: ExtensionAPI, options: JigCoreOptions = {}): Jig
             now: () => Date.now(),
             openPreview: options.openPreview ?? (async (preview, header) => openInBrowser(writePreviewPage(preview, header))),
         }),
-        watches: createWatchPlaceholder(),
+        watches: createWatchEngine({
+            now: () => now().getTime(),
+            ...(options.timers === undefined ? {} : { timers: options.timers }),
+            store: createWatchStore(),
+            // A message to the agent does not pass the hook that cleans tool results: the engine cleans its own text.
+            protect: { redact: (text) => redactor.text(text), mask: (text) => state.masker().text(text) },
+            notify(message, level) {
+                if (state.screen === undefined) return false;
+                try {
+                    state.screen.notify(message, level);
+                    return true;
+                } catch {
+                    // A screen from an earlier runtime can be gone; the watch goes on without it.
+                    return false;
+                }
+            },
+            emit: (event) => pi.events.emit(JIG_EVENTS.watchDone, event),
+            send: (message) => pi.sendMessage(message, { deliverAs: "followUp", triggerTurn: true }),
+        }),
         maskFields: [],
         masker() {
             const date = now();

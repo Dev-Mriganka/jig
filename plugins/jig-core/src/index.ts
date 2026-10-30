@@ -5,6 +5,8 @@
 //   tool_execution_end   write the call's record
 //   turn_end             write the model turn's record
 //
+// It also runs the watch engine (src/watch) and registers the `watch` tool.
+//
 // The factory only registers things. It starts nothing long-lived (Pi's documentation forbids it): the configuration is
 // loaded when the session starts.
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
@@ -22,6 +24,7 @@ import { cleanupRecords } from "./records.ts";
 import { finishCall, finishTurn, toolResult } from "./results.ts";
 import { createState, loadPersonalConfig } from "./state.ts";
 import type { JigCoreOptions, JigState } from "./state.ts";
+import { registerWatchTool } from "./watch/tool.ts";
 
 export type { JigCoreOptions };
 
@@ -42,8 +45,11 @@ export function jigCore(options: JigCoreOptions = {}): ExtensionFactory {
             withdrawJig(api);
             state.sessionAllows.clear();
             state.calls.clear();
+            state.watches.end();
+            state.screen = undefined;
         });
         registerCommands(pi, state);
+        registerWatchTool(pi, api, state.watches);
 
         // Last, so the hooks are in place before other plugins start declaring their tools. A plugin whose start-up
         // callback throws must not take the tool manager, or the other plugins, down with it: the error is kept
@@ -56,7 +62,10 @@ export function jigCore(options: JigCoreOptions = {}): ExtensionFactory {
 
 function startSession(state: JigState, ctx: ExtensionContext): void {
     state.sessionId = ctx.sessionManager.getSessionId();
+    state.screen = ctx.hasUI ? ctx.ui : undefined;
     loadPersonalConfig(state);
+    // Watches saved by this session before Pi was closed start polling again.
+    state.watches.begin(state.sessionId);
 
     const problems = [...state.policy().problems.map(describeProblem), ...state.startupProblems];
     if (problems.length > 0 && ctx.hasUI) {

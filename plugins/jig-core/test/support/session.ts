@@ -5,23 +5,26 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-works/pi-ai";
-import type { JsonObject } from "@earendil-works/pi-ai";
+import type { FauxProviderHandle, JsonObject } from "@earendil-works/pi-ai";
 import { createAgentSession, DefaultResourceLoader, ModelRuntime, SessionManager, SettingsManager } from "@earendil-works/pi-coding-agent";
 import type { AgentSession, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { jig, withJig } from "../../src/client.ts";
 import { JIG_EVENTS } from "../../src/contract.ts";
-import type { CallClass, DecisionEvent } from "../../src/contract.ts";
+import type { CallClass, DecisionEvent, WatchDoneEvent } from "../../src/contract.ts";
 import { jigCore } from "../../src/index.ts";
 import type { Masker } from "../../src/mask/index.ts";
 import { fakeMasker, fakeUi } from "./fakes.ts";
 import type { FakeUiLog, FakeUiScript } from "./fakes.ts";
 import { readRecords } from "./state.ts";
+import type { FakeClock } from "./clock.ts";
 
 /** What the fake plugin saw. */
 export interface PluginLog {
     executed: Array<{ tool: string; id: string; input: Record<string, unknown> }>;
     decisions: DecisionEvent[];
+    /** The `jig:watch-done` events, in order. */
+    watchDone: WatchDoneEvent[];
     /** The fake plugin's own section of jig.json, as `jig().config.section("fake")` returned it at session start. */
     section: unknown;
 }
@@ -52,6 +55,7 @@ const classifyByInput = (input: Readonly<Record<string, unknown>>): CallClass =>
 export function fakePlugin(log: PluginLog): ExtensionFactory {
     return (pi) => {
         pi.events.on(JIG_EVENTS.decision, (data) => { log.decisions.push(data as DecisionEvent); });
+        pi.events.on(JIG_EVENTS.watchDone, (data) => { log.watchDone.push(data as WatchDoneEvent); });
 
         withJig((api) => {
             api.declareTool({
@@ -182,6 +186,8 @@ export interface WorldOptions {
     realMasker?: boolean;
     /** Put the fake plugin before jig-core, so its `withJig` waits for jig-core to load. */
     pluginFirst?: boolean;
+    /** The time and timers the watch engine uses, so a test can move them by hand. Default: the real ones. */
+    clock?: FakeClock;
     env?: Record<string, string>;
 }
 
@@ -191,6 +197,8 @@ export interface World {
     stateDir: string;
     agentDir: string;
     log: PluginLog;
+    /** The scripted model, for a test that needs to answer a turn the session starts by itself. */
+    faux: FauxProviderHandle;
     ui: FakeUiLog | undefined;
     /** One model turn that makes these tool calls, then a closing message. */
     calls(calls: Array<{ name: string; args: JsonObject; id?: string }>): Promise<ToolOutcome[]>;
@@ -227,8 +235,9 @@ export async function startWorld(options: WorldOptions = {}): Promise<World> {
     const faux = fauxProvider();
     modelRuntime.registerNativeProvider(faux.provider);
 
-    const log: PluginLog = { executed: [], decisions: [], section: undefined };
-    const jigFactory = options.realMasker === true ? jigCore() : jigCore({ createMasker: () => options.masker ?? fakeMasker });
+    const log: PluginLog = { executed: [], decisions: [], watchDone: [], section: undefined };
+    const clock = options.clock === undefined ? {} : { now: options.clock.date, timers: options.clock.timers };
+    const jigFactory = options.realMasker === true ? jigCore(clock) : jigCore({ createMasker: () => options.masker ?? fakeMasker, ...clock });
     const plugin = fakePlugin(log);
     const resourceLoader = new DefaultResourceLoader({
         cwd, agentDir,
@@ -272,7 +281,7 @@ export async function startWorld(options: WorldOptions = {}): Promise<World> {
     }
 
     return {
-        session, cwd, agentDir, log,
+        session, cwd, agentDir, log, faux,
         stateDir: process.env.JIG_STATE_DIR ?? "",
         ui: screen?.log,
         calls,

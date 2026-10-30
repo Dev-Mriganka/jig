@@ -2,9 +2,11 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, test } from "node:test";
 import type { CallClass, JigApi } from "../src/contract.ts";
+import { fakeClock } from "./support/clock.ts";
 import { start, text } from "./support/harness.ts";
 import type { Harness, StartOptions } from "./support/harness.ts";
 import { tempState } from "./support/state.ts";
+import { rig, scripted } from "./support/watches.ts";
 
 const state = tempState();
 beforeEach(() => { state.start(); });
@@ -62,11 +64,67 @@ describe("/jig", () => {
             plugins: declareGit,
         });
         const status = await jigCommand(harness);
-        assert.match(status, /jig-core governs 4 tools in session session-test/);
+        // The four tools given, and jig-core's own `watch`.
+        assert.match(status, /jig-core governs 5 tools in session session-test/);
         assert.match(status, /Plugins: jig-core, jig-git/);
         assert.match(status, /Tools on the unknown default \(they ask until classified\): mystery\n/);
         assert.match(status, /Open watches: 0/);
         assert.match(status, /Configuration: none found \(.*jig\.json\), defaults apply/);
+    });
+
+    test("counts the open watches, and says which of them are paused or wait for their plugin", async () => {
+        // A watch this session saved before Pi was closed, whose plugin is not loaded now.
+        const earlier = rig();
+        earlier.engine.registerKind(scripted(earlier.clock, "gone", (n) => ({ state: n })).kind);
+        earlier.begin("session-test");
+        earlier.engine.start({ kind: "gone", spec: {}, title: "from the plugin that is not loaded" });
+        earlier.engine.end();
+
+        const clock = fakeClock();
+        const harness = await begin({
+            clock,
+            plugins: (api) => {
+                api.watches.registerKind(scripted(clock, "ok", (n) => ({ state: n })).kind);
+                api.watches.registerKind(scripted(clock, "broken", () => { throw new Error("down"); }).kind);
+            },
+        });
+        assert.match(await jigCommand(harness), /Open watches: 1 \(1 waiting for its plugin\)\n/);
+
+        harness.api.watches.start({ kind: "ok", spec: {}, title: "one" });
+        harness.api.watches.start({ kind: "ok", spec: {}, title: "two" });
+        assert.match(await jigCommand(harness), /Open watches: 3 \(1 waiting for its plugin\)\n/);
+
+        harness.api.watches.start({ kind: "broken", spec: {}, title: "three" });
+        await clock.advance(5 * 60_000);
+        assert.match(await jigCommand(harness), /Open watches: 4 \(1 paused, 1 waiting for its plugin\)\n/);
+    });
+
+    test("a watch that has finished is not counted as open", async () => {
+        const clock = fakeClock();
+        const harness = await begin({ clock, plugins: (api) => api.watches.registerKind(scripted(clock, "ok", () => ({ state: 1, done: { outcome: "passed", summary: "ok" } })).kind) });
+        harness.api.watches.start({ kind: "ok", spec: {}, title: "one" });
+        assert.match(await jigCommand(harness), /Open watches: 1\n/);
+        await clock.advance(5_000);
+        assert.match(await jigCommand(harness), /Open watches: 0\n/);
+    });
+
+    test("shows a problem with the saved watches", async () => {
+        const clock = fakeClock();
+        const harness = await begin({ clock, plugins: (api) => api.watches.registerKind(scripted(clock, "ok", (n) => ({ state: n })).kind) });
+        assert.ok(!/Watches:/.test(await jigCommand(harness)));
+        // A file in the folder that no version of Jig wrote.
+        const { mkdirSync, writeFileSync } = await import("node:fs");
+        mkdirSync(`${state.dir}/watches`, { recursive: true });
+        writeFileSync(`${state.dir}/watches/abcdefgh.json`, "{ not json");
+        await harness.host.fire("session_start", { reason: "reload" }, harness.ctx);
+        assert.match(await jigCommand(harness), /\nWatches: 1 saved watch file could not be read$/);
+    });
+
+    test("jig-core's own watch tool is not on the unknown default", async () => {
+        const harness = await begin({ tools: [{ name: "mystery" }] });
+        const status = await jigCommand(harness);
+        assert.match(status, /Plugins: jig-core\n/);
+        assert.match(status, /Tools on the unknown default \(they ask until classified\): mystery\n/);
     });
 
     test("a declared tool whose classification depends on the call is not on the unknown default", async () => {
@@ -152,6 +210,13 @@ describe("/jig rules", () => {
         assert.match(await jigCommand(harness, "rules fake"), /^fake: decided per call by its declaration \(jig-test\)$/m);
     });
 
+    test("lists jig-core's own watch tool: list reads and stop writes, both on this machine", async () => {
+        const harness = await begin();
+        const rules = await jigCommand(harness, "rules watch");
+        assert.match(rules, /^watch list: local read -> allow \(decision: table; classified by: declaration\)$/m);
+        assert.match(rules, /^watch stop: local write -> allow \(decision: table; classified by: declaration\)$/m);
+    });
+
     test("a tool that is named but unknown", async () => {
         const harness = await begin({ tools });
         assert.equal(await jigCommand(harness, "rules nothing"), "No tool named nothing.");
@@ -162,7 +227,7 @@ describe("/jig rules", () => {
         const harness = await begin({ tools: many });
         await jigCommand(harness, "rules");
         assert.equal(harness.ui.selects.length, 1);
-        assert.equal(harness.ui.selects[0]?.options.length, 30);
+        assert.equal(harness.ui.selects[0]?.options.length, 32, "the 30 tools, and a line for each of the two actions of jig-core's own `watch`");
         await jigCommand(harness, "rules tool_03");
         assert.equal(harness.ui.selects.length, 1, "one line is a notice");
     });

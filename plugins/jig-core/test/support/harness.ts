@@ -13,6 +13,7 @@ import type { FakeUiLog, FakeUiScript } from "./fakes.ts";
 import { fakeContext, fakePi } from "./fake-pi.ts";
 import type { FakePi, FakeTool } from "./fake-pi.ts";
 import { readRecords } from "./state.ts";
+import type { FakeClock } from "./clock.ts";
 
 export interface Result {
     content: Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: string }>;
@@ -73,6 +74,8 @@ export interface StartOptions {
     /** Runs after jig-core is published and before the session starts, as a plugin's start-up would. */
     plugins?: (api: JigApi) => void;
     openPreview?: (preview: never, header: string) => Promise<string>;
+    /** The time and timers the watch engine uses, so a test can move them by hand. Default: the real ones. */
+    clock?: FakeClock;
 }
 
 /** Loads jig-core into a fake Pi and starts a session. The state folder must already be set (see `tempState`). */
@@ -83,7 +86,11 @@ export async function start(options: StartOptions = {}): Promise<Harness> {
     process.env.PI_CODING_AGENT_DIR = agentDir;
 
     const host = fakePi(options.tools ?? []);
-    jigCore({ createMasker: () => options.masker ?? fakeMasker, ...(options.openPreview === undefined ? {} : { openPreview: options.openPreview as never }) })(host.pi);
+    jigCore({
+        createMasker: () => options.masker ?? fakeMasker,
+        ...(options.openPreview === undefined ? {} : { openPreview: options.openPreview as never }),
+        ...(options.clock === undefined ? {} : { now: options.clock.date, timers: options.clock.timers }),
+    })(host.pi);
     const api = jig();
     options.plugins?.(api);
     const { ctx, log } = fakeContext({

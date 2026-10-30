@@ -90,7 +90,7 @@ export function statusLines(state: JigState): string[] {
         `jig-core governs ${tools.length} tools${state.sessionId === undefined ? "" : ` in session ${state.sessionId}`}`,
         `Plugins: ${[...plugins].join(", ")}`,
         `Tools on the unknown default (they ask until classified): ${unclassified.length === 0 ? "none" : unclassified.join(", ")}`,
-        `Open watches: ${state.watches.list().length}`,
+        watchesLine(state),
         state.personal.found
             ? `Configuration: ${state.personal.file}`
             : `Configuration: none found (${state.personal.file || "not loaded yet"}), defaults apply`,
@@ -102,7 +102,21 @@ export function statusLines(state: JigState): string[] {
     }
     if (problems.length > 0) lines.push(`Configuration problems (${problems.length}):`, ...problems.map((problem) => `  ${problem}`));
     if (state.recordsProblem !== undefined) lines.push(`Records: the last write failed: ${state.recordsProblem}`);
+    const watchProblem = state.watches.problem();
+    if (watchProblem !== undefined) lines.push(`Watches: ${watchProblem}`);
     return lines;
+}
+
+/** `Open watches: 3 (1 paused, 1 waiting for its plugin)`: each watch not finished, and why some do not poll. */
+function watchesLine(state: JigState): string {
+    const open = state.watches.entries().filter((entry) => entry.status !== "done");
+    const paused = open.filter((entry) => entry.status === "paused").length;
+    const waiting = open.filter((entry) => entry.waiting).length;
+    const notes = [
+        ...(paused === 0 ? [] : [`${paused} paused`]),
+        ...(waiting === 0 ? [] : [`${waiting} waiting for ${waiting === 1 ? "its" : "their"} plugin`]),
+    ];
+    return `Open watches: ${open.length}${notes.length === 0 ? "" : ` (${notes.join(", ")})`}`;
 }
 
 // ---- /jig rules -------------------------------------------------------------------------------------------------------

@@ -6,8 +6,10 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, test } from "node:test";
 import { jig, withdrawJig, withJig } from "../src/client.ts";
 import jigDefault, { jigCore } from "../src/index.ts";
+import { fakeClock } from "./support/clock.ts";
 import { fakeContext, fakePi } from "./support/fake-pi.ts";
 import { tempState } from "./support/state.ts";
+import { passed, scripted } from "./support/watches.ts";
 
 const state = tempState();
 let agentDir = "";
@@ -26,11 +28,12 @@ afterEach(() => {
 });
 
 describe("the factory", () => {
-    test("registers the hooks it needs and the /jig command", () => {
+    test("registers the hooks it needs, the /jig command and the watch tool", () => {
         const host = fakePi();
         jigCore()(host.pi);
         assert.deepEqual([...host.handlers.keys()].sort(), ["session_shutdown", "session_start", "tool_call", "tool_execution_end", "tool_result", "turn_end"]);
         assert.ok(host.commands.has("jig"));
+        assert.deepEqual([...host.registered.keys()], ["watch"]);
         withdrawJig(jig());
     });
 
@@ -43,9 +46,12 @@ describe("the factory", () => {
     });
 
     test("starts nothing: no session, no files, no timers, until a session starts", async () => {
+        const clock = fakeClock();
         const host = fakePi();
-        jigCore()(host.pi);
+        jigCore({ now: clock.date, timers: clock.timers })(host.pi);
         assert.equal(existsSync(`${state.dir}/records`), false);
+        assert.equal(existsSync(`${state.dir}/watches`), false);
+        assert.equal(clock.pending(), 0);
         withdrawJig(jig());
     });
 
@@ -133,13 +139,108 @@ describe("the API that plugins get", () => {
         withdrawJig(api);
     });
 
-    test("watches are a placeholder: kinds are kept, nothing is listed, and starting or stopping says they are not built", () => {
-        const { api } = load();
-        assert.doesNotThrow(() => api.watches.registerKind({ kind: "k", plugin: "p", intervalMs: 1000, describe: () => "d", poll: async () => ({ state: 1 }) }));
+    test("watches: a plugin registers a kind when it loads, and starts watches once a session runs", async () => {
+        const clock = fakeClock();
+        const host = fakePi();
+        jigCore({ now: clock.date, timers: clock.timers })(host.pi);
+        const api = jig();
+        assert.deepEqual(Object.keys(api.watches).sort(), ["list", "registerKind", "start", "stop"], "a plugin gets the four calls and no more");
+        const { kind, polls } = scripted(clock, "ci", () => passed("done"));
+        api.watches.registerKind(kind);
         assert.deepEqual(api.watches.list(), []);
-        assert.throws(() => api.watches.start({ kind: "k", spec: {}, title: "t" }), /watches are not built yet/);
-        assert.throws(() => api.watches.stop("any"), /watches are not built yet/);
+        assert.throws(() => api.watches.start({ kind: "ci", spec: {}, title: "t" }), /only while a session is running/);
+
+        await host.fire("session_start", { reason: "startup" }, fakeContext({ session: "session-1" }).ctx);
+        const id = api.watches.start({ kind: "ci", spec: {}, title: "checks of pull request 42" });
+        assert.deepEqual(api.watches.list().map((watch) => [watch.id, watch.status]), [[id, "open"]]);
+        assert.equal(api.watches.stop("zzzzzzzz"), false);
+        await clock.advance(5_000);
+        assert.equal(polls.length, 1);
+        await host.fire("session_shutdown", { reason: "quit" }, fakeContext().ctx);
         withdrawJig(api);
+    });
+
+    test("watches: the agent gets one follow-up message that starts a turn, and other plugins get the event", async () => {
+        const clock = fakeClock();
+        const host = fakePi();
+        jigCore({ now: clock.date, timers: clock.timers })(host.pi);
+        const api = jig();
+        api.watches.registerKind(scripted(clock, "ci", () => passed("12 of 12 checks passed")).kind);
+        await host.fire("session_start", { reason: "startup" }, fakeContext().ctx);
+        const id = api.watches.start({ kind: "ci", spec: {}, title: "checks of pull request 42" });
+        await clock.advance(10_000);
+
+        assert.equal(host.sent.length, 1);
+        assert.deepEqual(host.sent[0]?.options, { deliverAs: "followUp", triggerTurn: true });
+        assert.equal(host.sent[0]?.message.customType, "jig-watch");
+        assert.equal(host.sent[0]?.message.display, true);
+        assert.equal(host.sent[0]?.message.content, 'The watch "checks of pull request 42" passed.\n12 of 12 checks passed');
+        const done = host.emitted.filter((entry) => entry.channel === "jig:watch-done");
+        assert.equal(done.length, 1);
+        assert.deepEqual(done[0]?.data, { id, kind: "ci", plugin: "jig-test", title: "checks of pull request 42", result: { outcome: "passed", summary: "12 of 12 checks passed" } });
+        await host.fire("session_shutdown", { reason: "quit" }, fakeContext().ctx);
+        withdrawJig(api);
+    });
+
+    test("watches: the session's screen gets the notices, and a session without one gets none", async () => {
+        for (const [ui, expected] of [[{ select: () => "Allow" }, 1], [false, 0]] as const) {
+            const clock = fakeClock();
+            const host = fakePi();
+            jigCore({ now: clock.date, timers: clock.timers })(host.pi);
+            const api = jig();
+            api.watches.registerKind(scripted(clock, "ci", (n) => ({ state: n })).kind);
+            const { ctx, log } = fakeContext({ ui, session: `session-${expected}` });
+            await host.fire("session_start", { reason: "startup" }, ctx);
+            api.watches.start({ kind: "ci", spec: {}, title: "t", stallMinutes: 1 });
+            await clock.advance(5 * 60_000);
+            assert.equal(log.notifications.filter((notice) => notice.message.startsWith("Still waiting")).length, expected);
+            await host.fire("session_shutdown", { reason: "quit" }, ctx);
+            withdrawJig(api);
+        }
+    });
+
+    test("watches: shutdown stops every timer, and saved watches wait for the same session to start again", async () => {
+        const clock = fakeClock();
+        const first = fakePi();
+        jigCore({ now: clock.date, timers: clock.timers })(first.pi);
+        jig().watches.registerKind(scripted(clock, "ci", (n) => ({ state: n })).kind);
+        await first.fire("session_start", { reason: "startup" }, fakeContext({ session: "session-9" }).ctx);
+        const id = jig().watches.start({ kind: "ci", spec: {}, title: "t" });
+        await first.fire("session_shutdown", { reason: "quit" }, fakeContext().ctx); // also withdraws the API
+        assert.equal(clock.pending(), 0);
+
+        // Pi starts again, in the same session.
+        const second = fakePi();
+        jigCore({ now: clock.date, timers: clock.timers })(second.pi);
+        const api = jig();
+        api.watches.registerKind(scripted(clock, "ci", () => passed("finished while Pi was closed")).kind);
+        await second.fire("session_start", { reason: "resume" }, fakeContext({ session: "session-9" }).ctx);
+        assert.deepEqual(api.watches.list().map((watch) => watch.id), [id]);
+        await clock.advance(10_000);
+        assert.equal(second.sent.length, 1);
+        assert.match(String(second.sent[0]?.message.content), /^While Pi was closed: the watch "t" passed\./);
+        await second.fire("session_shutdown", { reason: "quit" }, fakeContext().ctx);
+    });
+
+    test("watches: a different session does not pick the watch up", async () => {
+        const clock = fakeClock();
+        const first = fakePi();
+        jigCore({ now: clock.date, timers: clock.timers })(first.pi);
+        jig().watches.registerKind(scripted(clock, "ci", (n) => ({ state: n })).kind);
+        await first.fire("session_start", { reason: "startup" }, fakeContext({ session: "session-a" }).ctx);
+        jig().watches.start({ kind: "ci", spec: {}, title: "t" });
+        await first.fire("session_shutdown", { reason: "quit" }, fakeContext().ctx);
+
+        const second = fakePi();
+        jigCore({ now: clock.date, timers: clock.timers })(second.pi);
+        const api = jig();
+        const other = scripted(clock, "ci", (n) => ({ state: n }));
+        api.watches.registerKind(other.kind);
+        await second.fire("session_start", { reason: "new" }, fakeContext({ session: "session-b" }).ctx);
+        assert.deepEqual(api.watches.list(), []);
+        await clock.advance(5 * 60_000);
+        assert.equal(other.polls.length, 0);
+        await second.fire("session_shutdown", { reason: "quit" }, fakeContext().ctx);
     });
 
     test("declareTool checks what it is given, and declaring a tool again replaces it", () => {
