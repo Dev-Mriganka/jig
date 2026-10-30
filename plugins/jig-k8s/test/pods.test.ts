@@ -141,6 +141,20 @@ describe("a pod read from kubectl's JSON", () => {
         assert.deepEqual([bare?.status, bare?.ready, bare?.restarts, bare?.created, bare?.tags, bare?.totalContainers], ["Unknown", false, 0, undefined, [], 0]);
     });
 
+    test("a pod or a container whose name Kubernetes would not allow is left out, because the name goes into a command line", () => {
+        for (const name of ["-A", "--all", "-n=kube-system", "Orders", "a b", "x;y", "$(id)", "a\nb", ".", "a..", "x".repeat(254)]) {
+            assert.equal(parse(pod(name)), undefined, JSON.stringify(name));
+        }
+        for (const name of ["a", "orders-api-0", "orders-api-6d4f9c7b8-x2k9q", "pod.with.dots", "x".repeat(253)]) {
+            assert.equal(parse(pod(name))?.name, name, name);
+        }
+        const raw = pod("orders-api-0", { sidecar: "1.20" }) as { spec: { containers: Array<{ name: string; image: string }> } };
+        raw.spec.containers.push({ name: "--all-containers", image: "registry.example.test/x:1" }, { name: "Main", image: "registry.example.test/x:1" });
+        const read = parse(raw);
+        assert.deepEqual(read?.containers.map((c) => c.name), ["orders-api", "mesh-proxy"]);
+        assert.equal(read?.totalContainers, 2);
+    });
+
     test("a pod without a tag shows none", () => {
         const read = parse(pod("p", { image: "registry.example.test/shop/orders-api@sha256:abc" }));
         assert.deepEqual(read?.tags, []);

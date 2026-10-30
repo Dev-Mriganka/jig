@@ -40,6 +40,8 @@ const ENVIRONMENT_NAME = /^[A-Za-z][A-Za-z0-9_-]{0,39}$/;
 const CONTEXT = /^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,252}$/;
 /** What Kubernetes calls a DNS label: namespace and container names. */
 export const DNS_LABEL = /^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$/;
+/** What it calls a DNS subdomain: pod names. Neither starts with `-`, so neither can be read as a flag. */
+export const DNS_SUBDOMAIN = /^[a-z0-9]([-a-z0-9.]{0,251}[a-z0-9])?$/;
 const LABEL_PAIR = /^([A-Za-z0-9][A-Za-z0-9._/-]{0,252})=([A-Za-z0-9][A-Za-z0-9._-]{0,62})$/;
 const MAX_SERVICES = 100;
 const MAX_ENVIRONMENTS = 20;

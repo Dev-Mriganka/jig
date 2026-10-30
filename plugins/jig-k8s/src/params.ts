@@ -3,7 +3,7 @@
 // size. parseCall does no I/O.
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
-import { DNS_LABEL, describeServices, findTarget, notSetUp } from "./config.ts";
+import { DNS_LABEL, DNS_SUBDOMAIN, describeServices, findTarget, notSetUp } from "./config.ts";
 import type { K8sSettings, Target } from "./config.ts";
 import { InputError, shortList, shown } from "./values.ts";
 
@@ -90,7 +90,6 @@ export const PRODUCTION = "production";
 const CHARS = "A-Za-z0-9._~/!$&'()*+,;=:@%-";
 const PATH_AND_QUERY = new RegExp(`^(/[${CHARS}]{0,400})(\\?[${CHARS}]{0,400})?$`);
 const IMAGE_TAG = /^[A-Za-z0-9_][A-Za-z0-9._+-]{0,127}$/;
-const POD_NAME = /^[a-z0-9]([-a-z0-9.]{0,251}[a-z0-9])?$/;
 
 /** How many times a path is percent-decoded when it is searched for "..". */
 const MAX_DECODE_ROUNDS = 5;
@@ -196,7 +195,7 @@ export function parseCall(input: Readonly<Record<string, unknown>>, settings: K8
             return {
                 action,
                 target,
-                pod: text(action, input.pod, "pod", POD_NAME, "a pod name, as pods shows it"),
+                pod: text(action, input.pod, "pod", DNS_SUBDOMAIN, "a pod name, as pods shows it"),
                 container: text(action, input.container, "container", DNS_LABEL, "a container name"),
                 tail: integer(action, input.tail, "tail", 1, MAX_TAIL) ?? DEFAULT_TAIL,
                 sinceSeconds: integer(action, input.sinceSeconds, "sinceSeconds", 1, MAX_SINCE_SECONDS),

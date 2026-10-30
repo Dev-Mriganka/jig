@@ -1,5 +1,6 @@
 // The pods of a service, read from `kubectl get pods -o json`: whether each is ready, what it is doing, how often it
 // restarted, and the image tag of the containers that run the service itself. Also the `pods` action.
+import { DNS_LABEL, DNS_SUBDOMAIN } from "./config.ts";
 import type { Target } from "./config.ts";
 import { getJson } from "./kubectl.ts";
 import type { Kube } from "./kubectl.ts";
@@ -66,11 +67,16 @@ export function ownContainers(containers: readonly Container[], target: Target):
     return named.length > 0 ? named : [...containers];
 }
 
+/** The containers of a pod spec. A name goes into a command line later (`-c`), so one that Kubernetes would not allow, and
+ *  that could be read as a flag, is left out. */
 function containersOf(list: unknown): Container[] {
-    return (Array.isArray(list) ? list : []).filter(isObject).map((container) => {
-        const image = str(container.image) ?? "";
-        return { name: str(container.name) ?? "", image, tag: tagOf(image) };
-    });
+    return (Array.isArray(list) ? list : [])
+        .filter(isObject)
+        .map((container) => {
+            const image = str(container.image) ?? "";
+            return { name: str(container.name) ?? "", image, tag: tagOf(image) };
+        })
+        .filter((container) => DNS_LABEL.test(container.name));
 }
 
 function waitingReason(status: Record<string, unknown>): string | undefined {
@@ -85,8 +91,9 @@ function terminatedReason(status: Record<string, unknown>): string | undefined {
 
 export function parsePod(raw: unknown, target: Target): Pod | undefined {
     if (!isObject(raw) || !isObject(raw.metadata)) return undefined;
+    // The name goes into a command line later (`logs`, `exec`), so one Kubernetes would not allow is not a pod.
     const name = str(raw.metadata.name);
-    if (name === undefined) return undefined;
+    if (name === undefined || !DNS_SUBDOMAIN.test(name)) return undefined;
     const status = isObject(raw.status) ? raw.status : {};
     const statuses = (Array.isArray(status.containerStatuses) ? status.containerStatuses : []).filter(isObject);
     const initStatuses = (Array.isArray(status.initContainerStatuses) ? status.initContainerStatuses : []).filter(isObject);

@@ -21,13 +21,18 @@ function scrub(text: string): string {
     return text.replace(/([a-z][a-z0-9+.-]*:\/\/)[^/@\s]+@/gi, "$1");
 }
 
-/** The first few non-empty lines of kubectl's complaint, on one line. */
+/**
+ * The first few non-empty lines of kubectl's complaint, on one line. The lines are taken before anything is scrubbed, and
+ * each is cut: kubectl's complaint can be megabytes long, and nothing here may take longer for it.
+ */
 export function firstLines(text: string, count = 3): string {
-    const lines = scrub(text)
-        .split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean);
-    return oneLine(lines.slice(0, count).join("; "), 400);
+    const lines: string[] = [];
+    for (const line of text.split("\n")) {
+        const trimmed = line.trim();
+        if (trimmed !== "") lines.push(trimmed.slice(0, 500));
+        if (lines.length === count) break;
+    }
+    return oneLine(scrub(lines.join("; ")), 400);
 }
 
 /** `orders-api in staging`. */

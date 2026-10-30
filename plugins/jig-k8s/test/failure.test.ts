@@ -113,4 +113,18 @@ describe("anything else", () => {
     test("a very long complaint is cut", () => {
         assert.ok(message(`error: ${"x".repeat(2000)}`, 2).length < 450);
     });
+
+    test("a complaint of megabytes costs no more than a short one", () => {
+        for (const stderr of ["a".repeat(8 * 1024 * 1024), "line\n".repeat(1_000_000), "a://".repeat(500_000), `${"a".repeat(4 * 1024 * 1024)}://x@y`]) {
+            const started = Date.now();
+            const text = message(stderr, 2);
+            assert.ok(Date.now() - started < 1000, `${Date.now() - started} ms`);
+            assert.ok(text.length < 450);
+        }
+    });
+
+    test("only the first lines are looked at, and the rest is never repeated", () => {
+        const text = message(`first\nsecond\n\n   \nthird\nfourth-CANARY\nfifth-CANARY`, 2);
+        assert.equal(text, "kubectl get failed (exit 2): first; second; third");
+    });
 });
