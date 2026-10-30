@@ -4,7 +4,7 @@ Jig is a set of plugins for the [Pi](https://pi.dev) coding agent. They decide
 what the agent may do, ask you when it matters, keep secrets out of its reach,
 and record what happened so you can see it later.
 
-**Status:** eight of the twelve plugins are built. Each plugin's README is the
+**Status:** nine of the twelve plugins are built. Each plugin's README is the
 specification that its code follows.
 
 ## What works today
@@ -18,7 +18,8 @@ for you. `jig-jira` reads and changes Jira issues, with rendered previews.
 team's saved API requests by name, with sign-in added by the tool. `jig-ops`
 looks at CI on GitHub Actions, GitLab CI or Jenkins and watches it until it
 finishes, deploys a version to a test environment and reads what runs, all from
-one service catalog. The other plugins are designs.
+one service catalog. `jig-mongo` explores, queries, explains and (in a test
+environment) changes MongoDB, with allow and deny lists that reach fields. The other plugins are designs.
 
 ## Where Jig sits
 
@@ -41,7 +42,7 @@ one service catalog. The other plugins are designs.
 | [`jig-lens`](plugins/jig-lens/README.md) | built | A summary inside Pi of cost, tool failures, time spent waiting for you, blocked calls and checks; Grafana optional |
 | [`jig-workflow`](plugins/jig-workflow/README.md) | design | Named workflows you define: stages, exit conditions and holds, test runs and acceptance scenarios |
 | [`jig-memory`](plugins/jig-memory/README.md) | built | Ticket folders, notes and evidence; later, recall of related tickets |
-| [`jig-mongo`](plugins/jig-mongo/README.md) | design | MongoDB reads, with production limited to approved fields |
+| [`jig-mongo`](plugins/jig-mongo/README.md) | built | MongoDB: explore, indexes and plans, the full aggregation pipeline and writes in test environments; allow and deny lists that reach fields, production read-only |
 | [`jig-jira`](plugins/jig-jira/README.md) | built | Jira issues: reads, comments, transitions, updates, with rendered previews |
 | [`jig-logs`](plugins/jig-logs/README.md) | built | Log search over Elasticsearch, OpenSearch or Grafana Loki; another backend is one adapter |
 | [`jig-api`](plugins/jig-api/README.md) | built | Your team's saved API requests (Postman, `.http` files, Bruno, OpenAPI), run by name with only their variables filled, and sign-in added by the tool |

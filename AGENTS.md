@@ -2,9 +2,11 @@
 
 Seven plugins are built (`jig-core`, `jig-git`, `jig-memory`, `jig-lens`,
 `jig-jira`, `jig-logs`, `jig-api`). `jig-ops` is built: ci, deploy and
-runtime. The rest are design. Plugin READMEs are the specifications. Code
-follows them, and when either changes, the other changes in the same commit.
-The tool tables of `jig-git` and `jig-jira` are read by their tests.
+runtime. `jig-mongo` is built: explore, query, aggregate and write, with
+allow and deny lists. The rest are design. Plugin READMEs are the
+specifications. Code follows them, and when either changes, the other changes
+in the same commit. The tool tables of `jig-git` and `jig-jira` are read by
+their tests.
 
 - **Read first:** [docs/architecture.md](docs/architecture.md) and
   [docs/permissions.md](docs/permissions.md).
