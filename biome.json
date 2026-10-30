@@ -2,7 +2,13 @@
     "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
     "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
     "files": {
-        "includes": ["**", "!**/node_modules", "!plugins/jig-review/web", "!package-lock.json"]
+        "includes": [
+            "**",
+            "!**/node_modules",
+            "!plugins/jig-review/web",
+            "!plugins/jig-logs/test/golden",
+            "!package-lock.json"
+        ]
     },
     "formatter": {
         "enabled": true,
