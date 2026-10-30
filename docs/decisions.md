@@ -2,6 +2,20 @@
 
 Dated so the reasons stay attached.
 
+## 2026-10-30: jig-mongo is a complete MongoDB tool; no SQL tool for now
+
+- **Complete:** exploring, indexes, query plans, the full aggregation pipeline,
+  and writes. `jig-core` keeps it safe: reads run, writes to a test environment
+  ask with a preview that counts the documents, and production writes are
+  denied.
+- **Access by list:** a deny list in test environments, and an allow list in
+  production, which fails closed. The lists reach fields, so an aggregation
+  that names a denied field is refused before it runs. System databases and
+  credential-like fields are always denied.
+- **No generic SQL tool yet.** The SQL databases met so far are a company's own
+  reporting stores, read through its own scripts. A `sql` tool waits until one
+  is needed at more than one job.
+
 ## 2026-10-30: jig-ops runtime and deploy, as built
 
 - **The Kubernetes reads are the first runtime adapter,** and `jig-k8s` was never a
