@@ -52,6 +52,8 @@ export interface FakeJig {
     watches: StartedWatch[];
     /** The check each plugin registered for its section of jig.json. */
     sections: Map<string, (raw: unknown) => readonly string[]>;
+    /** The keys each plugin named that replace a company's defaults instead of merging into them. */
+    sectionReplace: Map<string, readonly string[] | undefined>;
     facts: Map<string, Facts[]>;
     /** Every program the plugin asked to start, in order. */
     started: Started[];
@@ -101,6 +103,7 @@ export const DEFAULT_KINDS: Readonly<Record<string, EnvironmentKind>> = {
 export function installFakeJig(): FakeJig {
     const declared = new Map<string, ToolDeclaration>();
     const sections = new Map<string, (raw: unknown) => readonly string[]>();
+    const sectionReplace = new Map<string, readonly string[] | undefined>();
     const values = new Map<string, unknown>();
     const facts = new Map<string, Facts[]>();
     const started: Started[] = [];
@@ -280,7 +283,10 @@ export function installFakeJig(): FakeJig {
             addSecretCommands: () => {},
             addMaskFields: () => {},
             addSectionDefaults: () => {},
-            registerSection: (name, validate) => void sections.set(name, validate),
+            registerSection: (name, validate, options) => {
+                sections.set(name, validate);
+                sectionReplace.set(name, options?.replace);
+            },
             section: (name) => {
                 const value = values.get(name);
                 const validate = sections.get(name);
@@ -320,6 +326,7 @@ export function installFakeJig(): FakeJig {
         kinds,
         watches,
         sections,
+        sectionReplace,
         facts,
         started,
         secrets,

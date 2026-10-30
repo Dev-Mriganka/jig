@@ -5,7 +5,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, test } from "node:test";
-import { validateMongo } from "../src/config.ts";
+import { layered } from "../../jig-core/src/section-defaults.ts";
+import { MONGO_REPLACE, validateMongo } from "../src/config.ts";
 import { ACTION_NAMES, ACTIONS } from "../src/params.ts";
 import { setupHarness } from "./support/harness.ts";
 import type { Harness } from "./support/harness.ts";
@@ -27,6 +28,30 @@ describe("what the plugin registers", () => {
         assert.equal(typeof h.declaration.preview, "function");
         assert.equal(h.jig.sections.get("mongo"), validateMongo);
         assert.deepEqual(h.handlers.get("session_shutdown")?.length, 1);
+    });
+
+    test("names the keys where your route replaces a company's whole, so an ssh forward and a tunnel are never both named", () => {
+        assert.deepEqual(h.jig.sectionReplace.get("mongo"), MONGO_REPLACE);
+        assert.deepEqual(MONGO_REPLACE, ["connections.*.via"]);
+
+        // A company gives the cluster and the way in through its tunnel; you give your credentials and, for once, a forward.
+        const company = {
+            connections: { staging: { uri: "mongodb://db.staging.example.com:27017", via: { tunnel: "corp-jump" } } },
+        };
+        const mine = {
+            connections: {
+                staging: {
+                    user: "agent",
+                    password: "pass:mongo/staging",
+                    via: { ssh: { host: "bastion.example.com", user: "agent", key: "pass:ssh/bastion" } },
+                },
+            },
+        };
+        assert.deepEqual(validateMongo(layered(company, mine, MONGO_REPLACE)), []);
+        assert.match(validateMongo(layered(company, mine)).join("\n"), /use ssh or tunnel, not both/);
+        // Without a route of your own, the company's stays.
+        const plain = { connections: { staging: { user: "agent", password: "pass:mongo/staging" } } };
+        assert.deepEqual(validateMongo(layered(company, plain, MONGO_REPLACE)), []);
     });
 
     test("loading reads nothing: no secret, no connection, no program, until a call is made", () => {

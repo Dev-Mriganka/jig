@@ -87,8 +87,8 @@ export interface JigState {
     sectionChecks: Map<string, SectionCheck>;
     /** Company defaults per plugin section, laid under the personal section. */
     sectionDefaults: Map<string, unknown>;
-    /** Problems already reported for a section's merged value, so each is reported once. */
-    sectionDefaultProblems: Set<string>;
+    /** The paths that replace the company's defaults instead of merging into them, per plugin section. */
+    sectionReplace: Map<string, readonly string[]>;
     /** Where jig.json is. The extension sets it, because only it knows Pi's agent folder. Empty until then. */
     configPath: () => string;
     /** Pi's agent folder, which holds jig.json and is protected from Pi's file tools. The extension sets it. Empty until
@@ -163,11 +163,18 @@ export function createState(pi: ExtensionAPI, options: JigCoreOptions = {}): Jig
         pi,
         now,
         declarations: new Map(),
-        personal: { file: "", found: false, config: defaultConfig(), problems: [], sections: new Map() },
+        personal: {
+            file: "",
+            found: false,
+            config: defaultConfig(),
+            problems: [],
+            sections: new Map(),
+            incomplete: new Map(),
+        },
         company: emptyAdditions(),
         sectionChecks: new Map(),
         sectionDefaults: new Map(),
-        sectionDefaultProblems: new Set(),
+        sectionReplace: new Map(),
         configPath: () => "",
         agentDir: () => "",
         configLoaded: false,
@@ -273,7 +280,10 @@ export function rememberCall(state: JigState, call: CallState): void {
 
 /** Reads jig.json, with the sections plugins registered, and rebuilds the policy. Run at session start. */
 export function loadPersonalConfig(state: JigState, file: string = state.configPath()): void {
-    state.personal = loadConfigFile(file, state.sectionChecks);
+    state.personal = loadConfigFile(file, state.sectionChecks, {
+        defaults: state.sectionDefaults,
+        replace: state.sectionReplace,
+    });
     state.configLoaded = true;
     state.invalidatePolicy();
 }

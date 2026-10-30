@@ -130,6 +130,8 @@ An action or parameter the CI system of the service lacks is refused, naming the
 
 - its service catalog, test environments and "artifact ready" rules; later, its deploy
   methods, and sign-in services and transports for CI servers behind a VPN or proxy.
+- Your `ops` section is laid over its defaults, so you write only what you change. A CI `auth` and a
+  `deploy` entry of yours replace the company's whole, and the rest merges key by key.
 
 ## Later
 

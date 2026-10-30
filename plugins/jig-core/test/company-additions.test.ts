@@ -56,14 +56,23 @@ describe("company defaults for a plugin's section", () => {
         });
     });
 
-    test("that do not fit with your settings are reported once, and your own section is used", () => {
+    test("that do not fit with your settings are reported once, and your own section is used when it is complete", () => {
         const { state, api } = setup({ logs: { url: "https://mine.example.com" } });
         api.config.addSectionDefaults("logs", { indexes: "not a list" });
         assert.deepEqual(api.config.section("logs"), { url: "https://mine.example.com" });
         api.config.section("logs");
-        const reports = state.startupProblems.filter((problem) => problem.includes('company defaults for "logs"'));
+        const reports = state
+            .policy()
+            .problems.filter((problem) => problem.message.includes('company defaults for "logs"'));
         assert.equal(reports.length, 1);
-        assert.match(reports[0] ?? "", /logs\.indexes must be a list/);
+        assert.match(reports[0]?.message ?? "", /logs\.indexes must be a list/);
+        assert.equal(reports[0]?.key, "logs");
+    });
+
+    test("are checked together with your section, so you may write only what you change", () => {
+        const { api } = setup({ logs: { indexes: ["mine-*"] } });
+        api.config.addSectionDefaults("logs", { url: "https://logs.example.com" });
+        assert.deepEqual(api.config.section("logs"), { url: "https://logs.example.com", indexes: ["mine-*"] });
     });
 
     test("cannot be given for jig-core's own fields", () => {

@@ -212,12 +212,33 @@ such as `git`, `lens` or `memory`.
   file. A section that fails is reported with the file and the key, `section()`
   returns `undefined`, and the plugin uses its defaults. The rest of the file
   still loads.
+- **A company can give defaults for a section** with
+  `config.addSectionDefaults(name, defaults)`. Your section is laid over them
+  before the plugin's check runs, so you write only what you change.
+  - **Objects merge key by key.** Any other value of yours replaces the
+    company's: a list, a string, a number.
+  - **A plugin names keys that replace instead,** with
+    `registerSection(name, validate, { replace: ["auth"] })`. Where an object is
+    one choice among several, such as an `auth` of `{ transport }` or of
+    `{ token }`, yours takes its place whole, and the two never make a mix.
+  - **A key is a path from the section's root,** with `*` for any one name:
+    `auth`, `backend.auth`, `services.*.ci.auth`. It matches at that depth only.
+  - **A section with no defaults is checked as you wrote it,** as before.
+- **Defaults can lack what only you can give.** With no section of yours, the
+  defaults alone are checked. When they are not valid, the plugin is not
+  configured: no problem is reported at start-up, and `/jig` says the company
+  defaults are incomplete, with the check's messages. Write your part and it
+  works.
+- **Defaults and your section that do not fit** are a problem with the file
+  and the key. If your section is complete without the defaults, the plugin
+  gets it as you wrote it; if not, it gets nothing.
 - **A top-level key that neither jig-core nor a plugin registered** is an
   unknown field.
 - **A plugin cannot register a name jig-core uses itself:** `environments`,
   `rules`, `classify`, `protectedPaths`, `secrets`, `records`, `spill`.
 - **Order does not matter.** A plugin that loads before jig-core waits for it,
-  and a section registered after the file was read is checked at once.
+  and a section or defaults registered after the file was read are applied at
+  once.
 
 ## Environment variables
 

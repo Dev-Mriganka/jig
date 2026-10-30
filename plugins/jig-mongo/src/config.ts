@@ -327,6 +327,12 @@ export function readMongo(raw: unknown): { settings?: MongoSettings; errors: str
     return { errors, settings: { connections, access } };
 }
 
+/**
+ * Where an object of yours replaces a company's whole, when a company plugin gives defaults for the section: the route
+ * is an `ssh` forward or a company `tunnel`, never both, and merging two would name both.
+ */
+export const MONGO_REPLACE: readonly string[] = ["connections.*.via"];
+
 /** The error messages for a raw section, for `registerSection`. An empty list means the section is valid. */
 export function validateMongo(raw: unknown): string[] {
     return readMongo(raw).errors;

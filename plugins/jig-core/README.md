@@ -103,6 +103,8 @@ the existing harness, it borrows that harness's sandbox.
   its targets count as production;
 - field names that hold personal data in its systems, for masking;
 - sign-in services and transports for its systems;
+- defaults for other plugins' sections of `jig.json` (`config.addSectionDefaults`), which your own
+  section is laid over;
 - secret commands (`config.addSecretCommands`) and protected paths
   (`config.addProtectedPaths`) for its own tools.
 

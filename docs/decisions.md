@@ -42,6 +42,19 @@ generic: no company is named.
   - **Required, not optional:** a service that cannot rely on the method would
     sign a guess. `jig-core` refuses a request without a method or headers
     before the service is asked.
+- **A section is checked laid over the company's defaults.** `loadPersonalConfig`
+  used to check your section alone and drop it on error, so a user who wrote
+  only what they change (`{ "jira": { "site": "…" } }`) got an error.
+  - **With defaults,** your section is validated after it is laid over them. A
+    section with none is validated as before.
+  - **Defaults that need you:** with no section of yours and defaults that are
+    not valid alone, the plugin is not configured. No start-up problem is
+    reported; `/jig` says the company defaults are incomplete.
+  - **`registerSection(name, validate, { replace })`** names keys that replace
+    the company's whole instead of merging, so `auth: { token }` never merges into
+    `auth: { transport }`. A key is a path from the section's root, with `*` for
+    any one name. Declared by `jig-ops` (CI `auth`, `deploy`), `jig-api`
+    (`environments.*`) and `jig-mongo` (`via`).
 
 ## 2026-10-30: Jig never signs in; it reads a credential and keeps it from the agent
 

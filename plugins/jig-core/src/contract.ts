@@ -437,13 +437,30 @@ export interface JigApi {
         addMaskFields(fields: readonly string[]): void;
         /** A plugin's own section of jig.json, such as `git` or `lens`. jig-core reports a top-level key that
          *  neither jig-core nor a plugin registered as an unknown field. `validate` returns error messages that
-         *  name the key; with errors, `section()` returns undefined and the plugin uses its defaults. */
-        registerSection(name: string, validate: (raw: unknown) => readonly string[]): void;
+         *  name the key; with errors, `section()` returns undefined and the plugin uses its defaults.
+         *
+         *  When a company plugin gave defaults for the section (`addSectionDefaults`), `validate` is given the user's
+         *  section laid over them, so the user writes only what they change, and a field that only the user can give
+         *  may be missing from the defaults.
+         *
+         *  `replace` names keys whose object in the user's section replaces the company's whole instead of merging
+         *  into it. Use it where an object is one choice among several, such as an `auth` of `{ transport }` or of
+         *  `{ token }`: merged, the two would make a mix that is neither. A key is a path from the section's root,
+         *  with `*` for any one name: `auth`, `backend.auth`, `services.*.ci.auth`. */
+        registerSection(
+            name: string,
+            validate: (raw: unknown) => readonly string[],
+            options?: { replace?: readonly string[] },
+        ): void;
         /** A company plugin's defaults for a plugin's section, such as its log backend or its service catalog. Your own
-         *  section in jig.json is laid over them: objects merge key by key, and any other value of yours replaces
-         *  theirs. The merged section is checked by the plugin's own validation. */
+         *  section in jig.json is laid over them: objects merge key by key, any other value of yours replaces theirs,
+         *  and a key the plugin named in `registerSection`'s `replace` is replaced whole. The result is checked by the
+         *  plugin's own validation. With no section of your own, the defaults alone are checked: when they are not
+         *  valid (a field only the user can give is missing), the plugin is not configured, no problem is reported,
+         *  and `/jig` says the company defaults are incomplete. */
         addSectionDefaults(name: string, defaults: unknown): void;
-        /** The section as loaded at the last session start, after validation. Undefined when absent or invalid. */
+        /** The section as loaded at the last session start, after validation: the user's, laid over the company's
+         *  defaults when it gave some. Undefined when absent or invalid. */
         section(name: string): unknown;
     };
 

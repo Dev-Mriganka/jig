@@ -296,6 +296,12 @@ export function readApi(raw: unknown): { settings?: ApiSettings; errors: string[
     return { errors, settings: { collections, environments, secrets, reads, adHoc, timeoutSec, allowPlainLocal } };
 }
 
+/**
+ * Where an object of yours replaces a company's whole, when a company plugin gives defaults for the section: an
+ * environment's entry names a sign-in service or a transport, never both, and merging two would name both.
+ */
+export const API_REPLACE: readonly string[] = ["environments.*"];
+
 /** The error messages for a raw section, for `registerSection`. An empty list means the section is valid. */
 export function validateApi(raw: unknown): string[] {
     return readApi(raw).errors;

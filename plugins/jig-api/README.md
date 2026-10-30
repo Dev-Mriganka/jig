@@ -119,6 +119,9 @@ example of each source, is in [Configuration](docs/configuration.md).
 - where its collections live, and their environment mapping;
 - a transport or a sign-in service, for APIs only reachable through a bastion host, a VPN or a
   sign-in proxy, named in `environments`.
+- Your `api` section is laid over its defaults, so you write only what you change. An entry of
+  `environments` of yours replaces the company's whole, so it never names both a sign-in service
+  and a transport.
 
 ## Later
 

@@ -100,7 +100,8 @@ Use a read-only database user for production. The floor denies writes anyway, bu
 
 ## Company part (in the company plugin)
 
-- its connections and routes, such as a tunnel through its own jump hosts;
+- its connections and routes, such as a tunnel through its own jump hosts. Your `mongo` section is laid
+  over them, so you add only your `user` and `password`; a `via` of yours replaces the company's whole;
 - its allow lists for production;
 - credentials, as secret references.
 

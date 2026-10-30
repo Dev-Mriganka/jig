@@ -1,6 +1,5 @@
 // The API other plugins reach through `jig()` (see client.ts and contract.ts). Each function is a thin step onto the
 // state the hooks work on.
-import { layered } from "./section-defaults.ts";
 import {
     addCompanyClassifyRules,
     addCompanyEnvironments,
@@ -104,11 +103,20 @@ export function buildApi(state: JigState): JigApi {
                 addCompanySecretCommands(state.company, commands);
             },
             addMaskFields: (fields) => state.addMaskFields(fields),
-            registerSection(name, validate) {
+            registerSection(name, validate, options) {
                 if (typeof name !== "string" || name === "")
                     throw new TypeError("registerSection: the section needs a name");
                 if (typeof validate !== "function")
                     throw new TypeError(`registerSection(${name}): validate must be a function`);
+                const replace = options?.replace;
+                if (
+                    replace !== undefined &&
+                    (!Array.isArray(replace) || replace.some((path) => typeof path !== "string" || path === ""))
+                ) {
+                    throw new TypeError(
+                        `registerSection(${name}): replace must be a list of paths such as "auth" or "services.*.ci.auth"`,
+                    );
+                }
                 // The names jig-core reads itself stay its own: a plugin could otherwise take over `rules`.
                 if (OWN_SECTIONS.includes(name)) {
                     throw new Error(
@@ -116,6 +124,9 @@ export function buildApi(state: JigState): JigApi {
                     );
                 }
                 state.sectionChecks.set(name, validate);
+                // Registering again replaces what the first call said, the keys that replace included.
+                if (replace === undefined || replace.length === 0) state.sectionReplace.delete(name);
+                else state.sectionReplace.set(name, [...replace]);
                 // A section registered after the file was read is checked now, so the order plugins load in does not matter.
                 if (state.configLoaded) loadPersonalConfig(state, state.personal.file);
             },
@@ -126,22 +137,12 @@ export function buildApi(state: JigState): JigApi {
                     throw new Error(`addSectionDefaults: "${name}" is a jig-core field, not a plugin's section`);
                 }
                 state.sectionDefaults.set(name, defaults);
+                // Your section was checked alone if it was read before the defaults came; it is checked over them now.
+                if (state.configLoaded) loadPersonalConfig(state, state.personal.file);
             },
             section(name) {
                 ensureConfigLoaded(state);
-                const mine = state.personal.sections.get(name);
-                if (!state.sectionDefaults.has(name)) return mine;
-                const merged = layered(state.sectionDefaults.get(name), mine);
-                const check = state.sectionChecks.get(name);
-                const problems = check === undefined ? [] : check(merged);
-                if (problems.length === 0) return merged;
-                // The company's defaults and your settings do not fit together: your own section, as you wrote it, wins.
-                const report = `the company defaults for "${name}", with your settings laid over them, are not valid: ${problems.join("; ")}`;
-                if (!state.sectionDefaultProblems.has(report)) {
-                    state.sectionDefaultProblems.add(report);
-                    state.startupProblems.push(report);
-                }
-                return mine;
+                return state.personal.sections.get(name);
             },
         },
 

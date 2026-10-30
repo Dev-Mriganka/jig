@@ -2,7 +2,7 @@
 // tool and the command `/api refresh` to Pi. Nothing is read or sent until a call is made.
 import type { ExtensionAPI, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { withJig } from "../../jig-core/src/client.ts";
-import { validateApi } from "./config.ts";
+import { API_REPLACE, validateApi } from "./config.ts";
 import { registerRefresh } from "./refresh.ts";
 import { createTool } from "./tool.ts";
 import type { ApiOptions } from "./tool.ts";
@@ -14,7 +14,7 @@ export function jigApi(options: ApiOptions = {}): ExtensionFactory {
     return (pi: ExtensionAPI) => {
         const tool = createTool(options);
         withJig((api) => {
-            api.config.registerSection("api", validateApi);
+            api.config.registerSection("api", validateApi, { replace: API_REPLACE });
             api.declareTool({ tool: "api", plugin: "jig-api", classify: tool.classify, preview: tool.preview });
         });
         pi.registerTool(tool.definition);
