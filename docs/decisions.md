@@ -81,6 +81,12 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
   of the process running it (in Pi, the project, where `git add -A` could commit
   them), and that it installs signal handlers that keep a process alive. One broker
   per session, with its own working folder, keeps both out of Pi and the project.
+- **One command can run outside, with your approval.** Some work needs what the
+  sandbox holds back (Docker, credentials, a private repository), and retyping the
+  command as your own `!` is friction. So the agent can ask to run one command
+  outside: `jig-core` asks you with the exact command and reason, only a rule naming
+  the command can allow it without asking, and no screen means no. Unlike Claude
+  Code's escape hatch, no mode approves it without asking.
 - **Your `!` commands are not sandboxed.** They are yours, as in the earlier harness.
 - **Fails closed, but optional.** With `jig-sandbox` installed, a sandbox that cannot
   start refuses `bash`. Without it, Jig still works and says plainly that bash is not

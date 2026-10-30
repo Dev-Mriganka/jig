@@ -26,8 +26,9 @@ each refusal into one line after the command's own output:
 | Write a toolchain folder such as `~/.sdkman` | Pi asks you; say yes and it runs again |
 | Write a locked file such as `~/.bashrc` | You do it yourself with `!`, if you want it |
 | Reach a new host in `ask` mode | Pi asks you while the connection waits |
-| Use Docker | `docker: true` in the `sandbox` section, if you accept that Docker is root |
-| Anything else that must run unsandboxed | Your own `!` command, or `/sandbox off` for this session |
+| Use Docker | The agent asks to run that command outside (below); or `docker: true` opens the socket inside, if you accept that Docker is root |
+| Run a script or CLI that needs your credentials, or a build that needs a private repository | The agent asks to run that one command outside (below) |
+| Anything else | Your own `!` command, or `/sandbox off` for this session |
 
 The bash tool's description tells the agent these up front, so it rarely gets there.
 
@@ -71,8 +72,33 @@ with what it was before:
 Jig's own `git` tool also refuses to run in a repository whose config runs a program,
 so even a setting that slipped in between is not run by Jig.
 
+## Running one command outside
+
+Some work needs what the sandbox holds back: your credentials, Docker, or a private
+package repository. When no Jig tool does it, the agent can ask to run one command
+outside the sandbox, by calling `bash` with `outside: true` and a `reason`:
+
+```text
+Run outside the sandbox?  (it gets your credentials and full network)
+Command:  docker compose up -d postgres
+Folder:   ~/work/orders-api
+Why:      the integration tests need a database; Docker is closed inside the sandbox
+[Run once]  [This exact command, this session]  [No]
+```
+
+- **It goes through `jig-core`** as its own action (`bash`, action `outside`): a local
+  write that asks by default.
+- **Only a rule that names it allows it without asking,** with a command pattern, such
+  as `{ "tool": "bash", "action": "outside", "command": "docker compose *", "decision":
+  "allow" }`. No wildcard rule and no default ever allows it.
+- **With no screen to ask on** (headless, a subagent), the answer is no.
+- **Its output** still goes through `jig-core`, so secrets are taken out, and every
+  outside run is recorded: `/sandbox` lists this session's, and `/lens` shows them.
+- **The agent is told** to use it only when the sandbox blocks something it needs and
+  no Jig tool does the job, and to say why.
+
 ## Turning it off
 
-`/sandbox off` is yours alone: the agent cannot run commands. It lasts for this
+`/sandbox off` is yours alone: the agent cannot run slash commands. It lasts for this
 session, the footer shows `bash: not sandboxed` in red while it is off, and
 `/sandbox on` or a new session turns it back on.

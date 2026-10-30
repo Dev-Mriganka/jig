@@ -50,6 +50,11 @@ everything not on them is writable. Every entry and its reason is in [The rules]
   If a command adds a setting that would run a program outside it (`core.fsmonitor`,
   an alias starting with `!`, a filter), `jig-sandbox` puts the file back as it was
   and says what it removed.
+- **One command can run outside, if you approve it.** When the sandbox blocks
+  something the agent needs and no Jig tool does it (Docker, a script that needs
+  your credentials, a build that must reach a private repository), the agent asks
+  to run that one command outside. You see the exact command, its folder and its
+  reason, and answer: once, this exact command for the session, or no.
 - **Your own `!` commands are never sandboxed,** and `/sandbox off` turns it off for
   this session if you need to. The footer then says so.
 
