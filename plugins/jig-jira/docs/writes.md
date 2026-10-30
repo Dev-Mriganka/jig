@@ -35,7 +35,7 @@ The rules for writes in full, and what each preview shows. Back to the
 
   | Write | The one read afterwards |
   |---|---|
-  | `comment` | The newest 50 comments: one by the same person with the same text |
+  | `comment` | The newest 50 comments: one by the same person with the same text (see below) |
   | `edit_comment` | The comment: it holds the new text, the old text, or neither |
   | `delete_comment` | The comment: it is gone, or still there |
   | `create` | A search for the summary, created in the last 10 minutes |
@@ -44,6 +44,19 @@ The rules for writes in full, and what each preview shows. Back to the
 
   A write that Jira turned down (a 4xx answer) changed nothing and is reported
   as that. A write that never left (no sign-in) is reported as that.
+- **Who is signed in.** `comment` asks `GET /myself` next to reading the issue,
+  for three things: the preview says who posts, the fingerprint holds the
+  account (a changed sign-in voids the approval), and the read after a lost
+  reply tells your comment from another with the same text.
+  - **A site with no "who am I"** (a sign-in proxy that answers 403 or 404 to
+    `/myself`, or whose transport refuses it) still gets its comment.
+  - **What degrades:** the preview has no "as <name>" and carries a note that
+    says why; the fingerprint holds nothing of the account; and after a lost
+    reply the read goes by the text alone. It can say that no comment has the
+    text (it did not happen), but not that one is yours, so it says it could not
+    settle it and asks you to check the issue.
+  - **Any other failure of `/myself`** (a bad sign-in, a timeout, a 5xx) stops
+    the comment, as before.
 - **Facts.** After a write, the call's record carries the issue key, as the
   fact `issue`.
 
@@ -51,7 +64,7 @@ The rules for writes in full, and what each preview shows. Back to the
 
 | Write | Preview |
 |---|---|
-| `comment` | The issue and its status, who posts, the wiki source and the rendered page |
+| `comment` | The issue and its status, who posts (when Jira says), the wiki source and the rendered page |
 | `edit_comment` | The new text, as source and rendered, and the text it replaces |
 | `delete_comment` | The comment's text, and that this cannot be undone |
 | `transition` | The issue, its status now and after, and the transition used |

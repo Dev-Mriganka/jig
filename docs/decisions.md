@@ -45,6 +45,15 @@ generic fix, in its own commit.
     configuration is checked.
   - **Not a tool parameter:** the tool has no field filter, because the text of
     a call never becomes a field name. Lists are configuration only.
+- **jig-jira: a comment works without `/myself`.** Some sites reach Jira only
+  through a sign-in proxy that has no "who am I".
+  - **What `me` was for:** the "as <name>" in the preview, the account in the
+    fingerprint, and telling your comment from another one after a lost reply.
+  - **When `/myself` answers 403 or 404, or the transport refuses it:** the
+    comment still goes. The preview drops the name and says why, and the read
+    after a lost reply goes by the text alone, so it can say "did not happen"
+    but only "could not settle it" when a comment has the text.
+  - **Any other failure still stops the comment.**
 
 ## 2026-10-30: Jig never signs in; it reads a credential and keeps it from the agent
 

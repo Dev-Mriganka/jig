@@ -9,5 +9,7 @@ against a real Jira:
   the create screen (`createmeta`), users, and comments on long threads;
 - that the sign-in forms work against a real single sign-on gateway or proxy;
 - how the rendered page compares with Jira's own rendering of unusual markup;
+- that a real sign-in proxy answers `GET /myself` with 403 or 404, or refuses it
+  from its transport, as `comment` expects (the fake Jira and a fake transport do);
 - a transition whose screen asks for a field (`resolution`, for example): the
   tool sends no field with a transition, and Jira's refusal is shown.

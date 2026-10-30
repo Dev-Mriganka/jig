@@ -1,7 +1,7 @@
 // Jira's REST endpoints (version 2), one function each. They return the shapes the rest of the plugin needs, and read
 // the answers so that they hold for Jira Cloud and for Jira Data Center alike.
 import type { JiraSettings } from "./config.ts";
-import { JiraError } from "./http.ts";
+import { JiraError, LostReplyError } from "./http.ts";
 import type { Http } from "./http.ts";
 import { arr, InputError, int, nameOf, obj, str, userOf } from "./values.ts";
 import type { Obj, User } from "./values.ts";
@@ -54,6 +54,28 @@ export async function issueHead(env: Env, key: string): Promise<IssueHead> {
 
 export async function myself(env: Env): Promise<User> {
     return userOf(await env.http.request({ method: "GET", path: "/myself" }));
+}
+
+/** Who is signed in, or why that could not be asked. */
+export type Identity = { user: User } | { user?: undefined; why: string };
+
+/**
+ * `myself`, for a write that can go on without it. Some sites reach Jira only through a sign-in proxy that has no "who
+ * am I": the proxy answers 403 or 404, or its transport refuses the request. Those say the answer is not available and
+ * return `why`; any other failure (a bad sign-in, a timeout, a 5xx) is raised as it always was.
+ */
+export async function whoAmI(env: Env): Promise<Identity> {
+    try {
+        return { user: await myself(env) };
+    } catch (error) {
+        if (error instanceof JiraError && (error.status === 403 || error.status === 404)) {
+            return { why: `Jira answered ${error.status} to GET /myself` };
+        }
+        if (error instanceof LostReplyError && error.viaTransport) {
+            return { why: "the transport did not carry GET /myself" };
+        }
+        throw error;
+    }
 }
 
 // ---- comments ---------------------------------------------------------------------------------------------------------

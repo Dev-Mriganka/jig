@@ -80,6 +80,8 @@ export interface FakeJira {
     createScreen: boolean;
     /** A header every request must carry, else it is answered 401. */
     requireHeader?: { name: string; value: string };
+    /** Answer `GET /myself` with this status and no user, as a sign-in proxy that has no "who am I" does. */
+    myselfStatus?: number;
     misbehave(rule: Misbehaviour): void;
     /** Requests of a kind, e.g. `fake.sent("POST", "/issue/PROJ-1/comment")`. */
     sent(method: string, path: string | RegExp): Recorded[];
@@ -356,6 +358,7 @@ export async function startFakeJira(flavor: Flavor = "cloud"): Promise<FakeJira>
             fake.inlineComments = Number.POSITIVE_INFINITY;
             fake.createScreen = true;
             delete fake.requireHeader;
+            delete fake.myselfStatus;
             rules = [];
             nextIssue = 100;
             nextComment = 10100;
@@ -419,7 +422,11 @@ export async function startFakeJira(flavor: Flavor = "cloud"): Promise<FakeJira>
         if (fake.requireHeader !== undefined && request.headers[fake.requireHeader.name] !== fake.requireHeader.value) {
             return { status: 401, body: { message: "Unauthorized" } };
         }
-        if (method === "GET" && path === "/myself") return { status: 200, body: userJson(fake.me) };
+        if (method === "GET" && path === "/myself") {
+            return fake.myselfStatus === undefined
+                ? { status: 200, body: userJson(fake.me) }
+                : { status: fake.myselfStatus, body: { errorMessages: ["No who-am-I here"], errors: {} } };
+        }
         if (method === "GET" && path === "/field") return { status: 200, body: fake.fields };
 
         if (method === "GET" && (match = /^\/project\/([A-Z]+)$/.exec(path))) {
