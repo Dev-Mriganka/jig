@@ -12,9 +12,12 @@ import type { JigApi } from "../../jig-core/src/contract.ts";
 import { callRecord, turnRecord } from "../../jig-core/src/records.ts";
 import type { CallInput, CallRecord, RecordLine, TurnInput, TurnRecord } from "../../jig-core/src/records.ts";
 import { importRecords } from "../src/import.ts";
+import { lens } from "../src/index.ts";
+import type { LensOptions } from "../src/index.ts";
 import { lensPaths } from "../src/paths.ts";
 import type { Paths } from "../src/paths.ts";
 import { openForReading, openIndex } from "../src/store.ts";
+import type { Viewer, ViewerCommand, ViewerState } from "../src/viewer.ts";
 
 /** The moment the sample records are measured from. */
 export const NOW = new Date("2026-10-30T12:00:00.000Z");
@@ -315,6 +318,52 @@ export function busyRecords(): RecordLine[] {
     return records;
 }
 
+/**
+ * A morning's work in one session on one ticket, as the README shows it: calls that went well and calls that failed, two
+ * questions, two calls a rule stopped, and a CI watch that passed.
+ */
+export function exampleRecords(): RecordLine[] {
+    const records: RecordLine[] = [];
+    let n = 0;
+    const id = (prefix: string) => `${prefix}${n++}`;
+    const pad = (value: number) => String(value).padStart(2, "0");
+    const at = (minute: number) => `2026-10-30T${pad(8 + Math.floor(minute / 60))}:${pad(minute % 60)}:00Z`;
+    const who = { ticket: "PROJ-123" };
+
+    [0.18, 0.22, 0.31, 0.27, 0.12].forEach((cost, i) => {
+        const tokens = { input: 2100, output: 900, cacheRead: 41_000 + i * 6000, cacheWrite: i === 0 ? 8000 : 500 };
+        records.push(turn(id("t"), at(5 + i * 30), "demo", "claude-sonnet-5-5", cost, { ...who, ...tokens }));
+    });
+    records.push(
+        turn(id("t"), at(100), "demo", "claude-opus-5", 0.31, { ...who, input: 3000, output: 1500, cacheRead: 20_000 }),
+    );
+
+    for (let i = 0; i < 12; i++) {
+        records.push(call(id("c"), at(10 + i), "demo", "read", { ...who, durationMs: 3 + i * 3 }));
+    }
+    for (let i = 0; i < 6; i++) {
+        records.push(call(id("c"), at(25 + i), "demo", "edit", { ...who, effect: "write", durationMs: 10 + i * 4 }));
+    }
+    for (let i = 0; i < 8; i++) {
+        const failed = i === 2 || i === 5;
+        const outcome = failed ? ({ outcome: "error", errorKind: "tool", error: "exit code 1" } as const) : {};
+        records.push(call(id("c"), at(40 + i), "demo", "bash", { ...who, durationMs: 1000 + i * 1500, ...outcome }));
+    }
+    for (let i = 0; i < 3; i++) {
+        records.push(call(id("c"), at(55 + i), "demo", "git", { ...who, action: "status", durationMs: 60 + i * 10 }));
+    }
+    const asked = { ...who, action: "push", decision: "ask", approval: "review" } as const;
+    records.push(call(id("c"), at(60), "demo", "git", { ...asked, durationMs: 1800, answer: "allow", waitedMs: 41_000 }));
+    records.push(
+        call(id("c"), at(90), "demo", "git", { ...asked, durationMs: 2400, answer: "allow-session", waitedMs: 12_000 }),
+    );
+    const facts = { conclusion: "success", passed: 412, failed: 0 };
+    records.push(call(id("c"), at(92), "demo", "checks", { ...who, action: "watch", durationMs: 250_000, facts }));
+    const stopped = { ...who, outcome: "blocked", errorKind: "denied", decisionSource: "rule", decision: "deny" } as const;
+    records.push(call(id("c"), at(80), "demo", "http", stopped), call(id("c"), at(81), "demo", "http", stopped));
+    return records;
+}
+
 /** Writes the sample records into the state folder's record files. */
 export function writeSample(state: string): void {
     writeRecords(state, sampleRecords());
@@ -365,6 +414,15 @@ export interface Notice {
 type Handler = (event: unknown, ctx: ExtensionContext) => unknown;
 type CommandHandler = (args: string, ctx: ExtensionCommandContext) => Promise<void>;
 
+/** The ways Pi runs: with a terminal, behind RPC, or with no screen at all. */
+export type Mode = "tui" | "rpc" | "print" | "json";
+
+export interface FakePiOptions {
+    mode?: Mode;
+    /** The id `ctx.sessionManager.getSessionId()` returns, or undefined to make it fail. */
+    session?: string | undefined;
+}
+
 /** What the plugin registers with Pi, and a screen that remembers what it was told. */
 export class FakePi {
     readonly handlers = new Map<string, Handler[]>();
@@ -372,15 +430,32 @@ export class FakePi {
         string,
         { description?: string; handler: CommandHandler; getArgumentCompletions?: (prefix: string) => unknown }
     >();
+    /** Entry renderers by entry type, as Pi would call them. */
+    readonly renderers = new Map<string, (entry: unknown, options: unknown, theme: unknown) => unknown>();
+    /** Everything that went to the screen as a notification. */
     readonly notices: Notice[] = [];
+    /** Custom entries the plugin appended to the session: kept in it, and never sent to the model. */
+    readonly entries: Array<{ type: string; data: unknown }> = [];
+    /** Everything the plugin did that reaches the model: messages added to the conversation, and user messages. */
+    readonly sent: unknown[] = [];
     readonly ctx: ExtensionCommandContext;
 
-    constructor(hasUI = true) {
+    constructor(options: FakePiOptions = {}) {
+        const mode = options.mode ?? "tui";
+        // `session: undefined` is a Pi that cannot say, which is not the same as leaving it out.
+        const session = "session" in options ? options.session : "s2";
         this.ctx = {
-            hasUI,
+            mode,
+            hasUI: mode === "tui" || mode === "rpc",
             ui: {
                 notify: (text: string, level?: string) => {
                     this.notices.push({ text, level: level ?? "info" });
+                },
+            },
+            sessionManager: {
+                getSessionId: () => {
+                    if (session === undefined) throw new Error("no session");
+                    return session;
                 },
             },
         } as unknown as ExtensionCommandContext;
@@ -405,6 +480,22 @@ export class FakePi {
         this.commands.set(name, options);
     }
 
+    registerEntryRenderer(type: string, renderer: (entry: unknown, options: unknown, theme: unknown) => unknown): void {
+        this.renderers.set(type, renderer);
+    }
+
+    appendEntry(type: string, data?: unknown): void {
+        this.entries.push({ type, data });
+    }
+
+    sendMessage(message: unknown): void {
+        this.sent.push(message);
+    }
+
+    sendUserMessage(content: unknown): void {
+        this.sent.push(content);
+    }
+
     /** Runs the handlers of an event in order, and waits for each. */
     async fire(event: string, payload: Record<string, unknown> = {}): Promise<void> {
         for (const handler of this.handlers.get(event) ?? []) await handler({ type: event, ...payload }, this.ctx);
@@ -419,6 +510,87 @@ export class FakePi {
         return this.notices.slice(before);
     }
 }
+
+// ---- the plugin in a fake Pi ----------------------------------------------------------------------------------------
+
+export interface RigOptions {
+    /**
+     * What the probe answers, one answer for each time it is asked, the last one for ever. A list answers for whichever
+     * viewer is asked; an object answers for each viewer on its own (a viewer it leaves out is stopped).
+     */
+    answers?: ViewerState[] | Partial<Record<Viewer, ViewerState[]>>;
+    /** The programs on PATH, by name. */
+    installed?: Record<string, string>;
+    /** The viewer's settings. Without them, the `lens` section of the fake jig-core, or the defaults. */
+    settings?: NonNullable<LensOptions["settings"]>;
+    /** Set when the started program has already exited. */
+    exit?: { code: number | null };
+    spawnFails?: Error;
+    /** Called when the program is started, with the paths of the state folder. */
+    onSpawn?: (where: Paths) => void;
+    /** Whether a browser could be found to open the page. */
+    opens?: boolean;
+    /** How Pi runs. Default: with a terminal. */
+    mode?: Mode;
+    /** The id of the session the user is in. Default `s2`; undefined for a Pi that cannot say. */
+    session?: string | undefined;
+    /** The moment the plugin takes for now. Default: `NOW`. */
+    now?: Date;
+}
+
+/** A plugin loaded into a fake Pi, with everything that would start a program or open a page recorded instead. */
+export function rig(t: TestContext, o: RigOptions = {}) {
+    const state = tempState(t);
+    const spawned: ViewerCommand[] = [];
+    const opened: string[] = [];
+    const probes: Array<[string, number]> = [];
+    const slept: number[] = [];
+    const installed = o.installed ?? { grafana: "/usr/bin/grafana", datasette: "/usr/bin/datasette" };
+    const asked = new Map<string, number>();
+    const answerFor = (viewer: Viewer): ViewerState => {
+        const { answers } = o;
+        let key: string = viewer;
+        let script: readonly ViewerState[] = ["stopped"];
+        if (answers === undefined || Array.isArray(answers)) {
+            key = "any";
+            script = answers ?? ["stopped", "running"];
+        } else {
+            script = answers[viewer] ?? ["stopped"];
+        }
+        const n = asked.get(key) ?? 0;
+        asked.set(key, n + 1);
+        return script[Math.min(n, script.length - 1)] ?? "stopped";
+    };
+    const pi = new FakePi({ mode: o.mode ?? "tui", ...("session" in o ? { session: o.session } : {}) });
+    lens({
+        env: { JIG_STATE_DIR: state, PATH: "/usr/bin:/bin", HOME: "/home/me", ANTHROPIC_API_KEY: "must-not-pass-on" },
+        now: () => o.now ?? NOW,
+        find: (names) => names.map((name) => installed[name]).find((file) => file !== undefined),
+        homepath: () => undefined,
+        probe: async (viewer, port) => {
+            probes.push([viewer, port]);
+            return answerFor(viewer);
+        },
+        spawn: async (command) => {
+            spawned.push(command);
+            o.onSpawn?.(paths(state));
+            if (o.spawnFails !== undefined) throw o.spawnFails;
+            return { pid: 4242, exited: () => o.exit };
+        },
+        open: async (url) => {
+            opened.push(url);
+            return o.opens ?? true;
+        },
+        sleep: async (ms) => {
+            slept.push(ms);
+        },
+        ...(o.settings === undefined ? {} : { settings: o.settings }),
+    })(pi.api);
+    return { pi, state, where: paths(state), spawned, opened, probes, slept };
+}
+
+/** The text of notices, one after the other. */
+export const text = (notices: readonly Notice[]) => notices.map((notice) => notice.text).join("\n");
 
 // ---- a fake jig-core ------------------------------------------------------------------------------------------------
 

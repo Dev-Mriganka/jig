@@ -1,5 +1,6 @@
-// Pi entry point of jig-lens. The factory only registers: the `lens` section goes to jig-core, and the import and the
-// commands are wired to Pi's events. Nothing is read, opened or started until an agent run ends or a command runs.
+// Pi entry point of jig-lens. The factory only registers: the `lens` section goes to jig-core, and the import, the
+// commands and the renderer of the summary are wired to Pi. Nothing is read, opened or started until an agent run ends
+// or a command runs.
 import type { ExtensionAPI, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { jig, withJig } from "../../jig-core/src/client.ts";
 import { settingsFrom, validateLens } from "./config.ts";

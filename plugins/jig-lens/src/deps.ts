@@ -2,7 +2,7 @@
 import type { LensSettings } from "./config.ts";
 import type { Paths } from "./paths.ts";
 import type { Open } from "./programs.ts";
-import type { Spawn, ViewerState } from "./viewer.ts";
+import type { Spawn, Viewer, ViewerState } from "./viewer.ts";
 
 export interface Deps {
     /** Pi's environment, for the state folder, PATH and what the viewer is passed of it. */
@@ -16,7 +16,7 @@ export interface Deps {
     find(names: readonly string[]): string | undefined;
     /** Grafana's home folder, found from its program. */
     homepath(program: string): string | undefined;
-    probe(viewer: LensSettings["viewer"], port: number): Promise<ViewerState>;
+    probe(viewer: Viewer, port: number): Promise<ViewerState>;
     spawn: Spawn;
     open: Open;
     sleep(ms: number): Promise<void>;

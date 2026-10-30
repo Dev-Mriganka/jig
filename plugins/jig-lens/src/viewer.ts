@@ -6,8 +6,11 @@ import { spawn } from "node:child_process";
 import { closeSync, existsSync, openSync, realpathSync } from "node:fs";
 import { get } from "node:http";
 import { basename, dirname, join } from "node:path";
-import type { LensSettings, Viewer } from "./config.ts";
+import type { LensSettings } from "./config.ts";
 import type { Paths } from "./paths.ts";
+
+/** The two programs that can show the index, which `/lens grafana` and `/lens datasette` start. */
+export type Viewer = "grafana" | "datasette";
 
 /** Whether the viewer answers on its port: `busy` is something else, which answers but is not the viewer. */
 export type ViewerState = "running" | "stopped" | "busy";
@@ -30,7 +33,7 @@ export const DATASETTE_PROGRAMS = ["datasette"] as const;
 export const INDEX_VARIABLE = "JIG_LENS_INDEX";
 export const DASHBOARDS_VARIABLE = "JIG_LENS_DASHBOARDS";
 
-/** The uid of the dashboard that `/lens` opens. */
+/** The uid of the dashboard that `/lens grafana` opens. */
 export const HOME_DASHBOARD = "jig-overview";
 
 /** Datasette names a database after its file, `index.sqlite`, and the metadata is filed under that name. */
@@ -38,9 +41,9 @@ export const DATASETTE_DATABASE = "index";
 
 export const viewerUrl = (settings: LensSettings) => `http://127.0.0.1:${settings.port}`;
 
-/** The page `/lens` opens: Grafana's overview dashboard, or Datasette's page for the index. */
-export function homeUrl(settings: LensSettings): string {
-    const page = settings.viewer === "grafana" ? `d/${HOME_DASHBOARD}` : DATASETTE_DATABASE;
+/** The page `/lens grafana` or `/lens datasette` opens: Grafana's overview, or Datasette's page for the index. */
+export function homeUrl(viewer: Viewer, settings: LensSettings): string {
+    const page = viewer === "grafana" ? `d/${HOME_DASHBOARD}` : DATASETTE_DATABASE;
     return `${viewerUrl(settings)}/${page}`;
 }
 

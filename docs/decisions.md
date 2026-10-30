@@ -85,6 +85,26 @@ its own safety pipeline.
   - OpenObserve: a general logs, metrics and traces platform with telemetry
     on and a login.
 
+## 2026-10-30, later: the lens summary is an entry the model never reads
+
+- **A session entry, drawn in the chat.** `/lens` keeps its summary with
+  `pi.appendEntry` and an entry renderer. Pi keeps such an entry out of the
+  conversation, the terminal's scrollback and selection work, and a resumed
+  session shows it again. A test runs `/lens` in a real Pi session and checks
+  that nothing of it reaches the model.
+- **Rejected:** a custom message (the model would read it, and every later turn
+  would pay for it); a status notification (dim, and the next one replaces it);
+  a panel or a widget (they take the keyboard or the space beside the editor).
+- **Without a terminal:** over RPC, which has no chat to draw in, a shortened
+  notification; in print and JSON modes, nothing.
+- **The `viewer` setting is gone.** `/lens grafana` and `/lens datasette` name
+  the viewer, so nothing else needed the setting. A `viewer` left in `jig.json`
+  is reported with what replaced it.
+- **Today is the user's day,** from local midnight, not a UTC day.
+- **A ticket has an index and a tool does not.** No query asks for one tool's
+  rows, and an index that starts with the tool made session and ticket scopes
+  slower. Percentiles are made in the plugin, because SQLite has none.
+
 ## 2026-10-30: the lens reads a copy of the records
 
 - **The records stay JSON lines,** written only by `jig-core`. Appending a line

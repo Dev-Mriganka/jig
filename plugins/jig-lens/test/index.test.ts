@@ -16,14 +16,16 @@ test("the default export is the factory Pi loads, and it only registers", () => 
     factory(pi.api);
     assert.deepEqual([...pi.commands.keys()], ["lens"]);
     assert.deepEqual([...pi.handlers.keys()], ["agent_end"]);
-    assert.deepEqual(pi.notices, []);
+    assert.deepEqual([...pi.renderers.keys()], ["jig-lens-summary"]);
+    assert.deepEqual([pi.notices, pi.entries, pi.sent], [[], [], []]);
 });
 
-test("lens() makes a factory that registers the command and the import", () => {
+test("lens() makes a factory that registers the command, the import and the renderer of the summary", () => {
     const pi = new FakePi();
     lens()(pi.api);
     assert.deepEqual([...pi.commands.keys()], ["lens"]);
     assert.deepEqual([...pi.handlers.keys()], ["agent_end"]);
+    assert.deepEqual([...pi.renderers.keys()], ["jig-lens-summary"]);
 });
 
 test("the extension is listed in the package, after jig-core, and every listed file exists", () => {
@@ -74,18 +76,31 @@ test("it needs nothing that is not in Node or Pi: no package of its own", () => 
                 source.startsWith("node:") ||
                 source.startsWith("./") ||
                 source.startsWith("../../jig-core/") ||
-                source === "@earendil-works/pi-coding-agent";
+                source === "@earendil-works/pi-coding-agent" ||
+                source === "@earendil-works/pi-tui";
             assert.ok(fine, `${name} imports ${source}`);
         }
     }
 });
 
-test("Pi is only imported for its types, so nothing of Pi loads with the plugin's own modules", () => {
+test("Pi is imported for its types only, except by display.ts, which draws with pi-tui's Box and Text", () => {
+    let drawing = 0;
     for (const name of readdirSync(SRC)) {
         for (const line of readFileSync(path.join(SRC, name), "utf8").split("\n")) {
-            if (line.includes("@earendil-works/")) assert.match(line, /^import type /, `${name}: ${line}`);
+            if (!line.includes("@earendil-works/") || line.startsWith("import type ")) continue;
+            assert.equal(name, "display.ts", `${name}: ${line}`);
+            assert.match(line, /^import \{ Box, Text \} from "@earendil-works\/pi-tui";$/);
+            drawing++;
         }
     }
+    assert.equal(drawing, 1);
+});
+
+test("nothing but the entry and display modules reaches pi-tui, so the rest loads without any of Pi", () => {
+    const importers = readdirSync(SRC).filter((name) =>
+        /from "@earendil-works\/pi-tui"/.test(readFileSync(path.join(SRC, name), "utf8")),
+    );
+    assert.deepEqual(importers, ["display.ts"]);
 });
 
 test("the importer only opens record files for reading", () => {

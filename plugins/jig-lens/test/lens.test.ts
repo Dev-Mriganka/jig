@@ -1,75 +1,13 @@
-// The commands and the import at the end of a run, with a fake Pi and fake programs: nothing here starts Grafana or
-// opens a browser.
+// The import at the end of a run, the viewer commands and the rest, with a fake Pi and fake programs: nothing here
+// starts Grafana or opens a browser. The summaries are in routing.test.ts and display.test.ts.
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
-import type { TestContext } from "node:test";
 import { lens } from "../src/index.ts";
-import type { LensOptions } from "../src/index.ts";
 import { START_ATTEMPTS, START_WAIT_MS } from "../src/start.ts";
 import { openIndex, readStatus } from "../src/store.ts";
-import type { ViewerCommand, ViewerState } from "../src/viewer.ts";
-import { appendLines, FakePi, NOW, paths, tempState, turn, useJig, writeSample } from "./support.ts";
-import type { Notice } from "./support.ts";
-import type { Paths } from "../src/paths.ts";
-
-interface RigOptions {
-    /** What the probe answers, one answer for each time it is asked, the last one for ever. */
-    answers?: ViewerState[];
-    /** The programs on PATH, by name. */
-    installed?: Record<string, string>;
-    /** The viewer's settings. Without them, the `lens` section of the fake jig-core, or the defaults. */
-    settings?: NonNullable<LensOptions["settings"]>;
-    /** Set when the started program has already exited. */
-    exit?: { code: number | null };
-    spawnFails?: Error;
-    /** Called when the program is started, with the paths of the state folder. */
-    onSpawn?: (where: Paths) => void;
-    /** Whether a browser could be found to open the page. */
-    opens?: boolean;
-    hasUI?: boolean;
-}
-
-/** A plugin loaded into a fake Pi, with everything that would start a program or open a page recorded instead. */
-function rig(t: TestContext, o: RigOptions = {}) {
-    const state = tempState(t);
-    const spawned: ViewerCommand[] = [];
-    const opened: string[] = [];
-    const probes: Array<[string, number]> = [];
-    const slept: number[] = [];
-    const installed = o.installed ?? { grafana: "/usr/bin/grafana", datasette: "/usr/bin/datasette" };
-    const answers = o.answers ?? ["stopped", "running"];
-    let asked = 0;
-    const pi = new FakePi(o.hasUI ?? true);
-    lens({
-        env: { JIG_STATE_DIR: state, PATH: "/usr/bin:/bin", HOME: "/home/me", ANTHROPIC_API_KEY: "must-not-pass-on" },
-        now: () => NOW,
-        find: (names) => names.map((name) => installed[name]).find((file) => file !== undefined),
-        homepath: () => undefined,
-        probe: async (viewer, port) => {
-            probes.push([viewer, port]);
-            return answers[Math.min(asked++, answers.length - 1)] ?? "stopped";
-        },
-        spawn: async (command) => {
-            spawned.push(command);
-            o.onSpawn?.(paths(state));
-            if (o.spawnFails !== undefined) throw o.spawnFails;
-            return { pid: 4242, exited: () => o.exit };
-        },
-        open: async (url) => {
-            opened.push(url);
-            return o.opens ?? true;
-        },
-        sleep: async (ms) => {
-            slept.push(ms);
-        },
-        ...(o.settings === undefined ? {} : { settings: o.settings }),
-    })(pi.api);
-    return { pi, state, where: paths(state), spawned, opened, probes, slept };
-}
-
-const text = (notices: readonly Notice[]) => notices.map((notice) => notice.text).join("\n");
+import { appendLines, FakePi, rig, text, turn, useJig, writeSample } from "./support.ts";
 
 const INDEX_LINE = /^Index: .*\/lens\/index\.sqlite, \d+(\.\d)? (B|KB|MB), 14 calls and 6 turns from 4 record files$/;
 
@@ -82,7 +20,7 @@ test("/lens status before anything was imported says there is no index yet", asy
         {
             level: "info",
             text: [
-                "Viewer: grafana at http://127.0.0.1:3300, not running (/lens starts it)",
+                "Viewer: none running at http://127.0.0.1:3300 (/lens grafana or /lens datasette starts one)",
                 `Index: none yet at ${r.where.index}. It is made when an agent run ends, and by /lens.`,
                 "Last import: never",
             ].join("\n"),
@@ -115,20 +53,37 @@ test("/lens status counts the lines that could not be read, by file", async (t) 
     assert.equal(lines[3], "Skipped lines: 3 (2026-10-29.jsonl: 1, 2026-10-30.jsonl: 2)");
 });
 
-test("/lens status says when the port is taken by something that is not the viewer", async (t) => {
+test("/lens status says when the port is taken by something that is neither viewer", async (t) => {
     const r = rig(t, { answers: ["busy"] });
-    const text0 = text(await r.pi.lens("status"));
-    assert.match(
-        text0,
-        /^Viewer: grafana at http:\/\/127\.0\.0\.1:3300, the port is taken by something that is not this viewer/,
+    const first = (await r.pi.lens("status"))[0]?.text.split("\n")[0];
+    assert.equal(
+        first,
+        "Viewer: the port is taken by something that is neither Grafana nor Datasette (http://127.0.0.1:3300)",
+    );
+    assert.deepEqual(r.probes, [
+        ["grafana", 3300],
+        ["datasette", 3300],
+    ]);
+});
+
+test("/lens status asks for Grafana first, and for Datasette only when something else answers", async (t) => {
+    const r = rig(t, { answers: { grafana: ["busy"], datasette: ["running"] }, settings: () => ({ port: 4100 }) });
+    const first = (await r.pi.lens("status"))[0]?.text.split("\n")[0];
+    assert.equal(first, "Viewer: datasette at http://127.0.0.1:4100, running");
+    assert.deepEqual(
+        r.probes,
+        [
+            ["grafana", 4100],
+            ["datasette", 4100],
+        ],
+        "on the port that is set",
     );
 });
 
-test("/lens status asks about the viewer that is set, on the port that is set", async (t) => {
-    const r = rig(t, { answers: ["running"], settings: () => ({ viewer: "datasette", port: 4100 }) });
-    const first = (await r.pi.lens("status"))[0]?.text.split("\n")[0];
-    assert.equal(first, "Viewer: datasette at http://127.0.0.1:4100, running");
-    assert.deepEqual(r.probes, [["datasette", 4100]]);
+test("/lens status asks once when nothing answers: the port is the same for both viewers", async (t) => {
+    const r = rig(t, { answers: ["stopped"] });
+    await r.pi.lens("status");
+    assert.deepEqual(r.probes, [["grafana", 3300]]);
 });
 
 test("/lens status starts nothing and opens nothing", async (t) => {
@@ -211,19 +166,19 @@ test("a failure that was fixed and then comes back is told again", async (t) => 
 });
 
 test("an import with no screen to tell does not fail", async (t) => {
-    const r = rig(t, { hasUI: false });
+    const r = rig(t, { mode: "print" });
     writeSample(r.state);
     await r.pi.fire("agent_end");
     assert.equal(readStatus(r.where.index)?.calls, 14);
     assert.deepEqual(r.pi.notices, []);
 });
 
-// ---- /lens: start and open ------------------------------------------------------------------------------------------
+// ---- /lens grafana and /lens datasette: start and open --------------------------------------------------------------
 
-test("/lens starts Grafana with exactly this command: loopback, sign-in on, no admin password", async (t) => {
+test("/lens grafana starts Grafana with exactly this command: loopback, sign-in on, no admin password", async (t) => {
     const r = rig(t);
     writeSample(r.state);
-    await r.pi.lens("");
+    await r.pi.lens("grafana");
     assert.equal(r.spawned.length, 1);
     assert.deepEqual(r.spawned[0], {
         file: "/usr/bin/grafana",
@@ -267,10 +222,10 @@ test("/lens starts Grafana with exactly this command: loopback, sign-in on, no a
     );
 });
 
-test("/lens tells what it did, and opens the overview dashboard in the browser", async (t) => {
+test("/lens grafana tells what it did, and opens the overview dashboard in the browser", async (t) => {
     const r = rig(t);
     writeSample(r.state);
-    const notices = await r.pi.lens("");
+    const notices = await r.pi.lens("grafana");
     assert.deepEqual(
         notices.map((notice) => notice.level),
         ["info"],
@@ -287,58 +242,58 @@ test("/lens tells what it did, and opens the overview dashboard in the browser",
     assert.deepEqual(r.opened, ["http://127.0.0.1:3300/d/jig-overview"]);
 });
 
-test("/lens imports before it starts the viewer, so the dashboard has the records when it opens", async (t) => {
+test("/lens grafana imports before it starts the viewer, so the dashboard has the records when it opens", async (t) => {
     let rowsWhenStarted: number | undefined;
     const r = rig(t, { onSpawn: (where) => (rowsWhenStarted = readStatus(where.index)?.calls) });
     writeSample(r.state);
-    await r.pi.lens("");
+    await r.pi.lens("grafana");
     assert.equal(rowsWhenStarted, 14);
 });
 
 test("Grafana's data folder is made private, and the first-start note comes only once", async (t) => {
     const r = rig(t, { answers: ["stopped", "running", "stopped", "running"] });
-    await r.pi.lens("");
+    await r.pi.lens("grafana");
     assert.equal(statSync(r.where.grafanaData).mode & 0o777, 0o700);
     assert.match(text(r.pi.notices), /First start: sign in as admin/);
 
     writeFileSync(path.join(r.where.grafanaData, "grafana.db"), "");
-    const second = text(await r.pi.lens(""));
+    const second = text(await r.pi.lens("grafana"));
     assert.doesNotMatch(second, /First start/);
     assert.match(second, /Grafana started \(process 4242\) at http:\/\/127\.0\.0\.1:3300\./);
 });
 
-test("/lens waits for the viewer to answer, a little at a time", async (t) => {
+test("/lens grafana waits for the viewer to answer, a little at a time", async (t) => {
     const r = rig(t, { answers: ["stopped", "stopped", "stopped", "stopped", "running"] });
-    const notices = await r.pi.lens("");
+    const notices = await r.pi.lens("grafana");
     assert.equal(notices[0]?.level, "info");
     assert.deepEqual(r.slept, [START_WAIT_MS, START_WAIT_MS, START_WAIT_MS], "three waits, then it answered");
     assert.equal(r.opened.length, 1);
 });
 
-test("/lens does not start a viewer that is already running, and still opens the dashboard", async (t) => {
+test("/lens grafana does not start a viewer that is already running, and still opens the dashboard", async (t) => {
     const r = rig(t, { answers: ["running"] });
     writeSample(r.state);
-    const notices = await r.pi.lens("");
+    const notices = await r.pi.lens("grafana");
     assert.deepEqual(r.spawned, []);
     assert.deepEqual(notices[0]?.text.split("\n"), [
         "Imported 14 new calls and 6 new turns.",
         "Opened http://127.0.0.1:3300/d/jig-overview in your browser.",
     ]);
     assert.deepEqual(r.opened, ["http://127.0.0.1:3300/d/jig-overview"]);
-    const again = await r.pi.lens("");
+    const again = await r.pi.lens("grafana");
     assert.equal(again[0]?.text.split("\n")[0], "The index is up to date.");
 });
 
-test("when no browser can be found, /lens gives the address to open", async (t) => {
+test("when no browser can be found, /lens grafana gives the address to open", async (t) => {
     const r = rig(t, { answers: ["running"], opens: false });
-    const lines = (await r.pi.lens(""))[0]?.text.split("\n") ?? [];
+    const lines = (await r.pi.lens("grafana"))[0]?.text.split("\n") ?? [];
     assert.equal(lines.at(-1), "Open http://127.0.0.1:3300/d/jig-overview in your browser.");
 });
 
-test("/lens starts Datasette with exactly this command, and opens its page for the index", async (t) => {
-    const r = rig(t, { settings: () => ({ viewer: "datasette", port: 4100 }) });
+test("/lens datasette starts Datasette with exactly this command, and opens its page for the index", async (t) => {
+    const r = rig(t, { settings: () => ({ port: 4100 }) });
     writeSample(r.state);
-    const notices = await r.pi.lens("");
+    const notices = await r.pi.lens("datasette");
     assert.deepEqual(r.spawned, [
         {
             file: "/usr/bin/datasette",
@@ -357,43 +312,39 @@ test("/lens starts Datasette with exactly this command, and opens its page for t
     ]);
 });
 
-test("without Grafana, /lens says how to install it and the plugin, mentions Datasette, starts nothing", async (t) => {
+test("without Grafana, /lens grafana says how to install it and the plugin, and mentions Datasette", async (t) => {
     const r = rig(t, { installed: {} });
-    const notices = await r.pi.lens("");
+    const notices = await r.pi.lens("grafana");
     assert.equal(notices[0]?.level, "warning");
     assert.deepEqual(notices[0]?.text.split("\n").slice(1), [
         "Grafana is not installed: there is no grafana or grafana-server on PATH.",
         "Install Grafana OSS with your package manager (Homebrew on macOS), then add its SQLite data source:",
         "  grafana cli plugins install frser-sqlite-datasource",
-        "and run /lens again.",
-        "Datasette shows the same index. Install it with pip (pip install datasette) " +
-            `and set "viewer": "datasette" under "lens" in jig.json.`,
+        "and run /lens grafana again.",
+        "Datasette shows the same index. Install it with pip (pip install datasette) and run /lens datasette.",
     ]);
     assert.deepEqual([r.spawned, r.opened], [[], []]);
 });
 
 test("the older grafana-server is used when it is the only Grafana", async (t) => {
     const r = rig(t, { installed: { "grafana-server": "/usr/sbin/grafana-server" } });
-    await r.pi.lens("");
+    await r.pi.lens("grafana");
     assert.equal(r.spawned[0]?.file, "/usr/sbin/grafana-server");
     assert.deepEqual(r.spawned[0]?.args, []);
 });
 
-test("without Datasette, /lens says how to install it, and starts nothing", async (t) => {
-    const r = rig(t, {
-        installed: { grafana: "/usr/bin/grafana" },
-        settings: () => ({ viewer: "datasette", port: 3300 }),
-    });
-    const notices = await r.pi.lens("");
+test("without Datasette, /lens datasette says how to install it, and starts nothing", async (t) => {
+    const r = rig(t, { installed: { grafana: "/usr/bin/grafana" } });
+    const notices = await r.pi.lens("datasette");
     assert.equal(notices[0]?.level, "warning");
     assert.match(text(notices), /Datasette is not installed: there is no datasette on PATH\./);
-    assert.match(text(notices), /pip install datasette/);
+    assert.match(text(notices), /pip install datasette\), then run \/lens datasette again\./);
     assert.deepEqual([r.spawned, r.opened], [[], []]);
 });
 
-test("when something else has the port, /lens says so and starts nothing", async (t) => {
+test("when something else has the port, /lens grafana says so and starts nothing", async (t) => {
     const r = rig(t, { answers: ["busy"] });
-    const notices = await r.pi.lens("");
+    const notices = await r.pi.lens("grafana");
     assert.equal(notices[0]?.level, "warning");
     assert.match(
         text(notices),
@@ -402,9 +353,9 @@ test("when something else has the port, /lens says so and starts nothing", async
     assert.deepEqual([r.spawned, r.opened], [[], []]);
 });
 
-test("when the program stops at once, /lens says so with its exit code, and does not wait for it", async (t) => {
+test("when the program stops at once, /lens grafana says so with its exit code, and does not wait", async (t) => {
     const r = rig(t, { answers: ["stopped"], exit: { code: 1 } });
-    const notices = await r.pi.lens("");
+    const notices = await r.pi.lens("grafana");
     assert.equal(notices[0]?.level, "warning");
     assert.match(
         text(notices),
@@ -414,9 +365,9 @@ test("when the program stops at once, /lens says so with its exit code, and does
     assert.equal(r.slept.length, 0);
 });
 
-test("when the viewer never answers, /lens gives up after about a minute and points to the log", async (t) => {
+test("when the viewer never answers, /lens grafana gives up after about a minute and points to the log", async (t) => {
     const r = rig(t, { answers: ["stopped"] });
-    const notices = await r.pi.lens("");
+    const notices = await r.pi.lens("grafana");
     assert.equal(notices[0]?.level, "warning");
     assert.match(
         text(notices),
@@ -432,20 +383,20 @@ test("when the viewer never answers, /lens gives up after about a minute and poi
 
 test("a program that cannot be started is reported with the reason", async (t) => {
     const r = rig(t, { answers: ["stopped"], spawnFails: new Error("spawn /usr/bin/grafana EACCES") });
-    const notices = await r.pi.lens("");
+    const notices = await r.pi.lens("grafana");
     assert.equal(notices[0]?.level, "warning");
     assert.match(text(notices), /Could not start \/usr\/bin\/grafana: spawn \/usr\/bin\/grafana EACCES/);
     assert.equal(r.opened.length, 0);
 });
 
-test("/lens goes on to the viewer when the import fails, and says the import failed", async (t) => {
+test("/lens grafana goes on to the viewer when the import fails, and says the import failed", async (t) => {
     const r = rig(t, { answers: ["running"] });
     mkdirSync(r.where.lens, { recursive: true });
     writeFileSync(
         r.where.index,
         "this is not a database, and it is long enough that SQLite reads a header from it".repeat(10),
     );
-    const notices = await r.pi.lens("");
+    const notices = await r.pi.lens("grafana");
     assert.match(
         notices[0]?.text.split("\n")[0] ?? "",
         /^The import failed: .*\. \/lens rebuild makes the index again\.$/,
@@ -453,14 +404,14 @@ test("/lens goes on to the viewer when the import fails, and says the import fai
     assert.equal(r.opened.length, 1);
 });
 
-test("/lens tells how many lines were skipped, and how many rows were too old", async (t) => {
+test("/lens grafana tells how many lines were skipped, and how many rows were too old", async (t) => {
     const r = rig(t, { answers: ["running"] });
     appendLines(r.state, "2026-10-30", ["garbage"]);
-    const first = (await r.pi.lens(""))[0]?.text.split("\n")[0];
+    const first = (await r.pi.lens("grafana"))[0]?.text.split("\n")[0];
     assert.equal(first, "The index is up to date. Skipped 1 line that is not a record.");
     appendLines(r.state, "2026-10-30", ["garbage", "more"]);
     assert.equal(
-        (await r.pi.lens(""))[0]?.text.split("\n")[0],
+        (await r.pi.lens("grafana"))[0]?.text.split("\n")[0],
         "The index is up to date. Skipped 2 lines that are not records.",
     );
 });
@@ -521,7 +472,12 @@ test("/lens rebuild with no index yet makes one, and counts the lines it skipped
 test("an unknown word shows the usage, and does nothing else", async (t) => {
     const r = rig(t);
     const notices = await r.pi.lens("restart");
-    assert.deepEqual(notices, [{ level: "warning", text: "Usage: /lens, /lens rebuild, /lens status" }]);
+    assert.deepEqual(notices, [
+        {
+            level: "warning",
+            text: "Usage: /lens [ticket KEY | session [id] | days N | grafana | datasette | rebuild | status]",
+        },
+    ]);
     assert.deepEqual([r.spawned, r.opened, r.probes], [[], [], []]);
 });
 
@@ -530,25 +486,25 @@ test("spaces around the word do not matter", async (t) => {
     assert.match((await r.pi.lens("  status  "))[0]?.text ?? "", /^Viewer: /);
 });
 
-test("with no screen the commands still do their work, and say nothing", async (t) => {
-    const r = rig(t, { hasUI: false });
+test("with no screen the viewer commands still do their work, and say nothing", async (t) => {
+    const r = rig(t, { mode: "print" });
     writeSample(r.state);
-    await r.pi.lens("");
+    await r.pi.lens("grafana");
     assert.equal(r.spawned.length, 1);
     assert.equal(r.opened.length, 1);
     assert.deepEqual(r.pi.notices, []);
 });
 
-test("the command is /lens, with completions for its two words", (t) => {
+test("the command is /lens, with completions for its words", (t) => {
     const r = rig(t);
     const command = r.pi.commands.get("lens");
     assert.ok(command?.description);
-    assert.deepEqual(command.getArgumentCompletions?.(""), [
-        { value: "rebuild", label: "rebuild" },
-        { value: "status", label: "status" },
-    ]);
-    assert.deepEqual(command.getArgumentCompletions?.("r"), [{ value: "rebuild", label: "rebuild" }]);
-    assert.deepEqual(command.getArgumentCompletions?.("st"), [{ value: "status", label: "status" }]);
+    const words = (prefix: string) =>
+        (command.getArgumentCompletions?.(prefix) as Array<{ value: string }> | null)?.map((item) => item.value);
+    assert.deepEqual(words(""), ["ticket", "session", "days", "grafana", "datasette", "rebuild", "status"]);
+    assert.deepEqual(words("r"), ["rebuild"]);
+    assert.deepEqual(words("st"), ["status"]);
+    assert.deepEqual(words("d"), ["days", "datasette"]);
     assert.equal(command.getArgumentCompletions?.("x"), null);
 });
 
@@ -575,11 +531,11 @@ test("the factory registers the section at once when jig-core is already loaded"
     assert.ok(jig.checks.has("lens"));
 });
 
-test("the viewer and the port come from the lens section of jig.json", async (t) => {
-    useJig(t, { lens: { viewer: "datasette", port: 4100 } });
+test("the port comes from the lens section of jig.json", async (t) => {
+    useJig(t, { lens: { port: 4100 } });
     const r = rig(t, { answers: ["running"] });
     const first = (await r.pi.lens("status"))[0]?.text.split("\n")[0];
-    assert.equal(first, "Viewer: datasette at http://127.0.0.1:4100, running");
+    assert.equal(first, "Viewer: grafana at http://127.0.0.1:4100, running");
 });
 
 test("without a lens section, or without jig-core, the defaults apply", async (t) => {
