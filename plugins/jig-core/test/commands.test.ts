@@ -77,7 +77,7 @@ describe("/jig", () => {
         const earlier = rig();
         earlier.engine.registerKind(scripted(earlier.clock, "gone", (n) => ({ state: n })).kind);
         earlier.begin("session-test");
-        earlier.engine.start({ kind: "gone", spec: {}, title: "from the plugin that is not loaded" });
+        const waiting = earlier.engine.start({ kind: "gone", spec: {}, title: "from the plugin that is not loaded" });
         earlier.engine.end();
 
         const clock = fakeClock();
@@ -90,13 +90,22 @@ describe("/jig", () => {
         });
         assert.match(await jigCommand(harness), /Open watches: 1 \(1 waiting for its plugin\)\n/);
 
-        harness.api.watches.start({ kind: "ok", spec: {}, title: "one" });
+        const one = harness.api.watches.start({ kind: "ok", spec: {}, title: "one" });
         harness.api.watches.start({ kind: "ok", spec: {}, title: "two" });
         assert.match(await jigCommand(harness), /Open watches: 3 \(1 waiting for its plugin\)\n/);
 
-        harness.api.watches.start({ kind: "broken", spec: {}, title: "three" });
+        const broken = harness.api.watches.start({ kind: "broken", spec: {}, title: "three" });
         await clock.advance(5 * 60_000);
         assert.match(await jigCommand(harness), /Open watches: 4 \(1 paused, 1 waiting for its plugin\)\n/);
+
+        // The watch tool shows the same three states in its lines.
+        const tool = harness.host.registered.get("watch");
+        const listed = await tool?.execute("call-1", { action: "list" } as never, undefined, undefined, harness.ctx as never);
+        const lines = (listed?.content[0] as { text: string }).text.split("\n");
+        assert.equal(lines.length, 4);
+        assert.match(lines.find((line) => line.startsWith(waiting)) ?? "", /\| from the plugin that is not loaded \| waiting for its plugin \(jig-test\) \| (?:\d+ s|\d+ min)$/);
+        assert.match(lines.find((line) => line.startsWith(one)) ?? "", /\| one \| open \| 5 min$/);
+        assert.match(lines.find((line) => line.startsWith(broken)) ?? "", /\| three \| paused \| 5 min$/);
     });
 
     test("a watch that has finished is not counted as open", async () => {
