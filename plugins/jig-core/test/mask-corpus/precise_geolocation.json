@@ -1,0 +1,85 @@
+{
+  "category": "precise_geolocation",
+  "cases": [
+    {
+      "id": "geo-structured",
+      "input": {
+        "location": {
+          "latitude": 0.123456,
+          "longitude": 0.654321
+        },
+        "orderId": "ord-7501"
+      },
+      "must_not_contain": [
+        "0.123456",
+        "0.654321"
+      ],
+      "must_keep": [
+        "ord-7501"
+      ],
+      "expect_tags": [],
+      "notes": "Remove both coordinates, including numeric JSON values."
+    },
+    {
+      "id": "geo-string-pair",
+      "input": {
+        "serviceGeo": "0.234567, -0.765432",
+        "state": "CA",
+        "country": "US"
+      },
+      "must_not_contain": [
+        "0.234567",
+        "-0.765432"
+      ],
+      "must_keep": [
+        "CA",
+        "US"
+      ],
+      "expect_tags": [],
+      "notes": "Coordinate pair in a single string."
+    },
+    {
+      "id": "geo-log",
+      "input": "INFO gps=0.345678,-0.876543 order=ord-7503 ts=2026-01-02T03:04:05Z",
+      "must_not_contain": [
+        "0.345678",
+        "-0.876543"
+      ],
+      "must_keep": [
+        "ord-7503",
+        "2026-01-02T03:04:05Z"
+      ],
+      "expect_tags": [],
+      "notes": "Coordinates in a log line; timestamp remains."
+    },
+    {
+      "id": "geo-url-query",
+      "input": "GET /dispatch?lat=0.456789&lon=0.987654&orderId=ord-7504",
+      "must_not_contain": [
+        "0.456789",
+        "0.987654"
+      ],
+      "must_keep": [
+        "ord-7504"
+      ],
+      "expect_tags": [],
+      "notes": "Coordinates in URL query parameters."
+    },
+    {
+      "id": "geo-negative-controls",
+      "input": {
+        "version": "0.12.34",
+        "orderId": "GEO-7505",
+        "durationSeconds": 34.567
+      },
+      "must_not_contain": [],
+      "must_keep": [
+        "0.12.34",
+        "GEO-7505",
+        "34.567"
+      ],
+      "expect_tags": [],
+      "notes": "Version and duration values must not be mistaken for geolocation."
+    }
+  ]
+}

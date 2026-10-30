@@ -1,0 +1,89 @@
+{
+  "category": "username_login",
+  "cases": [
+    {
+      "id": "user-portal-login",
+      "input": {
+        "portalLogin": "alex.example",
+        "username": "casey_sample",
+        "accountId": "acct-demo-301"
+      },
+      "must_not_contain": [
+        "alex.example",
+        "casey_sample"
+      ],
+      "must_keep": [
+        "acct-demo-301"
+      ],
+      "expect_tags": [
+        "user"
+      ],
+      "notes": "Portal usernames are tokenized."
+    },
+    {
+      "id": "user-sip-login",
+      "input": {
+        "sip": {
+          "authUsername": "sip_demo_301",
+          "realm": "sip.example.com"
+        },
+        "orderId": "ord-7302"
+      },
+      "must_not_contain": [
+        "sip_demo_301"
+      ],
+      "must_keep": [
+        "sip.example.com",
+        "ord-7302"
+      ],
+      "expect_tags": [
+        "user"
+      ],
+      "notes": "SIP login inside a nested document; example domain is nonpersonal."
+    },
+    {
+      "id": "user-json-log",
+      "input": "INFO payload={\"loginId\":\"sample.user03\",\"accountId\":\"acct-demo-303\"}",
+      "must_not_contain": [
+        "sample.user03"
+      ],
+      "must_keep": [
+        "acct-demo-303"
+      ],
+      "expect_tags": [
+        "user"
+      ],
+      "notes": "Login ID inside JSON-encoded log text."
+    },
+    {
+      "id": "user-url-query",
+      "input": "GET /session?username=test.user04&orderId=ord-7304",
+      "must_not_contain": [
+        "test.user04"
+      ],
+      "must_keep": [
+        "ord-7304"
+      ],
+      "expect_tags": [
+        "user"
+      ],
+      "notes": "Username in a URL query."
+    },
+    {
+      "id": "user-negative-controls",
+      "input": {
+        "orderId": "login-7305",
+        "sku": "USERNAME-MODULE",
+        "accountId": "acct-user-305"
+      },
+      "must_not_contain": [],
+      "must_keep": [
+        "login-7305",
+        "USERNAME-MODULE",
+        "acct-user-305"
+      ],
+      "expect_tags": [],
+      "notes": "Identifier words are not usernames by themselves."
+    }
+  ]
+}

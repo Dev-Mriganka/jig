@@ -1,0 +1,121 @@
+{
+  "category": "payment_card",
+  "cases": [
+    {
+      "id": "card-visa-spaces",
+      "input": {
+        "payment": {
+          "pan": "4111 1111 1111 1111",
+          "cvv": "123",
+          "expiry": "12/30"
+        },
+        "orderId": "ord-7701"
+      },
+      "must_not_contain": [
+        "4111 1111 1111 1111",
+        "123",
+        "12/30"
+      ],
+      "must_keep": [
+        "1111",
+        "ord-7701"
+      ],
+      "expect_tags": [
+        "card"
+      ],
+      "notes": "Public Luhn-valid Visa test PAN; remove CVV and expiry."
+    },
+    {
+      "id": "card-mastercard-dashes",
+      "input": {
+        "cardNumber": "5555-5555-5555-4444",
+        "cvc": "999",
+        "expirationDate": "01/31",
+        "invoiceId": "inv-demo-702"
+      },
+      "must_not_contain": [
+        "5555-5555-5555-4444",
+        "999",
+        "01/31"
+      ],
+      "must_keep": [
+        "4444",
+        "inv-demo-702"
+      ],
+      "expect_tags": [
+        "card"
+      ],
+      "notes": "Public Luhn-valid Mastercard test PAN with separators."
+    },
+    {
+      "id": "card-visa-compact",
+      "input": {
+        "Card": "4242424242424242",
+        "CVV": "321",
+        "EXPIRY": "2030-12",
+        "accountId": "acct-demo-703"
+      },
+      "must_not_contain": [
+        "4242424242424242",
+        "321",
+        "2030-12"
+      ],
+      "must_keep": [
+        "4242",
+        "acct-demo-703"
+      ],
+      "expect_tags": [
+        "card"
+      ],
+      "notes": "Public Luhn-valid Stripe test PAN and mixed-case fields."
+    },
+    {
+      "id": "card-free-text",
+      "input": "ERROR note=Test card 4111-1111-1111-1111 declined order=ord-7704",
+      "must_not_contain": [
+        "4111-1111-1111-1111"
+      ],
+      "must_keep": [
+        "1111",
+        "ord-7704",
+        "declined"
+      ],
+      "expect_tags": [
+        "card"
+      ],
+      "notes": "Card detector in free text."
+    },
+    {
+      "id": "card-json-log",
+      "input": "INFO payload={\"cardNumber\":\"4242 4242 4242 4242\",\"cvv\":\"456\",\"orderId\":\"ord-7705\"}",
+      "must_not_contain": [
+        "4242 4242 4242 4242",
+        "456"
+      ],
+      "must_keep": [
+        "4242",
+        "ord-7705"
+      ],
+      "expect_tags": [
+        "card"
+      ],
+      "notes": "PAN and CVV inside JSON-encoded log text."
+    },
+    {
+      "id": "card-luhn-negative",
+      "input": {
+        "orderId": "4111111111111112",
+        "sku": "CARD-4242424242424243",
+        "version": "4.1.1.1"
+      },
+      "must_not_contain": [],
+      "must_keep": [
+        "4111111111111112",
+        "CARD-4242424242424243",
+        "4.1.1.1"
+      ],
+      "expect_tags": [],
+      "notes": "Luhn-invalid numbers in identifier context are not cards."
+    }
+  ]
+}

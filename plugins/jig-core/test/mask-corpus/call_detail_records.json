@@ -1,0 +1,138 @@
+{
+  "category": "call_detail_records",
+  "cases": [
+    {
+      "id": "cdr-single",
+      "input": {
+        "cdr": {
+          "callingNumber": "202-555-0111",
+          "calledNumber": "202-555-0112",
+          "startTime": "2026-01-02T03:04:05Z",
+          "durationSeconds": 91,
+          "status": "COMPLETED"
+        },
+        "accountId": "acct-demo-1201"
+      },
+      "must_not_contain": [
+        "202-555-0111",
+        "202-555-0112"
+      ],
+      "must_keep": [
+        "0111",
+        "0112",
+        "2026-01-02T03:04:05Z",
+        "91",
+        "COMPLETED",
+        "acct-demo-1201"
+      ],
+      "expect_tags": [
+        "phone"
+      ],
+      "notes": "Calling and called numbers are CPNI; call time and duration remain for diagnosis."
+    },
+    {
+      "id": "cdr-mongo-array",
+      "input": {
+        "usage": [
+          {
+            "from": "+12025550113",
+            "to": "+12025550114",
+            "durationSeconds": 30
+          },
+          {
+            "from": "+12025550113",
+            "to": "+12025550115",
+            "durationSeconds": 45
+          }
+        ],
+        "totalCalls": 2,
+        "orderId": "ord-8202"
+      },
+      "must_not_contain": [
+        "+12025550113",
+        "+12025550114",
+        "+12025550115"
+      ],
+      "must_keep": [
+        "0113",
+        "0114",
+        "0115",
+        "30",
+        "45",
+        "totalCalls",
+        "ord-8202"
+      ],
+      "expect_tags": [
+        "phone"
+      ],
+      "notes": "Repeated number should receive the same token within the run; aggregates remain."
+    },
+    {
+      "id": "cdr-log-json",
+      "input": "INFO cdr={\"calledNumber\":\"(202) 555-0116\",\"durationSeconds\":120,\"callId\":\"call-demo-203\"}",
+      "must_not_contain": [
+        "(202) 555-0116"
+      ],
+      "must_keep": [
+        "0116",
+        "120",
+        "call-demo-203"
+      ],
+      "expect_tags": [
+        "phone"
+      ],
+      "notes": "Called number inside JSON-encoded CDR log."
+    },
+    {
+      "id": "cdr-free-text",
+      "input": "INFO call to 202-555-0117 lasted 33 seconds callId=call-demo-204",
+      "must_not_contain": [
+        "202-555-0117"
+      ],
+      "must_keep": [
+        "0117",
+        "33",
+        "call-demo-204"
+      ],
+      "expect_tags": [
+        "phone"
+      ],
+      "notes": "Called number in free-text usage log."
+    },
+    {
+      "id": "cdr-url-query",
+      "input": "GET /cdr?called=%2B12025550118&callId=call-demo-205",
+      "must_not_contain": [
+        "%2B12025550118"
+      ],
+      "must_keep": [
+        "0118",
+        "call-demo-205"
+      ],
+      "expect_tags": [
+        "phone"
+      ],
+      "notes": "Called number in a URL query."
+    },
+    {
+      "id": "cdr-aggregates-negative",
+      "input": {
+        "totalCalls": 17,
+        "totalDurationSeconds": 135,
+        "orderId": "CDR-8206",
+        "sku": "CALL-PLAN-01",
+        "status": "COMPLETED"
+      },
+      "must_not_contain": [],
+      "must_keep": [
+        "17",
+        "135",
+        "CDR-8206",
+        "CALL-PLAN-01",
+        "COMPLETED"
+      ],
+      "expect_tags": [],
+      "notes": "Aggregated usage, order ID, SKU, and status remain visible."
+    }
+  ]
+}

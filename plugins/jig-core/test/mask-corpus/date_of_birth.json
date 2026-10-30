@@ -1,0 +1,86 @@
+{
+  "category": "date_of_birth",
+  "cases": [
+    {
+      "id": "dob-iso",
+      "input": {
+        "dob": "1980-01-02",
+        "accountId": "acct-demo-1001"
+      },
+      "must_not_contain": [
+        "1980-01-02"
+      ],
+      "must_keep": [
+        "acct-demo-1001"
+      ],
+      "expect_tags": [],
+      "notes": "ISO date in an explicit DOB field."
+    },
+    {
+      "id": "dob-us-format",
+      "input": {
+        "dateOfBirth": "01/02/1980",
+        "orderId": "ord-8002"
+      },
+      "must_not_contain": [
+        "01/02/1980"
+      ],
+      "must_keep": [
+        "ord-8002"
+      ],
+      "expect_tags": [],
+      "notes": "US date in an explicit birth-date field."
+    },
+    {
+      "id": "dob-nested-array",
+      "input": {
+        "contacts": [
+          {
+            "name": "Alex Example",
+            "birthDate": "1981-03-04"
+          }
+        ],
+        "orderId": "ord-8003"
+      },
+      "must_not_contain": [
+        "Alex Example",
+        "1981-03-04"
+      ],
+      "must_keep": [
+        "ord-8003"
+      ],
+      "expect_tags": [
+        "name"
+      ],
+      "notes": "Birth date and name nested in a Mongo-style array."
+    },
+    {
+      "id": "dob-free-text",
+      "input": "INFO note=Example applicant DOB 02/03/1982 order=ord-8004",
+      "must_not_contain": [
+        "02/03/1982"
+      ],
+      "must_keep": [
+        "ord-8004"
+      ],
+      "expect_tags": [],
+      "notes": "DOB in free text."
+    },
+    {
+      "id": "dob-timestamp-negative",
+      "input": {
+        "createdAt": "2026-01-02T03:04:05Z",
+        "orderId": "DOB-8005",
+        "version": "1.2.1980"
+      },
+      "must_not_contain": [],
+      "must_keep": [
+        "2026-01-02T03:04:05Z",
+        "DOB-8005",
+        "1.2.1980"
+      ],
+      "expect_tags": [],
+      "notes": "Timestamps, version numbers, and order IDs must remain."
+    }
+  ]
+}
