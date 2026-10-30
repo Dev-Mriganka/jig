@@ -91,6 +91,17 @@ generic: no company is named.
   - **A contact masks only a scalar,** through a new `contact` kind: an object
     under it is read field by field, so a `billToContact` record keeps its ids.
   - **The corpus said `contact` was kept;** it is masked now, on purpose.
+- **A flaky `jig-mongo` route test is deterministic.** The tests where the SSH
+  forward must not come up used the real probe, which connects to the port
+  `freePort` handed out.
+  - **The assumption:** that port stays free. In a full run other test files open
+    servers on port 0 at the same moment, one can be given the same port, and the
+    probe then calls that server a forward that works: a call that has to fail
+    succeeds.
+  - **Fix:** those tests inject a probe that finds nothing listening. The tests
+    that need a working forward still use a real port.
+  - **Not fixed, and not a test matter:** `jig-mongo` cannot tell its own `ssh` from
+    another listener on that port. Letting `ssh` report when it is ready would.
 - **A connection failure is no longer described twice.** The line for a database
   that could not be reached was turned into "the database driver failed" by a
   second pass, so `jig-mongo` now says "cannot reach the staging/orders database".

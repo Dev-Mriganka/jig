@@ -58,6 +58,13 @@ const deps = (extra: Partial<RouteDeps> = {}): RouteDeps => ({
     ...extra,
 });
 
+/**
+ * A probe that finds nothing listening, for the tests where the forward must NOT come up. `freePort` hands out a port that is free
+ * for a moment; in a full run other test files open servers on port 0 at the same time, and one of them can be given the same
+ * port. The real probe would then connect to it and call that a forward that works, and a call that has to fail would succeed.
+ */
+const nobodyListens: Partial<RouteDeps> = { probe: async () => false };
+
 const start = async (extra: Partial<RouteDeps> = {}, signal?: AbortSignal): Promise<Forward> => {
     const forward = await startForward(route, target, deps(extra), signal);
     forwards.push(forward);
@@ -154,7 +161,7 @@ describe("the key file", () => {
     test("is deleted when ssh fails, whatever the failure", async () => {
         for (const mode of ["denied", "hostkey", "unreachable", "badkey"] as const) {
             ssh.mode(mode);
-            await assert.rejects(startForward(route, target, deps()), RouteError, mode);
+            await assert.rejects(startForward(route, target, deps(nobodyListens)), RouteError, mode);
             assert.deepEqual(leftBehind(), [], mode);
         }
     });
@@ -162,7 +169,7 @@ describe("the key file", () => {
     test("is deleted when the forward never comes up, and ssh is stopped", async () => {
         ssh.mode("silent");
         await assert.rejects(
-            startForward(route, target, deps({ readyTimeoutMs: 300 })),
+            startForward(route, target, deps({ ...nobodyListens, readyTimeoutMs: 300 })),
             /did not become ready in time/,
         );
         assert.deepEqual(leftBehind(), []);
@@ -172,7 +179,7 @@ describe("the key file", () => {
     test("is deleted when the call is cancelled while ssh starts", async () => {
         ssh.mode("silent");
         const controller = new AbortController();
-        const pending = startForward(route, target, deps(), controller.signal);
+        const pending = startForward(route, target, deps(nobodyListens), controller.signal);
         // Once ssh has been started: a fixed delay would be too short on a busy machine.
         await waitUntil(() => jig.started.length > 0, "ssh was started");
         controller.abort();
@@ -224,7 +231,7 @@ describe("the forward", () => {
         for (const [mode, pattern] of Object.entries(expected)) {
             ssh.mode(mode as "denied");
             await assert.rejects(
-                startForward(route, target, deps()),
+                startForward(route, target, deps(nobodyListens)),
                 (error: unknown) =>
                     error instanceof RouteError &&
                     pattern.test(error.message) &&
@@ -240,7 +247,7 @@ describe("the forward", () => {
         process.env.PATH = "";
         try {
             await assert.rejects(
-                startForward(route, target, deps()),
+                startForward(route, target, deps(nobodyListens)),
                 /could not start: ssh is not installed or not on PATH/,
             );
         } finally {

@@ -276,6 +276,9 @@ describe("a route in front of the database", () => {
 
     test("a failing forward fails the call before any driver is asked, and is not kept", async () => {
         ssh.mode("denied");
+        // Nothing listens: the port that was handed out can be given to another test's server in a full run, and the real probe
+        // would call that a forward that works.
+        session = new Session(deps({ route: { ...deps().route, probe: async () => false } }));
         await assert.rejects(session.acquire(connection(SSH), false), /the bastion refused the SSH key/);
         assert.equal(targets.length, 0);
         assert.deepEqual(session.environments(), []);
