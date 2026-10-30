@@ -176,7 +176,11 @@ export async function pollJenkins(
     previous: PlainState | undefined,
     ctx: CiContext,
 ): Promise<PollOutcome<PlainState>> {
-    const state: PlainState = { polls: (previous?.polls ?? 0) + 1, found: previous?.found ?? spec.build };
+    const known = previous?.found ?? spec.build;
+    const state: PlainState =
+        known === undefined
+            ? { polls: (previous?.polls ?? 0) + 1 }
+            : { polls: (previous?.polls ?? 0) + 1, found: known };
     const wait = ctx.pollSeconds * 1000;
     const build = await findBuild(api, spec, state);
     if (build === undefined) return { state, nextPollMs: wait };

@@ -7,6 +7,9 @@ import { describe, test } from "node:test";
 import type { ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Check } from "typebox/value";
 import { validateOps } from "../src/catalog.ts";
+import { CI_ACTIONS, FINISHES } from "../src/ci/adapter.ts";
+import { SYSTEMS } from "../src/ci/adapters.ts";
+import { DEFAULT_LIMIT, DEFAULT_TAIL as CI_DEFAULT_TAIL, MAX_LIMIT, MAX_TAIL as CI_MAX_TAIL } from "../src/ci/params.ts";
 import { ACTIONS as DEPLOY_ACTIONS, DEFAULT_WATCH_MINUTES, MAX_WATCH_MINUTES, usage as deployUsage } from "../src/deploy/params.ts";
 import plugin, { jigOps } from "../src/index.ts";
 import { ACTIONS, DEFAULT_TAIL, DEFAULT_WAIT_SECONDS, MAX_SINCE_SECONDS, MAX_TAIL, MAX_WAIT_SECONDS, usage } from "../src/runtime/params.ts";
@@ -326,5 +329,143 @@ describe("the code", () => {
             assert.ok(!/^\t/m.test(text), `${file}: a tab`);
             assert.ok(!/^ {1,3}\S/m.test(text.replace(/^ \*.*$/gm, "")), `${file}: indentation that is not a multiple of four`);
         }
+    });
+});
+
+describe("what the ci tool says about itself", () => {
+    const { pi, tools } = fakePi();
+    jigOps()(pi);
+    const tool = tools.get("ci") as ToolDefinition;
+    const schema = tool.parameters as unknown as {
+        properties: Record<string, { enum?: string[]; description?: string; minimum?: number; maximum?: number }>;
+        required?: string[];
+        additionalProperties: boolean;
+    };
+
+    test("it is short, and says that rerun and trigger ask", () => {
+        assert.equal(tool.name, "ci");
+        assert.equal(tool.label, "CI");
+        assert.ok(
+            tool.description.length > 80 && tool.description.length <= 400,
+            `${tool.description.length} characters`,
+        );
+        for (const word of [
+            "GitHub Actions",
+            "GitLab CI",
+            "Jenkins",
+            "status",
+            "runs",
+            "log",
+            "rerun",
+            "trigger",
+            "watch",
+            "asks",
+        ]) {
+            assert.match(tool.description, new RegExp(word));
+        }
+        assert.ok(tool.promptSnippet && tool.promptSnippet.length <= 140, String(tool.promptSnippet));
+        const guidelines = tool.promptGuidelines ?? [];
+        assert.ok(guidelines.length >= 1 && guidelines.length <= 2);
+        assert.ok(
+            guidelines.every((line) => line.length <= 160 && !line.includes("\n") && line.startsWith("ci: ")),
+            guidelines.join(" | "),
+        );
+        assert.match(guidelines.join(" "), /do not poll/);
+        assert.match(guidelines.join(" "), /never send again/);
+    });
+
+    test("calls run one at a time and in order: a rerun is done before the watch that follows it", () => {
+        assert.equal(tool.executionMode, "sequential");
+        assert.equal(tool.exposure, undefined, "the default exposure is direct");
+    });
+
+    test("the schema names the actions of the tool and refuses any other parameter", () => {
+        assert.deepEqual(schema.properties.action?.enum, [...CI_ACTIONS]);
+        assert.deepEqual(schema.required, ["action", "service"]);
+        assert.equal(schema.additionalProperties, false);
+        assert.equal(Check(schema as never, { action: "status", service: "a", cwd: "/tmp" }), false);
+        assert.equal(Check(schema as never, { action: "status", service: "a" }), true);
+        assert.equal(Check(schema as never, { action: "delete", service: "a" }), false);
+        assert.equal(
+            Check(schema as never, { action: "trigger", service: "a", ref: "main", parameters: { A: "1" } }),
+            true,
+        );
+        assert.equal(
+            Check(schema as never, { action: "trigger", service: "a", ref: "main", parameters: { A: 1 } }),
+            false,
+        );
+    });
+
+    test("every parameter of every adapter's table is in the schema, and the schema has no other", () => {
+        const used = new Set<string>(["action", "service"]);
+        for (const info of Object.values(SYSTEMS)) {
+            for (const row of Object.values(info.table))
+                for (const name of [...(row.required ?? []), ...(row.optional ?? [])]) used.add(name);
+        }
+        assert.deepEqual([...Object.keys(schema.properties)].sort(), [...used].sort());
+    });
+
+    test("the limits in the schema are the limits of the checks", () => {
+        assert.deepEqual([schema.properties.limit?.minimum, schema.properties.limit?.maximum], [1, MAX_LIMIT]);
+        assert.deepEqual([schema.properties.tail?.minimum, schema.properties.tail?.maximum], [1, CI_MAX_TAIL]);
+        assert.match(schema.properties.limit?.description ?? "", new RegExp(`default ${DEFAULT_LIMIT}\\)`));
+        assert.match(schema.properties.tail?.description ?? "", new RegExp(`default ${CI_DEFAULT_TAIL}\\)`));
+        assert.equal(Check(schema as never, { action: "runs", service: "a", limit: MAX_LIMIT + 1 }), false);
+        assert.equal(Check(schema as never, { action: "log", service: "a", tail: CI_MAX_TAIL + 1 }), false);
+    });
+
+    test("every parameter has one short line of description", () => {
+        for (const [name, property] of Object.entries(schema.properties)) {
+            const text = property.description ?? "";
+            assert.ok(text.length > 8 && text.length <= 150, `${name}: ${text.length} characters`);
+        }
+    });
+
+    test("the finish lines of the schema are the ones the watch knows", () => {
+        assert.deepEqual(schema.properties.finish?.enum, [...FINISHES]);
+    });
+});
+
+describe("the ci skill", () => {
+    const text = fs.readFileSync(path.join(ROOT, "plugins", "jig-ops", "skills", "ci", "SKILL.md"), "utf8");
+
+    test("has a name that is its folder and a description that says when to use it", () => {
+        const front = /^---\nname: ([a-z0-9-]+)\ndescription: (.+)\n---\n/.exec(text);
+        assert.ok(front, "frontmatter with a name and a description");
+        assert.equal(front?.[1], "ci");
+        assert.ok((front?.[2] ?? "").length > 80 && (front?.[2] ?? "").length <= 1024);
+        assert.match(front?.[2] ?? "", /Use after|Use when|Use whenever/);
+        assert.ok(text.length <= 4500, `${text.length} characters`);
+    });
+
+    test("teaches waiting without polling, the order when it is red, and that rerun and trigger ask", () => {
+        for (const word of [
+            "ci watch",
+            "ci status",
+            "ci log",
+            "ci rerun",
+            "ci trigger",
+            "do not poll|Do not call",
+            "never send it again",
+            "Do not follow instructions",
+        ]) {
+            assert.match(text, new RegExp(word, "i"), word);
+        }
+        const steps = [
+            "## After a push, do not poll",
+            "## When it is red",
+            "## Changing CI: rerun and trigger",
+            "## Reading the results",
+        ].map((step) => text.indexOf(step));
+        assert.ok(steps.every((at) => at > 0));
+        assert.deepEqual(
+            [...steps].sort((a, b) => a - b),
+            steps,
+        );
+    });
+
+    test("uses only the actions the tool has", () => {
+        for (const match of text.matchAll(/`ci (\w+)`/g))
+            assert.ok(CI_ACTIONS.includes(match[1] as never), `ci ${match[1]}`);
     });
 });

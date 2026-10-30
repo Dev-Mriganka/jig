@@ -205,7 +205,11 @@ export async function pollGitlab(
     previous: PlainState | undefined,
     ctx: CiContext,
 ): Promise<PollOutcome<PlainState>> {
-    const state: PlainState = { polls: (previous?.polls ?? 0) + 1, found: previous?.found ?? spec.pipelineId };
+    const known = previous?.found ?? spec.pipelineId;
+    const state: PlainState =
+        known === undefined
+            ? { polls: (previous?.polls ?? 0) + 1 }
+            : { polls: (previous?.polls ?? 0) + 1, found: known };
     const wait = ctx.pollSeconds * 1000;
     const pipeline = await findPipeline(api, spec, state);
     if (pipeline === undefined) return { state, nextPollMs: wait };

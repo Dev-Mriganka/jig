@@ -91,7 +91,14 @@ export async function testArtifacts(test: ArtifactTest): Promise<ArtifactReady[]
     const found: ArtifactReady[] = [];
     const add = (rule: ArtifactRule, ref: string, source: ArtifactReady["source"]) => {
         if (!found.some((artifact) => artifact.kind === rule.kind && artifact.ref === ref))
-            found.push({ repo: test.repo, pr: test.pr, sha, kind: rule.kind, ref, source });
+            found.push({
+                repo: test.repo,
+                ...(test.pr === undefined ? {} : { pr: test.pr }),
+                sha,
+                kind: rule.kind,
+                ref,
+                source,
+            });
     };
     for (const rule of rules) {
         if (rule.check !== undefined) {
