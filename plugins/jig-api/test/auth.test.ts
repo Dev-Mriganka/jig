@@ -176,10 +176,20 @@ describe("a company sign-in service", () => {
     test("is asked for the headers of every request, by name, with the system and the full address", async () => {
         ok(await h.call({ method: "GET", path: "/v1/me?x=1" }));
         ok(await h.call(POST, { ask: false }));
-        assert.deepEqual(h.jig.signInCalls, [
-            { name: "company-sso", request: { system: "api:base", url: `${h.api.origin}/v1/me?x=1` } },
-            { name: "company-sso", request: { system: "api:base", url: `${h.api.origin}/v1/items` } },
-        ]);
+        assert.deepEqual(
+            h.jig.signInCalls.map(({ name, request }) => ({
+                name,
+                system: request.system,
+                url: request.url,
+                method: request.method,
+            })),
+            [
+                { name: "company-sso", system: "api:base", url: `${h.api.origin}/v1/me?x=1`, method: "GET" },
+                { name: "company-sso", system: "api:base", url: `${h.api.origin}/v1/items`, method: "POST" },
+            ],
+            "and the method it will be sent with, so that a service can sign a POST as a POST",
+        );
+        assert.deepEqual(JSON.parse(String(h.jig.signInCalls[1]?.request.body)), POST.body, "with the body");
         assert.deepEqual(h.jig.secretCalls, [], "no secret is involved");
     });
 

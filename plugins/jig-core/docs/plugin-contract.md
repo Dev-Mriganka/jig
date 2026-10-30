@@ -53,6 +53,9 @@ closed instead of running ungoverned.
     [Credential sources](sign-in-and-transports.md)).
 - **`signIn`, `transports`** give a company's sign-in service or transport, by
   name (see [Credential sources](sign-in-and-transports.md)).
+  - A sign-in service is given the whole request: its `method`, `url`,
+    `headers` (without the credential) and `body`, so it can sign a POST as a
+    POST.
 - **`mask.text`, `mask.value`** are the masker, for a tool that masks its own
   results (see [Masking](masking.md)).
 - **`watches`** has `registerKind`, `start`, `list` and `stop` (see

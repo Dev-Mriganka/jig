@@ -199,11 +199,32 @@ sign-on gateway, as a **sign-in service**.
 - **A request asks for it by name,** with `auth: { signIn: name }` in
   `http.request`, and the headers are added to the request without the plugin
   seeing them.
-  - `signIn.headers(name, { system, url }, signal)` is the call underneath.
+  - `signIn.headers(name, { system, url, method, headers, body }, signal)` is
+    the call underneath.
   - Tools such as `jig-jira` and `jig-logs` use it when their configuration
     names a sign-in service instead of a secret reference.
   - The answer is the headers that authenticate that one request. Ask again for
     the next request: the service decides when a token has expired.
+- **The service sees the whole request,** so it can sign it. A scheme that signs
+  the method, the path and the body (an HMAC scheme, AWS Signature Version 4)
+  would otherwise sign a POST as a GET, and the server would answer 401.
+
+  | Field | What it holds |
+  |---|---|
+  | `system` | The system, as the tool calls it, such as `orders-api` |
+  | `url` | The full address, with its query |
+  | `method` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD` or `OPTIONS` |
+  | `headers` | The headers the request carries, without the credential |
+  | `body` | The body as sent, text or bytes; absent when there is none |
+
+  - **`headers`** are the caller's defaults, replaced by its own headers of the
+    same name (ignoring case). The network adds `Host`, `Content-Length` and, for
+    a text body with none, `Content-Type: text/plain;charset=UTF-8`. A service
+    that signs the content type returns it among its headers.
+  - **The service reads, and does not change,** the body and the headers. The
+    headers are a frozen copy, and the body is the one that is sent.
+  - **A request with no method or no headers is refused** before the service
+    is asked, so a service never signs a guess.
 - **The values are hidden like secrets.** Each header value is registered with
   the redactor before it is returned, so it is removed from every later result
   with the same encodings as a secret (see
@@ -215,6 +236,19 @@ sign-on gateway, as a **sign-in service**.
   names registered. A service that throws is an error that names the service
   and carries its message. A header whose value is not a string is an error
   that names the header.
+
+```ts
+// A service that signs the method, the path with its query, and a hash of the body
+jig().signIn.register("corp-hmac", {
+  async headers(request) {
+    const url = new URL(request.url);
+    const body = createHash("sha256").update(request.body ?? "").digest("hex");
+    const text = [request.method, url.pathname + url.search, body].join("\n");
+    const key = await jig().secrets.resolve("env:ORDERS_SIGNING_KEY");
+    return { "X-Signature": createHmac("sha256", key).update(text).digest("hex") };
+  },
+});
+```
 
 ## Transports
 

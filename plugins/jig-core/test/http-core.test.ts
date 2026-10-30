@@ -1,6 +1,7 @@
 // `jig().http.request` inside a real jig-core: its real secret backends, sign-in services and transports, and the
 // redaction of every credential it sent, against a small server on this machine.
 import assert from "node:assert/strict";
+import { createHash, createHmac } from "node:crypto";
 import { createServer } from "node:http";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -208,6 +209,85 @@ describe("jig().http.request in jig-core", () => {
         });
         assert.equal(carried.body, "via the proxy");
         assert.equal(seen.length, 1, "the network was not used for the transport");
+    });
+
+    test("a sign-in service that signs the request sees its method, address and body, so a POST is signed as a POST", async () => {
+        // The signature covers the method, the path with its query, and a hash of the body, as an HMAC scheme does.
+        const key = ["hmac", "key", "for", "tests"].join("-");
+        const sign = (method: string, target: string, body: string | Uint8Array): string =>
+            createHmac("sha256", key)
+                .update([method, target, createHash("sha256").update(body).digest("hex")].join("\n"))
+                .digest("hex");
+        const checked: Array<{ method: string; status: number }> = [];
+        const signed = createServer((request, response) => {
+            const chunks: Buffer[] = [];
+            request.on("data", (chunk: Buffer) => chunks.push(chunk));
+            request.on("end", () => {
+                const expected = sign(request.method ?? "", request.url ?? "", Buffer.concat(chunks));
+                const status = request.headers["x-signature"] === expected ? 200 : 401;
+                checked.push({ method: request.method ?? "", status });
+                response.writeHead(status).end(status === 200 ? "signed ok" : "bad signature");
+            });
+        });
+        await new Promise<void>((resolve) => signed.listen(0, "127.0.0.1", resolve));
+        const where = `http://127.0.0.1:${(signed.address() as AddressInfo).port}`;
+        const asked: Array<{ method: string; headers: Record<string, string>; body?: string | Uint8Array }> = [];
+        try {
+            const harness = await begin({
+                plugins: (api) => {
+                    api.signIn.register("corp-hmac", {
+                        async headers(request) {
+                            asked.push({
+                                method: request.method,
+                                headers: { ...request.headers },
+                                ...(request.body === undefined ? {} : { body: request.body }),
+                            });
+                            const url = new URL(request.url);
+                            const body = request.body ?? "";
+                            return { "X-Signature": sign(request.method, `${url.pathname}${url.search}`, body) };
+                        },
+                    });
+                },
+            });
+            const call = (method: "GET" | "POST" | "PUT", body?: string | Uint8Array) =>
+                harness.api.http.request({
+                    system: "orders",
+                    url: `${where}/v1/orders?page=2`,
+                    method,
+                    headers: { "Content-Type": "application/json" },
+                    ...(body === undefined ? {} : { body }),
+                    auth: { signIn: "corp-hmac" },
+                });
+
+            assert.equal((await call("GET")).status, 200);
+            assert.equal((await call("POST", '{"customer":"c-1"}')).status, 200, "a POST with a body");
+            assert.equal((await call("PUT", new Uint8Array([0, 1, 2, 255]))).status, 200, "a PUT with bytes");
+            assert.deepEqual(
+                checked.map((item) => [item.method, item.status]),
+                [
+                    ["GET", 200],
+                    ["POST", 200],
+                    ["PUT", 200],
+                ],
+            );
+            assert.deepEqual(
+                asked.map((item) => item.method),
+                ["GET", "POST", "PUT"],
+            );
+            assert.deepEqual(asked[1]?.headers, { "Content-Type": "application/json" }, "and no credential in them");
+            assert.equal(asked[1]?.body, '{"customer":"c-1"}');
+
+            // The check bites: a signature made for a GET does not pass for a POST of the same path, or another body.
+            const forGet = sign("GET", "/v1/orders?page=2", "");
+            const sent = await fetch(`${where}/v1/orders?page=2`, {
+                method: "POST",
+                headers: { "X-Signature": forGet },
+                body: '{"customer":"c-1"}',
+            });
+            assert.equal(sent.status, 401, "a POST signed as a GET is turned down");
+        } finally {
+            await new Promise<void>((resolve) => signed.close(() => resolve()));
+        }
     });
 
     test("a redirect is returned, not followed", async () => {

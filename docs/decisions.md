@@ -4,6 +4,7 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 
 ## Contents
 
+- [2026-10-31: gaps a company plugin found in jig-core, closed](#2026-10-31-gaps-a-company-plugin-found-in-jig-core-closed)
 - [2026-10-30: Jig never signs in; it reads a credential and keeps it from the agent](#2026-10-30-jig-never-signs-in-it-reads-a-credential-and-keeps-it-from-the-agent)
 - [2026-10-30: checks run on every push](#2026-10-30-checks-run-on-every-push)
 - [2026-10-30: jig-theme, the look, built on Pi's own themes](#2026-10-30-jig-theme-the-look-built-on-pis-own-themes)
@@ -27,6 +28,20 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 - [2026-10-30: jig-git's tools, and a watch that knows when it is done](#2026-10-30-jig-gits-tools-and-a-watch-that-knows-when-it-is-done)
 - [2026-10-30: built clean, beside the existing harness](#2026-10-30-built-clean-beside-the-existing-harness)
 - [Earlier decisions that still hold (2026-10-29)](#earlier-decisions-that-still-hold-2026-10-29)
+
+## 2026-10-31: gaps a company plugin found in jig-core, closed
+
+A company plugin that configured Jig for its own systems found these. Each is
+generic: no company is named.
+
+- **A sign-in service sees the whole request.** `SignInRequest` now carries the
+  `method`, the `headers` the request will carry (without the credential) and
+  the `body`, as well as `system` and `url`.
+  - **Why:** a service that signs requests (an HMAC scheme, AWS Signature
+    Version 4) signed a POST as a GET, and the server answered 401.
+  - **Required, not optional:** a service that cannot rely on the method would
+    sign a guess. `jig-core` refuses a request without a method or headers
+    before the service is asked.
 
 ## 2026-10-30: Jig never signs in; it reads a credential and keeps it from the agent
 

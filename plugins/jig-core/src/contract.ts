@@ -175,13 +175,28 @@ export interface RunResult {
     timedOut: boolean;
 }
 
-/** One request a sign-in service authenticates. */
+/**
+ * One request a sign-in service authenticates: everything a service that signs the request itself (an HMAC scheme, AWS
+ * Signature Version 4) needs to sign it as it will be sent, so a POST is not signed as a GET.
+ */
 export interface SignInRequest {
     /** The system, as the tool calls it, such as `jira` or `logs`. */
     system: string;
+    /** The full URL, with its query, as it will be called. */
     url: string;
+    /** The method the request will use. */
+    method: HttpMethod;
+    /** The headers the request will carry: the caller's defaults, replaced by its own headers of the same name, and
+     *  never the credential this service is about to give. The network adds its own (`Host`, `Content-Length`, and a
+     *  `Content-Type` of `text/plain;charset=UTF-8` for a text body that has none), so a service that signs a
+     *  `Content-Type` returns it among its headers. Names keep the case the caller wrote. */
+    headers: Readonly<Record<string, string>>;
+    /** The body as it will be sent: text or bytes, and absent when the request has none. Do not change it. */
+    body?: string | Uint8Array;
 }
 
+/** Gives the headers that authenticate one request. It is asked for every request, and decides when a token has run
+ *  out. A service that signs the request reads `method`, `url`, `headers` and `body` of the `SignInRequest`. */
 export interface SignInService {
     headers(request: SignInRequest, signal?: AbortSignal): Promise<Readonly<Record<string, string>>>;
 }
