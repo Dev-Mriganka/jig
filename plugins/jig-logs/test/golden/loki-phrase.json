@@ -1,5 +1,5 @@
 {
-  "query": "{app=\"orders-api\", env=\"staging\"} |= \"req-7f3a9c\"",
+  "query": "{app=\"orders-api\", env=\"staging\"} |~ \"(?i)req-7f3a9c\"",
   "start": "1791885600000000000",
   "end": "1791892800000000000",
   "limit": "50",

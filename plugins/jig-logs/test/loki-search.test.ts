@@ -54,7 +54,7 @@ test("a search is one GET to query_range: the selector, the phrase and the range
     assert.equal(request.method, "GET");
     assert.match(request.path, /^\/loki\/api\/v1\/query_range\?/);
     assert.deepEqual(paramsOf(request), {
-        query: `${SELECTOR} |= "order-1"`,
+        query: `${SELECTOR} |~ "(?i)order-1"`,
         start: nanos(NOW - 2 * HOUR_MS),
         end: nanos(NOW),
         limit: "50",
@@ -144,7 +144,7 @@ test("order desc searches the newest bucket first and fetches backward", async (
 
 // ---- match and exclude ---------------------------------------------------------------------------------------------
 
-test("match and exclude are sent as line filters, and the view applies them again, ignoring case", async (t) => {
+test("phrase, match and exclude are sent as line filters that ignore case, as on every backend", async (t) => {
     const w = await lokiWorld(t, [
         web(5, {
             text: (n) =>
@@ -158,15 +158,13 @@ test("match and exclude are sent as line filters, and the view applies them agai
         }),
     ]);
     const text = ok(await w.call({ ...ask, phrase: "talking", match: ["timeout"], exclude: ["heartbeat"] }));
-    assert.equal(paramsOf(w.requests[0] as Recorded).query, `${SELECTOR} |= "talking" |= "timeout" != "heartbeat"`);
-    // Loki matches the case it was given, so the capital T is not fetched, and nor is the lower-case heartbeat. The
-    // capital H is fetched, and the view hides it.
-    assert.match(lines(text)[0] as string, /: complete, 2 hits, 2 fetched \(oldest first\), 1 shown, 1 bucket$/);
-    assert.match(
-        text,
-        /^1 of 2 fetched hits contain all 1 match term and none of 1 exclude term \(case-insensitive, fetched hits only\)\.$/m,
+    assert.equal(
+        paramsOf(w.requests[0] as Recorded).query,
+        `${SELECTOR} |~ "(?i)talking" |~ "(?i)timeout" !~ "(?i)heartbeat"`,
     );
-    assert.deepEqual(messages(text), ["timeout talking to db"]);
+    // The filters ignore case, so both timeouts are fetched and both heartbeats are left out, whatever their case.
+    assert.match(lines(text)[0] as string, /: complete, 2 hits, 2 fetched \(oldest first\), 2 shown, 1 bucket$/);
+    assert.deepEqual(messages(text), ["Timeout talking to db", "timeout talking to db"]);
 });
 
 test("a query is appended after the selector and the filters, and Loki runs it", async (t) => {
@@ -421,7 +419,7 @@ test("transport: the request goes through jig-core as a GET with the full addres
     assert.equal(sent.system, "logs");
     assert.equal(sent.method, "GET");
     assert.ok(sent.url.startsWith("https://logs.test:9200/loki/api/v1/query_range?query="));
-    assert.equal(new URL(sent.url).searchParams.get("query"), `${SELECTOR} |= "message"`);
+    assert.equal(new URL(sent.url).searchParams.get("query"), `${SELECTOR} |~ "(?i)message"`);
     assert.deepEqual(sent.headers, { accept: "application/json", "X-Scope-OrgID": "orders" });
     assert.equal(sent.body, undefined);
     assert.deepEqual(w.jig.resolved, [], "no secret is read");

@@ -16,6 +16,15 @@ export function quote(text: string): string {
     return `${out}"`;
 }
 
+/**
+ * A regular expression that matches `text` literally, for a `|~` or `!~` filter. Loki reads RE2, and RE2 takes the same
+ * backslash escapes as here. The filters use it with `(?i)` in front, because the tool ignores case on every backend and
+ * Loki's `|=` and `!=` do not.
+ */
+export function literalPattern(text: string): string {
+    return text.replace(/[\\.+*?()|[\]{}^$]/g, "\\$&");
+}
+
 // ---- the stream selector, which comes from configuration ----------------------------------------------------------
 
 const LABEL = "[A-Za-z_][A-Za-z0-9_]*";

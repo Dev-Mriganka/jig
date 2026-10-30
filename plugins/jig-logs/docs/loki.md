@@ -52,16 +52,20 @@ One request for each bucket:
 | In the call | In the query |
 |---|---|
 | (the environment) | its `selector` |
-| `phrase` | `\|= "<phrase>"` |
-| `match` | one `\|= "<text>"` for each text |
-| `exclude` | one `!= "<text>"` for each text |
+| `phrase` | `\|~ "(?i)<phrase>"` |
+| `match` | one `\|~ "(?i)<text>"` for each text |
+| `exclude` | one `!~ "(?i)<text>"` for each text |
+
+The text is matched literally: every regular-expression character in it is
+escaped. `(?i)` makes the filter ignore case, as the tool does on every
+backend; Loki's own `|=` and `!=` would not.
 | `query` | the text itself, last |
 
 This is a search for the phrase `req-7f3a9c`, with `match: ["timeout"]` and
 `exclude: ["Heartbeat"]`, in `staging`:
 
 ```text
-{app="orders-api", env="staging"} |= "req-7f3a9c" |= "timeout" != "Heartbeat"
+{app="orders-api", env="staging"} |~ "(?i)req-7f3a9c" |~ "(?i)timeout" !~ "(?i)Heartbeat"
 ```
 
 `test/golden/loki-*.json` holds the exact parameters for each shape.
@@ -119,9 +123,8 @@ Loki answers a log query with lines and no count. So:
   number.
 
 `match` and `exclude` are sent to Loki and applied again to the hits that come
-back. Loki matches the case it is given, so `match: ["timeout"]` never fetches a
-line that only says `Timeout`, where the view alone would have shown it. Ask with
-the case the logs have, or use a `query` such as `|~ "(?i)timeout"`.
+back, ignoring case both times, so `match: ["timeout"]` also finds a line that
+only says `Timeout`.
 
 ## Limits
 

@@ -3,10 +3,11 @@
 //
 // A search is the stream selector from the configuration, then line filters, then perhaps the model's own pipeline:
 //
-//   {app="orders-api", env="staging"} |= "req-7f3a9c" |= "timeout" != "Heartbeat"
+//   {app="orders-api", env="staging"} |~ "(?i)req-7f3a9c" |~ "(?i)timeout" !~ "(?i)Heartbeat"
 //
-// The model's text lands in one of two places. A phrase, a `match` and an `exclude` are quoted strings in a line
-// filter, escaped so that nothing in them can close the string. A `query` is a pipeline that is checked first, so it
+// The model's text lands in one of two places. A phrase, a `match` and an `exclude` become line filters that ignore case:
+// the text matched literally (every regular-expression character escaped), in a quoted string escaped so that nothing
+// in it can close the string. A `query` is a pipeline that is checked first, so it
 // cannot open another stream selector (see logql.ts). The selector is never the model's.
 //
 // Loki answers a log query with the lines of the streams it found, and has no count to give with them. The total of a
@@ -19,7 +20,7 @@ import type { Source } from "../response.ts";
 import { HOUR_MS } from "../time.ts";
 import { isObject } from "../values.ts";
 import type { LogBackend } from "./backend.ts";
-import { checkPipeline, quote, selectorProblem } from "./logql.ts";
+import { checkPipeline, literalPattern, quote, selectorProblem } from "./logql.ts";
 
 /** Loki's default `max_entries_limit_per_query`, the most lines one query returns. An operator may set it lower. */
 const MAX_ENTRIES = 5000;
@@ -52,9 +53,12 @@ function limitFor(size: number): number {
 /** The selector, then the line filters that every backend understands, then the model's pipeline, if it wrote one. */
 function logql(query: LogQuery): string {
     const stages: string[] = [];
-    if (query.kind === "phrase") stages.push(`|= ${quote(query.text)}`);
-    for (const text of query.match ?? []) stages.push(`|= ${quote(text)}`);
-    for (const text of query.exclude ?? []) stages.push(`!= ${quote(text)}`);
+    // Case is ignored, as the tool promises for every backend: Loki's `|=` and `!=` match case, so the filters are
+    // `|~` and `!~` with `(?i)` and the text matched literally.
+    const ignoringCase = (text: string) => quote(`(?i)${literalPattern(text)}`);
+    if (query.kind === "phrase") stages.push(`|~ ${ignoringCase(query.text)}`);
+    for (const text of query.match ?? []) stages.push(`|~ ${ignoringCase(text)}`);
+    for (const text of query.exclude ?? []) stages.push(`!~ ${ignoringCase(text)}`);
     // Checked again here, so that a request is never built from a pipeline nobody looked at.
     if (query.kind === "query") stages.push(checkPipeline(query.text));
     return [lokiTarget(query.target).selector, ...stages].join(" ");

@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { loki } from "../src/backends/loki.ts";
-import { checkPipeline, quote, selectorProblem } from "../src/backends/logql.ts";
+import { checkPipeline, literalPattern, quote, selectorProblem } from "../src/backends/logql.ts";
 import type { Backend, LokiTarget, Target } from "../src/config.ts";
 import { failureFromStatus } from "../src/failure.ts";
 import { resolveQuery } from "../src/params.ts";
@@ -173,10 +173,10 @@ test("a phrase, a match and an exclude are each the value of one line filter, ho
         assert.ok(parsed, JSON.stringify(text));
         assert.equal(parsed.selector, SELECTOR);
         assert.deepEqual(parsed.filters, [
-            { op: "|=", value: text },
-            { op: "|=", value: text },
-            { op: "|=", value: "m" },
-            { op: "!=", value: text },
+            { op: "|~", value: `(?i)${literalPattern(text)}` },
+            { op: "|~", value: `(?i)${literalPattern(text)}` },
+            { op: "|~", value: "(?i)m" },
+            { op: "!~", value: `(?i)${literalPattern(text)}` },
         ]);
         assert.equal(parsed.rest, "", "nothing else follows");
         assert.deepEqual(
@@ -494,3 +494,13 @@ test("a problem with the sign-in names the settings of Loki, and none of them re
     );
     assert.throws(() => failureFromStatus(302, "", loki), /redirect \(HTTP 302\)/);
 });
+
+test("a literal pattern matches its text exactly, whatever regular-expression characters it holds", () => {
+    for (const text of ["a.b", "(x)", "a+b*c?", "[id] {1}", "^start$", "back\\slash", "pipe|or"]) {
+        const pattern = new RegExp(`^${literalPattern(text)}$`, "i");
+        assert.ok(pattern.test(text), text);
+        assert.ok(pattern.test(text.toUpperCase()), `${text}, ignoring case`);
+    }
+    assert.ok(!new RegExp(`^${literalPattern("a.b")}$`).test("axb"), "a dot is a dot, not any character");
+});
+
