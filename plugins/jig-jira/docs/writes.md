@@ -7,21 +7,24 @@ The rules for writes in full, and what each preview shows. Back to the
 
 - **Rendered previews.** Text is Jira wiki markup, and the review screen shows
   it before it is sent: the source on the screen, `o` for the rendered page,
-  and `y` to approve. The page is the text as Jira will show it: headings,
-  lists, tables, code, quotes, panels, colours, links, mentions, line breaks
-  and rules. What the renderer does not know stays on the page as written, so
-  nothing the readers will see is hidden from you. The browser only shows;
-  approval stays in Pi.
+  and `y` to approve.
+  - The page is the text as Jira will show it: headings, lists, tables, code,
+    quotes, panels, colours, links, mentions, line breaks and rules.
+  - What the renderer does not know stays on the page as written, so nothing the
+    readers will see is hidden from you.
+  - The browser only shows; approval stays in Pi.
 - **Local-pointer check.** Outgoing text is checked for local paths (`/home/`,
   `/Users/`, `/root/`, `/mnt/`, `/tmp/`, `~/`, `C:\`, `file://`, and relative
-  `./` and `../` paths) and for the names in `privateNames`. These are flagged
-  at the top of the preview and in its summary. They do not block: you decide.
-  A path inside a web address is not a pointer.
+  `./` and `../` paths) and for the names in `privateNames`.
+  - These are flagged at the top of the preview and in its summary. They do not
+    block: you decide.
+  - A path inside a web address is not a pointer.
 - **Invalid input is not asked about.** Every call is checked before anyone is
   asked: the action and its parameters, the issue and comment, the transition
   name, the fields `update` may set, the values the create screen allows, and
-  the text limit. A mistake blocks the call with a message that says what to
-  change, and nobody is asked about a call that cannot run.
+  the text limit.
+  - A mistake blocks the call with a message that says what to change.
+  - Nobody is asked about a call that cannot run.
 - **Changed since the preview.** The plan is made again right before the write
   is sent. If what would be sent now differs from the preview you approved (a
   status moved, a comment was edited, a field changed), the write is refused:
@@ -51,9 +54,17 @@ The rules for writes in full, and what each preview shows. Back to the
 | `comment` | The issue and its status, who posts, the wiki source and the rendered page |
 | `edit_comment` | The new text, as source and rendered, and the text it replaces |
 | `delete_comment` | The comment's text, and that this cannot be undone |
-| `transition` | The issue, its status now and the status after, and the transition used. A name that matches no transition, or several, is refused with the names. A status name gets a hint at the transition that leads there |
-| `update` | Each field as `before → after`; a description as source and rendered, with the text it replaces. A person is shown by name |
-| `create` | The project and type, every field with its final value (a priority or component as the create screen spells it), possible duplicates, and the description. Possible duplicates are a summary search in the project over the last 30 days, up to 5 |
+| `transition` | The issue, its status now and after, and the transition used |
+| `update` | Each field as `before → after`; a person is shown by name |
+| `create` | The project and type, every field with its final value, possible duplicates, and the description |
+
+- **`transition`:** a name that matches no transition, or several, is refused
+  with the names. A status name gets a hint at the transition that leads there.
+- **`update`:** a description is shown as source and rendered, with the text it
+  replaces.
+- **`create`:** a priority or component is shown as the create screen spells it.
+  Possible duplicates are a summary search in the project over the last 30 days,
+  up to 5.
 
 `create` reads the project's create screen, so required fields and allowed
 values come from Jira and are checked before you are asked. If the create

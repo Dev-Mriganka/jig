@@ -30,14 +30,20 @@ comment needs text. Usage: jira comment {key, text}`.
 |---|---|
 | `key`, `project` | An issue key such as `PROJ-123`; a project key such as `PROJ` |
 | `jql`, `page` | The query. `page` is the value that the previous result gives after `More: repeat with page=` |
-| `limit` | How many to return. `search` and `assignable`: 20 by default, up to 50. `comments`: 20, up to 100. `changelog`: 30, up to 100 |
+| `limit` | How many to return (see below) |
 | `include` | Up to 10 more fields to show, by name or id |
 | `full` | Lifts the length caps on descriptions and comments. Read with it before rewriting a text |
 | `query` | Part of a person's name (`assignable`) or of a field's name (`find_field`) |
 | `commentId`, `text` | The number `comments` shows; the comment, in Jira wiki markup |
 | `transition` | A name from `transitions` (or its id) |
 | `type`, `summary`, `description` | The issue type name; a one-line title of at most 255 characters; the description, in wiki markup |
-| `fields` | The fields to set, by name or id: `{"labels": ["a"], "priority": "High", "assignee": "<id from assignable>"}`. A person is given by the id `assignable` shows, or `null` to unassign |
+| `fields` | The fields to set, by name or id (see below) |
+
+- **`limit`:** `search` and `assignable` return 20 by default, up to 50.
+  `comments` returns 20, up to 100. `changelog` returns 30, up to 100.
+- **`fields`:** an example is
+  `{"labels": ["a"], "priority": "High", "assignee": "<id from assignable>"}`. A
+  person is given by the id `assignable` shows, or `null` to unassign.
 
 ## Fields
 
