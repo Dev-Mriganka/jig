@@ -566,6 +566,11 @@ describe("the .bru language", () => {
         assert.deepEqual(collection.problems[0], { file: "r.bru", key: "line 1", message: "is not a block of a .bru file, and is skipped", level: "warning" });
     });
 
+    test("a name in vars:secret that is switched off, or is an annotation, is not a variable", () => {
+        const collection = written("bru", { "environments/E.bru": "vars:secret [\n  token,\n  ~old,\n  @description('x')\n]\n", "r.bru": "get {\n  url: https://a.example.test/\n}\n" });
+        assert.deepEqual([...(collection.environments.get("E")?.variables.keys() ?? [])], ["token"]);
+    });
+
     test("a custom method is a request of that method, and its name is the file's when meta has none", () => {
         const collection = written("bru", { "folder/my-request.bru": "http {\n  method: PROPFIND\n  url: https://a.example.test/\n}\n" });
         assert.deepEqual([collection.requests[0]?.name, collection.requests[0]?.method], ["my-request", "PROPFIND"]);

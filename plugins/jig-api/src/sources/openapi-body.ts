@@ -68,7 +68,8 @@ export function typeOf(schema: Record<string, unknown>): string | undefined {
 /** What a scalar value is, in a few words: `integer`, `string, one of open | shipped`, `string (date-time)`. */
 export function describeScalar(schema: Record<string, unknown>): string {
     const type = typeOf(schema) ?? "string";
-    const values = Array.isArray(schema.enum) ? (schema.enum as unknown[]).filter((item) => ["string", "number", "boolean"].includes(typeof item)).map(String) : [];
+    const listed = Array.isArray(schema.enum) ? (schema.enum as unknown[]) : [];
+    const values = listed.filter((item) => ["string", "number", "boolean"].includes(typeof item)).map(String);
     if (values.length > 0) return `${type}, one of ${values.slice(0, 12).join(" | ")}${values.length > 12 ? " | ..." : ""}`;
     return typeof schema.format === "string" ? `${type} (${schema.format})` : type;
 }
@@ -98,12 +99,19 @@ export function shapeOf(schema: unknown, deref: Deref, required: boolean): BodyS
     const notes: string[] = [];
     let unsupported: string | undefined;
 
-    const build = (given: { properties: Map<string, unknown>; required: Set<string> }, path: readonly string[], here: boolean): Extract<Shape, { kind: "object" }> => {
+    type Fields = { properties: Map<string, unknown>; required: Set<string> };
+    const build = (given: Fields, path: readonly string[], here: boolean): Extract<Shape, { kind: "object" }> => {
         const fields: Array<{ key: string; shape: Shape }> = [];
         for (const [key, definition] of given.properties) {
             const where = [...path, key];
             const name = where.join(".");
             const mine = here && given.required.has(key);
+            if (/[{}\u0000-\u001f]/.test(key)) {
+                // The name could not stand in a `{{variable}}`.
+                if (mine) unsupported ??= `its JSON body needs the property ${name}, whose name cannot be a variable`;
+                else notes.push(`the optional property ${name} is left out: its name cannot be a variable`);
+                continue;
+            }
             const schema = deref(definition);
             if (!isObject(schema)) {
                 notes.push(`the property ${name} is left out: its schema cannot be read`);
@@ -127,7 +135,8 @@ export function shapeOf(schema: unknown, deref: Deref, required: boolean): BodyS
                 continue;
             }
             const type = typeOf(schema) ?? "string";
-            const leaf: Leaf = { path: where, type: type === "integer" || type === "number" ? "number" : type === "boolean" ? "boolean" : "string", required: mine, doc: describeLeaf(schema, where) };
+            const written = type === "integer" || type === "number" ? "number" : type === "boolean" ? "boolean" : "string";
+            const leaf: Leaf = { path: where, type: written, required: mine, doc: describeLeaf(schema, where) };
             leaves.push(leaf);
             fields.push({ key, shape: { kind: "leaf", leaf } });
         }

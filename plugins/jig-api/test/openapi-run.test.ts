@@ -168,6 +168,14 @@ for (const format of ["yaml", "json"] as const) {
             assert.match(text, /^Folder Smoke in Staging \(staging\): 1 of 1 ran, all answered 2xx\n1\. getHealth: GET \S+\/v1\/health -> HTTP 200 OK/);
         });
 
+        test("an ad-hoc call on the spec's collection signs in with the spec's own security, and goes only to the mapped server", async () => {
+            ok(await h.call({ action: "call", method: "GET", environment: "Staging", collection: "acme", url: `${h.api.origin}/v1/anything` }));
+            assert.equal(last().path, "/v1/anything");
+            assert.equal(last().headers.authorization, `Bearer ${TOKENS.staging.value}`);
+            const elsewhere = await h.call({ action: "call", method: "GET", environment: "Staging", collection: "acme", url: `${h.prod.origin}/v1/anything` });
+            assert.match(elsewhere.blocked ?? "", /goes to 127\.0\.0\.1:\d+, which is not a host of Staging/);
+        });
+
         test("a POST that only reads is a read when api.reads names its operation", async () => {
             h.configure({ ...(h.jig.api.config.section("api") as object), reads: ["searchOrders"] });
             const result = await run("searchOrders", { text: "red" });

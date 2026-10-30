@@ -21,13 +21,20 @@ export async function refreshCollections(
     const fetchable = [...settings.collections.values()].filter((collection) => collection.refresher !== undefined);
     if (wanted !== undefined) {
         const found = settings.collections.get(wanted);
-        if (found === undefined) return { lines: [`No collection is named ${wanted}. Known: ${shortList([...settings.collections.keys()], ", ", 80)}`], failed: true };
+        if (found === undefined) {
+            const known = shortList([...settings.collections.keys()], ", ", 80);
+            return { lines: [`No collection is named ${wanted}. Known: ${known}`], failed: true };
+        }
         if (found.refresher === undefined) {
-            return { lines: [`${wanted} is read from files, so there is nothing to fetch. Collections that can be fetched: ${fetchable.map((each) => each.name).join(", ") || "none"}`], failed: true };
+            const names = fetchable.map((each) => each.name).join(", ") || "none";
+            return { lines: [`${wanted} is read from files, so there is nothing to fetch. Collections that can be fetched: ${names}`], failed: true };
         }
     }
     const chosen = fetchable.filter((collection) => wanted === undefined || collection.name === wanted);
-    if (chosen.length === 0) return { lines: ["No collection is a Postman cloud collection: add one under api.collections as { \"postman\": { \"cloud\": \"<id>\", \"apiKey\": \"<secret reference>\" } }"], failed: true };
+    if (chosen.length === 0) {
+        const how = '{ "postman": { "cloud": "<id>", "apiKey": "<secret reference>" } }';
+        return { lines: [`No collection is a Postman cloud collection: add one under api.collections as ${how}`], failed: true };
+    }
 
     const http = createHttp(options);
     const deps = { http, timeoutSec: settings.timeoutSec, allowPlainLocal: settings.allowPlainLocal, serviceUrl: options.postmanApi };
@@ -63,7 +70,8 @@ export function registerRefresh(pi: ExtensionAPI, options: ApiOptions): void {
             }
             const settings = settingsOf(jig().config.section("api"));
             if (settings === undefined) {
-                ctx.ui.notify('api is not set up: add an "api" section with "collections" to jig.json (/jig lists configuration problems)', "warning");
+                const how = 'add an "api" section with "collections" to jig.json (/jig lists configuration problems)';
+                ctx.ui.notify(`api is not set up: ${how}`, "warning");
                 return;
             }
             const report = await refreshCollections(settings, wanted, options, ctx.signal);

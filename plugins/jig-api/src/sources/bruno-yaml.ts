@@ -5,7 +5,7 @@
 // Format: https://github.com/opencollection-dev/opencollection (schema: packages/oc-schema/src/opencollection.schema.json)
 import { isObject } from "../engine/values.ts";
 import type { FormField } from "../model.ts";
-import { apiKeyAuth, hasText, noBody, oauth2Auth, refusedAuth } from "./bruno-types.ts";
+import { apiKeyAuth, fileBody, hasText, noBody, oauth2Auth, refusedAuth, textBody, urlencodedBody } from "./bruno-types.ts";
 import type { AuthSetting, Pairs, ParsedBody, ParsedDefaults, ParsedEnvironment, ParsedRequest, ParsedVariable, Report } from "./bruno-types.ts";
 
 const text = (value: unknown): string =>
@@ -25,7 +25,8 @@ function valueOf(value: unknown): string {
 
 /** The enabled `{ name, value }` entries of a list. */
 function pairsOf(entries: unknown): Pairs {
-    return list(entries).filter((entry) => entry.disabled !== true && text(entry.name) !== "").map((entry) => [text(entry.name), valueOf(entry.value)] as const);
+    const enabled = list(entries).filter((entry) => entry.disabled !== true && text(entry.name) !== "");
+    return enabled.map((entry) => [text(entry.name), valueOf(entry.value)] as const);
 }
 
 /** The description of an item: text, or `{ content }`. */
@@ -87,15 +88,11 @@ function bodyOf(raw: unknown): ParsedBody {
     const data = raw.data;
     switch (text(raw.type)) {
         case "json":
-            return text(data).trim() === "" ? noBody() : { body: { kind: "json", text: text(data) }, contentType: "application/json", notes: [] };
         case "text":
-            return hasText(text(data)) ? { body: { kind: "raw", text: text(data), language: "text" }, contentType: "text/plain", notes: [] } : noBody();
         case "xml":
-            return hasText(text(data)) ? { body: { kind: "raw", text: text(data), language: "xml" }, contentType: "application/xml", notes: [] } : noBody();
-        case "form-urlencoded": {
-            const fields: FormField[] = pairsOf(data).map(([name, value]) => ({ kind: "text", name, value }));
-            return fields.length === 0 ? noBody() : { body: { kind: "form", encoding: "urlencoded", fields }, contentType: "application/x-www-form-urlencoded", notes: [] };
-        }
+            return textBody(raw.type as "json" | "text" | "xml", text(data));
+        case "form-urlencoded":
+            return urlencodedBody(pairsOf(data).map(([name, value]) => ({ kind: "text", name, value })));
         case "multipart-form": {
             const fields: FormField[] = [];
             const notes: string[] = [];
@@ -118,7 +115,7 @@ function bodyOf(raw: unknown): ParsedBody {
             const chosen = files.find((file) => file.selected === true) ?? files[0];
             const path = chosen === undefined ? "" : text(chosen.filePath);
             if (chosen === undefined || path === "") return { notes: ["its body is a file, but no file is chosen, so it has no body"] };
-            return { body: { kind: "file", file: { path } }, ...(text(chosen.contentType) === "" ? {} : { contentType: text(chosen.contentType) }), notes: [] };
+            return fileBody(path, text(chosen.contentType));
         }
         case "sparql":
             return { unsupported: 'the body type "sparql" is not sent', notes: [] };
@@ -190,7 +187,8 @@ export function readRequest(raw: Record<string, unknown>, report: Report): Parse
     if (settings.followRedirects === true) notes.push("followRedirects is ignored: redirects are never followed");
 
     const params = list(details.params).filter((param) => param.disabled !== true);
-    const method = type === "websocket" ? "WEBSOCKET" : type === "grpc" ? "GRPC" : (text(details.method) || (type === "graphql" ? "POST" : "GET")).toUpperCase();
+    const given = text(details.method) || (type === "graphql" ? "POST" : "GET");
+    const method = type === "websocket" ? "WEBSOCKET" : type === "grpc" ? "GRPC" : given.toUpperCase();
     if (type === "http" && !isObject(raw.http)) report("http", "is missing: this file has no request", "warning");
     return {
         name: text(info.name) || undefined,
@@ -207,7 +205,7 @@ export function readRequest(raw: Record<string, unknown>, report: Report): Parse
         notes,
         assertions: list(runtime.assertions)
             .filter((assertion) => assertion.disabled !== true)
-            .map((assertion) => [text(assertion.expression), text(assertion.operator), text(assertion.value)].filter((part) => part !== "").join(" ")),
+            .map((each) => [text(each.expression), text(each.operator), text(each.value)].filter((part) => part !== "").join(" ")),
         docs: describedBy(raw.docs),
     };
 }
@@ -247,7 +245,9 @@ export function readEnvironment(raw: unknown, report: Report): ParsedEnvironment
     });
     const external = isObject(file.externalSecrets) ? file.externalSecrets : undefined;
     for (const entry of list(external?.variables)) {
-        if (text(entry.name) !== "") variables.push({ name: text(entry.name), value: undefined, secret: true, external: text(external?.type) || "an external secret manager" });
+        if (text(entry.name) === "") continue;
+        const manager = text(external?.type) || "an external secret manager";
+        variables.push({ name: text(entry.name), value: undefined, secret: true, external: manager });
     }
     return {
         name: text(file.name) || undefined,

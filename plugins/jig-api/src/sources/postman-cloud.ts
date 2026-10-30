@@ -51,8 +51,11 @@ const KEY_SHAPE = /PMAK-[A-Za-z0-9-]{10,}/g;
 function check(entry: Readonly<Record<string, unknown>>, at: string, errors: string[]): CloudConfig | undefined {
     const before = errors.length;
     for (const key of Object.keys(entry)) {
-        if (key === "environments") errors.push(`${at}.environments: for a Postman cloud collection this belongs inside postman, as { "Staging": "<environment id>" }`);
-        else if (key !== "postman") errors.push(`${at}.${key}: unknown field`);
+        if (key === "environments") {
+            errors.push(`${at}.environments: for a Postman cloud collection this belongs inside postman, as { "Staging": "<environment id>" }`);
+        } else if (key !== "postman") {
+            errors.push(`${at}.${key}: unknown field`);
+        }
     }
     const raw = entry.postman;
     if (!isObject(raw)) return undefined;
@@ -64,8 +67,12 @@ function check(entry: Readonly<Record<string, unknown>>, at: string, errors: str
         errors.push(`${key}: must be the id of a Postman ${key.endsWith(".cloud") ? "collection" : "environment"} (letters, digits and -)`);
         return undefined;
     };
-    const cloud = raw.cloud === undefined ? (errors.push(`${here}.cloud: required, the id of the collection`), undefined) : id(raw.cloud, `${here}.cloud`);
-    const apiKey = raw.apiKey === undefined ? (errors.push(`${here}.apiKey: required, a secret reference such as pass:postman/api-key`), undefined) : checkReference(raw.apiKey, `${here}.apiKey`, errors);
+    let cloud: string | undefined;
+    if (raw.cloud === undefined) errors.push(`${here}.cloud: required, the id of the collection`);
+    else cloud = id(raw.cloud, `${here}.cloud`);
+    let apiKey: string | undefined;
+    if (raw.apiKey === undefined) errors.push(`${here}.apiKey: required, a secret reference such as pass:postman/api-key`);
+    else apiKey = checkReference(raw.apiKey, `${here}.apiKey`, errors);
 
     const environments: Array<readonly [string, string]> = [];
     if (raw.environments !== undefined) {
@@ -125,13 +132,17 @@ function readCopy(id: string, problems?: Problem[]): Copy | undefined {
     try {
         text = readText(copyFile(id), MAX_BYTES);
     } catch (error) {
-        if (problems !== undefined && (error as { code?: unknown }).code !== "ENOENT") problems.push({ file: shown, key: "", message: whyNotRead(error), level: "error" });
+        // A copy that does not exist yet is not a problem of the file; the caller says what to run.
+        if (problems !== undefined && (error as { code?: unknown }).code !== "ENOENT") {
+            problems.push({ file: shown, key: "", message: whyNotRead(error), level: "error" });
+        }
         return undefined;
     }
     try {
         const raw = JSON.parse(text) as unknown;
         if (isObject(raw) && raw.version === 1 && isObject(raw.collection)) {
-            return { version: 1, fetchedAt: typeof raw.fetchedAt === "string" ? raw.fetchedAt : "", collection: raw.collection, environments: isObject(raw.environments) ? raw.environments : {} };
+            const fetchedAt = typeof raw.fetchedAt === "string" ? raw.fetchedAt : "";
+            return { version: 1, fetchedAt, collection: raw.collection, environments: isObject(raw.environments) ? raw.environments : {} };
         }
     } catch {
         // Falls through to the problem below.
@@ -174,7 +185,8 @@ function load(config: CloudConfig, name: string): Collection {
     for (const [label] of config.environments) {
         const raw = copy.environments[label];
         if (raw === undefined) {
-            problems.push({ file: shown, key: label, message: `the environment has not been fetched yet: run /api refresh ${name}`, level: "warning" });
+            const message = `the environment has not been fetched yet: run /api refresh ${name}`;
+            problems.push({ file: shown, key: label, message, level: "warning" });
             continue;
         }
         const read = environmentFrom(label, shown, raw, problems);
@@ -201,6 +213,13 @@ type Fetched = { ok: true; value: unknown } | { ok: false; reason: string };
 /** Any text that could hold a key, with the key's shape removed and cut short. */
 const cleaned = (text: string): string => oneLine(text.replace(KEY_SHAPE, "[redacted]"), 120);
 
+/** How the fetch is carried: by the company's transport or sign-in service if one is named, else by the network. */
+function carriedBy(config: CloudConfig): Plan["signIn"] {
+    if (config.transport !== undefined) return { kind: "transport", name: config.transport };
+    if (config.signIn !== undefined) return { kind: "service", name: config.signIn };
+    return { kind: "none" };
+}
+
 async function fetchJson(config: CloudConfig, name: string, route: string, deps: RefreshDeps, signal: AbortSignal | undefined): Promise<Fetched> {
     const base = deps.serviceUrl ?? API_HOSTS[config.region];
     const plan: Plan = sealed({
@@ -215,7 +234,7 @@ async function fetchJson(config: CloudConfig, name: string, route: string, deps:
         // The key is a secret piece: it is read when the request is sent, and removed from whatever comes back.
         headers: [["X-API-Key", [{ secret: "apiKey", reference: config.apiKey }]]],
         body: undefined,
-        signIn: config.transport !== undefined ? { kind: "transport", name: config.transport } : config.signIn !== undefined ? { kind: "service", name: config.signIn } : { kind: "none" },
+        signIn: carriedBy(config),
         timeoutSec: deps.timeoutSec,
         allowPlainLocal: deps.allowPlainLocal,
         maxAnswerBytes: MAX_BYTES,
@@ -232,7 +251,10 @@ async function fetchJson(config: CloudConfig, name: string, route: string, deps:
         }
     } catch (error) {
         if (error instanceof NotSentError) return { ok: false, reason: `${cleaned(error.message)} (nothing was sent)` };
-        if (error instanceof LostReplyError) return { ok: false, reason: error.reason === "timeout" ? `no answer within ${deps.timeoutSec} s` : `no answer (${cleaned(error.message)})` };
+        if (error instanceof LostReplyError) {
+            const reason = error.reason === "timeout" ? `no answer within ${deps.timeoutSec} s` : `no answer (${cleaned(error.message)})`;
+            return { ok: false, reason };
+        }
         return { ok: false, reason: "it failed" };
     }
 }
@@ -253,7 +275,10 @@ function withoutSecretValues(environment: Record<string, unknown>): { environmen
 // What changed ---------------------------------------------------------------------------------------------------------
 
 const signature = (request: SavedRequest): string =>
-    JSON.stringify([request.method, request.url, request.headers, request.body ?? null, request.auth, [...request.defaults], request.scripts, request.unsupported ?? null]);
+    JSON.stringify([
+        request.method, request.url, request.headers, request.body ?? null, request.auth, [...request.defaults], request.scripts,
+        request.unsupported ?? null,
+    ]);
 
 function requestsOf(name: string, raw: unknown): Map<string, string> {
     const read = collectionFrom(name, "copy", "", { collection: raw, environments: new Map() }, []);
@@ -330,23 +355,28 @@ function refresher(config: CloudConfig, name: string): Refresher {
                     failed = true;
                     const earlier = before?.environments[label];
                     if (earlier !== undefined) environments[label] = earlier;
-                    lines.push(`  ${label}: could not fetch the environment: ${fetched.ok ? "the answer is not an environment" : fetched.reason}.${earlier === undefined ? "" : " The earlier copy is kept."}`);
+                    const why = fetched.ok ? "the answer is not an environment" : fetched.reason;
+                    lines.push(`  ${label}: could not fetch the environment: ${why}.${earlier === undefined ? "" : " The earlier copy is kept."}`);
                     continue;
                 }
                 const stripped = withoutSecretValues(environment);
                 environments[label] = stripped.environment;
                 lines.push(`  ${label}: ${changesOfEnvironment(before?.environments[label], stripped.environment)}`);
                 if (stripped.hidden.length > 0) {
-                    lines.push(`  ${label}: ${shortList(stripped.hidden, ", ", 60)} ${stripped.hidden.length === 1 ? "is a secret" : "are secrets"} with a value in Postman; the value is not kept, so give it in api.secrets`);
+                    const are = stripped.hidden.length === 1 ? "is a secret" : "are secrets";
+                    const names = shortList(stripped.hidden, ", ", 60);
+                    lines.push(`  ${label}: ${names} ${are} with a value in Postman; the value is not kept, so give it in api.secrets`);
                 }
             }
 
             try {
                 writeCopy(config.cloud, { version: 1, fetchedAt: new Date().toISOString(), collection, environments });
             } catch (error) {
-                return { lines: [`${name}: fetched the collection, but the local copy could not be saved (${readFailure(error)}). The copy was not changed.`], failed: true };
+                const why = `the local copy could not be saved (${readFailure(error)}). The copy was not changed.`;
+                return { lines: [`${name}: fetched the collection, but ${why}`], failed: true };
             }
-            const head = `${name}: fetched the collection${config.environments.length === 0 ? "" : ` and ${plural(config.environments.length, "environment")}`}`;
+            const also = config.environments.length === 0 ? "" : ` and ${plural(config.environments.length, "environment")}`;
+            const head = `${name}: fetched the collection${also}`;
             return { lines: [head, `  ${changesOfRequests(name, before, collection)}`, ...lines], failed };
         },
     };

@@ -96,7 +96,9 @@ function formatOf(root: string): Format | undefined {
 const extensionOf = (format: Format): readonly string[] => (format === "yaml" ? [".yml", ".yaml"] : [".bru"]);
 const folderFileOf = (format: Format): string => (format === "yaml" ? "folder.yml" : "folder.bru");
 /** The files of a folder that are not requests. */
-const NOT_REQUESTS: ReadonlySet<string> = new Set(["folder.yml", "folder.yaml", "folder.bru", "collection.bru", "opencollection.yml", "opencollection.yaml"]);
+const NOT_REQUESTS: ReadonlySet<string> = new Set([
+    "folder.yml", "folder.yaml", "folder.bru", "collection.bru", "opencollection.yml", "opencollection.yaml",
+]);
 
 // Environments --------------------------------------------------------------------------------------------------------
 
@@ -139,7 +141,9 @@ function readEnvironmentFiles(reading: Reading): EnvironmentFile[] {
         }
         if (parsed === undefined) continue;
         const name = parsed.name ?? entry.slice(0, entry.length - extension.length);
-        if (found.some((each) => each.name === name)) problems.push({ file: relative, key: "", message: `names the environment ${name} again; the later file wins`, level: "warning" });
+        if (found.some((each) => each.name === name)) {
+            problems.push({ file: relative, key: "", message: `names the environment ${name} again; the later file wins`, level: "warning" });
+        }
         found.push({ name, file: relative, parsed });
     }
     return found;
@@ -193,7 +197,12 @@ function environmentsOf(reading: Reading): Map<string, Environment> {
     const environments = new Map<string, Environment>();
     for (const file of files) {
         if (file.parsed.dotEnv) {
-            problems.push({ file: file.file, key: "dotEnvFilePath", message: "points at a .env file, which is never read: give those values in api.secrets as process.env.NAME", level: "warning" });
+            problems.push({
+                file: file.file,
+                key: "dotEnvFilePath",
+                message: "points at a .env file, which is never read: give those values in api.secrets as process.env.NAME",
+                level: "warning",
+            });
         }
         const variables = new Map<string, Variable>();
         for (const [name, merged] of mergedVariables(file, files, problems)) {
@@ -203,7 +212,9 @@ function environmentsOf(reading: Reading): Map<string, Environment> {
                     problems.push({
                         file: file.file,
                         key: name,
-                        message: `is a secret with a value in the file. The value is ignored and never sent; give the secret in api.secrets as "${name}"`,
+                        message:
+                            `is a secret with a value in the file. The value is ignored and never sent; ` +
+                                `give the secret in api.secrets as "${name}"`,
                         level: "warning",
                     });
                 }
@@ -250,7 +261,13 @@ function headerMap(base: ReadonlyMap<string, readonly [string, string]>, headers
 
 function belowCollection(defaults: ParsedDefaults): Level {
     const auth: AuthSetting = defaults.auth.kind === "set" || defaults.auth.kind === "refused" ? defaults.auth : { kind: "none" };
-    return { folder: [], headers: headerMap(new Map(), defaults.headers), auth, prerequest: defaults.prerequest ? "the collection" : undefined, vars: new Map() };
+    return {
+        folder: [],
+        headers: headerMap(new Map(), defaults.headers),
+        auth,
+        prerequest: defaults.prerequest ? "the collection" : undefined,
+        vars: new Map(),
+    };
 }
 
 /** A folder's own sign-in replaces the one above it; a folder with none, or with `inherit`, leaves it. */
@@ -388,7 +405,9 @@ function readDefaultsFile(file: string, relative: string, reading: Reading): Par
     return raw === undefined ? undefined : opencollection.readDefaults(raw, report);
 }
 
-const EMPTY_DEFAULTS: ParsedDefaults = { name: undefined, seq: undefined, headers: [], auth: { kind: "none" }, vars: new Map(), prerequest: false, docs: undefined };
+const EMPTY_DEFAULTS: ParsedDefaults = {
+    name: undefined, seq: undefined, headers: [], auth: { kind: "none" }, vars: new Map(), prerequest: false, docs: undefined,
+};
 
 /** The requests and folders in a directory of the collection. */
 function entriesOfDirectory(directory: string, depth: number, reading: Reading): Entry[] {
@@ -414,7 +433,8 @@ function entriesOfDirectory(directory: string, depth: number, reading: Reading):
                 continue;
             }
             const sub = path.join(directory, entry.name);
-            const defaults = readDefaultsFile(path.join(sub, folderFileOf(format)), path.join(relative, folderFileOf(format)), reading) ?? EMPTY_DEFAULTS;
+            const folderFile = folderFileOf(format);
+            const defaults = readDefaultsFile(path.join(sub, folderFile), path.join(relative, folderFile), reading) ?? EMPTY_DEFAULTS;
             entries.push({
                 kind: "folder",
                 seq: defaults.seq,
@@ -424,7 +444,10 @@ function entriesOfDirectory(directory: string, depth: number, reading: Reading):
             });
         } else if (entry.isFile() && extensionOf(format).some((extension) => entry.name.endsWith(extension)) && !NOT_REQUESTS.has(entry.name)) {
             if (++reading.files > MAX_FILES) {
-                if (reading.files === MAX_FILES + 1) problems.push({ file: relative, key: "", message: `is past the first ${MAX_FILES} files, so it and the rest are not read`, level: "warning" });
+                if (reading.files === MAX_FILES + 1) {
+                    const message = `is past the first ${MAX_FILES} files, so it and the rest are not read`;
+                    problems.push({ file: relative, key: "", message, level: "warning" });
+                }
                 continue;
             }
             const parsed = readRequestFile(path.join(directory, entry.name), relative, reading);
@@ -520,7 +543,12 @@ function load(config: BrunoConfig, name: string): Collection {
                 reading.ignored = namesIn(extensions.ignore);
                 const inline = isObject(raw.config) ? raw.config.environments : undefined;
                 if (Array.isArray(inline) && inline.length > 0) {
-                    problems.push({ file: "opencollection.yml", key: "config.environments", message: "environments inside the collection file are not read: keep them in environments/", level: "warning" });
+                    problems.push({
+                        file: "opencollection.yml",
+                        key: "config.environments",
+                        message: "environments inside the collection file are not read: keep them in environments/",
+                        level: "warning",
+                    });
                 }
             }
         }
@@ -542,7 +570,9 @@ function load(config: BrunoConfig, name: string): Collection {
     }
 
     // `{{process.env.NAME}}` anywhere, even inside the value of another variable, is a secret in every environment.
-    for (const value of reading.values) for (const variable of variablesIn(value)) if (variable.startsWith(PROCESS_ENV)) reading.processEnv.add(variable);
+    for (const value of reading.values) {
+        for (const variable of variablesIn(value)) if (variable.startsWith(PROCESS_ENV)) reading.processEnv.add(variable);
+    }
     for (const environment of environments.values()) {
         const declared = environment.variables as Map<string, Variable>;
         for (const variable of reading.processEnv) declared.set(variable, { value: "", secret: true });

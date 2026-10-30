@@ -1,7 +1,7 @@
 // What a Bruno file says, in one shape whichever language it was written in (`.bru` or OpenCollection YAML). The two readers
 // (bruno-bru.ts, bruno-yaml.ts) produce these, and bruno.ts turns them into saved requests: inheritance, variables and
 // refusals are done once, there.
-import type { Auth, Body } from "../model.ts";
+import type { Auth, Body, FormField } from "../model.ts";
 
 /** A sign-in as a collection, a folder or a request sets it. `inherit` takes the nearest one above. */
 export type AuthSetting =
@@ -84,6 +84,24 @@ export const hasText = (text: string | undefined): boolean => text !== undefined
 /** The body that is no body at all. */
 export const noBody = (): ParsedBody => ({ notes: [] });
 
+/** A body of JSON, text or XML, with the content type Bruno sends for it. Nothing in it is no body. */
+export function textBody(kind: "json" | "text" | "xml", text: string): ParsedBody {
+    if (text.trim() === "") return noBody();
+    const contentType = { json: "application/json", text: "text/plain", xml: "application/xml" }[kind];
+    return { body: kind === "json" ? { kind, text } : { kind: "raw", text, language: kind }, contentType, notes: [] };
+}
+
+/** A URL-encoded form. */
+export function urlencodedBody(fields: readonly FormField[]): ParsedBody {
+    if (fields.length === 0) return noBody();
+    return { body: { kind: "form", encoding: "urlencoded", fields }, contentType: "application/x-www-form-urlencoded", notes: [] };
+}
+
+/** A whole body that is a file, with the content type its entry gives. */
+export function fileBody(file: string, contentType: string | undefined): ParsedBody {
+    return { body: { kind: "file", file: { path: file } }, ...(contentType === undefined || contentType === "" ? {} : { contentType }), notes: [] };
+}
+
 /** Bruno's `@file(a|b)` value in a multipart form or a file body: the paths. */
 export function filesOf(value: string): string[] | undefined {
     const match = /^@file\((.*)\)$/s.exec(value.trim());
@@ -101,9 +119,9 @@ export const REFUSED_AUTH: Readonly<Record<string, string>> = {
 };
 
 export function refusedAuth(mode: string): AuthSetting {
-    const named = REFUSED_AUTH[mode];
-    if (named !== undefined) return { kind: "refused", reason: `the sign-in type ${named} is not sent (bearer, basic, apikey and OAuth 2.0 client credentials or password are)` };
-    return { kind: "refused", reason: `the sign-in type "${mode}" is not sent (bearer, basic, apikey and OAuth 2.0 client credentials or password are)` };
+    const named = REFUSED_AUTH[mode] ?? `"${mode}"`;
+    const sent = "bearer, basic, apikey and OAuth 2.0 client credentials or password are";
+    return { kind: "refused", reason: `the sign-in type ${named} is not sent (${sent})` };
 }
 
 /** What OAuth 2.0 settings of either language come to, for `oauth2Auth`. Empty text is a setting that is not there. */

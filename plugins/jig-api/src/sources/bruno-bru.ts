@@ -8,7 +8,7 @@
 //
 // A block ends at a `}` or `]` in the first column. Nothing here runs a script: a script block is only noticed.
 // Format: https://docs.usebruno.com/bru-lang/language
-import { filesOf, hasText, noBody, oauth2Auth, apiKeyAuth, refusedAuth } from "./bruno-types.ts";
+import { apiKeyAuth, fileBody, filesOf, hasText, noBody, oauth2Auth, refusedAuth, textBody, urlencodedBody } from "./bruno-types.ts";
 import type { AuthSetting, ParsedBody, ParsedDefaults, ParsedEnvironment, ParsedRequest, ParsedVariable, Pairs, Report } from "./bruno-types.ts";
 import type { FormField } from "../model.ts";
 
@@ -167,7 +167,8 @@ const find = (blocks: readonly Block[], name: string): Block | undefined => bloc
 
 /** The enabled pairs of every block with this name. */
 function enabledPairs(blocks: readonly Block[], ...names: string[]): Pairs {
-    return blocks.filter((block) => names.includes(block.name)).flatMap((block) => block.pairs.filter((pair) => pair.enabled).map((pair) => [pair.key, pair.value] as const));
+    const pairs = blocks.filter((block) => names.includes(block.name)).flatMap((block) => block.pairs);
+    return pairs.filter((pair) => pair.enabled).map((pair) => [pair.key, pair.value] as const);
 }
 
 function valueOf(block: Block | undefined, key: string): string {
@@ -225,14 +226,12 @@ function bodyFrom(blocks: readonly Block[], mode: string): ParsedBody {
         case "":
         case "none":
             return noBody();
-        case "json": {
-            const json = text("body:json") || text("body");
-            return json.trim() === "" ? noBody() : { body: { kind: "json", text: json }, contentType: "application/json", notes: [] };
-        }
+        case "json":
+            return textBody("json", text("body:json") || text("body"));
         case "text":
-            return hasText(text("body:text")) ? { body: { kind: "raw", text: text("body:text"), language: "text" }, contentType: "text/plain", notes: [] } : noBody();
+            return textBody("text", text("body:text"));
         case "xml":
-            return hasText(text("body:xml")) ? { body: { kind: "raw", text: text("body:xml"), language: "xml" }, contentType: "application/xml", notes: [] } : noBody();
+            return textBody("xml", text("body:xml"));
         case "graphql": {
             const query = text("body:graphql");
             if (!hasText(query)) return noBody();
@@ -244,8 +243,7 @@ function bodyFrom(blocks: readonly Block[], mode: string): ParsedBody {
             };
         }
         case "formUrlEncoded": {
-            const fields: FormField[] = enabledPairs(blocks, "body:form-urlencoded").map(([name, value]) => ({ kind: "text", name, value }));
-            return fields.length === 0 ? noBody() : { body: { kind: "form", encoding: "urlencoded", fields }, contentType: "application/x-www-form-urlencoded", notes: [] };
+            return urlencodedBody(enabledPairs(blocks, "body:form-urlencoded").map(([name, value]) => ({ kind: "text", name, value })));
         }
         case "multipartForm": {
             const fields: FormField[] = [];
@@ -262,10 +260,11 @@ function bodyFrom(blocks: readonly Block[], mode: string): ParsedBody {
         }
         case "file": {
             // The entries are `file1: @file(path)`; the enabled one is the body.
-            const entry = enabledPairs(blocks, "body:file").map(([, value]) => withContentType(value)).find((each) => filesOf(each.value) !== undefined);
+            const entries = enabledPairs(blocks, "body:file").map(([, value]) => withContentType(value));
+            const entry = entries.find((each) => filesOf(each.value) !== undefined);
             const file = entry === undefined ? undefined : filesOf(entry.value)?.[0];
             if (entry === undefined || file === undefined) return { notes: ["its body is a file, but no file is chosen, so it has no body"] };
-            return { body: { kind: "file", file: { path: file } }, ...(entry.contentType === undefined || entry.contentType === "" ? {} : { contentType: entry.contentType }), notes: [] };
+            return fileBody(file, entry.contentType);
         }
         default:
             return { unsupported: `the body type "${mode}" is not sent`, notes: [] };
@@ -296,15 +295,18 @@ export function readRequest(source: string, report: Report): ParsedRequest | und
         return undefined;
     }
     const type = verb.name === "grpc" ? "grpc" : verb.name === "ws" ? "websocket" : valueOf(meta, "type") === "graphql" ? "graphql" : "http";
-    const method = verb.name === "grpc" ? "GRPC" : verb.name === "ws" ? "WEBSOCKET" : (verb.name === "http" ? valueOf(verb, "method") : verb.name).toUpperCase();
+    const named = verb.name === "http" ? valueOf(verb, "method") : verb.name;
+    const method = verb.name === "grpc" ? "GRPC" : verb.name === "ws" ? "WEBSOCKET" : named.toUpperCase();
 
-    const pathParams = blocks.filter((block) => block.name === "params:path").flatMap((block) => block.pairs.filter((pair) => pair.enabled).map((pair) => [pair.key, pair.value] as const));
+    const pathParams = enabledPairs(blocks, "params:path");
     const notes: string[] = [];
     if (hasText(find(blocks, "script:post-response")?.text)) notes.push("its post-response script is ignored (scripts never run)");
     if (hasText(find(blocks, "tests")?.text)) notes.push("its tests are ignored (scripts never run)");
-    if ((find(blocks, "vars:post-response")?.pairs.length ?? 0) > 0) notes.push("its post-response variables are not set (nothing reads the answer)");
-    if (find(blocks, "auth:oauth2:additional_params:access_token_req:body") !== undefined || find(blocks, "auth:oauth2:additional_params:access_token_req:headers") !== undefined
-        || find(blocks, "auth:oauth2:additional_params:access_token_req:queryparams") !== undefined) {
+    if ((find(blocks, "vars:post-response")?.pairs.length ?? 0) > 0) {
+        notes.push("its post-response variables are not set (nothing reads the answer)");
+    }
+    const tokenRequest = ["body", "headers", "queryparams"].map((part) => `auth:oauth2:additional_params:access_token_req:${part}`);
+    if (tokenRequest.some((name) => find(blocks, name) !== undefined)) {
         notes.push("the additional parameters of its OAuth 2.0 token request are not sent");
     }
     if (valueOf(find(blocks, "settings"), "followRedirects") === "true") notes.push("followRedirects is ignored: redirects are never followed");
@@ -351,7 +353,8 @@ export function readEnvironment(source: string, report: Report): ParsedEnvironme
         if (block.name === "vars") {
             for (const pair of block.pairs) if (pair.enabled) variables.push({ name: pair.key, value: pair.value, secret: false });
         } else if (block.name === "vars:secret") {
-            for (const item of block.items) if (!item.startsWith("~")) variables.push({ name: item, value: undefined, secret: true });
+            // A name switched off with ~ is not a variable, and an annotation line is not a name.
+            for (const item of block.items) if (!item.startsWith("~") && !item.startsWith("@")) variables.push({ name: item, value: undefined, secret: true });
         } else if (block.name.startsWith("vars:externalsecrets:")) {
             const manager = block.name.slice("vars:externalsecrets:".length);
             for (const pair of block.pairs) if (pair.enabled) variables.push({ name: pair.key, value: undefined, secret: true, external: manager });

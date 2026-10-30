@@ -309,7 +309,8 @@ export function planRequest(ctx: PlanContext, request: SavedRequest, input: RunI
 
     // An optional variable that nobody gave a value is left out of the request, with whatever hangs on it.
     const given = (variable: string): boolean =>
-        agent.has(variable) || environment.variables.get(variable)?.secret === false || request.defaults.has(variable) || collection.variables.has(variable);
+        agent.has(variable) || environment.variables.get(variable)?.secret === false || request.defaults.has(variable) ||
+            collection.variables.has(variable);
     const left = pruned(request, new Set((request.optional ?? []).filter((variable) => !given(variable))));
 
     const url = endpoint(left.url, `the address of ${name}`);

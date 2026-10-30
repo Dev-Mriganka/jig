@@ -131,7 +131,7 @@ for (const format of ["yaml", "json"] as const) {
             assert.deepEqual(swagger.problems[0], { file: swagger.problems[0]?.file, key: "swagger", message: "is a Swagger 2.0 document: only OpenAPI 3.0 and 3.1 are read", level: "error" });
             assert.equal(written({ openapi: "4.0.0", paths: {} }).problems[0]?.message, "is 4.0.0: only OpenAPI 3.0 and 3.1 are read");
             assert.equal(written({ paths: {} }).problems[0]?.message, "is missing: this is not an OpenAPI document");
-            assert.equal(written("openapi: 3.0.3\npaths: [unclosed\n").problems[0]?.message, "is not valid YAML (UNEXPECTED_TOKEN)".replace("UNEXPECTED_TOKEN", written("openapi: 3.0.3\npaths: [unclosed\n").problems[0]?.message.match(/\((\w+)\)/)?.[1] ?? ""));
+            assert.match(written("openapi: 3.0.3\npaths: [unclosed\n").problems[0]?.message ?? "", /^is not valid YAML \(\w+\)$/);
             assert.equal(written("{ not json", "bad.json").problems[0]?.message, "is not valid JSON");
         });
 
@@ -142,7 +142,7 @@ for (const format of ["yaml", "json"] as const) {
 
         test("a reference to another file is a problem, not followed", () => {
             const outside = written(minimal({ "/a": { get: op({ operationId: "get", parameters: [{ $ref: "other.yaml#/components/parameters/Id" }] }) } }));
-            assert.deepEqual(outside.requests[0]?.variables, ["serverUrl", "bearerAuth"].filter((variable) => variable === "serverUrl"));
+            assert.deepEqual(outside.requests[0]?.variables, ["serverUrl"]);
             assert.match(outside.problems[0]?.message ?? "", /is a reference outside the document, which is not followed/);
         });
     });
@@ -206,6 +206,19 @@ for (const format of ["yaml", "json"] as const) {
             assert.deepEqual(add.variables.slice(0, 3), ["serverUrl", "path.id", "body.id"]);
             const reserved = written(minimal({ "/a/{serverUrl}": { get: op({ parameters: [{ name: "serverUrl", in: "path", required: true, schema: { type: "string" } }] }) } }));
             assert.equal(reserved.requests[0]?.url, "{{serverUrl}}/a/{{path.serverUrl}}", "the agent can never give the variable that holds the host");
+        });
+
+        test("a name that could not stand in a {{variable}} is left out, in a parameter and in a body", () => {
+            const braces = written(minimal({
+                "/a": { post: op({
+                    parameters: [{ name: "a{b}", in: "query", schema: { type: "string" } }],
+                    requestBody: { content: { "application/json": { schema: { type: "object", properties: { "x}": { type: "string" }, ok: { type: "string" } } } } } },
+                }) },
+            }));
+            assert.equal(braces.requests[0]?.url, "{{serverUrl}}/a");
+            assert.deepEqual(braces.requests[0]?.variables, ["serverUrl", "ok"]);
+            assert.ok(braces.requests[0]?.notes.includes("the optional property x} is left out: its name cannot be a variable"));
+            assert.equal(braces.problems[0]?.message, "has no name that can be a variable, and is left out");
         });
 
         test("a path with a placeholder that no parameter describes refuses the operation", () => {
