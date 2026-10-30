@@ -42,7 +42,9 @@ This tool lists and stops the watches of every plugin.
   environment. Git runs with hooks off, and refuses a repository whose own
   configuration would run a command.
 - **Records and saved watches stay on this machine,** and `jig-core` sends
-  nothing anywhere.
+  nothing of its own anywhere: it sends only the requests that plugins ask for
+  (`http.request`), with a credential it reads for them. It never signs in and
+  stores no credential ([Decisions](../../docs/decisions.md)).
 
 ## Commands
 

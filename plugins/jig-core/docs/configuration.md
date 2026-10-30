@@ -163,7 +163,7 @@ such as `git`, `lens` or `memory`.
 - **A top-level key that neither jig-core nor a plugin registered** is an
   unknown field.
 - **A plugin cannot register a name jig-core uses itself:** `environments`,
-  `rules`, `classify`, `secrets`, `records`, `spill`.
+  `rules`, `classify`, `protectedPaths`, `secrets`, `records`, `spill`.
 - **Order does not matter.** A plugin that loads before jig-core waits for it,
   and a section registered after the file was read is checked at once.
 
