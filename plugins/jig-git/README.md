@@ -140,9 +140,8 @@ jig-git/
     git.ts, pr.ts, checks.ts, release.ts  the four tools: schema, table of actions, classification
     git-read.ts, git-local.ts, git-remote.ts, clone.ts   the git actions
     pr-read.ts, pr-write.ts, checks-read.ts              the pull request actions, and the checks that only read
-    github.ts, repo.ts                    gh (argument lists, JSON, ETags, lost replies); which repository
+    github.ts, repo.ts, ci.ts, logs.ts    gh (argument lists, JSON, ETags, lost replies); which repository; check states; job logs
     watch.ts, artifacts.ts, autowatch.ts  the GitHub watch kind, the artifact rules, the watch after a push
-    ci.ts, logs.ts                        check states, job logs
     config.ts, previews.ts, tool.ts, params.ts, names.ts, text.ts, run.ts   settings, plan and preview, tool builder, input checks
   skills/   git/SKILL.md: how to use the tools (status before commit, watch after push)
   test/     against temporary local repositories, a fake gh and a fake jig-core

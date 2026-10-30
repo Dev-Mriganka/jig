@@ -97,17 +97,10 @@ starts with the defaults rather than guessing. So is a wrong type or value.
 
 ## Company part (in the company plugin)
 
-At start-up, it adds to what `jig-core` knows:
-- environments, and which of its targets count as production;
-- rules and classification rules for its own tools;
+- environments, rules and classification rules for its own tools, and which of
+  its targets count as production;
 - field names that hold personal data in its systems, for masking;
 - sign-in services and transports for its systems.
-
-## Origin
-
-`jig-core` is its own code. It borrows patterns from
-`@gotgenes/pi-permission-system` and does not depend on it (see
-[Reuse](../../docs/reuse.md#tool-manager)).
 
 ## Layout
 
@@ -138,3 +131,5 @@ jig-core/
 - [Configuration](docs/configuration.md): rule matching, secrets, sections, variables
 - [Running programs](docs/running-programs.md): no shell, and the checks on git
 - [Plugin contract](docs/plugin-contract.md): what a plugin gets from `jig-core`
+- [Reuse](../../docs/reuse.md#tool-manager): what `jig-core` borrows from
+  `@gotgenes/pi-permission-system`, and why it is not a dependency
