@@ -1,36 +1,28 @@
-// Everything a tool test needs: the fake jig-core, the fake kubectl, a fake Pi with an event bus, and the plugin loaded into
-// it the way Pi loads it. `call` then runs a tool call the way jig-core runs one: classify it, block it when the tool says
-// the input is invalid, decide, announce the decision on the event bus, and only then execute.
+// Everything a tool test needs: the fake jig-core, the fake kubectl and helm, a fake Pi, and the plugin loaded into it the
+// way Pi loads it. `call` then runs a tool call the way jig-core runs one: classify it, block it when the tool says the input
+// is invalid, decide by the default rules table, build the preview and record it as approved when the call would ask, and
+// only then execute.
 import type { ExtensionAPI, ExtensionToolContext, ToolDefinition } from "@earendil-works/pi-coding-agent";
-import type { CallClass, EnvironmentKind, ToolDeclaration } from "../../../jig-core/src/contract.ts";
-import { jigK8s } from "../../src/index.ts";
+import type { CallClass, Preview, ToolDeclaration } from "../../../jig-core/src/contract.ts";
+import { jigOps } from "../../src/index.ts";
+import type { OpsOptions } from "../../src/index.ts";
 import { fakeClock } from "./clock.ts";
 import type { FakeClock } from "./clock.ts";
 import { installFakeJig } from "./fake-jig.ts";
 import type { FakeJig } from "./fake-jig.ts";
-import { installFakeKubectl } from "./fake-kubectl.ts";
-import type { FakeKubectl } from "./fake-kubectl.ts";
+import { installFakePrograms } from "./fake-programs.ts";
+import type { FakePrograms } from "./fake-programs.ts";
 import { section } from "./section.ts";
 import type { Raw } from "./section.ts";
 
-/** What jig-core's configuration says each environment is. A name it does not know counts as production. */
-export const KINDS: Readonly<Record<string, EnvironmentKind>> = {
-    local: "local",
-    external: "external",
-    production: "production",
-    staging: "test",
-    qa: "test",
-    prod: "production",
-};
-
 export interface CallOptions {
     signal?: AbortSignal;
-    /** Skip announcing jig-core's decision, as if jig-core never said anything about the call. */
-    silent?: boolean;
-    /** The kinds of environments for this call, over the default ones. */
-    kinds?: Record<string, EnvironmentKind>;
     /** The progress notes of the call are collected here. */
     updates?: string[];
+    /** Do not ask, as if a rule allowed the call: the tool is given no approved preview. */
+    allowed?: boolean;
+    /** Runs after the user approved the preview and before the tool executes: the place to change the world. */
+    between?: () => void | Promise<void>;
 }
 
 export interface CallResult {
@@ -43,108 +35,119 @@ export interface CallResult {
     /** Set when jig-core would have blocked the call without running the tool, and what the model reads then. */
     blocked?: string;
     cls?: CallClass;
+    /** The preview the user was shown, when the call asked. */
+    preview?: Preview;
     details?: unknown;
 }
 
-export interface Harness {
-    kubectl: FakeKubectl;
-    jig: FakeJig;
-    clock: FakeClock;
+export interface ToolHarness {
     tool: ToolDefinition;
     declaration: ToolDeclaration;
-    /** Every message sent on the event bus. */
-    emitted: Array<{ channel: string; data: unknown }>;
-    /** Sets the `k8s` section as jig.json holds it. */
-    configure(raw?: Raw): void;
-    /** Sends a message on the event bus, as jig-core does. */
-    emit(channel: string, data: unknown): void;
     call(input: Record<string, unknown>, options?: CallOptions): Promise<CallResult>;
+}
+
+export interface Harness {
+    cluster: FakePrograms;
+    jig: FakeJig;
+    clock: FakeClock;
+    runtime: ToolHarness;
+    /** Sets the `ops` section as jig.json holds it. */
+    configure(raw?: Raw): void;
     close(): void;
 }
 
-export function setupHarness(): Harness {
+/** What jig-core's default rules table does with a call: a read is allowed, a write to a test environment asks, a write to
+ *  this machine is allowed, and a write to production is denied by the floor. */
+function decide(cls: CallClass, kind: string): "allow" | "ask" | "deny" {
+    if (cls.effect === "read" || kind === "local") return "allow";
+    return kind === "production" ? "deny" : "ask";
+}
+
+/** What health checks use unless a test gives another: a test never reaches the network. */
+const NO_NETWORK = async (): Promise<Response> => {
+    throw new Error("a test tried to use the network: give the harness a fetch");
+};
+
+export function setupHarness(options: OpsOptions = {}): Harness {
     const jig = installFakeJig();
-    const kubectl = installFakeKubectl();
-    jig.useProgramsIn(kubectl.bin, kubectl.env);
+    const cluster = installFakePrograms();
+    jig.useProgramsIn(cluster.bin, cluster.env);
     const clock = fakeClock();
 
-    // A Pi that keeps what the plugin registers, and runs listeners at once, as Pi's event bus does.
-    const tools: ToolDefinition[] = [];
-    const listeners = new Map<string, Array<(data: unknown) => void>>();
-    const emitted: Harness["emitted"] = [];
-    const pi = {
-        registerTool: (tool: ToolDefinition) => void tools.push(tool),
-        events: {
-            on(channel: string, handler: (data: unknown) => void) {
-                listeners.set(channel, [...(listeners.get(channel) ?? []), handler]);
-                return () => {};
-            },
-            emit(channel: string, data: unknown) {
-                emitted.push({ channel, data });
-                for (const handler of listeners.get(channel) ?? []) handler(data);
-            },
-        },
-    };
+    // A Pi that keeps what the plugin registers.
+    const tools = new Map<string, ToolDefinition>();
+    const pi = { registerTool: (tool: ToolDefinition) => void tools.set(tool.name, tool) };
 
-    jigK8s({ now: clock.now, sleep: clock.deps.sleep })(pi as unknown as ExtensionAPI);
-    const tool = tools[0];
-    const declaration = jig.declared.get("k8s");
-    if (tool === undefined || declaration === undefined) throw new Error("the plugin did not register its tool");
+    jigOps({ now: clock.now, sleep: clock.deps.sleep, fetch: NO_NETWORK, ...options })(pi as unknown as ExtensionAPI);
 
-    const configure = (raw: Raw = section()): void => jig.setSection("k8s", raw);
+    const configure = (raw: Raw = section()): void => jig.setSection("ops", raw);
     configure();
     let counter = 0;
 
+    function harnessOf(name: string): ToolHarness {
+        const tool = tools.get(name);
+        const declaration = jig.declared.get(name);
+        if (tool === undefined || declaration === undefined) throw new Error(`the plugin did not register the ${name} tool`);
+        return {
+            tool,
+            declaration,
+            async call(given, callOptions = {}) {
+                jig.publish();
+                const id = `call-${++counter}`;
+                const blockedBy = (error: unknown): CallResult => {
+                    // What jig-core does when a tool says its input is invalid: it blocks, and nobody is asked.
+                    const reason = error instanceof Error ? error.message : String(error);
+                    if (error instanceof TypeError) return { id, text: "", blocked: `Blocked by jig-core: ${name} cannot run with this input: ${reason}` };
+                    return { id, text: "", blocked: `jig-core could not decide: ${reason}` };
+                };
+
+                let cls: CallClass | undefined;
+                try {
+                    cls = declaration.classify(given);
+                } catch (error) {
+                    return blockedBy(error);
+                }
+                // A tool that does not classify a call leaves it unknown, and an unknown call asks. These tools always classify.
+                if (cls === undefined) return { id, text: "", blocked: "the tool did not classify the call" };
+
+                const decision = decide(cls, jig.api.environments.kindOf(cls.environment));
+                if (decision === "deny") return { id, text: "", cls, blocked: "Denied by the floor: a write to production" };
+
+                let preview: Preview | undefined;
+                if (decision === "ask" && callOptions.allowed !== true && declaration.preview !== undefined) {
+                    try {
+                        preview = await declaration.preview(given, callOptions.signal ?? new AbortController().signal);
+                        jig.approve(id, preview);
+                    } catch (error) {
+                        if (error instanceof TypeError) return blockedBy(error);
+                        // "Preview unavailable": the user is still asked, and nothing is recorded as approved.
+                    }
+                }
+                await callOptions.between?.();
+
+                const onUpdate = (partial: { content: Array<{ type: string; text?: string }> }) => {
+                    callOptions.updates?.push(partial.content[0]?.text ?? "");
+                };
+                try {
+                    const result = await tool.execute(id, given as never, callOptions.signal, onUpdate as never, {} as ExtensionToolContext);
+                    const first = result.content[0];
+                    return { id, text: first !== undefined && first.type === "text" ? first.text : "", cls, preview, details: result.details };
+                } catch (error) {
+                    return { id, text: "", error: error as Error, cls, preview };
+                }
+            },
+        };
+    }
+
     return {
-        kubectl,
+        cluster,
         jig,
         clock,
-        tool,
-        declaration,
-        emitted,
+        runtime: harnessOf("runtime"),
         configure,
-        emit: (channel, data) => pi.events.emit(channel, data),
-        async call(given, options = {}) {
-            jig.publish();
-            const id = `call-${++counter}`;
-            let cls: CallClass | undefined;
-            try {
-                cls = declaration.classify(given);
-            } catch (error) {
-                // What jig-core does when a tool says its input is invalid: it blocks, and nobody is asked.
-                const reason = error instanceof Error ? error.message : String(error);
-                if (error instanceof TypeError) return { id, text: "", blocked: `Blocked by jig-core: k8s cannot run with this input: ${reason}` };
-                return { id, text: "", blocked: `jig-core could not decide: ${reason}` };
-            }
-            // A tool that does not classify a call leaves it unknown, and an unknown call asks. This tool always classifies.
-            if (cls === undefined) return { id, text: "", blocked: "the tool did not classify the call" };
-            if (options.silent !== true) {
-                const kind = options.kinds?.[cls.environment] ?? KINDS[cls.environment] ?? "production";
-                pi.events.emit("jig:decision", {
-                    toolCallId: id,
-                    tool: "k8s",
-                    action: cls.action,
-                    environment: cls.environment,
-                    environmentKind: kind,
-                    effect: cls.effect,
-                    decision: "allow",
-                    source: "table",
-                });
-            }
-            const onUpdate = (partial: { content: Array<{ type: string; text?: string }> }) => {
-                options.updates?.push(partial.content[0]?.text ?? "");
-            };
-            try {
-                const result = await tool.execute(id, given as never, options.signal, onUpdate as never, {} as ExtensionToolContext);
-                const first = result.content[0];
-                return { id, text: first !== undefined && first.type === "text" ? first.text : "", cls, details: result.details };
-            } catch (error) {
-                return { id, text: "", error: error as Error, cls };
-            }
-        },
         close() {
             jig.remove();
-            kubectl.remove();
+            cluster.remove();
         },
     };
 }

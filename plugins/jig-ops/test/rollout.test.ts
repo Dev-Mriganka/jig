@@ -1,12 +1,12 @@
 // The rollout of a service: the workloads behind the pods, the verdict, and waiting until a version is running.
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, test } from "node:test";
-import { readK8s } from "../src/runtime/kubernetes/config.ts";
+import { readOps } from "../src/catalog.ts";
 import { parsePod } from "../src/runtime/kubernetes/pods.ts";
 import type { Pod } from "../src/runtime/kubernetes/pods.ts";
 import { evaluate, parseWorkloads, podLines, verdictLine, workloadLines } from "../src/runtime/kubernetes/rollout.ts";
-import { nextDelay, POLL_FIRST_MS, POLL_MAX_MS, statusAction } from "../src/runtime/kubernetes/status.ts";
-import type { Call } from "../src/runtime/kubernetes/params.ts";
+import { nextDelay, POLL_FIRST_MS, POLL_MAX_MS, rolloutAction } from "../src/runtime/kubernetes/wait.ts";
+import type { RolloutAsk } from "../src/runtime/kubernetes/wait.ts";
 import { fakeClock, NOW } from "./support/clock.ts";
 import type { FakeClock } from "./support/clock.ts";
 import { list, pod, workload } from "./support/fixtures.ts";
@@ -23,17 +23,17 @@ beforeEach(() => {
 afterEach(() => r.close());
 
 // The parsing and the verdict need no cluster, so their tests read the target straight from the section.
-const TARGET = readK8s(section()).settings?.services.get("orders-api")?.get("staging");
+const TARGET = readOps(section()).catalog?.services.get("orders-api")?.environments.get("staging")?.kubernetes;
 if (TARGET === undefined) throw new Error("the default section has no orders-api in staging");
 const target = () => TARGET;
 const pods = (...items: Array<Record<string, unknown>>): Pod[] => items.map((item) => parsePod(item, target())).filter((p): p is Pod => p !== undefined);
 const workloads = (...items: Array<Record<string, unknown>>) => parseWorkloads({ items }, target());
 
-/** A status call, as parseCall would make it. */
-function call(waitFor?: string, timeoutSec = 300): Extract<Call, { action: "status" }> {
-    return { action: "status", target: target(), waitFor, timeoutSec };
+/** What a rollout call asks for, as parseCall would make it. */
+function ask(waitFor?: string, timeoutSec = 300): RolloutAsk {
+    return { waitFor, timeoutSec };
 }
-const run = (waitFor?: string, timeoutSec?: number) => statusAction(r.kube(), call(waitFor, timeoutSec), clock.deps);
+const run = (waitFor?: string, timeoutSec?: number) => rolloutAction(r.kube(), ask(waitFor, timeoutSec), clock.deps);
 
 /** Pods that are all ready on one tag. */
 const rolled = (tag: string, count = 2) => list(...Array.from({ length: count }, (_, n) => pod(`orders-api-${n}`, { tag, created: "2026-10-15T08:55:00Z" })));
@@ -170,7 +170,7 @@ describe("the verdict", () => {
         assert.equal(sentence(pods(pod("a-0", { tag: "1.4.3" }), pod("a-1")), undefined), "Still rolling: 2 of 2 pods ready; pods run 1.4.3, 1.4.2.");
         assert.equal(
             sentence(pods(pod("a-0"), pod("a-1", { ready: false, waiting: "ImagePullBackOff", restarts: 0 })), "1.4.2"),
-            "Failing: pod a-1 is ImagePullBackOff (0 restarts). Read why with logs (pod: a-1, previous: true).",
+            "Failing: pod a-1 is ImagePullBackOff (0 restarts). Read why with runtime logs (pod: a-1, previous: true).",
         );
         assert.equal(sentence([], "1.4.2"), "No pods match app=orders-api in namespace orders-staging.");
         assert.equal(sentence([], "1.4.2", "1m00s"), "No pods after waiting 1m00s match app=orders-api in namespace orders-staging.");
@@ -200,9 +200,9 @@ describe("the poll schedule", () => {
     });
 });
 
-describe("status without a version to wait for", () => {
+describe("rollout without a version to wait for", () => {
     test("says what runs, from the workload and the pods", async () => {
-        r.kubectl.answer({ pods: rolled("1.4.2"), workloads: list(workload("orders-api")) });
+        r.cluster.answer({ pods: rolled("1.4.2"), workloads: list(workload("orders-api")) });
         const outcome = await run();
         assert.equal(
             outcome.text,
@@ -218,16 +218,16 @@ describe("status without a version to wait for", () => {
     });
 
     test("reads the pods and then the workloads, and nothing else", async () => {
-        r.kubectl.answer({ pods: rolled("1.4.2"), workloads: list(workload("orders-api")) });
+        r.cluster.answer({ pods: rolled("1.4.2"), workloads: list(workload("orders-api")) });
         await run();
-        assert.deepEqual(r.kubectl.calls().map((c) => c.argv.slice(3)), [
+        assert.deepEqual(r.cluster.calls().map((c) => c.argv.slice(3)), [
             ["get", "pods", "--selector=app=orders-api", "-o", "json"],
             ["get", "deployments,statefulsets", "-o", "json"],
         ]);
     });
 
     test("a rollout in progress shows which pods are on which version", async () => {
-        r.kubectl.answer({
+        r.cluster.answer({
             pods: list(pod("orders-api-0", { tag: "1.4.3", created: "2026-10-15T08:55:00Z" }), pod("orders-api-1", { tag: "1.4.2", created: "2026-10-15T08:00:00Z" })),
             workloads: list(workload("orders-api", { tag: "1.4.3", currentRevision: "r1", updateRevision: "r2", updated: 1 })),
         });
@@ -237,14 +237,14 @@ describe("status without a version to wait for", () => {
     });
 
     test("a crash looping pod is named, with the next step", async () => {
-        r.kubectl.answer({ pods: list(pod("orders-api-0", { ready: false, waiting: "CrashLoopBackOff", restarts: 5 })), workloads: list(workload("orders-api")) });
+        r.cluster.answer({ pods: list(pod("orders-api-0", { ready: false, waiting: "CrashLoopBackOff", restarts: 5 })), workloads: list(workload("orders-api")) });
         const outcome = await run();
-        assert.match(outcome.text.split("\n")[0] ?? "", /Failing: pod orders-api-0 is CrashLoopBackOff \(5 restarts\)\. Read why with logs \(pod: orders-api-0, previous: true\)\.$/);
+        assert.match(outcome.text.split("\n")[0] ?? "", /Failing: pod orders-api-0 is CrashLoopBackOff \(5 restarts\)\. Read why with runtime logs \(pod: orders-api-0, previous: true\)\.$/);
         assert.equal(outcome.facts.verdict, "failing");
     });
 
     test("no pods, and no workload", async () => {
-        r.kubectl.answer({ pods: list(), workloads: list() });
+        r.cluster.answer({ pods: list(), workloads: list() });
         const outcome = await run();
         assert.equal(
             outcome.text,
@@ -253,14 +253,14 @@ describe("status without a version to wait for", () => {
     });
 
     test("a workload that cannot be read is an error with the reason, not a guess", async () => {
-        r.kubectl.answer({ pods: rolled("1.4.2"), workloads: { code: 1, stderr: 'Error from server (Forbidden): deployments.apps is forbidden: User "u" cannot list resource "deployments"' } });
+        r.cluster.answer({ pods: rolled("1.4.2"), workloads: { code: 1, stderr: 'Error from server (Forbidden): deployments.apps is forbidden: User "u" cannot list resource "deployments"' } });
         await assert.rejects(run(), /^Error: The kubeconfig user is not allowed to read orders-api in staging/);
     });
 });
 
 describe("waiting for a version", () => {
     test("returns running at once when the version is already there, without a sleep", async () => {
-        r.kubectl.answer({ pods: rolled("1.4.3"), workloads: list(workload("orders-api", { tag: "1.4.3" })) });
+        r.cluster.answer({ pods: rolled("1.4.3"), workloads: list(workload("orders-api", { tag: "1.4.3" })) });
         const outcome = await run("1.4.3");
         assert.match(outcome.text, /^orders-api in staging \(namespace orders-staging\): Running: 2 of 2 pods ready on 1\.4\.3\.\n/);
         assert.deepEqual(clock.sleeps, []);
@@ -268,7 +268,7 @@ describe("waiting for a version", () => {
     });
 
     test("polls with a growing delay until the version is running, and says how it goes", async () => {
-        r.kubectl.answer({
+        r.cluster.answer({
             pods: [
                 list(pod("orders-api-0", { tag: "1.4.2" }), pod("orders-api-1", { tag: "1.4.2" })),
                 list(pod("orders-api-0", { tag: "1.4.3" }), pod("orders-api-1", { tag: "1.4.2", ready: false })),
@@ -284,11 +284,11 @@ describe("waiting for a version", () => {
         ]);
         assert.match(outcome.text.split("\n")[0] ?? "", /Running: 2 of 2 pods ready on 1\.4\.3\.$/);
         assert.deepEqual(outcome.facts, { verdict: "running", pods: 2, ready: 2, polls: 3, timedOut: false });
-        assert.equal(r.kubectl.calls().filter((c) => c.argv[3] === "get" && c.argv[4] === "pods").length, 3);
+        assert.equal(r.cluster.calls().filter((c) => c.argv[3] === "get" && c.argv[4] === "pods").length, 3);
     });
 
     test("is still rolling when the time is up, and says how far it got", async () => {
-        r.kubectl.answer({ pods: rolled("1.4.2"), workloads: list(workload("orders-api")) });
+        r.cluster.answer({ pods: rolled("1.4.2"), workloads: list(workload("orders-api")) });
         const outcome = await run("1.4.3", 10);
         assert.deepEqual(clock.sleeps, [2000, 3000, 4500, 500], "the last sleep is cut to the time that is left");
         assert.equal(clock.sleeps.reduce((a, b) => a + b, 0), 10_000);
@@ -300,7 +300,7 @@ describe("waiting for a version", () => {
 
     test("looks one last time at the deadline: a version that arrives in the last moment is seen", async () => {
         const olds = list(pod("orders-api-0", { tag: "1.4.2" }), pod("orders-api-1", { tag: "1.4.2" }));
-        r.kubectl.answer({ pods: [olds, olds, olds, olds, rolled("1.4.3")], workloads: list(workload("orders-api", { tag: "1.4.3" })) });
+        r.cluster.answer({ pods: [olds, olds, olds, olds, rolled("1.4.3")], workloads: list(workload("orders-api", { tag: "1.4.3" })) });
         const outcome = await run("1.4.3", 10);
         assert.deepEqual(clock.sleeps, [2000, 3000, 4500, 500]);
         assert.match(outcome.text.split("\n")[0] ?? "", /Running: 2 of 2 pods ready on 1\.4\.3\.$/);
@@ -308,14 +308,14 @@ describe("waiting for a version", () => {
     });
 
     test("the shortest wait is one second", async () => {
-        r.kubectl.answer({ pods: rolled("1.4.2"), workloads: list(workload("orders-api")) });
+        r.cluster.answer({ pods: rolled("1.4.2"), workloads: list(workload("orders-api")) });
         const outcome = await run("1.4.3", 1);
         assert.deepEqual(clock.sleeps, [1000]);
         assert.match(outcome.text.split("\n")[0] ?? "", /Still rolling after waiting 1s:/);
     });
 
     test("the longest wait is ten minutes, polled less and less often, and ends at the limit", async () => {
-        r.kubectl.answer({ pods: rolled("1.4.2"), workloads: list(workload("orders-api")) });
+        r.cluster.answer({ pods: rolled("1.4.2"), workloads: list(workload("orders-api")) });
         await run("1.4.3", 600);
         assert.deepEqual(clock.sleeps.slice(0, 8), [2000, 3000, 4500, 6750, 10_125, 15_000, 15_000, 15_000]);
         assert.equal(clock.sleeps.reduce((a, b) => a + b, 0), 600_000);
@@ -326,7 +326,7 @@ describe("waiting for a version", () => {
     test("ends at once, as a result, when a pod cannot come up", async () => {
         for (const waiting of ["CrashLoopBackOff", "ImagePullBackOff", "ErrImagePull"]) {
             clock = fakeClock();
-            r.kubectl.answer({
+            r.cluster.answer({
                 pods: list(pod("orders-api-0", { tag: "1.4.3" }), pod("orders-api-1", { tag: "1.4.3", ready: false, waiting, restarts: 3 })),
                 workloads: list(workload("orders-api", { tag: "1.4.3" })),
             });
@@ -338,7 +338,7 @@ describe("waiting for a version", () => {
     });
 
     test("ends as a result when a pod starts failing in the middle of the rollout", async () => {
-        r.kubectl.answer({
+        r.cluster.answer({
             pods: [rolled("1.4.2"), list(pod("orders-api-0", { tag: "1.4.3", ready: false, waiting: "ImagePullBackOff" }), pod("orders-api-1", { tag: "1.4.2" }))],
             workloads: list(workload("orders-api", { tag: "1.4.3" })),
         });
@@ -348,7 +348,7 @@ describe("waiting for a version", () => {
     });
 
     test("keeps waiting while there are no pods, as they may yet appear", async () => {
-        r.kubectl.answer({ pods: [list(), list(), rolled("1.4.3")], workloads: list(workload("orders-api", { tag: "1.4.3" })) });
+        r.cluster.answer({ pods: [list(), list(), rolled("1.4.3")], workloads: list(workload("orders-api", { tag: "1.4.3" })) });
         const outcome = await run("1.4.3");
         assert.deepEqual(clock.sleeps, [2000, 3000]);
         assert.match(outcome.text.split("\n")[0] ?? "", /Running:/);
@@ -356,20 +356,20 @@ describe("waiting for a version", () => {
     });
 
     test("a kubectl failure during the wait ends it with the line that says what to do", async () => {
-        r.kubectl.answer({ pods: [rolled("1.4.2"), { code: 1, stderr: "Unable to connect to the server: dial tcp: i/o timeout" }], workloads: list(workload("orders-api")) });
+        r.cluster.answer({ pods: [rolled("1.4.2"), { code: 1, stderr: "Unable to connect to the server: dial tcp: i/o timeout" }], workloads: list(workload("orders-api")) });
         await assert.rejects(run("1.4.3"), /^Error: Cannot reach the cluster of context test-cluster for orders-api in staging/);
         assert.deepEqual(clock.sleeps, [2000]);
     });
 
     test("the user stopping the wait ends it with an error that says the rollout goes on", async () => {
         const controller = new AbortController();
-        r.kubectl.answer({ pods: rolled("1.4.2"), workloads: list(workload("orders-api")) });
+        r.cluster.answer({ pods: rolled("1.4.2"), workloads: list(workload("orders-api")) });
         clock.afterSleep = (count) => {
             if (count === 2) controller.abort();
         };
         await assert.rejects(
-            statusAction(r.kube(r.target(), controller.signal), call("1.4.3"), clock.deps),
-            /^Error: k8s status: the wait was stopped \(last seen: rolling, 0 of 2 ready\)\. The rollout itself is not affected: run status with waitFor to wait again$/,
+            rolloutAction(r.kube(r.target(), controller.signal), ask("1.4.3"), clock.deps),
+            /^Error: runtime rollout: the wait was stopped \(last seen: rolling, 0 of 2 ready\)\. The rollout itself is not affected: run rollout with waitFor to wait again$/,
         );
         assert.deepEqual(clock.sleeps, [2000, 3000]);
     });
@@ -377,21 +377,21 @@ describe("waiting for a version", () => {
     test("a call stopped before anything was read says so", async () => {
         const controller = new AbortController();
         controller.abort();
-        r.kubectl.answer({ pods: rolled("1.4.2"), workloads: list(workload("orders-api")) });
+        r.cluster.answer({ pods: rolled("1.4.2"), workloads: list(workload("orders-api")) });
         r.jig.script = () => new Error("kubectl was aborted");
         await assert.rejects(
-            statusAction(r.kube(r.target(), controller.signal), call("1.4.3"), clock.deps),
-            /^Error: k8s status: the wait was stopped\. The rollout itself is not affected/,
+            rolloutAction(r.kube(r.target(), controller.signal), ask("1.4.3"), clock.deps),
+            /^Error: runtime rollout: the wait was stopped\. The rollout itself is not affected/,
         );
     });
 
     test("a stop that kills a kubectl call in the middle of a poll is a stopped wait, not a kubectl failure", async () => {
         const controller = new AbortController();
-        r.kubectl.answer({ pods: [rolled("1.4.2"), { stdout: "late", delayMs: 3000 }], workloads: list(workload("orders-api")) });
+        r.cluster.answer({ pods: [rolled("1.4.2"), { stdout: "late", delayMs: 3000 }], workloads: list(workload("orders-api")) });
         clock.afterSleep = () => setTimeout(() => controller.abort(), 100);
         await assert.rejects(
-            statusAction(r.kube(r.target(), controller.signal), call("1.4.3"), clock.deps),
-            /^Error: k8s status: the wait was stopped \(last seen: rolling, 0 of 2 ready\)/,
+            rolloutAction(r.kube(r.target(), controller.signal), ask("1.4.3"), clock.deps),
+            /^Error: runtime rollout: the wait was stopped \(last seen: rolling, 0 of 2 ready\)/,
         );
     });
 });

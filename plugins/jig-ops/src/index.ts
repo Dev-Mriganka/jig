@@ -1,28 +1,25 @@
-// Pi entry point of jig-ops. The factory only registers: the `k8s` section and the tool's declaration go to jig-core,
-// the tool goes to Pi, and a listener hears jig-core's decisions. Nothing is read from a cluster until a call is made.
+// Pi entry point of jig-ops. The factory only registers: the `ops` section and the tools' declarations go to jig-core, the
+// tools go to Pi. Nothing is read from a cluster until a call is made.
 import type { ExtensionAPI, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { withJig } from "../../jig-core/src/client.ts";
-import { validateK8s } from "./runtime/kubernetes/config.ts";
-import { createDecisions, DECISION_EVENT } from "./runtime/kubernetes/decisions.ts";
-import { createTool } from "./runtime/kubernetes/tool.ts";
-import type { K8sOptions } from "./runtime/kubernetes/tool.ts";
+import { validateOps } from "./catalog.ts";
+import { createRuntimeTool } from "./runtime/tool.ts";
+import type { RuntimeOptions } from "./runtime/tool.ts";
 
-export type { K8sOptions };
+/** The parts of the plugin a test replaces: the clock, the sleep, the fetch and the timeouts. */
+export type OpsOptions = RuntimeOptions;
 
-/** The extension, with parts a test can replace (the clock and the sleep). Pi loads the default export below. */
-export function jigK8s(options: K8sOptions = {}): ExtensionFactory {
+/** The extension, with parts a test can replace. Pi loads the default export below. */
+export function jigOps(options: OpsOptions = {}): ExtensionFactory {
     return (pi: ExtensionAPI) => {
-        const decisions = createDecisions();
-        pi.events.on(DECISION_EVENT, (event) => decisions.remember(event));
-        const tool = createTool({ ...options, decisions });
-        // jig-core may load after this plugin; withJig waits for it. What the tool declares is how jig-core classifies
-        // it.
+        const runtime = createRuntimeTool(options);
+        // jig-core may load after this plugin; withJig waits for it. What the tools declare is how jig-core classifies them.
         withJig((api) => {
-            api.config.registerSection("k8s", validateK8s);
-            api.declareTool({ tool: "k8s", plugin: "jig-ops", classify: tool.classify });
+            api.config.registerSection("ops", validateOps);
+            api.declareTool({ tool: "runtime", plugin: "jig-ops", classify: runtime.classify });
         });
-        pi.registerTool(tool.definition);
+        pi.registerTool(runtime.definition);
     };
 }
 
-export default jigK8s();
+export default jigOps();

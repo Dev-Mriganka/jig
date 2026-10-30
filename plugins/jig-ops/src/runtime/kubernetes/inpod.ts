@@ -1,17 +1,17 @@
-// `api`: a GET on a path of the service, made from inside one of its Ready pods with curl, on the port the target
-// names. The pod must have curl; the tool adds nothing to the pod.
+// The health check inside a pod: a GET on the path the catalog gives, made from one of the service's Ready pods with curl,
+// on the port the catalog names. The pod must have curl; the tool adds nothing to the pod.
 //
-// The request is fixed. Only the path (and its query) comes from the call, after parseCall has checked it, and it is
-// one argument of curl's command line, which no shell reads. The call has no method, no header and no body, so there
-// is nothing to put on curl's standard input and nothing to hide from kubectl's: an API that wants a body is not
-// reachable here.
+// The request is fixed. The container, the port and the path are the catalog's, checked when the catalog was read, and the
+// address is one argument of curl's command line, which no shell reads. The model gives no path, method, header or body,
+// so there is nothing to put on curl's standard input and nothing to hide from kubectl's.
+//
+// This runs a command in a pod, so it never runs in production: the runtime tool refuses it there (see ../tool.ts).
+import { clean, shortList } from "../../values.ts";
+import type { Outcome } from "../../values.ts";
 import { explain, firstLines } from "./failure.ts";
 import { cutMark, runKubectl, wasCut } from "./kubectl.ts";
 import type { Kube, Limits } from "./kubectl.ts";
-import type { Call } from "./params.ts";
 import { firstReady, listPods } from "./pods.ts";
-import { clean, shortList } from "./values.ts";
-import type { Outcome } from "./values.ts";
 
 /** How long curl waits for the answer, inside the pod. */
 const CURL_TIMEOUT_SEC = 20;
@@ -66,8 +66,12 @@ function split(stdout: string): { status: number; body: string } | undefined {
     return { status: Number(tail), body: stdout.slice(0, at) };
 }
 
-export async function apiAction(kube: Kube, call: Extract<Call, { action: "api" }>): Promise<Outcome> {
+export async function inPodHealth(kube: Kube): Promise<Outcome> {
     const { target } = kube;
+    const { container, port, healthPath } = target;
+    if (container === undefined || port === undefined || healthPath === undefined) {
+        throw new Error(`${target.service} in ${target.environment} has no health check inside a pod in the catalog`);
+    }
     const pod = firstReady(await listPods(kube));
     if (pod === undefined) {
         throw new Error(
@@ -75,30 +79,27 @@ export async function apiAction(kube: Kube, call: Extract<Call, { action: "api" 
                 "run pods, and try again when one is ready",
         );
     }
-    if (!pod.containers.some((container) => container.name === call.container)) {
-        const have = shortList(pod.containers.map((container) => container.name), 120);
+    if (!pod.containers.some((one) => one.name === container)) {
+        const have = shortList(pod.containers.map((one) => one.name), 120);
         throw new Error(
-            `${pod.name} has no container ${call.container} (it has ${have}): ` +
-                'fix "container" in the k8s section of jig.json',
+            `${pod.name} has no container ${container} (it has ${have}): ` +
+                'fix "container" in the ops catalog of jig.json (runtime.kubernetes)',
         );
     }
 
-    const path = `${call.path}${call.query}`;
-    const url = `http://localhost:${call.port}${path}`;
-    const result = await runKubectl(kube, "exec", [pod.name, "-c", call.container, "--", ...curlArgs(url)], API);
+    const url = `http://localhost:${port}${healthPath}`;
+    const result = await runKubectl(kube, "exec", [pod.name, "-c", container, "--", ...curlArgs(url)], API);
     if (result.code !== 0) {
         if (NO_CURL.test(result.stderr)) {
-            throw new Error(`${pod.name} has no curl in container ${call.container}: api needs curl inside the pod`);
+            throw new Error(`${pod.name} has no curl in container ${container}: the health check inside a pod needs curl`);
         }
         // curl's own failure comes back through kubectl; anything else is kubectl's (sign-in, network) and reads as
         // such.
-        if (CURL_FAILED.test(result.stderr)) {
-            throw new Error(curlProblem(result.stderr, result.code, pod.name, call.port));
-        }
+        if (CURL_FAILED.test(result.stderr)) throw new Error(curlProblem(result.stderr, result.code, pod.name, port));
         throw explain(result.stderr, result.code, `curl inside ${pod.name}`, target);
     }
 
-    const where = `GET ${path} on ${pod.name}:${call.port}`;
+    const where = `GET ${healthPath} on ${pod.name}:${port}`;
     // A reply longer than the limit was cut, and a cut reply has lost the end where the status is. A status found
     // inside it could be part of the body, so none is looked for.
     if (wasCut(result.stdout, API.maxBytes)) {

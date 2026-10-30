@@ -4,8 +4,8 @@ import { DNS_LABEL, DNS_SUBDOMAIN } from "./config.ts";
 import type { Target } from "./config.ts";
 import { getJson } from "./kubectl.ts";
 import type { Kube } from "./kubectl.ts";
-import { count, isObject, objects, plural, str } from "./values.ts";
-import type { Outcome } from "./values.ts";
+import { count, isObject, objects, plural, str } from "../../values.ts";
+import type { Outcome } from "../../values.ts";
 
 export interface Container {
     name: string;
@@ -46,6 +46,13 @@ export function tagOf(image: string): string | undefined {
     const withoutDigest = image.split("@")[0] ?? "";
     const colon = withoutDigest.lastIndexOf(":");
     return colon > withoutDigest.lastIndexOf("/") ? withoutDigest.slice(colon + 1) : undefined;
+}
+
+/** The image without its tag and digest: `registry:5000/path/name:tag` becomes `registry:5000/path/name`. */
+export function withoutTag(image: string): string {
+    const withoutDigest = image.split("@")[0] ?? "";
+    const colon = withoutDigest.lastIndexOf(":");
+    return colon > withoutDigest.lastIndexOf("/") ? withoutDigest.slice(0, colon) : withoutDigest;
 }
 
 /** `name` of `registry/path/name:tag`. */

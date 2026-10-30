@@ -1,12 +1,12 @@
 // Small helpers the modules share: the error that means "invalid input", the shape an action hands back, ways to read
 // kubectl's JSON, and ways to put a value or a piece of cluster text into a message.
-import type { Facts } from "../../../../jig-core/src/contract.ts";
+import type { Facts } from "../../jig-core/src/contract.ts";
 
 /**
  * A mistake in a call's input, or in the configuration it names. jig-core takes a `TypeError` from a tool's classify to
  * mean "invalid input" and blocks the call without asking. Every such finding is an InputError, which is a TypeError.
- * A TypeError from a bug in this plugin is not one, and tool.ts keeps the two apart, so a bug is never reported as the
- * model's mistake.
+ * A TypeError from a bug in this plugin is not one, and `classifying` keeps the two apart, so a bug is never reported
+ * as the model's mistake.
  */
 export class InputError extends TypeError {
     constructor(message: string) {
@@ -15,8 +15,39 @@ export class InputError extends TypeError {
     }
 }
 
+/**
+ * Runs the checks of a tool's classify or preview. An InputError goes on to jig-core as it is, and jig-core blocks the
+ * call without asking. Any other TypeError is a bug here, and leaves as an ordinary error, which jig-core reports as a
+ * call it could not decide.
+ */
+export function classifying<T>(work: () => T): T {
+    try {
+        return work();
+    } catch (error) {
+        if (error instanceof TypeError && !(error instanceof InputError)) {
+            throw new Error(`internal error: ${error.message}`);
+        }
+        throw error;
+    }
+}
+
 export function isObject(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Checks one setting of the catalog against a pattern and returns it, or adds a problem to `errors`. A setting that is
+ * missing is "required"; one that is wrong is "must be". The message never repeats the value: a configuration error may
+ * be shown to the model, and a value pasted into the wrong place may be a secret.
+ */
+export function checkPattern(value: unknown, pattern: RegExp, key: string, what: string, errors: string[]): string | undefined {
+    if (value === undefined) {
+        errors.push(`${key}: required, ${what}`);
+        return undefined;
+    }
+    if (typeof value === "string" && pattern.test(value)) return value;
+    errors.push(`${key}: must be ${what}`);
+    return undefined;
 }
 
 /** The objects in a list from kubectl's JSON, whatever else is in it. A missing list is an empty one. */

@@ -6,14 +6,12 @@ import path from "node:path";
 import { describe, test } from "node:test";
 import type { ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Check } from "typebox/value";
-import { validateK8s } from "../src/runtime/kubernetes/config.ts";
-import { DECISION_EVENT } from "../src/runtime/kubernetes/decisions.ts";
-import plugin, { jigK8s } from "../src/index.ts";
-import { ACTIONS, DEFAULT_TAIL, DEFAULT_WAIT_SECONDS, MAX_SINCE_SECONDS, MAX_TAIL, MAX_WAIT_SECONDS, usage } from "../src/runtime/kubernetes/params.ts";
+import { validateOps } from "../src/catalog.ts";
+import plugin, { jigOps } from "../src/index.ts";
+import { ACTIONS, DEFAULT_TAIL, DEFAULT_WAIT_SECONDS, MAX_SINCE_SECONDS, MAX_TAIL, MAX_WAIT_SECONDS, usage } from "../src/runtime/params.ts";
 import { installFakeJig } from "./support/fake-jig.ts";
 import { section } from "./support/section.ts";
 import { ROOT, sources } from "./support/sources.ts";
-
 
 /** A Pi that only records what the plugin registers and listens to. */
 function fakePi() {
@@ -33,22 +31,22 @@ function fakePi() {
 }
 
 describe("the extension", () => {
-    test("registers one tool, k8s, and tells jig-core its section and its tool", () => {
+    test("registers its tools, and tells jig-core its section and how each tool is classified", () => {
         const jig = installFakeJig();
         try {
             const { pi, tools } = fakePi();
             assert.equal(typeof plugin, "function");
-            jigK8s()(pi);
-            assert.deepEqual([...tools.keys()], ["k8s"]);
-            assert.deepEqual([...jig.declared.keys()], ["k8s"]);
-            const declaration = jig.declared.get("k8s");
+            jigOps()(pi);
+            assert.deepEqual([...tools.keys()], ["runtime"]);
+            assert.deepEqual([...jig.declared.keys()], ["runtime"]);
+            const declaration = jig.declared.get("runtime");
             assert.equal(declaration?.plugin, "jig-ops");
-            assert.equal(declaration?.tool, "k8s");
+            assert.equal(declaration?.tool, "runtime");
             assert.equal(declaration?.masksOwnResults, undefined, "jig-core masks production results");
             assert.equal(declaration?.preview, undefined);
-            const check = jig.sections.get("k8s");
-            assert.ok(check, "the k8s section");
-            assert.deepEqual(check({ nonsense: 1 }), validateK8s({ nonsense: 1 }), "the same checks");
+            const check = jig.sections.get("ops");
+            assert.ok(check, "the ops section");
+            assert.deepEqual(check({ nonsense: 1 }), validateOps({ nonsense: 1 }), "the same checks");
             assert.deepEqual(check(section()), []);
             assert.equal(check({ services: {} }).length, 1);
         } finally {
@@ -56,13 +54,12 @@ describe("the extension", () => {
         }
     });
 
-    test("listens for jig-core's decisions, once, under the name jig-core publishes them by", () => {
+    test("listens to no event: the kind of an environment is asked of jig-core when it is needed", () => {
         const jig = installFakeJig();
         try {
             const { pi, listening } = fakePi();
-            jigK8s()(pi);
-            assert.deepEqual(listening, ["jig:decision"]);
-            assert.equal(DECISION_EVENT, "jig:decision");
+            jigOps()(pi);
+            assert.deepEqual(listening, []);
         } finally {
             jig.remove();
         }
@@ -72,13 +69,13 @@ describe("the extension", () => {
         const first = installFakeJig();
         first.remove();
         const { pi, tools } = fakePi();
-        jigK8s()(pi);
-        assert.equal(first.declared.has("k8s"), false, "nothing was declared into the jig-core that went away");
+        jigOps()(pi);
+        assert.equal(first.declared.has("runtime"), false, "nothing was declared into the jig-core that went away");
         const late = installFakeJig();
         try {
-            assert.deepEqual([...late.declared.keys()], ["k8s"], "the queued declaration ran when jig-core loaded");
-            assert.ok(late.sections.has("k8s"));
-            assert.ok(tools.has("k8s"));
+            assert.deepEqual([...late.declared.keys()], ["runtime"], "the queued declaration ran when jig-core loaded");
+            assert.ok(late.sections.has("ops"));
+            assert.ok(tools.has("runtime"));
         } finally {
             late.remove();
         }
@@ -86,29 +83,29 @@ describe("the extension", () => {
 
     test("fails closed: without jig-core the tool does not run, and starts nothing", async () => {
         const { pi, tools } = fakePi();
-        jigK8s()(pi);
+        jigOps()(pi);
         await assert.rejects(
-            (tools.get("k8s") as ToolDefinition).execute("c1", { action: "pods", service: "orders-api", environment: "staging" } as never, undefined, undefined, {} as never),
+            (tools.get("runtime") as ToolDefinition).execute("c1", { action: "pods", service: "orders-api", environment: "staging" } as never, undefined, undefined, {} as never),
             /jig-core is not loaded: enable jig-core, which governs every Jig tool/,
         );
     });
 });
 
-describe("what the tool says about itself", () => {
+describe("what the runtime tool says about itself", () => {
     const { pi, tools } = fakePi();
-    jigK8s()(pi);
-    const tool = tools.get("k8s") as ToolDefinition;
+    jigOps()(pi);
+    const tool = tools.get("runtime") as ToolDefinition;
 
     test("it is short, and says that it only reads", () => {
-        assert.equal(tool.name, "k8s");
-        assert.equal(tool.label, "Kubernetes");
+        assert.equal(tool.name, "runtime");
+        assert.equal(tool.label, "Runtime");
         assert.ok(tool.description.length > 80 && tool.description.length <= 320, `${tool.description.length} characters`);
         assert.match(tool.description, /only reads/);
-        for (const word of ["pods", "rollout", "logs", "GET", "test environments"]) assert.match(tool.description, new RegExp(word));
+        for (const word of ["pods", "rollout", "logs", "events", "health"]) assert.match(tool.description, new RegExp(word));
         assert.ok(tool.promptSnippet && tool.promptSnippet.length <= 140, String(tool.promptSnippet));
         const guidelines = tool.promptGuidelines ?? [];
         assert.ok(guidelines.length >= 1 && guidelines.length <= 2);
-        assert.ok(guidelines.every((line) => line.length <= 160 && !line.includes("\n") && line.startsWith("k8s: ")));
+        assert.ok(guidelines.every((line) => line.length <= 160 && !line.includes("\n") && line.startsWith("runtime: ")), guidelines.join(" | "));
         assert.match(guidelines.join(" "), /waitFor/);
     });
 
@@ -127,7 +124,7 @@ describe("what the tool says about itself", () => {
     test("the schema lists exactly the parameters the usage lines name, and refuses any other", () => {
         const used = new Set<string>();
         for (const action of ACTIONS) {
-            const names = usage(action).replace(/^Usage: k8s \w+ \{/, "").replace(/\}$/, "").split(", ");
+            const names = usage(action).replace(/^Usage: runtime \w+ \{/, "").replace(/\}$/, "").split(", ");
             for (const name of names) used.add(name.replace(/\?$/, ""));
         }
         assert.deepEqual([...Object.keys(schema.properties)].sort(), ["action", ...used].sort());
@@ -147,7 +144,7 @@ describe("what the tool says about itself", () => {
         assert.equal(MAX_TAIL, 2000);
         assert.match(schema.properties.tail?.description ?? "", new RegExp(`default ${DEFAULT_TAIL}\\)`));
         assert.match(schema.properties.timeoutSec?.description ?? "", new RegExp(`default ${DEFAULT_WAIT_SECONDS}\\)`));
-        assert.equal(Check(schema as never, { action: "status", service: "a", environment: "b", timeoutSec: 601 }), false);
+        assert.equal(Check(schema as never, { action: "rollout", service: "a", environment: "b", timeoutSec: 601 }), false);
         assert.equal(Check(schema as never, { action: "logs", service: "a", environment: "b", tail: 2001 }), false);
     });
 

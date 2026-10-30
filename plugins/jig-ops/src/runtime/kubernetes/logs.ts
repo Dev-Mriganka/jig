@@ -4,13 +4,21 @@
 import type { Target } from "./config.ts";
 import { cutMark, LOGS, readKubectl, wasCut } from "./kubectl.ts";
 import type { Kube } from "./kubectl.ts";
-import type { Call } from "./params.ts";
 import { firstReady, listPods, ownContainers } from "./pods.ts";
 import type { Pod } from "./pods.ts";
-import { clean, linesOf, plural, shortList } from "./values.ts";
-import type { Outcome } from "./values.ts";
+import { clean, linesOf, plural, shortList } from "../../values.ts";
+import type { Outcome } from "../../values.ts";
 
 const MIB = 1024 * 1024;
+
+/** What the `logs` action was asked. */
+export interface LogsAsk {
+    pod: string | undefined;
+    container: string | undefined;
+    tail: number;
+    sinceSeconds: number | undefined;
+    previous: boolean;
+}
 
 /** The pod a call reads: the named one, which must belong to the service, or else the first Ready one. */
 function choosePod(pods: readonly Pod[], given: string | undefined, target: Target): Pod {
@@ -56,7 +64,7 @@ function whose(pod: Pod, container: string | undefined): string {
     return `${pod.name} (kubectl chose the container; the pod has ${shortList(pod.containers.map((c) => c.name), 80)})`;
 }
 
-export async function logsAction(kube: Kube, call: Extract<Call, { action: "logs" }>): Promise<Outcome> {
+export async function logsAction(kube: Kube, call: LogsAsk): Promise<Outcome> {
     const pod = choosePod(await listPods(kube), call.pod, kube.target);
     const container = chooseContainer(pod, call.container, kube.target);
     const args = [

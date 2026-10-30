@@ -1,5 +1,5 @@
 // Kubernetes fixtures: pod and workload JSON as `kubectl get -o json` prints it. The names are made up.
-import type { Reply } from "./fake-kubectl.ts";
+import type { Reply } from "./fake-programs.ts";
 
 export interface PodOptions {
     /** The service the pod belongs to. Default `orders-api`. */
@@ -125,5 +125,86 @@ export function workload(name: string, options: WorkloadOptions = {}): Record<st
                 }
                 : {}),
         },
+    };
+}
+
+export interface EventOptions {
+    kind?: string;
+    type?: "Normal" | "Warning";
+    reason?: string;
+    message?: string;
+    count?: number;
+    /** `lastTimestamp` of the core API. */
+    last?: string;
+    /** The events API's own fields, for events that have no `lastTimestamp`. */
+    eventTime?: string;
+    seriesLast?: string;
+    first?: string;
+    created?: string;
+}
+
+/** An event about `kind/name`, as `kubectl get events -o json` prints it. */
+export function event(name: string, options: EventOptions = {}): Record<string, unknown> {
+    return {
+        metadata: { name: `${name}.${options.reason ?? "Pulled"}`, ...(options.created === undefined ? {} : { creationTimestamp: options.created }) },
+        involvedObject: { kind: options.kind ?? "Pod", name },
+        type: options.type ?? "Normal",
+        reason: options.reason ?? "Pulled",
+        message: options.message ?? "Successfully pulled image",
+        ...(options.count === undefined ? {} : { count: options.count }),
+        ...(options.last === undefined ? {} : { lastTimestamp: options.last }),
+        ...(options.first === undefined ? {} : { firstTimestamp: options.first }),
+        ...(options.eventTime === undefined ? {} : { eventTime: options.eventTime }),
+        ...(options.seriesLast === undefined ? {} : { series: { lastObservedTime: options.seriesLast } }),
+    };
+}
+
+export interface ReplicaSetOptions {
+    /** The deployment that owns it. */
+    owner?: string;
+    service?: string;
+    revision?: number;
+    tag?: string;
+    /** Where the service's label sits: on the pod template (default) or nowhere. */
+    labelsOn?: "template" | "none";
+}
+
+/** A replica set of a deployment, as `kubectl get replicasets -o json` prints it. */
+export function replicaSet(name: string, options: ReplicaSetOptions = {}): Record<string, unknown> {
+    const service = options.service ?? "orders-api";
+    const owner = options.owner ?? service;
+    return {
+        kind: "ReplicaSet",
+        metadata: {
+            name,
+            ownerReferences: [{ kind: "Deployment", name: owner }],
+            annotations: { "deployment.kubernetes.io/revision": String(options.revision ?? 1) },
+        },
+        spec: {
+            selector: { matchLabels: { other: "x" } },
+            template: {
+                metadata: { labels: options.labelsOn === "none" ? { other: "x" } : { app: service } },
+                spec: { containers: [{ name: service, image: IMAGE(options.tag ?? "1.4.2", service) }] },
+            },
+        },
+    };
+}
+
+export interface ControllerRevisionOptions {
+    /** The stateful set that owns it. */
+    owner?: string;
+    service?: string;
+    revision?: number;
+    tag?: string;
+}
+
+/** A controller revision of a stateful set, as `kubectl get controllerrevisions -o json` prints it. */
+export function controllerRevision(name: string, options: ControllerRevisionOptions = {}): Record<string, unknown> {
+    const service = options.service ?? "ledger";
+    return {
+        kind: "ControllerRevision",
+        metadata: { name, ownerReferences: [{ kind: "StatefulSet", name: options.owner ?? service }] },
+        revision: options.revision ?? 1,
+        data: { spec: { template: { spec: { containers: [{ name: service, image: IMAGE(options.tag ?? "1.4.2", service) }] } } } },
     };
 }

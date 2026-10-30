@@ -1,7 +1,8 @@
 // A stand-in for jig-core's run-time API, published on the same process-wide slot, so the plugin runs as it would under
-// jig-core. Only what jig-k8s uses is real: the tool's declaration, the `k8s` section, facts, and `exec.run`, which starts
-// real programs from an argument list with a short environment, as jig-core does. The programs are the fake kubectl,
-// found through a PATH that starts with its folder.
+// jig-core. Only what jig-ops uses is real: the tools' declarations, the `ops` section, facts, the kind of an environment,
+// the approved preview of a call, the watch kinds and the watches it starts, and `exec.run`, which starts real programs from
+// an argument list with a short environment, as jig-core does. The programs are the fake kubectl and helm, found through a
+// PATH that starts with their folder.
 //
 // `exec.run` follows jig-core's rules where they matter to this plugin: no shell, the input on standard input, output cut
 // at `maxOutputBytes` with a marker, a program that runs too long ends with code 124 and `timedOut`, a missing program or
@@ -9,7 +10,17 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { publishJig, withdrawJig } from "../../../jig-core/src/client.ts";
-import type { Facts, JigApi, RunOptions, RunResult, ToolDeclaration } from "../../../jig-core/src/contract.ts";
+import type {
+    EnvironmentKind,
+    Facts,
+    JigApi,
+    Preview,
+    RunOptions,
+    RunResult,
+    StartWatch,
+    ToolDeclaration,
+    WatchKind,
+} from "../../../jig-core/src/contract.ts";
 
 /** One program the plugin started. */
 export interface Started {
@@ -18,9 +29,19 @@ export interface Started {
     options: RunOptions;
 }
 
+/** A watch the plugin started: what it asked for, and the id it was given. */
+export interface StartedWatch extends StartWatch<unknown> {
+    id: string;
+    status: "open" | "done";
+}
+
 export interface FakeJig {
     api: JigApi;
     declared: Map<string, ToolDeclaration>;
+    /** The watch kinds the plugin registered, by name. */
+    kinds: Map<string, WatchKind<never, never>>;
+    /** The watches the plugin started, in order. */
+    watches: StartedWatch[];
     /** The check each plugin registered for its section of jig.json. */
     sections: Map<string, (raw: unknown) => readonly string[]>;
     facts: Map<string, Facts[]>;
@@ -28,6 +49,10 @@ export interface FakeJig {
     started: Started[];
     /** What `config.section(name)` returns once the section passes its check, as at jig-core's session start. */
     setSection(name: string, value: unknown): void;
+    /** What jig-core says each environment is, over the default table. A name that is not in it counts as production. */
+    setKinds(kinds: Readonly<Record<string, EnvironmentKind>>): void;
+    /** Records that the user approved this preview for this call, as `approvedPreview` will return it. */
+    approve(toolCallId: string, preview: Preview): void;
     /** The folders that start the PATH of the programs run, and the environment they get besides jig-core's own. */
     useProgramsIn(bin: string, env: Readonly<Record<string, string>>): void;
     /** Answers a program instead of starting it, when it returns a result. For cases a real process cannot make. */
@@ -41,12 +66,26 @@ export interface FakeJig {
 /** What jig-core passes on from Pi's own environment. */
 const PASSED_ON = ["HOME", "USER", "LANG", "TMPDIR"];
 
+/** What jig-core's configuration says each environment is. A name it does not know counts as production. */
+export const DEFAULT_KINDS: Readonly<Record<string, EnvironmentKind>> = {
+    local: "local",
+    external: "external",
+    production: "production",
+    prod: "production",
+    staging: "test",
+    qa: "test",
+};
+
 export function installFakeJig(): FakeJig {
     const declared = new Map<string, ToolDeclaration>();
     const sections = new Map<string, (raw: unknown) => readonly string[]>();
     const values = new Map<string, unknown>();
     const facts = new Map<string, Facts[]>();
     const started: Started[] = [];
+    const kinds = new Map<string, WatchKind<never, never>>();
+    const watches: StartedWatch[] = [];
+    const approved = new Map<string, Preview>();
+    let environments: Record<string, EnvironmentKind> = { ...DEFAULT_KINDS };
     const programs = { bin: "", env: {} as Readonly<Record<string, string>> };
     const fake = { script: undefined as FakeJig["script"] };
 
@@ -116,37 +155,53 @@ export function installFakeJig(): FakeJig {
     const api: JigApi = {
         version: 1,
         declareTool: (declaration) => void declared.set(declaration.tool, declaration),
-        approvedPreview: () => undefined,
+        approvedPreview: (id) => approved.get(id),
         addFacts: (id, added) => void facts.set(id, [...(facts.get(id) ?? []), added]),
         setTicket: () => {},
         secrets: {
             resolve: async () => {
-                throw new Error("jig-k8s resolves no secrets");
+                throw new Error("jig-ops resolves no secrets");
             },
         },
         environments: {
-            kindOf: (name: string) => (name === "local" || name === "external" ? name : name === "production" || name === "prod" ? "production" : "test"),
+            // As in jig-core: a name nobody defined counts as production.
+            kindOf: (name) => (Object.hasOwn(environments, name) ? (environments[name] as EnvironmentKind) : "production"),
         },
         transports: {
             register: () => {},
             request: async () => {
-                throw new Error("jig-k8s makes no requests of its own");
+                throw new Error("jig-ops makes no requests of its own");
             },
         },
         signIn: {
             register: () => {},
             headers: async () => {
-                throw new Error("jig-k8s signs in nothing itself");
+                throw new Error("jig-ops signs in nothing itself");
             },
         },
         mask: { text: (input) => input, value: (input) => input },
         watches: {
-            registerKind: () => {},
-            start: () => {
-                throw new Error("no watches in tests");
+            registerKind: (kind) => void kinds.set(kind.kind, kind as unknown as WatchKind<never, never>),
+            start: (watch) => {
+                const id = `watch-${watches.length + 1}`;
+                watches.push({ ...(watch as StartWatch<unknown>), id, status: "open" });
+                return id;
             },
-            list: () => [],
-            stop: () => false,
+            list: () =>
+                watches.map((watch) => ({
+                    id: watch.id,
+                    kind: watch.kind,
+                    plugin: "jig-ops",
+                    title: watch.title,
+                    status: watch.status,
+                    startedAt: "2026-10-15T09:00:00Z",
+                })),
+            stop: (id) => {
+                const open = watches.find((watch) => watch.id === id && watch.status === "open");
+                if (open === undefined) return false;
+                open.status = "done";
+                return true;
+            },
         },
         config: {
             addEnvironments: () => {},
@@ -170,7 +225,7 @@ export function installFakeJig(): FakeJig {
                 return spawnProgram(file, args, options);
             },
             git: async () => {
-                throw new Error("jig-k8s starts no git");
+                throw new Error("jig-ops starts no git");
             },
         },
     };
@@ -179,10 +234,16 @@ export function installFakeJig(): FakeJig {
     return {
         api,
         declared,
+        kinds,
+        watches,
         sections,
         facts,
         started,
         setSection: (name, value) => void values.set(name, value),
+        setKinds(more) {
+            environments = { ...DEFAULT_KINDS, ...more };
+        },
+        approve: (id, preview) => void approved.set(id, preview),
         useProgramsIn(bin, env) {
             programs.bin = bin;
             programs.env = env;
@@ -198,6 +259,9 @@ export function installFakeJig(): FakeJig {
             values.clear();
             facts.clear();
             started.length = 0;
+            watches.length = 0;
+            approved.clear();
+            environments = { ...DEFAULT_KINDS };
             fake.script = undefined;
         },
         remove: () => withdrawJig(api),

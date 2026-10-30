@@ -192,31 +192,31 @@ describe("the first Ready pod", () => {
 
 describe("listing the pods", () => {
     test("asks kubectl for the pods that match the selector, as JSON, and reads them in order", async () => {
-        r.kubectl.answer({ pods: list(pod("orders-api-1"), pod("orders-api-0"), { not: "a pod" }) });
+        r.cluster.answer({ pods: list(pod("orders-api-1"), pod("orders-api-0"), { not: "a pod" }) });
         const pods = await listPods(r.kube());
         assert.deepEqual(pods.map((p) => p.name), ["orders-api-1", "orders-api-0"]);
-        assert.deepEqual(r.kubectl.calls().map((call) => call.argv), [
+        assert.deepEqual(r.cluster.calls().map((call) => call.argv), [
             ["--request-timeout=25s", "--context=test-cluster", "--namespace=orders-staging", "get", "pods", "--selector=app=orders-api", "-o", "json"],
         ]);
     });
 
     test("uses the selector of the target, with all its pairs", async () => {
-        r.kubectl.answer({ pods: list() });
+        r.cluster.answer({ pods: list() });
         await listPods(r.kube(r.target("orders-api", "production")));
-        assert.equal(r.kubectl.calls()[0]?.argv[5], "--selector=app=orders-api,tier=web");
+        assert.equal(r.cluster.calls()[0]?.argv[5], "--selector=app=orders-api,tier=web");
     });
 
     test("a list with no items, or no list at all, is no pods", async () => {
-        r.kubectl.answer({ pods: { stdout: { items: [] } } });
+        r.cluster.answer({ pods: { stdout: { items: [] } } });
         assert.deepEqual(await listPods(r.kube()), []);
-        r.kubectl.answer({ pods: { stdout: {} } });
+        r.cluster.answer({ pods: { stdout: {} } });
         assert.deepEqual(await listPods(r.kube()), []);
     });
 });
 
 describe("the pods action", () => {
     test("one line per pod: ready, status, restarts, age and image tag", async () => {
-        r.kubectl.answer({
+        r.cluster.answer({
             pods: list(
                 pod("orders-api-0", { created: "2026-10-15T08:55:00Z" }),
                 pod("orders-api-1", { ready: false, waiting: "CrashLoopBackOff", restarts: 7, tag: "1.4.3", created: "2026-10-15T08:00:00Z" }),
@@ -238,14 +238,14 @@ describe("the pods action", () => {
     });
 
     test("says when no pod matches, and what was looked for", async () => {
-        r.kubectl.answer({ pods: list() });
+        r.cluster.answer({ pods: list() });
         const outcome = await podsAction(r.kube(r.target("billing", "staging")), NOW);
         assert.equal(outcome.text, "No pods match app=billing for billing in staging (namespace billing-staging).");
         assert.deepEqual(outcome.facts, { pods: 0, ready: 0 });
     });
 
     test("counts a pod that is on its way out as a pod, but not as a ready one", async () => {
-        r.kubectl.answer({ pods: list(pod("a-0"), pod("a-1", { deleting: true })) });
+        r.cluster.answer({ pods: list(pod("a-0"), pod("a-1", { deleting: true })) });
         const outcome = await podsAction(r.kube(), NOW);
         assert.match(outcome.text, /^2 pods of /);
         assert.match(outcome.text, /- a-1: 1\/1 ready, Terminating, /);
@@ -253,12 +253,12 @@ describe("the pods action", () => {
     });
 
     test("a single pod reads as one", async () => {
-        r.kubectl.answer({ pods: list(pod("a-0")) });
+        r.cluster.answer({ pods: list(pod("a-0")) });
         assert.match((await podsAction(r.kube(), NOW)).text, /^1 pod of orders-api in staging/);
     });
 
     test("a kubectl that fails is one line that says what to do", async () => {
-        r.kubectl.answer({ pods: { code: 1, stderr: "Unable to connect to the server: dial tcp: i/o timeout" } });
+        r.cluster.answer({ pods: { code: 1, stderr: "Unable to connect to the server: dial tcp: i/o timeout" } });
         await assert.rejects(podsAction(r.kube(), NOW), /^Error: Cannot reach the cluster of context test-cluster for orders-api in staging/);
     });
 });

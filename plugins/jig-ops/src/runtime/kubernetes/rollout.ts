@@ -6,7 +6,7 @@ import { getJson } from "./kubectl.ts";
 import type { Kube } from "./kubectl.ts";
 import { containersOf, ownContainers, podLine, tagsOf } from "./pods.ts";
 import type { Pod } from "./pods.ts";
-import { count, isObject, objects, plural, str } from "./values.ts";
+import { count, isObject, objects, plural, str } from "../../values.ts";
 
 export interface Workload {
     kind: "StatefulSet" | "Deployment";
@@ -30,7 +30,7 @@ function carries(labels: unknown, wanted: Target["labels"]): boolean {
  * A workload belongs to the service when its selector or its pod template carries the labels the target selects pods
  * with. The workload's own labels say nothing: a chart may put others on it.
  */
-function owns(item: Record<string, unknown>, target: Target): boolean {
+export function owns(item: Record<string, unknown>, target: Target): boolean {
     const spec = isObject(item.spec) ? item.spec : {};
     const selector = isObject(spec.selector) ? spec.selector.matchLabels : undefined;
     const template = isObject(spec.template) ? spec.template : {};
@@ -137,7 +137,7 @@ export function verdictLine(rollout: Rollout, target: Target, version: string | 
             const pod = rollout.failing as Pod;
             return (
                 `Failing: pod ${pod.name} is ${pod.failing} (${plural(pod.restarts, "restart")}). ` +
-                `Read why with logs (pod: ${pod.name}, previous: true).`
+                `Read why with runtime logs (pod: ${pod.name}, previous: true).`
             );
         }
         case "no-pods":

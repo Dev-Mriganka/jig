@@ -1,4 +1,4 @@
-// kubectl's complaints as one line that says what to do.
+// The complaints of kubectl and helm as one line that says what to do.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { explain, firstLines } from "../src/runtime/kubernetes/failure.ts";
@@ -58,14 +58,14 @@ describe("a configuration that does not match the cluster", () => {
     test("a context the kubeconfig lacks says which setting to fix", () => {
         assert.equal(
             message('error: context "test-cluster" does not exist'),
-            'kubectl has no context test-cluster (orders-api in staging): fix "context" in the k8s section of jig.json, or add the context to the kubeconfig',
+            'kubectl has no context test-cluster (orders-api in staging): fix "context" in the ops catalog of jig.json (runtime.kubernetes), or add the context to the kubeconfig',
         );
     });
 
     test("a namespace the cluster lacks says which setting to fix", () => {
         assert.equal(
             message('Error from server (NotFound): namespaces "orders-staging" not found'),
-            'Namespace orders-staging does not exist in context test-cluster: fix "namespace" in the k8s section of jig.json',
+            'Namespace orders-staging does not exist in context test-cluster: fix "namespace" in the ops catalog of jig.json (runtime.kubernetes)',
         );
     });
 
@@ -74,6 +74,44 @@ describe("a configuration that does not match the cluster", () => {
             message('Error from server (Forbidden): pods is forbidden: User "u" cannot list resource "pods" in the namespace "orders-staging"'),
             /^The kubeconfig user is not allowed to read orders-api in staging \(Error from server \(Forbidden\): pods is forbidden.*\): tell the user$/,
         );
+    });
+});
+
+describe("a user who may not change the cluster", () => {
+    test("is told so for a change, not for a read", () => {
+        const stderr = 'Error from server (Forbidden): deployments.apps "orders-api" is forbidden: User "u" cannot patch resource "deployments"';
+        assert.match(explain(stderr, 1, "kubectl set", target, "change").message, /^The kubeconfig user is not allowed to change orders-api in staging \(/);
+        assert.match(explain(stderr, 1, "kubectl get", target).message, /^The kubeconfig user is not allowed to read orders-api in staging \(/);
+    });
+});
+
+describe("what helm says", () => {
+    const helm = (stderr: string) => explain(stderr, 1, "helm upgrade", target, "change").message;
+
+    test("a cluster it cannot reach is the network's to fix", () => {
+        assert.equal(
+            helm('Error: Kubernetes cluster unreachable: Get "https://10.0.0.1/version": dial tcp 10.0.0.1:443: i/o timeout'),
+            "Cannot reach the cluster of context test-cluster for orders-api in staging: check the network or VPN, and retry once it is back",
+        );
+    });
+
+    test("a release that an interrupted deploy left locked is the user's to look at, and is not retried", () => {
+        assert.equal(
+            helm("Error: UPGRADE FAILED: another operation (install/upgrade/rollback) is in progress"),
+            "helm says another operation on the release of orders-api in staging is in progress: an interrupted deploy leaves it locked. Nothing was retried; tell the user, who looks at the release with helm",
+        );
+    });
+
+    test("a release that does not exist says which setting to check", () => {
+        for (const stderr of ["Error: release: not found", "Error: UPGRADE FAILED: \"orders-api\" has no deployed releases"]) {
+            assert.match(helm(stderr), /^helm has no such release for orders-api in staging \(.+\): it was never deployed with helm there, or "release" in the ops catalog of jig.json is wrong$/, stderr);
+        }
+    });
+
+    test("a chart it cannot find says to fix the chart or the folder Pi starts in", () => {
+        for (const stderr of ['Error: path "deploy/chart" not found', 'Error: chart "orders" matching  not found in acme index. (try \'helm repo update\')', "Error: failed to download \"acme/orders\""]) {
+            assert.match(helm(stderr), /^helm cannot find the chart \(.+\): fix "chart" in the ops catalog of jig.json, or start Pi in the folder a relative chart path is read from$/, stderr);
+        }
     });
 });
 
