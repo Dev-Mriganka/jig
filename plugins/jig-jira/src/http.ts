@@ -8,13 +8,17 @@
 //   LostReplyError                   the request may have arrived, but no usable answer came back (a timeout, a dropped
 //                                    connection, a reply that is not JSON). For a write, whether it happened is unknown.
 //
-// There is one request function for all four ways to sign in. They differ only in how the request travels: with `fetch`
-// and a header that carries a token or the sign-in service's headers, or, for a transport, through the company's local
-// sign-in proxy, which holds the session and needs no header. The answer is read the same way after that.
+// There is one request function for all four ways to sign in. jig-core sends the request (`jig().http.request`) and reads
+// the credential for it, so no credential is ever in this plugin's hands: this file says where the credential comes from
+// (a bearer token, Basic, a sign-in service) or that a transport carries the request, and what each failure means. The
+// answer is read the same way whichever way it came.
 import { jig } from "../../jig-core/src/client.ts";
+import type { HttpAuth } from "../../jig-core/src/contract.ts";
+import { isHttpError } from "../../jig-core/src/kit/http.ts";
+import type { HttpError } from "../../jig-core/src/kit/http.ts";
 import { httpsOnly } from "./config.ts";
 import type { JiraSettings } from "./config.ts";
-import { arr, errorMessage, isObject, obj, str } from "./values.ts";
+import { arr, errorMessage, obj } from "./values.ts";
 
 export class JiraError extends Error {
     readonly status: number;
@@ -68,8 +72,6 @@ export interface Http {
 export const TIMEOUTS: Timeouts = { normal: 30_000, search: 60_000 };
 
 export interface HttpOptions {
-    /** For tests: stands in for the global `fetch`. */
-    fetch?: typeof fetch;
     timeouts?: Timeouts;
     signal?: AbortSignal;
 }
@@ -92,75 +94,25 @@ const HINTS: Readonly<Record<number, string>> = {
     429: "Jira is rate limiting; wait before trying again",
 };
 
-/** Rejects when `signal` aborts, whatever `work` is doing. A transport is another package's code and may ignore the
- *  signal; the timeout must still hold. */
-function untilAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
-        const onAbort = (): void => reject(signal.reason);
-        if (signal.aborted) {
-            onAbort();
-            return;
-        }
-        signal.addEventListener("abort", onAbort, { once: true });
-        work.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
-    });
-}
-
 export function createHttp(settings: JiraSettings, options: HttpOptions = {}): Http {
-    const send = options.fetch ?? fetch;
     const timeouts = options.timeouts ?? TIMEOUTS;
-    // The token is resolved once per call and kept only for it. A sign-in service is asked for every request, because it
-    // decides when its token has expired.
-    let token: Promise<string> | undefined;
+    // One signal for every request of the call: jig-core reads the token once for it, and keeps it only that long. A
+    // sign-in service is asked for every request, because it decides when its token has expired.
+    const call = AbortSignal.any(options.signal === undefined ? [] : [options.signal]);
 
-    /** The headers that sign a request in. A transport needs none: the proxy holds the session. */
-    async function authHeaders(url: string): Promise<Record<string, string>> {
+    /** Where the credential comes from. A transport needs none: the proxy holds the session. */
+    function how(): { auth: HttpAuth } | { transport: string } {
         const { auth } = settings;
-        if (auth.kind === "transport") return {};
-        try {
-            if (auth.kind === "signIn") {
-                return { ...(await jig().signIn.headers(auth.name, { system: "jira", url }, options.signal)) };
-            }
-            token ??= jig().secrets.resolve(auth.token, options.signal);
-            const secret = await token;
-            if (auth.kind === "bearer") return { Authorization: `Bearer ${secret}` };
-            return { Authorization: `Basic ${Buffer.from(`${auth.email}:${secret}`).toString("base64")}` };
-        } catch (error) {
-            throw new NotSentError(`could not sign in to Jira: ${errorMessage(error)}`);
+        switch (auth.kind) {
+            case "transport":
+                return { transport: auth.name };
+            case "signIn":
+                return { auth: { signIn: auth.name } };
+            case "bearer":
+                return { auth: { bearer: auth.token } };
+            case "basic":
+                return { auth: { basic: { user: auth.email, password: auth.token } } };
         }
-    }
-
-    /** Sends the request the way the settings say, and returns what came back. */
-    async function travel(
-        request: JiraRequest,
-        url: string,
-        headers: Record<string, string>,
-        body: string | undefined,
-        signal: AbortSignal,
-    ): Promise<Answer> {
-        const { auth } = settings;
-        const bodyPart = body === undefined ? {} : { body };
-        if (auth.kind === "transport") {
-            try {
-                const sent = jig().transports.request(
-                    auth.name,
-                    { system: "jira", method: request.method, url, headers, ...bodyPart },
-                    signal,
-                );
-                const answer = await untilAborted(sent, signal);
-                if (Buffer.byteLength(answer.body) > MAX_ANSWER_BYTES) throw new LostReplyError(TOO_LARGE);
-                return { status: answer.status, headers: answer.headers, text: answer.body };
-            } catch (error) {
-                // jig-core says so when no transport has this name; then nothing was sent.
-                if (/^no transport named /.test(errorMessage(error))) throw new NotSentError(errorMessage(error));
-                throw error;
-            }
-        }
-        // A redirect is never followed: a sign-in page or a plain-http address must not receive the credentials.
-        const init = { method: request.method, headers, redirect: "manual" as const, signal, ...bodyPart };
-        const response = await untilAborted(send(url, init), signal);
-        const text = await untilAborted(readText(response), signal);
-        return { status: response.status, headers: Object.fromEntries(response.headers), text };
     }
 
     return {
@@ -173,22 +125,31 @@ export function createHttp(settings: JiraSettings, options: HttpOptions = {}): H
             if (httpsOnly(url.href) === undefined) throw new NotSentError("the Jira address must be https");
 
             const body = request.body === undefined ? undefined : JSON.stringify(request.body);
-            const headers = {
-                Accept: "application/json",
-                "User-Agent": "jig-jira",
-                ...(body === undefined ? {} : { "Content-Type": "application/json" }),
-                ...(await authHeaders(url.href)),
-            };
             const timeoutMs = request.timeoutMs ?? timeouts.normal;
-            const signals = options.signal === undefined ? [] : [options.signal];
-            const signal = AbortSignal.any([AbortSignal.timeout(timeoutMs), ...signals]);
 
             let answer: Answer;
             try {
-                answer = await travel(request, url.href, headers, body, signal);
+                const reply = await jig().http.request(
+                    {
+                        system: "jira",
+                        url: url.href,
+                        method: request.method,
+                        headers: {
+                            Accept: "application/json",
+                            "User-Agent": "jig-jira",
+                            ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+                        },
+                        ...(body === undefined ? {} : { body }),
+                        ...how(),
+                        timeoutMs,
+                        maxBytes: MAX_ANSWER_BYTES,
+                    },
+                    call,
+                );
+                if (reply.truncated) throw new LostReplyError(TOO_LARGE);
+                answer = { status: reply.status, headers: reply.headers, text: reply.body };
             } catch (error) {
-                if (error instanceof NotSentError || error instanceof LostReplyError) throw error;
-                throw new LostReplyError(`no answer from Jira (${whyLost(error, timeoutMs)})`);
+                throw failed(error, timeoutMs);
             }
 
             const data = parse(answer.text);
@@ -203,6 +164,17 @@ export function createHttp(settings: JiraSettings, options: HttpOptions = {}): H
     };
 }
 
+/** What a failure of jig-core's request means for a caller: nothing was sent, or no usable answer came back. */
+function failed(error: unknown, timeoutMs: number): unknown {
+    if (error instanceof NotSentError || error instanceof LostReplyError) return error;
+    if (!isHttpError(error)) return new LostReplyError(`no answer from Jira (${whyLost(error, timeoutMs)})`);
+    // jig-core could not read the credential (a secret that is missing or locked, a sign-in service that failed).
+    if (error.code === "auth_failed") return new NotSentError(`could not sign in to Jira: ${error.message}`);
+    // No transport has this name, or the request itself was wrong: nothing was sent.
+    if (error.code === "no_transport" || error.code === "invalid_request") return new NotSentError(error.message);
+    return new LostReplyError(`no answer from Jira (${whyLost(error, timeoutMs)})`);
+}
+
 const NOT_JSON = Symbol("not json");
 const TOO_LARGE = "Jira's answer is larger than 8 MiB, so it was not read";
 
@@ -215,33 +187,24 @@ function parse(text: string): unknown {
     }
 }
 
-async function readText(response: Response): Promise<string> {
-    const reader = response.body?.getReader();
-    if (reader === undefined) return "";
-    const chunks: Uint8Array[] = [];
-    let size = 0;
-    for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        size += value.byteLength;
-        if (size > MAX_ANSWER_BYTES) {
-            await reader.cancel();
-            throw new LostReplyError(TOO_LARGE);
-        }
-        chunks.push(value);
-    }
-    return Buffer.concat(chunks).toString("utf8");
-}
-
 /** Why a request got no answer, in words that hold no address and no credential. */
 function whyLost(error: unknown, timeoutMs: number): string {
-    const name = isObject(error) ? str(error.name) : "";
-    if (name === "TimeoutError") {
+    if (isHttpError(error)) return whyHttp(error, timeoutMs);
+    return errorMessage(error).replace(/\s+/g, " ").slice(0, 160);
+}
+
+function whyHttp(error: HttpError, timeoutMs: number): string {
+    if (error.code === "timeout") {
         return `timed out after ${timeoutMs >= 1000 ? `${Math.round(timeoutMs / 1000)} s` : `${timeoutMs} ms`}`;
     }
-    if (name === "AbortError") return "cancelled";
-    const code = str(obj(isObject(error) ? error.cause : undefined).code);
-    return code !== "" ? code : errorMessage(error).replace(/\s+/g, " ").slice(0, 160);
+    if (error.code === "aborted") return "cancelled";
+    // A system code is the whole explanation. Without one, the words of the original error, on one line.
+    if (/^[A-Z][A-Z0-9_]+$/.test(error.code)) return error.code;
+    if (error.code === "network_error")
+        return errorMessage(error.cause ?? error)
+            .replace(/\s+/g, " ")
+            .slice(0, 160);
+    return error.message;
 }
 
 function hostOf(location: string | undefined): string {

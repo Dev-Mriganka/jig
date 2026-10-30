@@ -86,20 +86,25 @@ describe("the extension", () => {
 
     test("fails closed: without jig-core the tool does not run, and does not send anything", async () => {
         const jig = installFakeJig();
+        // The plugin has no network of its own now, so nothing can be sent without jig-core; the global fetch is watched.
+        const realFetch = globalThis.fetch;
         let fetched = false;
-        const [tool] = load({
-            fetch: (async () => {
-                fetched = true;
-                return new Response("{}");
-            }) as typeof fetch,
-        });
-        jig.remove();
-        assert.ok(tool);
-        await assert.rejects(
-            tool.execute("call-1", { action: "get", key: "PROJ-1" } as never, undefined, undefined, {} as never),
-            /jig-core is not loaded/,
-        );
-        assert.equal(fetched, false);
+        globalThis.fetch = (async () => {
+            fetched = true;
+            return new Response("{}");
+        }) as typeof fetch;
+        try {
+            const [tool] = load();
+            jig.remove();
+            assert.ok(tool);
+            await assert.rejects(
+                tool.execute("call-1", { action: "get", key: "PROJ-1" } as never, undefined, undefined, {} as never),
+                /jig-core is not loaded/,
+            );
+            assert.equal(fetched, false);
+        } finally {
+            globalThis.fetch = realFetch;
+        }
     });
 });
 

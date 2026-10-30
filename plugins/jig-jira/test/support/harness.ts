@@ -67,13 +67,14 @@ export async function setupHarness(flavor: Flavor = "cloud", timeouts = LONG_TIM
     // Requests for the https address go to the fake on this machine; everything else about them is real.
     const reach = ((input: string | URL | Request, init?: RequestInit) =>
         fetch(String(input).replace(SITE, jira.origin), init)) as typeof fetch;
+    jig.setFetch(reach);
 
     /** Loads the plugin into a fake Pi, as Pi does at start-up. A new load has learned nothing yet. */
     function load(): { tool: ToolDefinition; declaration: ToolDeclaration } {
         jig.publish();
         const tools: ToolDefinition[] = [];
         const pi = { registerTool: (tool: ToolDefinition) => void tools.push(tool) } as unknown as ExtensionAPI;
-        void jigJira({ fetch: reach, timeouts })(pi);
+        void jigJira({ timeouts })(pi);
         const tool = tools[0];
         const declaration = jig.declared.get("jira");
         if (tool === undefined || declaration === undefined) throw new Error("the plugin did not register its tool");
@@ -95,6 +96,7 @@ export async function setupHarness(flavor: Flavor = "cloud", timeouts = LONG_TIM
         reset() {
             jira.reset();
             jig.reset();
+            jig.setFetch(reach);
             configure();
             Object.assign(harness, load());
         },
