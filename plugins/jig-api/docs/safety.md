@@ -63,6 +63,16 @@ any part of the host; it cannot choose the method or the headers of a saved requ
 name that `api.environments` does not map, which counts as production. A name in `reads` cannot make `call` a read: only the
 method does.
 
+## What it does not guard
+
+- **A collection that the agent can write.** The files are read to classify a call, to preview it and to send it. A file that
+  changes between the preview and the send is caught ("changed since the preview"). A call that runs without asking has no
+  preview, so a file changed in the moments between its classification and its send is not caught. Keep collections where the agent
+  cannot write them.
+- **A name that points at a blocked address** (see above).
+- **What a saved request does by itself.** Whether a `POST` in `reads` really only reads, and what a `GET` does on a server that
+  changes state, is the team's word. The tool does not read a GraphQL query to see whether it is a mutation.
+
 ## Limits
 
 A saved request's body is at most 1 MiB of text, or 20 MiB with files; a call's JSON body at most 256 KiB, with at most 10 headers;

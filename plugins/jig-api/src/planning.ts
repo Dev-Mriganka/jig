@@ -16,12 +16,12 @@ import type { ApiSettings } from "./config.ts";
 import { addressProblem } from "./engine/address.ts";
 import { isMethod, METHODS, sealed } from "./engine/plan.ts";
 import type { Plan, SignIn } from "./engine/plan.ts";
-import { byteLengthOf, isUpload, joined, plainOf, upload } from "./engine/text.ts";
+import { byteLengthOf, displayOf, isUpload, joined, plainOf, upload } from "./engine/text.ts";
 import type { Text, Upload } from "./engine/text.ts";
 import { InputError, shortList, shown } from "./engine/values.ts";
 import type { Auth, Body, Collection, Environment, FileRef, SavedRequest } from "./model.ts";
 import { agentValues, createResolver, secretNamesOf } from "./resolve.ts";
-import type { Resolver } from "./resolve.ts";
+import type { Resolver, Slot } from "./resolve.ts";
 import { confined } from "./sources/files.ts";
 
 export interface PlanContext {
@@ -132,6 +132,18 @@ function formEncoded(text: Text): Text {
     });
 }
 
+/**
+ * How the agent's values are written into a raw body: by what the body is. The language the source found says so, and so does a
+ * Content-Type that the request sets itself, since a body of text that the request calls JSON is JSON to the server.
+ */
+function slotOf(language: string | undefined, headers: ReadonlyArray<readonly [string, Text]>): Slot {
+    const type = displayOf(headers.find(([name]) => name.toLowerCase() === "content-type")?.[1] ?? []).toLowerCase();
+    if (type.includes("json")) return "json";
+    if (language === "urlencoded" || type.includes("x-www-form-urlencoded")) return "form";
+    if (language === "xml" || language === "html" || type.includes("xml") || type.includes("html")) return "xml";
+    return "plain";
+}
+
 function boundaryOf(body: Extract<Body, { kind: "form" }>): string {
     return body.boundary ?? `jig-api-${createHash("sha256").update(JSON.stringify(body.fields)).digest("hex").slice(0, 24)}`;
 }
@@ -143,10 +155,8 @@ function quotedParam(value: string): string {
 /** The body as text, with the headers it needs added to `headers`. */
 function bodyOf(body: Body, resolver: Resolver, collection: Collection, headers: Array<readonly [string, Text]>, request: string): Text {
     switch (body.kind) {
-        case "raw": {
-            const slot = body.language === "urlencoded" ? "form" : body.language === "xml" || body.language === "html" ? "xml" : "plain";
-            return resolver.text(body.text, slot);
-        }
+        case "raw":
+            return resolver.text(body.text, slotOf(body.language, headers));
         case "json":
             return resolver.text(body.text, "json");
         case "file":
@@ -188,7 +198,12 @@ function bodyOf(body: Body, resolver: Resolver, collection: Collection, headers:
                 const head = `--${boundary}\r\nContent-Disposition: form-data; name="${quotedParam(field.name)}"`;
                 if (field.kind === "text") {
                     const type = field.contentType === undefined ? "" : `\r\nContent-Type: ${field.contentType}`;
-                    return joined(head, type, "\r\n\r\n", resolver.text(field.value, "plain"), "\r\n");
+                    const value = resolver.text(field.value, "plain");
+                    // A value that holds the boundary would end the part and start another that the request does not have.
+                    if (displayOf(value).includes(`--${boundary}`)) {
+                        throw new InputError(`the field ${shown(field.name, 30)} of ${quoted(request)} holds the boundary of the form`);
+                    }
+                    return joined(head, type, "\r\n\r\n", value, "\r\n");
                 }
                 const file = uploadOf(collection, field.file);
                 const filename = field.filename ?? file.upload;

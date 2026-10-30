@@ -480,6 +480,47 @@ describe("the files of a collection", () => {
     });
 });
 
+describe("what the agent gives cannot change the shape of what it sits in", () => {
+    test("a value that holds the boundary of a multipart form is refused", async () => {
+        const note = 'x\r\n--ReceiptBoundary\r\nContent-Disposition: form-data; name="admin"\r\n\r\ntrue';
+        const result = await h.call({ action: "run", request: "Upload receipt", collection: "ledger", environment: "staging", variables: { orderId: "1", note } });
+        assert.equal(result.blocked, 'jig-core could not decide: the field "note" of "Upload receipt" holds the boundary of the form');
+        assert.equal(h.api.requests.length, 0);
+        const fine = await h.call({ action: "run", request: "Upload receipt", collection: "ledger", environment: "staging", variables: { orderId: "1", note: "two\r\nlines" } });
+        ok(fine);
+        assert.match(last().body, /name="note"\r\n\r\ntwo\r\nlines\r\n--ReceiptBoundary/);
+    });
+
+    test("a body of text that the request calls JSON is written as JSON, whatever language the collection gave it", async () => {
+        const file = path.join(h.dir, "typed.postman_collection.json");
+        writeFileSync(file, JSON.stringify({
+            item: [{
+                name: "Typed",
+                request: {
+                    method: "POST", url: { raw: "{{baseUrl}}/t" }, header: [{ key: "Content-Type", value: "application/json" }],
+                    body: { mode: "raw", raw: '{"note": "{{note}}", "n": {{n}}}', options: { raw: { language: "text" } } },
+                },
+            }],
+        }));
+        const env = path.join(h.dir, "typed-env.json");
+        writeFileSync(env, JSON.stringify({ values: [{ key: "baseUrl", value: h.api.origin, enabled: true }] }));
+        h.configure({ collections: { typed: { postman: file, environments: { Staging: env } } }, environments: { Staging: "staging" }, allowPlainLocal: true });
+        ok(await h.call({ action: "run", request: "Typed", environment: "Staging", variables: { note: 'a"b', n: "2" } }));
+        assert.deepEqual(JSON.parse(last().body), { note: 'a"b', n: 2 });
+        const injected = await h.call({ action: "run", request: "Typed", environment: "Staging", variables: { note: "x", n: "2, 3" } });
+        assert.match(injected.blocked ?? "", /n sits outside a string in a JSON body/);
+    });
+
+    test("a variable named like a property of every object is only a name", async () => {
+        for (const name of ["__proto__", "constructor", "toString"]) {
+            const variables = JSON.parse(`{"${name}": "x", "orderId": "1"}`) as Record<string, string>;
+            const result = await h.call({ action: "run", request: "Get order", collection: "acme", environment: "Staging", variables });
+            assert.match(result.blocked ?? "", new RegExp(`"${name}" is not a variable of Get order`), name);
+        }
+        assert.equal(h.api.requests.length, 0);
+    });
+});
+
 describe("the .http collection", () => {
     const ledger = (request: string, variables: Record<string, string> = {}) =>
         h.call({ action: "run", request, collection: "ledger", environment: "staging", variables });
