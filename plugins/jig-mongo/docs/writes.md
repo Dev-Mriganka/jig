@@ -18,11 +18,14 @@ checked first, and an invalid call is blocked without asking.
 
 | Action | The preview shows |
 |---|---|
-| `update`, `replace`, `delete` | the filter, the change, how many documents match now (counted just before), what the write changes, and the cap |
+| `update`, `replace`, `delete` | the filter, the change, how many documents match now, and the cap |
 | `insert` | the first 10 documents and how many more |
 | `bulk` | the operations, and for each one how many documents match |
-| `aggregate` with `$out` or `$merge` | the pipeline, how many documents reach the output stage, and how many the target has now (`$out` replaces it) |
+| `aggregate` with `$out` or `$merge` | the pipeline, and how many documents reach the output and the target |
 | `create-index`, `drop-index` | the keys and options, or the index and its definition, and the indexes there are |
+
+- **`update`, `replace` and `delete`** count the documents just before the preview, and also show what the write changes.
+- **`aggregate` with `$out` or `$merge`:** `$out` replaces the target, so the preview says how many documents it has now.
 
 The count is `countDocuments` with a limit one past the cap, so a huge collection is not counted whole. The preview has a fingerprint
 (a SHA-256 of the request and every count). It is read back with `approvedPreview` when the call runs.
@@ -41,8 +44,10 @@ Ids made for documents with none are not part of the fingerprint, so an `insert`
 
 - **An empty filter** in `update`, `replace`, `delete` or a bulk operation is refused: it would change every document.
 - **The cap:** `which: "many"` may touch 1000 documents. `limit` raises it on purpose, up to 2000, and lowers it too: it is the most the
-  write may touch. A filter that matches more is refused, and so is a `bulk` whose operations together touch more, an `insert` of
-  more documents, and an `$out` or `$merge` that writes more. `limit` with `which: "one"` is refused.
+  write may touch.
+  - A filter that matches more is refused, and so is a `bulk` whose operations together touch more, an `insert` of more documents,
+    and an `$out` or `$merge` that writes more.
+  - `limit` with `which: "one"` is refused.
 - **A filter that matches nothing** is refused: there is nothing to approve.
 - **Not supported:** upserts, array filters and collations. A bulk operation or an `update` that names them is refused.
 
@@ -56,7 +61,10 @@ What it knows depends on where the call ended:
 | The route, the connection or the sign-in failed, or a count before the write failed | `Nothing was changed.` |
 | The server rejected the write of one document, or one index change | `Nothing was changed.` |
 | The server rejected a write of many | `Part of it may have been carried out. It was not sent again.` and the result of one read |
-| The reply was lost, the server's time limit ran out, or the call's time ran out | `no answer (...). The outcome is unknown: the server may have carried it out. It was not sent again.` and the result of one read |
+| The reply was lost, or a time limit ran out | `no answer (...). The outcome is unknown ...` and the result of one read |
+
+The full message for an unknown outcome is: `no answer (...). The outcome is unknown: the server may have carried it out. It was not
+sent again.`
 
 The one read, on a new connection with a short time limit:
 

@@ -2,10 +2,14 @@
 
 What the tests of `jig-mongo` do not cover. Back to the [jig-mongo overview](../README.md).
 
-The tests use a fake of the driver seam (what the tool asks of the database, recorded), a fake of the driver's client (what `driver.ts`
-asks of the driver), and a fake `ssh` on `PATH`. No test connects to a MongoDB unless `JIG_TEST_MONGO_URI` is set (see
-`test/integration.test.ts`; give it a user and password in the address to run the tool itself as well). It was run once, on one machine,
-against a single MongoDB 8.0 node with authentication on and no TLS, started for the purpose. Not tried:
+The tests use three fakes:
+- a fake of the driver seam (what the tool asks of the database, recorded);
+- a fake of the driver's client (what `driver.ts` asks of the driver);
+- a fake `ssh` on `PATH`.
+
+No test connects to a MongoDB unless `JIG_TEST_MONGO_URI` is set (see `test/integration.test.ts`; give it a user and password in the
+address to run the tool itself as well). It was run once, on one machine, against a single MongoDB 8.0 node with authentication on
+and no TLS, started for the purpose. Not tried:
 
 - **A server that is not that one.** A managed service (Atlas, DocumentDB and the like), a replica set (the secondary read preference of
   production), a sharded cluster, an older server, TLS, and a user with fewer privileges than the one the test signs in as.
@@ -28,10 +32,13 @@ against a single MongoDB 8.0 node with authentication on and no TLS, started for
 
 ## Facts the code relies on
 
-| Fact | Source |
-|---|---|
-| The driver's relaxed Extended JSON writes a 64-bit integer as a number, which loses digits beyond 2^53, so `bson.ts` writes `$numberLong` itself | tried against the driver's `Long` |
-| Converting an object that has `$regex` to BSON drops its other operators, so `driver.ts` converts typed values one at a time | tried against `EJSON.deserialize` |
-| A listener that was just closed can go on accepting connections for a few milliseconds, so a free port is handed out only once it refuses | seen on WSL2 |
-| `servername` and `checkServerIdentity` are accepted as client options | the driver's `connection_string.js` |
-| `retryWrites: false` is what stops the driver from sending a write again | the driver's documentation of retryable writes |
+- The driver's relaxed Extended JSON writes a 64-bit integer as a number, which loses digits beyond 2^53, so `bson.ts` writes `$numberLong` itself.
+  - *Source:* tried against the driver's `Long`.
+- Converting an object that has `$regex` to BSON drops its other operators, so `driver.ts` converts typed values one at a time.
+  - *Source:* tried against `EJSON.deserialize`.
+- A listener that was just closed can go on accepting connections for a few milliseconds, so a free port is handed out only once it refuses.
+  - *Source:* seen on WSL2.
+- `servername` and `checkServerIdentity` are accepted as client options.
+  - *Source:* the driver's `connection_string.js`.
+- `retryWrites: false` is what stops the driver from sending a write again.
+  - *Source:* the driver's documentation of retryable writes.
