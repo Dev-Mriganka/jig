@@ -5,8 +5,7 @@
 `jig-k8s` lets the agent look at what runs in a cluster: a service's pods, the
 rollout behind them, and their logs. Every action is a read, and it never uses
 a shell. For example, `k8s pods` for `orders-api` in `staging` shows each pod's
-readiness, restarts and image tag, and `k8s status` can wait until a given
-version is running.
+readiness, restarts and image tag.
 
 ## Tool: `k8s`
 

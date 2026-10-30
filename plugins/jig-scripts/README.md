@@ -13,7 +13,7 @@ date, and nothing else.
 | Action | Kind | What it does |
 |---|---|---|
 | `list` | read | The registered scripts with their descriptions and parameters |
-| `run` | read or write, as registered | Runs one registered script with checked parameters. The script's `environment` and `effect` decide how `jig-core` treats the call |
+| `run` | as registered: read, local write or external write | Runs one registered script with checked parameters. The script's `environment` and `effect` decide how `jig-core` treats the call |
 
 ## Rules
 

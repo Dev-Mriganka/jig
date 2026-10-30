@@ -9,8 +9,7 @@ own tools, Jig's tools, and tools from other packages. For each call it works
 out where the call acts and whether it reads or writes, applies your rules, asks
 you when a rule says so, masks and redacts the result, and records the call. For
 example, `git push` is a write to `external`, so `jig-core` shows you the push
-and waits for your `y`; a write to `production` is denied without asking. Every
-other Jig plugin needs it.
+and waits for your `y` before it runs. Every other Jig plugin needs it.
 
 ![Every tool call passes through jig-core's hooks before and after it runs](../../docs/img/one-call.svg)
 
