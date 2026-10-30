@@ -1,4 +1,6 @@
-// Small helpers the modules share: the error that means "invalid input", and ways to put a value into a message.
+// Small helpers the modules share: the error that means "invalid input", the shape an action hands back, and ways to put a
+// value or a piece of cluster text into a message.
+import type { Facts } from "../../jig-core/src/contract.ts";
 
 /**
  * A mistake in a call's input, or in the configuration it names. jig-core takes a `TypeError` from a tool's classify to
@@ -70,4 +72,31 @@ export function duration(ms: number): string {
     const minutes = Math.floor(total / 60);
     const seconds = total % 60;
     return minutes > 0 ? `${minutes}m${String(seconds).padStart(2, "0")}s` : `${seconds}s`;
+}
+
+/** What an action hands back to the tool. */
+export interface Outcome {
+    /** What the model reads. jig-core masks it for production and cuts it when it is long. */
+    text: string;
+    /** A few numbers and short codes for the call's record, never free text. */
+    facts: Facts;
+    details: Record<string, unknown>;
+}
+
+// Colour and cursor sequences (CSI) and title or link sequences (OSC), which a log line can carry. A terminal acts on
+// them, and a hostile log line must not be able to make it.
+const ANSI = /\u001b\[[0-9;?]*[ -/]*[@-~]|\u001b\][^\u0007\u001b]*(?:\u0007|\u001b\\)/g;
+/** Control characters but tab, newline and carriage return, and the Unicode line and paragraph separators. */
+const CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u2028\u2029]/g;
+
+/** Text from a pod, safe to show: no terminal sequences, and no other control character. */
+export function clean(text: string): string {
+    return text.replace(ANSI, "").replace(CONTROL, "?");
+}
+
+/** The lines of `text` without a trailing empty line. A carriage return (a progress bar) ends a line too. */
+export function linesOf(text: string): string[] {
+    const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+    if (lines[lines.length - 1] === "") lines.pop();
+    return lines;
 }
