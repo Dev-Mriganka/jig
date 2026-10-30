@@ -1,15 +1,16 @@
 // Tunnels: how a company plugin gives a tool a network route of its own, such as a database behind a jump host.
 //
 // A transport carries one HTTP request; a database speaks its own protocol and needs a port. A tunnel provider opens a
-// local port that reaches the target, and the tool connects to 127.0.0.1 on it. The provider is code from another
+// local port, and the tool connects to 127.0.0.1 on it. The port is a `forward` that reaches the target, or a `socks` proxy
+// that reaches any host the far side can. The provider is code from another
 // package, so what it gives back is checked here, where its mistake would otherwise show up as a confusing failure.
-import type { Tunnel, TunnelProvider } from "./contract.ts";
+import type { OpenedTunnel, TunnelProvider } from "./contract.ts";
 import { errorMessage } from "./errors.ts";
 import { printable } from "./kit/text.ts";
 
 export interface Tunnels {
     register(name: string, provider: TunnelProvider): void;
-    open(name: string, target: { host: string; port: number }, signal?: AbortSignal): Promise<Tunnel>;
+    open(name: string, target: { host: string; port: number }, signal?: AbortSignal): Promise<OpenedTunnel>;
 }
 
 const MAX_NAMES_SHOWN = 10;
@@ -49,10 +50,14 @@ export function createTunnels(): Tunnels {
             }
             const who = `tunnel provider "${printable(name)}"`;
             if (typeof tunnel !== "object" || tunnel === null) throw new TypeError(`${who} returned no tunnel`);
-            const { port, close } = tunnel as Record<string, unknown>;
+            const { port, close, kind } = tunnel as Record<string, unknown>;
             if (!validPort(port)) throw new TypeError(`${who} returned a tunnel without a valid local port`);
             if (typeof close !== "function") throw new TypeError(`${who} returned a tunnel that cannot be closed`);
-            return { port, close: () => (close as () => void | Promise<void>).call(tunnel) };
+            // A provider that does not say what its port is gives a forward, as every provider did before kinds.
+            if (kind !== undefined && kind !== "forward" && kind !== "socks") {
+                throw new TypeError(`${who} returned a tunnel whose kind is not forward or socks`);
+            }
+            return { kind: kind ?? "forward", port, close: () => (close as () => void | Promise<void>).call(tunnel) };
         },
     };
 }

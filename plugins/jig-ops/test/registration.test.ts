@@ -419,6 +419,7 @@ describe("the package", () => {
             "hono",
             "ignore",
             "mongodb",
+            "socks",
             "yaml",
         ]);
     });

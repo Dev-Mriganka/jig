@@ -199,6 +199,9 @@ export function clientOptions(target: ConnectTarget): Record<string, unknown> {
         // Behind a forward the address is local, while the certificate is the database host's.
         servername: target.serverName,
         directConnection: target.directConnection === true ? true : undefined,
+        // The driver reaches each host of the address through a SOCKS5 proxy (it needs the `socks` package, a dependency here).
+        proxyHost: target.proxyHost,
+        proxyPort: target.proxyPort,
         serverSelectionTimeoutMS: 10_000,
         connectTimeoutMS: 8_000,
         socketTimeoutMS: 120_000,

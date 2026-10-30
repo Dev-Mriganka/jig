@@ -87,12 +87,18 @@ In `~/.pi/agent/jig.json`, under `mongo`. An unknown field is an error, and the 
 
 | Field | Meaning |
 |---|---|
-| `connections` | Per environment: `uri`, `user`, `password`, optional `authSource`, `tls` and `via` |
-| `via` | An SSH forward through a bastion host, or a company tunnel ([Connections](docs/connections.md)) |
-| `access` | Per environment: `deny` (a list of names) or `allow` (collections with their fields) |
+| `connections` | Per environment: one connection, or named ones, each with `uri`, `user`, `password` and more |
+| `via` | An SSH forward, or a company tunnel, as a forward or a SOCKS proxy ([Connections](docs/connections.md)) |
+| `access` | Per environment, or per connection where there are several: `deny` or `allow` |
 
-- **`uri`** holds no credentials: one that has them is refused. **`password`** is a secret reference.
+- **`uri`** holds no credentials: one that has them is refused. **`password`** is a secret reference. **`user`** is a name, or a
+  secret reference such as `pass:mongo/staging-user`.
 - **`via`** is `{ "ssh": { host, user, key, port? } }`, with `key` a secret reference, or `{ "tunnel": "<name>" }`.
+  - A SOCKS tunnel reaches every member of a replica set or `mongodb+srv` address.
+  - An SSH forward or a forward tunnel reaches one host.
+- **Several connections in one environment** (`orders` and `billing` in `staging`): give it a map of names.
+  - The tool then takes a `cluster`, required there and refused elsewhere.
+  - The environment still decides the rules ([Connections](docs/connections.md#several-connections-in-one-environment)).
 - **`deny`** is a list of `db.collection`, `db.*`, `*.field` or `db.collection.field`. Production must use `allow`; anything else
   is an error.
 - **`javascript: true`** allows server-side JavaScript in a test environment.
@@ -126,6 +132,6 @@ jig-mongo/
 
 - [Access](docs/access.md): the lists, the always-denied names, how a pipeline is walked, what is refused and why
 - [Writes](docs/writes.md): previews, the count, the cap, "changed since the preview", a lost reply
-- [Connections](docs/connections.md): the configuration, the SSH route and its key file, the tunnel, how connections are kept
+- [Connections](docs/connections.md): the configuration, several connections in one environment, the SSH route and its key file, the tunnel (forward or SOCKS), how connections are kept
 - [Results](docs/results.md): Extended JSON in and out, partial results, schema and explain output, the record
 - [Not verified yet](docs/not-verified.md): what needs a real MongoDB

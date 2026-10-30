@@ -10,6 +10,7 @@ import type { Doc } from "./values.ts";
 
 export type Param =
     | "environment"
+    | "cluster"
     | "database"
     | "collection"
     | "filter"
@@ -79,6 +80,11 @@ export const MAX_MAX_TIME_MS = 60_000;
 export const WRITE_CAP = 1000;
 const MAX_REQUEST_CHARACTERS = 256 * 1024;
 
+/** Where a call acts, as a message says it: the environment, and the connection's name when the environment has several. */
+export function placeOf(call: { environment: string; cluster?: string }): string {
+    return call.cluster === undefined ? call.environment : `${call.environment}/${call.cluster}`;
+}
+
 export function isAction(value: unknown): value is ActionName {
     return typeof value === "string" && Object.hasOwn(ACTIONS, value);
 }
@@ -103,6 +109,12 @@ export const parameters = Type.Object({
         description: `What to do. Needs: ${describeActions()}. All also need environment`,
     }),
     environment: Type.Optional(Type.String({ description: "The connection's environment name, such as staging" })),
+    cluster: Type.Optional(
+        Type.String({
+            description:
+                "Which connection, for an environment that has several, such as orders. Refused where there is one",
+        }),
+    ),
     database: Type.Optional(Type.String({ description: "The database, such as orders" })),
     collection: Type.Optional(Type.String({ description: "The collection, such as orders" })),
     filter: Type.Optional(
@@ -165,6 +177,8 @@ export const parameters = Type.Object({
 export interface Call {
     action: ActionName;
     environment: string;
+    /** Which of the environment's connections, when it has several. */
+    cluster?: string;
     database?: string;
     collection?: string;
     filter?: Doc;
@@ -186,7 +200,7 @@ export interface Call {
     verbosity?: "queryPlanner" | "executionStats";
 }
 
-const TEXT_PARAMS: readonly Param[] = ["environment", "database", "collection", "field", "name"];
+const TEXT_PARAMS: readonly Param[] = ["environment", "cluster", "database", "collection", "field", "name"];
 const OBJECT_PARAMS: readonly Param[] = ["filter", "projection", "sort", "update", "replacement", "keys", "options"];
 const LIST_PARAMS: readonly Param[] = ["pipeline", "documents", "operations"];
 const present = (value: unknown): boolean => value !== undefined && value !== null;
@@ -200,7 +214,8 @@ export function parseCall(input: Readonly<Record<string, unknown>>): Call {
     if (!isAction(action))
         throw new InputError(`mongo: unknown action ${shown(action, 30)}; use one of ${ACTION_NAMES.join(", ")}`);
     const spec: ActionSpec = ACTIONS[action];
-    const accepted = new Set<string>(["action", ...spec.required, ...spec.optional]);
+    // `cluster` goes with `environment` in every action; whether the environment takes it is for the configuration to say.
+    const accepted = new Set<string>(["action", "cluster", ...spec.required, ...spec.optional]);
     const extra = Object.keys(input).filter((name) => present(input[name]) && !accepted.has(name));
     if (extra.length > 0) throw new InputError(`mongo ${action} does not use ${extra.join(", ")}. ${usage(action)}`);
     const missing = spec.required.filter((name) => !present(input[name]));

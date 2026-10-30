@@ -9,7 +9,7 @@ import { checkKey, newCtx } from "./expr.ts";
 import type { Ctx } from "./expr.ts";
 import { summarizeExplain } from "./explain.ts";
 import { checkFilter } from "./filter.ts";
-import { DEFAULT_LIMIT } from "./params.ts";
+import { DEFAULT_LIMIT, placeOf } from "./params.ts";
 import type { Call } from "./params.ts";
 import { checkPipeline } from "./pipeline.ts";
 import type { CheckedPipeline } from "./pipeline.ts";
@@ -34,7 +34,7 @@ export interface ReadRun {
 /** The environment's name and what a call acts on, as the lines of a result start. */
 export function labelOf(call: Call): string {
     const target = [call.database, call.collection].filter((part) => part !== undefined).join(".");
-    return `mongo ${call.action} ${call.environment}${target === "" ? "" : ` ${target}`}`;
+    return `mongo ${call.action} ${placeOf(call)}${target === "" ? "" : ` ${target}`}`;
 }
 
 export const nsOf = (call: Call): Ns => ({ db: call.database as string, coll: call.collection as string });

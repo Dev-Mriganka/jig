@@ -206,6 +206,7 @@ test("the plugin adds no run-time dependency", () => {
         "hono",
         "ignore",
         "mongodb",
+        "socks",
         "yaml",
     ]);
 });

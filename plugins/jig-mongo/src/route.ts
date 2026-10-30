@@ -2,19 +2,25 @@
 // jig-core's `exec.run` (a program from an argument list, never a shell) and lives until it is stopped. The key is written to a
 // private temporary file for the time ssh needs it to sign in, and the file is deleted as soon as the forward works or fails.
 //
-// A route named `tunnel` is for a company plugin that provides one. jig-core has no registry of tunnels yet, so such a route is
-// accepted in the configuration and reports at call time that no provider is registered.
+// A route named `tunnel` is for a company plugin that provides one, through jig-core's tunnels. What the provider gives is a
+// `forward` (a local port that reaches the one host and port, used as the SSH forward is) or a `socks` proxy (the driver reaches
+// every host of the address through it, so a replica set or a `mongodb+srv` address works).
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { connect, createServer } from "node:net";
 import path from "node:path";
-import type { RunOptions, RunResult } from "../../jig-core/src/contract.ts";
+import type { OpenedTunnel, RunOptions, RunResult } from "../../jig-core/src/contract.ts";
 import type { HostPort, Route, SshRoute } from "./config.ts";
 import { RouteError } from "./errors.ts";
+import { oneLine } from "./values.ts";
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** A running forward: connect to `127.0.0.1:port` to reach the database. */
+/**
+ * A running route. `forward`: connect to `127.0.0.1:port` to reach the database. `socks`: `127.0.0.1:port` is a SOCKS5 proxy, and
+ * the database is reached at its own address through it.
+ */
 export interface Forward {
+    kind: "forward" | "socks";
     port: number;
     alive(): boolean;
     /** Ends ssh. Safe to call twice. */
@@ -23,6 +29,8 @@ export interface Forward {
 
 export interface RouteDeps {
     run(file: string, args: readonly string[], options?: RunOptions): Promise<RunResult>;
+    /** Opens a tunnel that a company plugin provides, by name (jig-core's `tunnels.open`). */
+    openTunnel(name: string, target: HostPort, signal?: AbortSignal): Promise<OpenedTunnel>;
     resolveSecret(reference: string, signal?: AbortSignal): Promise<string>;
     freePort(): Promise<number>;
     /** Whether something accepts connections on `127.0.0.1:port`. */
@@ -195,25 +203,61 @@ async function startSsh(
         } finally {
             signal?.removeEventListener("abort", stop);
         }
-        return { port, alive: () => ended === undefined, stop };
+        return { kind: "forward", port, alive: () => ended === undefined, stop };
     } finally {
         // ssh has signed in by now, or has failed: the key is not needed any more.
         keyFile.remove();
     }
 }
 
-/** Starts the forward of a route to a database host. A direct route needs none and is not given here. */
+/** Opens a company's tunnel. What the provider says is shortened to a line: it can hold addresses. */
+async function startTunnel(
+    name: string,
+    target: HostPort,
+    deps: RouteDeps,
+    signal: AbortSignal | undefined,
+): Promise<Forward> {
+    // A function and not a check of the flag, because the flag changes while this waits.
+    const cancelled = (): boolean => signal?.aborted === true;
+    if (cancelled()) throw new RouteError("the call was cancelled while the tunnel was opening");
+    let tunnel: OpenedTunnel;
+    try {
+        tunnel = await deps.openTunnel(name, target, signal);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        // jig-core's words for a name nobody registered, kept short and in the words this tool has always used for it.
+        if (/^no tunnel provider named /.test(message)) {
+            throw new RouteError(
+                `no tunnel provider is registered: the route "${name}" needs a company plugin that provides it`,
+            );
+        }
+        throw new RouteError(`the tunnel "${name}" could not be opened: ${oneLine(message, 160)}`);
+    }
+    let stopped = false;
+    const stop = (): void => {
+        if (stopped) return;
+        stopped = true;
+        // A provider closes in its own way, perhaps slowly or with an error; neither may hold up a session that is ending.
+        void Promise.resolve()
+            .then(() => tunnel.close())
+            .catch(() => undefined);
+    };
+    if (cancelled()) {
+        // The provider did not stop for the signal: its tunnel is closed here, and not left open.
+        stop();
+        throw new RouteError("the call was cancelled while the tunnel was opening");
+    }
+    return { kind: tunnel.kind, port: tunnel.port, alive: () => !stopped, stop };
+}
+
+/** Starts the route of a connection to a database host. A direct route needs none and is not given here. */
 export async function startForward(
     route: Exclude<Route, { kind: "direct" }>,
     target: HostPort,
     deps: RouteDeps,
     signal?: AbortSignal,
 ): Promise<Forward> {
-    if (route.kind === "tunnel") {
-        throw new RouteError(
-            `no tunnel provider is registered: the route "${route.name}" needs a company plugin that provides it`,
-        );
-    }
+    if (route.kind === "tunnel") return startTunnel(route.name, target, deps, signal);
     return startSsh(route, target, deps, signal);
 }
 

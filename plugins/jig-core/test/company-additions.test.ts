@@ -100,6 +100,41 @@ describe("tunnels", () => {
         assert.equal(closed, 1);
     });
 
+    test("have a kind: a forward when the provider does not say, and a socks proxy when it does", async () => {
+        const tunnels = createTunnels();
+        tunnels.register("plain", { open: async () => ({ port: 41001, close: () => {} }) });
+        tunnels.register("forward", { open: async () => ({ kind: "forward", port: 41002, close: () => {} }) });
+        tunnels.register("proxy", { open: async () => ({ kind: "socks", port: 41003, close: () => {} }) });
+        const target = { host: "db.internal.example.com", port: 27017 };
+        assert.equal((await tunnels.open("plain", target)).kind, "forward");
+        assert.equal((await tunnels.open("forward", target)).kind, "forward");
+        const proxy = await tunnels.open("proxy", target);
+        assert.deepEqual([proxy.kind, proxy.port], ["socks", 41003]);
+    });
+
+    test("a kind that is neither forward nor socks is named, and so is one that is not text", async () => {
+        const tunnels = createTunnels();
+        for (const kind of ["tcp", "", 7, null, ["socks"]]) {
+            tunnels.register("odd", { open: async () => ({ kind, port: 41004, close: () => {} }) as never });
+            await assert.rejects(
+                tunnels.open("odd", { host: "h", port: 1 }),
+                /tunnel provider "odd" returned a tunnel whose kind is not forward or socks/,
+                JSON.stringify(kind),
+            );
+        }
+    });
+
+    test("a tunnel closes through its own close, whatever its kind", async () => {
+        const tunnels = createTunnels();
+        const closed: string[] = [];
+        tunnels.register("proxy", {
+            open: async () => ({ kind: "socks", port: 41005, close: async () => void closed.push("proxy") }),
+        });
+        const tunnel = await tunnels.open("proxy", { host: "h", port: 1 });
+        await tunnel.close();
+        assert.deepEqual(closed, ["proxy"]);
+    });
+
     test("an unknown name lists the registered ones; a bad target or a bad answer is named", async () => {
         const tunnels = createTunnels();
         await assert.rejects(

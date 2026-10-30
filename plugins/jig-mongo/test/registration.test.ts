@@ -32,7 +32,8 @@ describe("what the plugin registers", () => {
 
     test("names the keys where your route replaces a company's whole, so an ssh forward and a tunnel are never both named", () => {
         assert.deepEqual(h.jig.sectionReplace.get("mongo"), MONGO_REPLACE);
-        assert.deepEqual(MONGO_REPLACE, ["connections.*.via"]);
+        // The route of a connection of its own, and of each connection of an environment that has several.
+        assert.deepEqual(MONGO_REPLACE, ["connections.*.via", "connections.*.*.via"]);
 
         // A company gives the cluster and the way in through its tunnel; you give your credentials and, for once, a forward.
         const company = {
@@ -102,8 +103,9 @@ describe("the package", () => {
         assert.ok(fs.existsSync(path.join(plugin, "src", "index.ts")));
     });
 
-    test("the driver is a runtime dependency at an exact version", () => {
+    test("the driver is a runtime dependency at an exact version, and so is the package it needs to go through a SOCKS proxy", () => {
         assert.match(manifest.dependencies.mongodb ?? "", /^\d+\.\d+\.\d+$/);
+        assert.match(manifest.dependencies.socks ?? "", /^\d+\.\d+\.\d+$/);
     });
 
     test("the skill has the frontmatter Pi needs: a name that is its folder, and a description that says when to use it", () => {

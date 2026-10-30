@@ -2,10 +2,11 @@
 
 What the tests of `jig-mongo` do not cover. Back to the [jig-mongo overview](../README.md).
 
-The tests use three fakes:
+The tests use these fakes:
 - a fake of the driver seam (what the tool asks of the database, recorded);
 - a fake of the driver's client (what `driver.ts` asks of the driver);
-- a fake `ssh` on `PATH`.
+- a fake `ssh` on `PATH`;
+- a SOCKS5 server and servers that speak a little of the wire protocol, for the proxy route.
 
 No test connects to a MongoDB unless `JIG_TEST_MONGO_URI` is set (see `test/integration.test.ts`; give it a user and password in the
 address to run the tool itself as well). It was run once, on one machine, against a single MongoDB 8.0 node with authentication on
@@ -24,7 +25,9 @@ and no TLS, started for the purpose. Not tried:
   `servername` option.
 - **The SSH route against a real bastion:** the arguments and the key file were checked against a fake `ssh`. Real `ssh` versions differ in
   what they print on failure, so a failure that matches none of the patterns is reported as a general failure with its exit code.
-- **A company tunnel:** `jig-core` has no tunnel registry yet, so only the "no tunnel provider is registered" report exists.
+- **A company tunnel:** the forward and the SOCKS kinds were tried with a fake provider. For SOCKS the test uses a SOCKS5 server
+  written for it, the real driver and the `socks` package, and small servers that speak enough of the wire protocol to answer a
+  replica set's handshake. Not tried: a real jump host, a real SOCKS proxy, and a `mongodb+srv` address (its DNS lookup is local).
 - **The review screen:** the preview was checked as data against a fake of `jig-core`, and not seen in the terminal.
 - **How masking treats a result:** production results are masked by `jig-core`'s backstop. That the Extended JSON lines are masked field
   by field was not run against the real masker.

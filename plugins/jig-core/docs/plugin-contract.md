@@ -70,6 +70,20 @@ closed instead of running ungoverned.
   A company plugin gives a tool a network route of its own, such as a database
   behind a jump host or a cloud port forward. The tool connects to `127.0.0.1`
   on the port it gets, and closes the tunnel when done.
+  - **A tunnel says what its port is** with `kind`:
+
+    | `kind` | The port on `127.0.0.1` is | The tool connects |
+    |---|---|---|
+    | `forward` (the default) | A local port that reaches the one host and port asked for | To `127.0.0.1`, as if it were that host |
+    | `socks` | A SOCKS5 proxy that reaches any host the far side can | To its real hosts, through the proxy |
+
+  - **A provider that does not say** gives a `forward`, as every provider did
+    before kinds. `open` always returns the kind, and refuses any other word.
+  - **The target** is where the tool is going. A `forward` reaches exactly that.
+    A `socks` tunnel reaches whatever the tool asks it for, so the target only
+    tells the provider which route to open.
+  - **Why `socks`:** a tool that needs several hosts, such as the members of a
+    replica set, cannot use a forward, which reaches one.
 - **`config`** is what a company plugin adds at start-up, and what a plugin
   keeps for itself.
   - A company adds `addEnvironments`, `addRules`, `addClassifyRules`,

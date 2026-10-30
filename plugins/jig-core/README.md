@@ -102,7 +102,8 @@ the existing harness, it borrows that harness's sandbox.
 - environments, rules and classification rules for its own tools, and which of
   its targets count as production;
 - field names that hold personal data in its systems, for masking;
-- sign-in services and transports for its systems;
+- sign-in services and transports for its systems, and tunnels (a forward, or a SOCKS proxy) for its
+  databases;
 - defaults for other plugins' sections of `jig.json` (`config.addSectionDefaults`), which your own
   section is laid over;
 - secret commands (`config.addSecretCommands`) and protected paths

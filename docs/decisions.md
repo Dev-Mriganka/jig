@@ -55,6 +55,34 @@ generic: no company is named.
     `auth: { transport }`. A key is a path from the section's root, with `*` for
     any one name. Declared by `jig-ops` (CI `auth`, `deploy`), `jig-api`
     (`environments.*`) and `jig-mongo` (`via`).
+- **A tunnel says what it is, and `jig-mongo` uses both kinds.** A `Tunnel` has a
+  `kind`: `forward` (the default: a local port that reaches one host and port)
+  or `socks` (a local SOCKS5 proxy that reaches any host the far side can).
+  - **Why:** a `mongodb+srv` address or a replica set needs every member
+    reached, which a forward cannot do. With a SOCKS tunnel `jig-mongo` gives the
+    driver `proxyHost` and `proxyPort`, and keeps the real address.
+  - **`jig-mongo` now opens a company tunnel through `jig-core`.** Until now a
+    `via: { tunnel }` route always failed with "no tunnel provider is registered",
+    although `jig-core` had a registry. A forward is used as an SSH forward is.
+  - **A new dependency, `socks` 2.8.9, pinned exactly (MIT).** The driver needs it
+    to go through a proxy and does not install it. Its own dependencies are
+    `ip-address` and `smart-buffer`.
+  - **A `mongodb+srv` address is still looked up in this machine's DNS:** the
+    driver cannot send a lookup through a proxy.
+- **An environment may have several MongoDB connections.**
+  `connections.<environment>` is one connection, as before, or a map of named
+  ones (`orders` and `billing` in `staging`).
+  - **The tool takes `cluster`,** required where an environment is a map and
+    refused where it has one connection. The environment still decides the
+    rules, so classification is unchanged.
+  - **Access lists are per connection** for such an environment, and keep their
+    shape for one connection.
+  - **The user can be a secret reference,** like the password; plain text still
+    works. A value that starts with the name of a secret backend and a colon is
+    read as a reference.
+- **A connection failure is no longer described twice.** The line for a database
+  that could not be reached was turned into "the database driver failed" by a
+  second pass, so `jig-mongo` now says "cannot reach the staging/orders database".
 
 ## 2026-10-30: Jig never signs in; it reads a credential and keeps it from the agent
 

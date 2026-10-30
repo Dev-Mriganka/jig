@@ -4,7 +4,7 @@
 import { createAccess, readAllow, readDeny } from "./access.ts";
 import type { Access, AccessRules } from "./access.ts";
 import { jig } from "../../jig-core/src/client.ts";
-import { InputError, isObject, shown } from "./values.ts";
+import { InputError, isObject, shortList, shown } from "./values.ts";
 
 export interface SshRoute {
     kind: "ssh";
@@ -40,7 +40,10 @@ export interface ParsedUri {
 
 export interface Connection {
     environment: string;
+    /** The name that picks this connection, when its environment has several. */
+    cluster?: string;
     uri: ParsedUri;
+    /** Plain text, or a secret reference (see `isReference`). */
     user: string;
     /** A secret reference. */
     password: string;
@@ -50,15 +53,42 @@ export interface Connection {
 }
 
 export interface MongoSettings {
-    /** By jig-core environment name. A Map, so that a name such as `constructor` is only ever a name. */
+    /**
+     * Every connection, by `connectionKey`: the jig-core environment name, or `environment/cluster` for an environment that
+     * has several. A Map, so that a name such as `constructor` is only ever a name.
+     */
     connections: ReadonlyMap<string, Connection>;
-    /** What was configured, by environment. Defaults are applied when a call is made (see accessFor). */
+    /** The cluster names of each environment that has several connections, in the order they were written. */
+    clusters: ReadonlyMap<string, readonly string[]>;
+    /** What was configured, by `connectionKey`. Defaults are applied when a call is made (see accessFor). */
     access: ReadonlyMap<string, AccessRules>;
+}
+
+/** The key of a connection: its environment, or `environment/cluster` when the environment has several. Neither name can hold a slash. */
+export function connectionKey(environment: string, cluster?: string): string {
+    return cluster === undefined ? environment : `${environment}/${cluster}`;
+}
+
+/** The environments that have a connection, each once. */
+export function environmentsOf(settings: MongoSettings): string[] {
+    return [...new Set([...settings.connections.values()].map((connection) => connection.environment))];
+}
+
+/**
+ * Whether a user is a secret reference. One that starts with the name of a secret backend and a colon is read as one, so
+ * `pass:mongo/staging-user` is looked up, and `agent` is the user's name. (jig-core's list of backends.)
+ */
+const REFERENCE_SCHEMES = ["pass", "env", "keychain", "op", "cmd", "file"] as const;
+export function isReference(user: string): boolean {
+    return REFERENCE_SCHEMES.some((scheme) => user.startsWith(`${scheme}:`) && user.length > scheme.length + 1);
 }
 
 const SECTION_FIELDS: ReadonlySet<string> = new Set(["connections", "access"]);
 const CONNECTION_FIELDS: ReadonlySet<string> = new Set(["uri", "user", "password", "authSource", "tls", "via"]);
 const ACCESS_FIELDS: ReadonlySet<string> = new Set(["deny", "allow", "javascript"]);
+/** A cluster name is also a key beside a connection's own fields and an access list's, so it cannot be one of those. */
+export const CLUSTER_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/;
+const MAX_CLUSTERS = 10;
 const SSH_FIELDS: ReadonlySet<string> = new Set(["host", "user", "key", "port"]);
 
 const ENVIRONMENT_NAME = /^[A-Za-z][A-Za-z0-9_-]{0,39}$/;
@@ -191,18 +221,25 @@ function checkVia(raw: unknown, uri: ParsedUri | undefined, at: string, errors: 
     return route;
 }
 
-function checkConnection(environment: string, raw: unknown, errors: string[]): Connection | undefined {
-    const at = `mongo.connections.${environment}`;
+function checkConnection(
+    environment: string,
+    raw: unknown,
+    errors: string[],
+    cluster?: string,
+): Connection | undefined {
+    const at = `mongo.connections.${environment}${cluster === undefined ? "" : `.${cluster}`}`;
     if (!isObject(raw)) {
-        errors.push(`${at}: must be an object with uri, user and password`);
+        errors.push(
+            cluster === undefined
+                ? `${at}: must be an object with uri, user and password`
+                : `${at}: must be an object with uri, user and password (a connection of ${environment}), not a value`,
+        );
         return undefined;
     }
     const before = errors.length;
     for (const key of Object.keys(raw)) if (!CONNECTION_FIELDS.has(key)) errors.push(`${at}.${key}: unknown field`);
     const uri = checkUri(raw.uri, `${at}.uri`, errors);
-    const user = typeof raw.user === "string" && USER.test(raw.user) ? raw.user : undefined;
-    if (user === undefined)
-        errors.push(`${at}.user: required, the database user (plain text; a read-only user for production)`);
+    const user = checkUser(raw.user, `${at}.user`, errors);
     const password = checkReference(raw.password, `${at}.password`, errors);
     let authSource: string | undefined;
     if (raw.authSource !== undefined) {
@@ -225,6 +262,7 @@ function checkConnection(environment: string, raw: unknown, errors: string[]): C
         return undefined;
     return {
         environment,
+        ...(cluster === undefined ? {} : { cluster }),
         uri,
         user,
         password,
@@ -234,8 +272,29 @@ function checkConnection(environment: string, raw: unknown, errors: string[]): C
     };
 }
 
-function checkAccess(environment: string, raw: unknown, errors: string[]): AccessRules | undefined {
-    const at = `mongo.access.${environment}`;
+/** The database user: plain text, or a secret reference such as `pass:mongo/staging-user`, read when the connection opens. */
+function checkUser(value: unknown, key: string, errors: string[]): string | undefined {
+    if (typeof value === "string" && USER.test(value)) {
+        // A reference is not repeated if it is wrong; the shape of a backend is all that is checked here.
+        if (!isReference(value) || SECRET_REFERENCE.test(value)) return value;
+    }
+    errors.push(
+        `${key}: required, the database user (plain text, or a secret reference such as pass:mongo/staging-user)`,
+    );
+    return undefined;
+}
+
+/** Whether the value of an environment names connections of its own (`{ orders: {...}, billing: {...} }`) and not one connection. */
+function isNamedConnections(value: unknown): value is Record<string, unknown> {
+    return (
+        isObject(value) &&
+        Object.keys(value).length > 0 &&
+        !Object.keys(value).some((key) => CONNECTION_FIELDS.has(key))
+    );
+}
+
+function checkAccess(environment: string, raw: unknown, errors: string[], cluster?: string): AccessRules | undefined {
+    const at = `mongo.access.${environment}${cluster === undefined ? "" : `.${cluster}`}`;
     if (!isObject(raw)) {
         errors.push(`${at}: must be { "deny": [...] } or { "allow": { "db.collection": ["field"] } }`);
         return undefined;
@@ -281,13 +340,14 @@ export function readMongo(raw: unknown): { settings?: MongoSettings; errors: str
     for (const key of Object.keys(raw)) if (!SECTION_FIELDS.has(key)) errors.push(`mongo.${key}: unknown field`);
 
     const connections = new Map<string, Connection>();
+    const clusters = new Map<string, string[]>();
     if (
         !isObject(raw.connections) ||
         Object.keys(raw.connections).length === 0 ||
         Object.keys(raw.connections).length > MAX_CONNECTIONS
     ) {
         errors.push(
-            `mongo.connections: required, 1 to ${MAX_CONNECTIONS} connections by environment name, ` +
+            `mongo.connections: required, 1 to ${MAX_CONNECTIONS} environments, each with one connection or several by name, ` +
                 'such as { "staging": { "uri": "mongodb://db.staging.example.com:27017", ... } }',
         );
     } else {
@@ -301,6 +361,8 @@ export function readMongo(raw: unknown): { settings?: MongoSettings; errors: str
                 errors.push(
                     `mongo.connections.${name}: a database is a test or production environment; define one in jig.json "environments" and use its name`,
                 );
+            } else if (isNamedConnections(value)) {
+                readClusters(name, value, connections, clusters, errors);
             } else {
                 const connection = checkConnection(name, value, errors);
                 if (connection !== undefined) connections.set(name, connection);
@@ -314,8 +376,14 @@ export function readMongo(raw: unknown): { settings?: MongoSettings; errors: str
             errors.push("mongo.access: must be an object by environment name");
         } else {
             for (const [name, value] of Object.entries(raw.access)) {
-                if (isObject(raw.connections) && !Object.hasOwn(raw.connections, name)) {
-                    errors.push(`mongo.access.${name}: there is no connection with this name`);
+                if (!isObject(raw.connections) || !Object.hasOwn(raw.connections, name)) {
+                    if (isObject(raw.connections))
+                        errors.push(`mongo.access.${name}: there is no connection with this name`);
+                    continue;
+                }
+                const named = raw.connections[name];
+                if (isNamedConnections(named)) {
+                    readClusterAccess(name, value, Object.keys(named), access, errors);
                     continue;
                 }
                 const rules = checkAccess(name, value, errors);
@@ -324,14 +392,73 @@ export function readMongo(raw: unknown): { settings?: MongoSettings; errors: str
         }
     }
     if (errors.length > 0) return { errors };
-    return { errors, settings: { connections, access } };
+    return { errors, settings: { connections, clusters, access } };
+}
+
+/** The connections an environment names one by one. They are kept under `environment/cluster`, and the names in the order written. */
+function readClusters(
+    environment: string,
+    raw: Record<string, unknown>,
+    connections: Map<string, Connection>,
+    clusters: Map<string, string[]>,
+    errors: string[],
+): void {
+    const names = Object.keys(raw);
+    if (names.length > MAX_CLUSTERS) {
+        errors.push(`mongo.connections.${environment}: at most ${MAX_CLUSTERS} connections by name`);
+        return;
+    }
+    const found: string[] = [];
+    for (const cluster of names) {
+        if (!CLUSTER_NAME.test(cluster) || ACCESS_FIELDS.has(cluster)) {
+            errors.push(
+                `mongo.connections.${environment}: ${shown(cluster, 30)} is not a usable name for a connection ` +
+                    "(letters, digits, - and _, starting with a letter or digit; not deny, allow or javascript)",
+            );
+            continue;
+        }
+        const connection = checkConnection(environment, raw[cluster], errors, cluster);
+        if (connection === undefined) continue;
+        connections.set(connectionKey(environment, cluster), connection);
+        found.push(cluster);
+    }
+    clusters.set(environment, found);
+}
+
+/** The access rules of an environment that has several connections: one set per connection name, never one for all. */
+function readClusterAccess(
+    environment: string,
+    raw: unknown,
+    known: readonly string[],
+    access: Map<string, AccessRules>,
+    errors: string[],
+): void {
+    const at = `mongo.access.${environment}`;
+    if (!isObject(raw)) {
+        errors.push(
+            `${at}: must be an object by connection name, such as { "${known[0] ?? "orders"}": { "deny": [...] } }`,
+        );
+        return;
+    }
+    for (const [cluster, value] of Object.entries(raw)) {
+        if (ACCESS_FIELDS.has(cluster)) {
+            errors.push(
+                `${at}.${cluster}: ${environment} has several connections (${shortList(known)}), so give the rules for each by name`,
+            );
+        } else if (!known.includes(cluster)) {
+            errors.push(`${at}.${shown(cluster, 30)}: there is no connection with this name in ${environment}`);
+        } else {
+            const rules = checkAccess(environment, value, errors, cluster);
+            if (rules !== undefined) access.set(connectionKey(environment, cluster), rules);
+        }
+    }
 }
 
 /**
  * Where an object of yours replaces a company's whole, when a company plugin gives defaults for the section: the route
  * is an `ssh` forward or a company `tunnel`, never both, and merging two would name both.
  */
-export const MONGO_REPLACE: readonly string[] = ["connections.*.via"];
+export const MONGO_REPLACE: readonly string[] = ["connections.*.via", "connections.*.*.via"];
 
 /** The error messages for a raw section, for `registerSection`. An empty list means the section is valid. */
 export function validateMongo(raw: unknown): string[] {
@@ -348,14 +475,16 @@ export function settingsOf(raw: unknown): MongoSettings | undefined {
 }
 
 /**
- * The access rules for an environment, with the defaults of its kind: a test environment reads everything but what is denied, and
- * production reads nothing until it is listed. A production environment that somehow holds a deny list is refused here too.
+ * The access rules for an environment (and, when it has several connections, one of them), with the defaults of its kind: a test
+ * environment reads everything but what is denied, and production reads nothing until it is listed. A production environment that
+ * somehow holds a deny list is refused here too.
  */
-export function accessFor(settings: MongoSettings, environment: string): Access {
-    const configured = settings.access.get(environment);
+export function accessFor(settings: MongoSettings, environment: string, cluster?: string): Access {
+    const configured = settings.access.get(connectionKey(environment, cluster));
+    const where = cluster === undefined ? environment : `${environment}/${cluster}`;
     if (isProduction(environment)) {
         if (configured !== undefined && configured.mode !== "allow") {
-            throw new InputError(`${environment} is production: it needs an allow list, not a deny list`);
+            throw new InputError(`${where} is production: it needs an allow list, not a deny list`);
         }
         return createAccess({
             ...(configured ?? { mode: "allow", allow: new Map() }),

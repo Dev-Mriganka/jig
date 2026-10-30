@@ -6,7 +6,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { Access, Ns } from "./access.ts";
 import type { Backend, Req } from "./backend.ts";
-import { MAX_LIMIT, WRITE_CAP } from "./params.ts";
+import { MAX_LIMIT, WRITE_CAP, placeOf } from "./params.ts";
 import type { Call } from "./params.ts";
 import type { CheckedPipeline } from "./pipeline.ts";
 import { labelOf, nsOf } from "./reads.ts";
@@ -71,7 +71,12 @@ function previewOf(call: Call, summary: string, sections: readonly string[], fin
     const where = [call.database, call.collection].filter((part) => part !== undefined).join(".");
     return {
         summary,
-        body: [`Environment: ${call.environment}`, `Collection: ${where}`, ...sections].join("\n\n"),
+        body: [
+            `Environment: ${call.environment}`,
+            ...(call.cluster === undefined ? [] : [`Connection: ${call.cluster}`]),
+            `Collection: ${where}`,
+            ...sections,
+        ].join("\n\n"),
         format: "text",
         fingerprint,
     };
@@ -129,7 +134,7 @@ function planInsert(call: Call, access: Access): WriteRun {
         async prepare(backend) {
             const fingerprint = fingerprintOf({
                 action: "insert",
-                environment: call.environment,
+                environment: placeOf(call),
                 ns,
                 documents: given,
             });
@@ -141,7 +146,7 @@ function planInsert(call: Call, access: Access): WriteRun {
                 counted: plural(given.length, "document"),
                 preview: previewOf(
                     call,
-                    `insert ${plural(given.length, "document")} into ${call.database}.${call.collection} in ${call.environment}`,
+                    `insert ${plural(given.length, "document")} into ${call.database}.${call.collection} in ${placeOf(call)}`,
                     [block("Documents", shown), ...more],
                     fingerprint,
                 ),
@@ -185,7 +190,7 @@ function planFiltered(call: Call, access: Access, kind: "update" | "replace" | "
             requireInRange(label, count, many, cap);
             const fingerprint = fingerprintOf({
                 action: kind,
-                environment: call.environment,
+                environment: placeOf(call),
                 ns,
                 which: scope,
                 filter,
@@ -210,7 +215,7 @@ function planFiltered(call: Call, access: Access, kind: "update" | "replace" | "
                 counted: `${documents(count, cap)} match`,
                 preview: previewOf(
                     call,
-                    `${kind} ${scope} in ${call.database}.${call.collection} (${call.environment}): ${documents(count, cap)} match`,
+                    `${kind} ${scope} in ${call.database}.${call.collection} (${placeOf(call)}): ${documents(count, cap)} match`,
                     sections,
                     fingerprint,
                 ),
@@ -267,7 +272,7 @@ function planBulk(call: Call, access: Access): WriteRun {
             }
             const fingerprint = fingerprintOf({
                 action: "bulk",
-                environment: call.environment,
+                environment: placeOf(call),
                 ns,
                 operations: call.operations,
                 counts,
@@ -286,7 +291,7 @@ function planBulk(call: Call, access: Access): WriteRun {
                 counted: `${counts.join(", ")} documents match`,
                 preview: previewOf(
                     call,
-                    `bulk write of ${plural(items.length, "operation")} in ${call.database}.${call.collection} (${call.environment}): up to ${plural(touched, "document")}`,
+                    `bulk write of ${plural(items.length, "operation")} in ${call.database}.${call.collection} (${placeOf(call)}): up to ${plural(touched, "document")}`,
                     [block("Operations", call.operations), `Matches now, per operation:\n${lines.join("\n")}`],
                     fingerprint,
                 ),
@@ -334,7 +339,7 @@ function planCreateIndex(call: Call, access: Access): WriteRun {
             const existing = (await backend.indexes(ns, req)).map((index) => String(index.name));
             const fingerprint = fingerprintOf({
                 action: "create-index",
-                environment: call.environment,
+                environment: placeOf(call),
                 ns,
                 keys,
                 options,
@@ -345,7 +350,7 @@ function planCreateIndex(call: Call, access: Access): WriteRun {
                 counted: `${plural(existing.length, "index", "indexes")} exist`,
                 preview: previewOf(
                     call,
-                    `create an index on ${call.database}.${call.collection} (${call.environment})`,
+                    `create an index on ${call.database}.${call.collection} (${placeOf(call)})`,
                     [
                         block("Keys", keys),
                         ...(Object.keys(options).length === 0 ? [] : [block("Options", options)]),
@@ -382,7 +387,7 @@ function planDropIndex(call: Call, access: Access): WriteRun {
                 throw new InputError(`${label}: there is no index named ${name} (indexes lists them)`);
             const fingerprint = fingerprintOf({
                 action: "drop-index",
-                environment: call.environment,
+                environment: placeOf(call),
                 ns,
                 name,
                 key: found.key,
@@ -392,7 +397,7 @@ function planDropIndex(call: Call, access: Access): WriteRun {
                 counted: `the index ${name} exists`,
                 preview: previewOf(
                     call,
-                    `drop the index ${name} of ${call.database}.${call.collection} (${call.environment})`,
+                    `drop the index ${name} of ${call.database}.${call.collection} (${placeOf(call)})`,
                     [block("Index", { name, key: found.key })],
                     fingerprint,
                 ),
@@ -432,7 +437,7 @@ export function planAggregateWrite(call: Call, ns: Ns, checked: CheckedPipeline,
             const targetCount = await backend.count({ ...output.target, filter: {}, limit: cap + 1 }, req);
             const fingerprint = fingerprintOf({
                 action: "aggregate",
-                environment: call.environment,
+                environment: placeOf(call),
                 ns,
                 pipeline: call.pipeline,
                 count,
@@ -447,7 +452,7 @@ export function planAggregateWrite(call: Call, ns: Ns, checked: CheckedPipeline,
                 counted: `${plural(count, "document")} reach ${output.stage}`,
                 preview: previewOf(
                     call,
-                    `${output.stage} into ${target} (${call.environment}): ${plural(count, "document")}`,
+                    `${output.stage} into ${target} (${placeOf(call)}): ${plural(count, "document")}`,
                     [
                         block("Pipeline", call.pipeline),
                         `${plural(count, "document")} reach the ${output.stage} stage (counted just before this preview).\n${replaces}`,

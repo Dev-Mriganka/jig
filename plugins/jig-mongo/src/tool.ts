@@ -4,14 +4,14 @@
 // InputError: jig-core blocks the call without asking.
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { jig } from "../../jig-core/src/client.ts";
-import type { CallClass, Preview } from "../../jig-core/src/contract.ts";
+import type { CallClass, Facts, Preview } from "../../jig-core/src/contract.ts";
 import type { Access } from "./access.ts";
 import type { Backend, Connect, Req } from "./backend.ts";
-import { accessFor, settingsOf } from "./config.ts";
+import { accessFor, CLUSTER_NAME, connectionKey, environmentsOf, settingsOf } from "./config.ts";
 import type { Connection, MongoSettings } from "./config.ts";
 import { connectDriver } from "./driver.ts";
 import { ChangedError, deliveryOf, describeFailure, dropsConnection } from "./errors.ts";
-import { ACTIONS, parameters, parseCall } from "./params.ts";
+import { ACTIONS, parameters, parseCall, placeOf } from "./params.ts";
 import type { Call } from "./params.ts";
 import { planCall } from "./plan.ts";
 import type { Planned } from "./plan.ts";
@@ -75,15 +75,39 @@ interface Checked {
     planned: Planned;
 }
 
+/** The connection a call names: the environment's only one, or the one that `cluster` picks where there are several. */
+function connectionOf(settings: MongoSettings, call: Call): Connection {
+    const clusters = settings.clusters.get(call.environment);
+    if (clusters === undefined) {
+        const connection = settings.connections.get(call.environment);
+        if (connection === undefined) {
+            throw new InputError(
+                `unknown environment ${shown(call.environment, 30)}; configured: ${shortList(environmentsOf(settings))}`,
+            );
+        }
+        if (call.cluster !== undefined) {
+            throw new InputError(`${call.environment} has one connection, so cluster is not used there: leave it out`);
+        }
+        return connection;
+    }
+    if (call.cluster === undefined) {
+        throw new InputError(`${call.environment} has several connections: add cluster, one of ${shortList(clusters)}`);
+    }
+    const connection = CLUSTER_NAME.test(call.cluster)
+        ? settings.connections.get(connectionKey(call.environment, call.cluster))
+        : undefined;
+    if (connection === undefined) {
+        throw new InputError(
+            `${call.environment} has no connection named ${shown(call.cluster, 30)}; cluster is one of ${shortList(clusters)}`,
+        );
+    }
+    return connection;
+}
+
 function check(input: Readonly<Record<string, unknown>>): Checked {
     const call = parseCall(input);
     const settings = requiredSettings();
-    const connection = settings.connections.get(call.environment);
-    if (connection === undefined) {
-        throw new InputError(
-            `unknown environment ${shown(call.environment, 30)}; configured: ${shortList([...settings.connections.keys()])}`,
-        );
-    }
+    const connection = connectionOf(settings, call);
     const kind = jig().environments.kindOf(call.environment);
     if (kind !== "test" && kind !== "production") {
         throw new InputError(
@@ -98,7 +122,7 @@ function check(input: Readonly<Record<string, unknown>>): Checked {
             `${call.environment} is production, which is read-only: ${call.action} is not allowed there`,
         );
     }
-    const access = accessFor(settings, call.environment);
+    const access = accessFor(settings, call.environment, call.cluster);
     const planned = planCall(call, access);
     return { call, connection, access, production, planned };
 }
@@ -133,6 +157,10 @@ function raceAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
     });
 }
 
+/** The facts of a call, with the connection's name when the environment has several. */
+const withCluster = (c: Checked, facts: Facts): Facts =>
+    c.call.cluster === undefined ? facts : { ...facts, cluster: c.call.cluster };
+
 export function createTool(options: MongoOptions = {}): MongoTool {
     const connect = options.connect ?? connectDriver;
     const session = new Session({ ...systemSessionDeps(connect), ...options.session });
@@ -141,7 +169,7 @@ export function createTool(options: MongoOptions = {}): MongoTool {
     const counted = new Map<string, string>();
 
     const contextOf = (c: Checked, signal: AbortSignal) => ({
-        environment: c.call.environment,
+        environment: placeOf(c.call),
         production: c.production,
         maxTimeMS: c.call.maxTimeMS,
         aborted: signal.aborted,
@@ -281,7 +309,12 @@ export function createTool(options: MongoOptions = {}): MongoTool {
                 const until = signal === undefined ? deadline : AbortSignal.any([signal, deadline]);
                 const text = (value: string, details: Record<string, unknown>) => ({
                     content: [{ type: "text" as const, text: value }],
-                    details: { action: c.call.action, environment: c.call.environment, ...details },
+                    details: {
+                        action: c.call.action,
+                        environment: c.call.environment,
+                        ...(c.call.cluster === undefined ? {} : { cluster: c.call.cluster }),
+                        ...details,
+                    },
                 });
 
                 if (c.planned.effect === "read") {
@@ -293,11 +326,11 @@ export function createTool(options: MongoOptions = {}): MongoTool {
                             ? error
                             : new Error(`${run.label}: ${describeFailure(error, contextOf(c, until)).message}`);
                     });
-                    jig().addFacts(toolCallId, rendered.facts);
+                    jig().addFacts(toolCallId, withCluster(c, rendered.facts));
                     return text(rendered.text, rendered.details);
                 }
                 const outcome = await runWrite(toolCallId, c, c.planned.run, until);
-                jig().addFacts(toolCallId, outcome.facts);
+                jig().addFacts(toolCallId, withCluster(c, outcome.facts));
                 return text(outcome.text, outcome.details);
             },
         },

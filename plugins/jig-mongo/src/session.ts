@@ -1,11 +1,13 @@
-// Connections kept for the session: for each environment one forward (when its route needs one) and one client, reused by the
-// calls that follow, closed after five idle minutes and when the session ends. A failed start is not kept, and a connection that
-// failed in use is dropped so the next call starts clean.
+// Connections kept for the session: for each connection (one per environment, or one per name where an environment has several)
+// one route (when it needs one) and one client, reused by the calls that follow, closed after five idle minutes and when the
+// session ends. A failed start is not kept, and a connection that failed in use is dropped so the next call starts clean.
 import { tmpdir } from "node:os";
 import { jig } from "../../jig-core/src/client.ts";
 import type { Backend, Connect } from "./backend.ts";
+import { connectionKey, isReference } from "./config.ts";
 import type { Connection, HostPort } from "./config.ts";
 import { RouteError } from "./errors.ts";
+import { placeOf } from "./params.ts";
 import { DEFAULT_ROUTE_TIMINGS, freePort, probe, startForward } from "./route.ts";
 import type { Forward, RouteDeps } from "./route.ts";
 
@@ -27,6 +29,7 @@ const SHUTDOWN_GRACE_MS = 3000;
 export function systemRouteDeps(): RouteDeps {
     return {
         run: (file, args, options) => jig().exec.run(file, args, options),
+        openTunnel: (name, target, signal) => jig().tunnels.open(name, target, signal),
         resolveSecret: (reference, signal) => jig().secrets.resolve(reference, signal),
         freePort,
         probe,
@@ -50,12 +53,13 @@ export function systemSessionDeps(connect: Connect): SessionDeps {
 
 export interface Lease {
     backend: Backend;
-    /** `failed` drops the environment's connection, so the next call starts clean. */
+    /** `failed` drops the connection, so the next call starts clean. */
     release(failed?: boolean): void;
 }
 
 interface Entry {
-    environment: string;
+    /** The connection's `connectionKey`. */
+    key: string;
     forward?: Forward;
     backend?: Backend;
     ready: Promise<void>;
@@ -89,6 +93,11 @@ function raceAbort<T>(promise: Promise<T>, signal: AbortSignal | undefined): Pro
     });
 }
 
+/** Whether the uri names one host and port, which is all a forward reaches. */
+function singleHost(connection: Connection): boolean {
+    return connection.uri.scheme === "mongodb" && connection.uri.hosts.length === 1;
+}
+
 /** The address a forward listens on, in place of the database's own. */
 function localUri(connection: Connection, port: number): string {
     const options = connection.uri.options === "" ? "" : `?${connection.uri.options}`;
@@ -104,7 +113,7 @@ export class Session {
     }
 
     async acquire(connection: Connection, production: boolean, signal?: AbortSignal): Promise<Lease> {
-        let entry = this.entries.get(connection.environment);
+        let entry = this.entries.get(connectionKey(connection.environment, connection.cluster));
         if (entry?.forward !== undefined && !entry.forward.alive()) {
             await this.close(entry);
             entry = undefined;
@@ -136,12 +145,12 @@ export class Session {
 
     private create(connection: Connection, production: boolean, signal: AbortSignal | undefined): Entry {
         const entry: Entry = {
-            environment: connection.environment,
+            key: connectionKey(connection.environment, connection.cluster),
             active: 0,
             closed: false,
             ready: Promise.resolve(),
         };
-        this.entries.set(entry.environment, entry);
+        this.entries.set(entry.key, entry);
         entry.ready = (async () => {
             const target = connection.uri.hosts[0] as HostPort;
             if (connection.via.kind !== "direct") {
@@ -152,17 +161,33 @@ export class Session {
                 }
             }
             try {
-                const password = await this.deps.route.resolveSecret(connection.password, signal);
                 const forwarded = entry.forward;
+                // A forward reaches one host and port. A replica set or a `mongodb+srv` address needs every member reached, which
+                // only a proxy does, so a forward that cannot is said so here and not left to fail as a timeout.
+                if (forwarded?.kind === "forward" && connection.via.kind === "tunnel" && !singleHost(connection)) {
+                    throw new RouteError(
+                        `the tunnel "${connection.via.name}" reaches one host and port, and the uri of ${placeOf(connection)} ` +
+                            "names a replica set or mongodb+srv: give one mongodb://host:27017 address, or a tunnel that is a SOCKS proxy",
+                    );
+                }
+                // The user may be a reference too. Both are read once the route is up, and neither is kept.
+                const user = isReference(connection.user)
+                    ? await this.deps.route.resolveSecret(connection.user, signal)
+                    : connection.user;
+                const password = await this.deps.route.resolveSecret(connection.password, signal);
+                const local = forwarded?.kind === "forward";
                 entry.backend = await this.deps.connect({
                     environment: connection.environment,
-                    uri: forwarded === undefined ? connection.uri.text : localUri(connection, forwarded.port),
-                    user: connection.user,
+                    ...(connection.cluster === undefined ? {} : { cluster: connection.cluster }),
+                    // Behind a forward the address is local. Behind a proxy it is the real one: the driver reaches each host.
+                    uri: local ? localUri(connection, forwarded.port) : connection.uri.text,
+                    user,
                     password,
                     production,
                     ...(connection.authSource === undefined ? {} : { authSource: connection.authSource }),
                     ...(connection.tls === undefined ? {} : { tls: connection.tls }),
-                    ...(forwarded === undefined ? {} : { serverName: target.host, directConnection: true }),
+                    ...(local ? { serverName: target.host, directConnection: true } : {}),
+                    ...(forwarded?.kind === "socks" ? { proxyHost: "127.0.0.1", proxyPort: forwarded.port } : {}),
                 });
                 if (entry.closed) {
                     await entry.backend.close().catch(() => undefined);
@@ -176,7 +201,7 @@ export class Session {
         // A failed start must not stay cached; the callers waiting on it still see the rejection.
         entry.ready.catch(() => {
             entry.closed = true;
-            if (this.entries.get(entry.environment) === entry) this.entries.delete(entry.environment);
+            if (this.entries.get(entry.key) === entry) this.entries.delete(entry.key);
         });
         return entry;
     }
@@ -191,7 +216,7 @@ export class Session {
     private async close(entry: Entry): Promise<void> {
         entry.closed = true;
         entry.timer?.cancel();
-        if (this.entries.get(entry.environment) === entry) this.entries.delete(entry.environment);
+        if (this.entries.get(entry.key) === entry) this.entries.delete(entry.key);
         const { backend, forward } = entry;
         entry.backend = undefined;
         entry.forward = undefined;

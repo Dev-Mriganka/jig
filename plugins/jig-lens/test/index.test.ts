@@ -79,6 +79,7 @@ test("it needs nothing that is not in Node or Pi: no package of its own", () => 
         "hono",
         "ignore",
         "mongodb",
+        "socks",
         "yaml",
     ]);
     for (const name of readdirSync(SRC)) {

@@ -91,29 +91,33 @@ export interface FailureContext {
     aborted: boolean;
 }
 
+/** An error that already says, in one line, what to tell the model: describing it again must not change it. */
+const told = (message: string): Error => Object.assign(new Error(message), { told: true });
+
 /** The end of a call that did not finish: one line the model can act on. Production gets no server text, which can echo values. */
 export function describeFailure(error: unknown, context: FailureContext): Error {
     if (error instanceof InputError || error instanceof RouteError) return error;
+    if ((error as { told?: unknown } | undefined)?.told === true) return error as Error;
     const e = (error ?? {}) as DriverError;
-    if (context.aborted || isAbort(error)) return new Error("the call hit its time limit or was cancelled");
+    if (context.aborted || isAbort(error)) return told("the call hit its time limit or was cancelled");
     const name = String(e.name ?? "");
     if (name === "MongoServerSelectionError") {
-        return new Error(
+        return told(
             `cannot reach the ${context.environment} database: check the network, the VPN and the route, then try again`,
         );
     }
-    if (NETWORK.has(name)) return new Error("the connection to the database dropped");
+    if (NETWORK.has(name)) return told("the connection to the database dropped");
     if (name === "MongoServerError") {
         if (e.code === AUTH_FAILED)
-            return new Error(
+            return told(
                 `the database refused the sign-in for ${context.environment}: check the user and the password reference`,
             );
         if (e.code === UNAUTHORIZED)
-            return new Error(
+            return told(
                 `the database user cannot do this in ${context.environment} (Unauthorized): it needs another role`,
             );
         if (e.code === MAX_TIME_EXPIRED) {
-            return new Error(
+            return told(
                 `the query ran longer than maxTimeMS ${context.maxTimeMS}: narrow the filter to an indexed field, or raise maxTimeMS`,
             );
         }
@@ -123,11 +127,11 @@ export function describeFailure(error: unknown, context: FailureContext): Error 
             : `: ${String(e.message ?? "")
                   .replace(/\s+/g, " ")
                   .slice(0, 160)}`;
-        return new Error(
+        return told(
             `the database rejected the request (${what}${e.code === DUPLICATE_KEY ? ", a duplicate key" : ""})${detail}`,
         );
     }
-    return new Error(
+    return told(
         `the database driver failed (${name === "" || name === "Error" ? "unknown error" : name}); try again or narrow the request`,
     );
 }

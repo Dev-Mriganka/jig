@@ -247,3 +247,176 @@ describe("the tool", () => {
         }
     });
 });
+
+describe("an environment with several connections", () => {
+    const section = () => ({
+        connections: {
+            staging: {
+                orders: {
+                    uri: "mongodb://orders.staging.example.com:27017",
+                    user: "agent",
+                    password: STAGING_PASSWORD.reference,
+                },
+                billing: {
+                    uri: "mongodb://billing.staging.example.com:27017",
+                    user: "agent",
+                    password: STAGING_PASSWORD.reference,
+                },
+            },
+            production: {
+                uri: "mongodb://db.example.com:27017",
+                user: "agent-readonly",
+                password: PRODUCTION_PASSWORD.reference,
+            },
+        },
+        access: {
+            staging: { orders: { deny: ["*.notes"] }, billing: { deny: ["cards.*"] } },
+            production: { allow: { "orders.orders": ["_id", "status"] } },
+        },
+    });
+    beforeEach(() => h.configure(section()));
+
+    test("needs `cluster`, and a call without it is refused before anyone is asked, naming the choices", async () => {
+        const result = await h.call(find("staging"));
+        assert.equal(result.blocked, "staging has several connections: add cluster, one of orders, billing");
+        assert.equal(h.connects.length, 0);
+        assert.throws(
+            () => h.declaration.classify({ action: "count", environment: "staging", ...target }),
+            /staging has several connections: add cluster/,
+        );
+    });
+
+    test("`cluster` picks the connection: each has its own address, and they are kept separately", async () => {
+        ok(await h.call(find("staging", { cluster: "orders" })));
+        ok(await h.call(find("staging", { cluster: "billing" })));
+        ok(await h.call(find("staging", { cluster: "orders" })));
+        assert.deepEqual(
+            h.connects.map((connect) => [connect.environment, connect.cluster, connect.uri]),
+            [
+                ["staging", "orders", "mongodb://orders.staging.example.com:27017"],
+                ["staging", "billing", "mongodb://billing.staging.example.com:27017"],
+            ],
+            "one connection each, and the first is reused",
+        );
+    });
+
+    test("a name that is not one of them is refused with the names there are", async () => {
+        const result = await h.call(find("staging", { cluster: "invoices" }));
+        assert.equal(result.blocked, 'staging has no connection named "invoices"; cluster is one of orders, billing');
+        const odd = await h.call(find("staging", { cluster: "../x" }));
+        assert.match(odd.blocked ?? "", /staging has no connection named "\.\.\/x"/);
+        const notText = await h.call(find("staging", { cluster: 7 }));
+        assert.match(notText.blocked ?? "", /cluster must be text/);
+    });
+
+    test("an environment with one connection refuses it, and says to leave it out", async () => {
+        const result = await h.call(find("production", { cluster: "orders" }));
+        assert.equal(result.blocked, "production has one connection, so cluster is not used there: leave it out");
+        assert.equal(
+            ok(await h.call(find("production", { projection: { status: 1 } }))).startsWith("mongo find production"),
+            true,
+        );
+    });
+
+    test("an unknown environment is named before its clusters are", async () => {
+        const result = await h.call(find("nowhere", { cluster: "orders" }));
+        assert.match(result.blocked ?? "", /unknown environment "nowhere"; configured: staging, production/);
+    });
+
+    test("is classified by its environment: the connection's name changes neither the kind nor the effect", async () => {
+        const read = await h.call(find("staging", { cluster: "billing" }));
+        assert.deepEqual(read.cls, { action: "find", environment: "staging", effect: "read" });
+        const write = await h.call({
+            action: "insert",
+            environment: "staging",
+            cluster: "billing",
+            ...target,
+            documents: [{ n: 1 }],
+        });
+        assert.deepEqual(write.cls, { action: "insert", environment: "staging", effect: "write" });
+        // Production is read-only whatever the connection.
+        const refused = await h.call({ action: "insert", environment: "production", ...target, documents: [{ n: 1 }] });
+        assert.match(refused.blocked ?? "", /production, which is read-only/);
+    });
+
+    test("the access rules of each connection apply to it alone", async () => {
+        const billing = await h.call({
+            action: "count",
+            environment: "staging",
+            cluster: "billing",
+            database: "cards",
+            collection: "visa",
+        });
+        assert.match(billing.blocked ?? "", /cards\.visa is denied by the access list/);
+        const orders = await h.call({
+            action: "count",
+            environment: "staging",
+            cluster: "orders",
+            database: "cards",
+            collection: "visa",
+        });
+        ok(orders);
+        h.backend.answers.find = [{ _id: 1, notes: "private", status: "open" }];
+        assert.equal(
+            ok(await h.call(find("staging", { cluster: "orders" }))),
+            'mongo find staging/orders orders.orders: 1 document\n{"_id":1,"status":"open"}',
+            "orders hides notes",
+        );
+        h.backend.answers.find = [{ _id: 1, notes: "kept", status: "open" }];
+        assert.match(ok(await h.call(find("staging", { cluster: "billing" }))), /"notes":"kept"/);
+    });
+
+    test("a result names the connection, and its details and facts carry it", async () => {
+        h.backend.answers.find = [];
+        const result = await h.call(find("staging", { cluster: "billing" }));
+        assert.match(ok(result), /^mongo find staging\/billing orders\.orders: /);
+        assert.deepEqual(result.details, {
+            action: "find",
+            environment: "staging",
+            cluster: "billing",
+            count: 0,
+            partial: false,
+        });
+        assert.deepEqual(factsOf(result.id), { returned: 0, cluster: "billing" });
+    });
+
+    test("a write is previewed with its connection, and the fingerprint tells one connection from another", async () => {
+        h.backend.answers.count = 3;
+        const insert = (cluster: string) => ({
+            action: "update",
+            environment: "staging",
+            cluster,
+            database: "orders",
+            collection: "orders",
+            filter: { status: "stuck" },
+            update: { $set: { status: "shipped" } },
+            which: "many",
+        });
+        const orders = await h.call(insert("orders"));
+        ok(orders);
+        assert.equal(orders.preview?.summary, "update many in orders.orders (staging/orders): 3 documents match");
+        assert.match(
+            orders.preview?.body ?? "",
+            /Environment: staging\n\nConnection: orders\n\nCollection: orders\.orders/,
+        );
+        const billing = await h.call(insert("billing"));
+        ok(billing);
+        assert.notEqual(orders.preview?.fingerprint, billing.preview?.fingerprint);
+    });
+
+    test("a failure names the connection, so the model can tell which one is down", async () => {
+        const harness = setupHarness({
+            connect: async () => {
+                throw driverError("MongoServerSelectionError", "connect ECONNREFUSED 10.0.0.5:27017");
+            },
+        });
+        harness.configure(section());
+        try {
+            const result = await harness.call(find("staging", { cluster: "billing" }));
+            assert.match(result.error?.message ?? "", /cannot reach the staging\/billing database/);
+            assert.ok(!(result.error?.message ?? "").includes("10.0.0.5"));
+        } finally {
+            await harness.close();
+        }
+    });
+});

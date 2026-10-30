@@ -218,14 +218,34 @@ export interface TransportResponse {
     body: string;
 }
 
+/** What a tunnel's port is: `forward` reaches one host and port, `socks` reaches any host the far side can. */
+export type TunnelKind = "forward" | "socks";
+
 /** A local port that reaches a host the machine cannot reach directly, such as a database behind a bastion. */
 export interface Tunnel {
+    /**
+     * What the port is. `forward` (the default, for a provider that does not say): the port on 127.0.0.1 reaches the one
+     * host and port that was asked for, and the tool connects to it as to that host (an SSH local forward, a cloud port
+     * forward). `socks`: the port on 127.0.0.1 is a SOCKS5 proxy that reaches any host the far side can, and the tool
+     * connects to its real hosts through it (a SOCKS proxy on a jump host, `ssh -D`). A tool that needs several hosts, such
+     * as the members of a replica set, needs `socks`.
+     */
+    kind?: TunnelKind;
     /** The port on 127.0.0.1 to connect to. */
     port: number;
     close(): void | Promise<void>;
 }
 
-/** Opens tunnels for a company, such as an SSH forward through its jump host or a cloud port forward. */
+/** A tunnel as `tunnels.open` returns it: its kind is always set. */
+export interface OpenedTunnel extends Tunnel {
+    kind: TunnelKind;
+}
+
+/**
+ * Opens tunnels for a company, such as an SSH forward through its jump host or a cloud port forward. `target` is where
+ * the tool is going. A `forward` tunnel reaches exactly that; a `socks` tunnel reaches whatever the tool asks it for, and
+ * the target only tells the provider which route to open (which jump host, which region).
+ */
 export interface TunnelProvider {
     open(target: { host: string; port: number }, signal?: AbortSignal): Promise<Tunnel>;
 }
@@ -369,8 +389,9 @@ export interface JigApi {
     readonly tunnels: {
         /** Registering the same name again replaces the provider. */
         register(name: string, provider: TunnelProvider): void;
-        /** Opens a tunnel through a registered provider. Throws when no provider has this name. */
-        open(name: string, target: { host: string; port: number }, signal?: AbortSignal): Promise<Tunnel>;
+        /** Opens a tunnel through a registered provider. Throws when no provider has this name, or when the tunnel it
+         *  gives is not valid. A tunnel whose provider did not say its kind is a `forward`. */
+        open(name: string, target: { host: string; port: number }, signal?: AbortSignal): Promise<OpenedTunnel>;
     };
 
     /** Transports a company plugin provides for its systems. A tool configured with a transport's name sends its HTTP
