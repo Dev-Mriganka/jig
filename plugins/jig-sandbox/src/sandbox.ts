@@ -116,6 +116,11 @@ export class Sandbox {
 
     // ---- state ----------------------------------------------------------------------------------------------------------
 
+    /** Secret files the agent made in this session: they are its own, so the rules do not hide them. */
+    get createdByAgent(): Set<string> {
+        return this.deps.createdByAgent;
+    }
+
     get active(): boolean {
         return this.state.kind === "ready" || this.state.kind === "starting";
     }

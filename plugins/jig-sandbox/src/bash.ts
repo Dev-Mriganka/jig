@@ -71,7 +71,8 @@ export function sandboxedOperations(deps: BashDeps, ctx: ExtensionContext, shell
                 tail.add(chunk);
                 onData(chunk);
             };
-            let result: { exitCode: number | null };
+            let result: { exitCode: number | null } | undefined;
+            let failure: unknown;
             let violations: ReadonlyArray<{ line: string }> = [];
             try {
                 result = await shell.exec(prepared.wrapped, cwd, {
@@ -80,11 +81,13 @@ export function sandboxedOperations(deps: BashDeps, ctx: ExtensionContext, shell
                     ...(timeout === undefined ? {} : { timeout }),
                     env: prepared.env,
                 });
-            } finally {
-                emit(cleaner.end());
-                // Always, also for a command that was aborted or timed out: the broker keeps state until it is told.
-                violations = (await prepared.finish()).violations;
+            } catch (error) {
+                // An aborted or timed-out command may have planted something before it was stopped, so it is audited as well.
+                failure = error;
             }
+            emit(cleaner.end());
+            // Always: the broker keeps state until it is told, and the audit looks at what the command left.
+            violations = (await prepared.finish()).violations;
             const lines = await deps.aftermath.after({
                 prepared,
                 output: tail.value(),
@@ -98,7 +101,8 @@ export function sandboxedOperations(deps: BashDeps, ctx: ExtensionContext, shell
                 const lead = tail.value() === "" || tail.value().endsWith("\n") ? "" : "\n";
                 onData(Buffer.from(`${lead}${lines.join("\n")}\n`));
             }
-            return result;
+            if (failure !== undefined) throw failure;
+            return result as { exitCode: number | null };
         },
     };
 }

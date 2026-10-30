@@ -13,6 +13,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir, userInfo } from "node:os";
 import path from "node:path";
 import { createLocalBashOperations } from "@earendil-works/pi-coding-agent";
+import { createAftermath } from "../../src/aftermath.ts";
 import { startBroker } from "../../src/broker-client.ts";
 import { DEFAULT_SETTINGS } from "../../src/config.ts";
 import type { SandboxSettings } from "../../src/config.ts";
@@ -71,10 +72,20 @@ export interface World {
     env: Record<string, string>;
     /** Runs a command in the sandbox, in the project (or `cwd`), and returns what it printed. */
     run(command: string, options?: { cwd?: string; timeout?: number }): Promise<RunResult>;
+    /**
+     * Runs a command the way the bash tool does: with the audit before and after, and the explanations. `lines` is what
+     * follows the command's output for the agent; `notices` is what the user is told.
+     */
+    runAudited(
+        command: string,
+        options?: { cwd?: string },
+    ): Promise<RunResult & { lines: string[]; notices: string[] }>;
     /** Writes a file, with its folders, relative to the world's root unless absolute. */
     put(file: string, text?: string): string;
     link(target: string, linkPath: string): void;
     cleanup(): Promise<void>;
+    /** The last audited run, for a test that failed on it. */
+    lastAudit?: { output: string; lines: string[]; notices: string[] };
 }
 
 function marker(kind: string): string {
@@ -138,7 +149,8 @@ export async function makeWorld(options: WorldOptions = {}): Promise<World> {
     // A folder of the user's own on PATH, which a command must not be able to put a program in.
     mkdirSync(path.join(home, "bin"), { recursive: true });
     const env: Record<string, string> = {
-        PATH: `${path.join(home, "bin")}:${process.env.PATH ?? "/usr/bin:/bin"}`,
+        // One folder of the user's own that is there, and one that is not there yet.
+        PATH: `${path.join(home, "bin")}:${path.join(home, ".local", "bin")}:${process.env.PATH ?? "/usr/bin:/bin"}`,
         HOME: home,
         LANG: "C.UTF-8",
         // A credential in Pi's environment, which must not reach the command.
@@ -198,6 +210,38 @@ export async function makeWorld(options: WorldOptions = {}): Promise<World> {
             } finally {
                 await prepared.finish();
             }
+        },
+        async runAudited(command, runOptions = {}) {
+            const cwd = runOptions.cwd ?? project;
+            const aftermath = createAftermath({ sandbox, agentDir: () => agentDir, now: () => Date.now() });
+            const prepared = await sandbox.prepare(command, cwd, env);
+            const snapshot = aftermath.before(prepared, cwd);
+            const chunks: Buffer[] = [];
+            let exitCode: number | null = null;
+            try {
+                exitCode = (
+                    await exec(prepared.wrapped, cwd, {
+                        onData: (data) => chunks.push(Buffer.from(data)),
+                        env: prepared.env,
+                    })
+                ).exitCode;
+            } finally {
+                const { violations } = await prepared.finish();
+                const output = Buffer.concat(chunks).toString("utf8");
+                const notices: string[] = [];
+                const ui = { notify: (message: string) => notices.push(message) };
+                const lines = await aftermath.after({
+                    prepared,
+                    output,
+                    cwd,
+                    ctx: { hasUI: true, ui } as never,
+                    snapshot,
+                    violations,
+                });
+                world.lastAudit = { output, lines, notices };
+            }
+            const last = world.lastAudit as { output: string; lines: string[]; notices: string[] };
+            return { exitCode, output: last.output, lines: last.lines, notices: last.notices };
         },
         async cleanup() {
             await sandbox.stop();

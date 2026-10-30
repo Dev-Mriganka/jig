@@ -166,7 +166,8 @@ export function sandbox(options: SandboxOptions = {}): ExtensionFactory {
             }
         };
 
-        const aftermath = options.aftermath ?? createAftermath();
+        const aftermath =
+            options.aftermath ?? createAftermath({ sandbox: core, agentDir, now: options.now ?? (() => Date.now()) });
         pi.registerTool(createBashTool({ sandbox: core, shell: { exec }, aftermath, decisions }) as never);
         registerSandboxCommand(pi, {
             sandbox: core,

