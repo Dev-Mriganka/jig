@@ -1,5 +1,5 @@
-// The only module that builds kubectl arguments and starts kubectl. Nothing else in the plugin touches a kubectl command
-// line.
+// The only module that builds kubectl arguments and starts kubectl.
+// Nothing else in the plugin touches a kubectl command line.
 //
 // The context and namespace come from the catalog's target, the verb from the lists below, and everything else from a
 // value a parseCall or a kubectl answer has already vouched for. kubectl is started by jig-core from an argument list,
@@ -10,8 +10,8 @@ import type { Target } from "./config.ts";
 import { explain } from "./failure.ts";
 
 /**
- * The kubectl commands that read: `get` and `logs`, and `exec`, which only the in-pod health check uses, to run curl in a
- * pod. A verb that is not here, or in WRITES, cannot be built: `delete`, `scale`, `apply`, `edit`, `rollout restart`,
+ * The kubectl commands that read: `get` and `logs`, and `exec`, which only the in-pod health check uses, to run curl in
+ * a pod. A verb that is not here, or in WRITES, cannot be built: `delete`, `scale`, `apply`, `edit`, `rollout restart`,
  * `port-forward`, `cp` and the rest are not a matter of being refused later, they are not in the code.
  */
 export const READS = ["get", "logs", "exec"] as const;
@@ -81,13 +81,20 @@ export function programEnvironment(): Record<string, string> {
 
 /**
  * Starts kubectl and returns what it did, whether it succeeded or not. A command that ran out of time is a result with
- * `timedOut`, not an error, because for a write that means the outcome is unknown, and only the caller knows what to say
- * about that. Reads go through runKubectl.
+ * `timedOut`, not an error, because for a write that means the outcome is unknown, and only the caller knows what to
+ * say about that. Reads go through runKubectl.
  */
-export async function startKubectl(kube: Kube, verb: Verb, args: readonly string[], limits: Limits): Promise<RunResult> {
+export async function startKubectl(
+    kube: Kube,
+    verb: Verb,
+    args: readonly string[],
+    limits: Limits,
+): Promise<RunResult> {
     if (!allowed(verb, args)) {
         const what = [verb, args[0]].filter((word) => word !== undefined).join(" ");
-        throw new Error(`kubectl ${what} is not allowed: the tools run only get, logs, exec, set image and rollout undo`);
+        throw new Error(
+            `kubectl ${what} is not allowed: the tools run only get, logs, exec, set image and rollout undo`,
+        );
     }
     return jig().exec.run("kubectl", argvOf(kube.target, verb, args, limits), {
         timeoutMs: limits.timeoutMs,

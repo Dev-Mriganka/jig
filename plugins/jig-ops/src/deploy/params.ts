@@ -1,5 +1,5 @@
-// The parameters of the `deploy` tool, and the checks that turn them into a Call. The version is the only text of a call that
-// can reach a command line, and it is checked here to be an image tag. parseCall does no I/O.
+// The parameters of the `deploy` tool, and the checks that turn them into a Call. The version is the only text of a
+// call that can reach a command line, and it is checked here to be an image tag. parseCall does no I/O.
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import { describeServices, findEnvironment, notSetUp } from "../catalog.ts";
@@ -60,9 +60,9 @@ export function usage(action: Action): string {
 }
 
 /**
- * An image tag, by the grammar of the registries: 1 to 128 letters, digits, `_`, `.` and `-`, not starting with `.` or `-`.
- * This is stricter than what `runtime rollout` accepts to wait for, because this is written into a cluster: it is never
- * something kubectl or helm could read as a flag, and never a digest or a second image.
+ * An image tag, by the grammar of the registries: 1 to 128 letters, digits, `_`, `.` and `-`, not starting with `.` or
+ * `-`. This is stricter than what `runtime rollout` accepts to wait for, because this is written into a cluster: it is
+ * never something kubectl or helm could read as a flag, and never a digest or a second image.
  */
 export const VERSION = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/;
 
@@ -82,13 +82,30 @@ function checkAction(value: unknown): Action {
 
 function checkVersion(action: Action, value: unknown): string {
     if (typeof value === "string" && VERSION.test(value)) return value;
-    return fail(action, `version must be an image tag of 1 to 128 characters (letters, digits, . _ -, not starting with . or -) (got ${shown(value)})`);
+    return fail(
+        action,
+        "version must be an image tag of 1 to 128 characters (letters, digits, . _ -, not starting with . or -) " +
+            `(got ${shown(value)})`,
+    );
 }
 
-/** The Kubernetes runtime is where a rollout is read. An environment without one has nothing to plan, watch or run in. */
+function checkMinutes(action: Action, value: unknown): number {
+    if (!present(value)) return DEFAULT_WATCH_MINUTES;
+    if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1 || value > MAX_WATCH_MINUTES) {
+        fail(action, `timeoutMinutes must be a whole number from 1 to ${MAX_WATCH_MINUTES} (got ${shown(value)})`);
+    }
+    return value;
+}
+
+/**
+ * The Kubernetes runtime is where a rollout is read. An environment without one has nothing to plan, watch or run in.
+ */
 function kubernetesOf(action: Action, env: Environment): Target {
     if (env.kubernetes === undefined) {
-        fail(action, `${env.service} in ${env.name} has no Kubernetes runtime in the catalog, so there is no rollout to read`);
+        fail(
+            action,
+            `${env.service} in ${env.name} has no Kubernetes runtime in the catalog, so there is no rollout to read`,
+        );
     }
     return env.kubernetes;
 }
@@ -121,11 +138,8 @@ export function parseCall(input: Readonly<Record<string, unknown>>, catalog: Cat
         case "rollback":
             return { action, env, target };
         case "watch": {
-            const minutes = input.timeoutMinutes;
-            if (present(minutes) && (typeof minutes !== "number" || !Number.isSafeInteger(minutes) || minutes < 1 || minutes > MAX_WATCH_MINUTES)) {
-                fail(action, `timeoutMinutes must be a whole number from 1 to ${MAX_WATCH_MINUTES} (got ${shown(minutes)})`);
-            }
-            return { action, env, target, version: checkVersion(action, input.version), timeoutMinutes: (minutes as number | undefined) ?? DEFAULT_WATCH_MINUTES };
+            const version = checkVersion(action, input.version);
+            return { action, env, target, version, timeoutMinutes: checkMinutes(action, input.timeoutMinutes) };
         }
     }
 }

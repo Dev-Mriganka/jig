@@ -1,14 +1,14 @@
-// The `deploy` tool: what Pi registers, and the classification and preview that jig-core's declaration is made of besides its
-// name.
+// The `deploy` tool: what Pi registers, and the classification and preview that make up jig-core's declaration of it.
 //
-//   plan, status  read, in the environment of the call
-//   run, rollback write in the environment of the call. jig-core asks the user, with the preview as the screen; the floor
-//                 denies production anyway
-//   watch         a local write: it starts a watch on this machine, and changes no environment
+//   plan, status   read, in the environment of the call
+//   run, rollback  write in the environment of the call. jig-core asks the user, with the preview as the screen,
+//                  and its floor denies production anyway
+//   watch          a local write: it starts a watch on this machine, and changes no environment
 //
-// What may not run is refused in classify with a TypeError, so jig-core blocks the call without asking: an unknown service or
-// environment, an environment the catalog gives no deploy method, production, and a rollback outside a test environment. The
-// kind of an environment is asked of jig-core, which knows every name; a name it does not know counts as production.
+// What may not run is refused in classify with a TypeError, so jig-core blocks the call without asking: an unknown
+// service or environment, an environment the catalog gives no deploy method, production, and a rollback outside a
+// test environment. The kind of an environment is asked of jig-core, which knows every name; a name it does not
+// know counts as production.
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { jig } from "../../../jig-core/src/client.ts";
 import type { CallClass, Preview } from "../../../jig-core/src/contract.ts";
@@ -24,8 +24,9 @@ import { planRollback, planRun, refusal } from "./plan.ts";
 import { createRecords } from "./records.ts";
 
 const DESCRIPTION =
-    "Deploy a version of a service with the method the ops catalog names: plan what would change, run it (the user is asked " +
-    "first), status, rollback (test environments only), and watch the rollout in the background. Never production.";
+    "Deploy a version of a service with the method the ops catalog names: plan what would change, run it " +
+    "(the user is asked first), status, rollback (test environments only), and watch the rollout in the background. " +
+    "Never production.";
 
 type Input = Readonly<Record<string, unknown>>;
 
@@ -33,7 +34,9 @@ type Input = Readonly<Record<string, unknown>>;
 export interface DeployOptions {
     /** The clock. Default: the real one. */
     now?: () => number;
-    /** How long a command that changes the cluster may run before it is stopped. Default: helm six minutes, kubectl one. */
+    /**
+     * How long a command that changes the cluster may run before it is stopped. Default: helm six minutes, kubectl one.
+     */
     writeTimeoutMs?: number;
 }
 
@@ -56,7 +59,11 @@ function refuse(call: Call): void {
 }
 
 export function createDeployTool(options: DeployOptions = {}): DeployTool {
-    const ctx: Context = { now: options.now ?? Date.now, writeTimeoutMs: options.writeTimeoutMs, records: createRecords() };
+    const ctx: Context = {
+        now: options.now ?? Date.now,
+        writeTimeoutMs: options.writeTimeoutMs,
+        records: createRecords(),
+    };
 
     function run(call: Call, toolCallId: string, signal: AbortSignal | undefined): Promise<Outcome> | Outcome {
         const kube: Kube = { target: call.target, signal };
@@ -86,8 +93,8 @@ export function createDeployTool(options: DeployOptions = {}): DeployTool {
             });
         },
 
-        // The review screen of a deploy or a rollback: the exact command, and the versions it goes between. The plan reads the
-        // cluster, and the tool plans again when it runs and refuses if the plan is no longer this one.
+        // The review screen of a deploy or a rollback: the exact command, and the versions it goes between. The plan
+        // reads the cluster, and the tool plans again when it runs and refuses if the plan is no longer this one.
         async preview(input, signal) {
             return previewing(async () => {
                 const call = parseCall(input, currentCatalog());
@@ -114,10 +121,12 @@ export function createDeployTool(options: DeployOptions = {}): DeployTool {
             name: "deploy",
             label: "Deploy",
             description: DESCRIPTION,
-            promptSnippet: "deploy: plan, run (asks the user), status, rollback and watch a service's rollout; never production",
+            promptSnippet:
+                "deploy: plan, run (asks the user), status, rollback and watch a service's rollout; never production",
             promptGuidelines: [
                 "deploy: plan first, then run; run asks the user. Then watch with the same version instead of polling.",
-                "deploy: when run says the outcome is unknown, do not run it again. Check with status and tell the user.",
+                "deploy: when run says the outcome is unknown, do not run it again. " +
+                    "Check with status and tell the user.",
             ],
             parameters,
             // One call at a time and in order: a deploy must be done before the watch that follows it.

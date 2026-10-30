@@ -1,6 +1,6 @@
 // The `ops` section of jig.json: the service catalog. Each service is described once, with the environments it runs in,
-// how to deploy there, where it runs and its health address. jig-core checks the section with validateOps when a session
-// starts, so the rest of the plugin reads a catalog that is valid.
+// how to deploy there, where it runs and its health address. jig-core checks the section with validateOps when a
+// session starts, so the rest of the plugin reads a catalog that is valid.
 //
 // A call never names a context, a namespace, a release or an address. It names a service and an environment, and this
 // catalog says where that is, so nothing outside the catalog can be reached through the tools.
@@ -13,8 +13,10 @@ import { InputError, isObject, shortList, shown } from "./values.ts";
 /** One service in one environment: the part of the catalog a call acts on. */
 export interface Environment {
     service: string;
-    /** The name in the catalog and in a call. It is also the name that jig-core knows the environment by, so its rules, its
-     *  masking and the kind (test or production) of the environment come from that name. */
+    /**
+     * The name in the catalog and in a call. It is also the name that jig-core knows the environment by, so its rules,
+     * its masking and the kind (test or production) of the environment come from that name.
+     */
     name: string;
     deploy?: DeployConfig;
     /** The Kubernetes runtime: where the pods are. */
@@ -40,7 +42,9 @@ export interface Catalog {
 const SECTION_FIELDS: ReadonlySet<string> = new Set(["services"]);
 const SERVICE_FIELDS: ReadonlySet<string> = new Set(["repo", "ci", "environments"]);
 const ENVIRONMENT_FIELDS: ReadonlySet<string> = new Set(["deploy", "runtime", "health"]);
-/** The runtimes an environment can have. A new one (Docker Compose, ECS) is a folder beside kubernetes/ and a name here. */
+/**
+ * The runtimes an environment can have. A new one (Docker Compose, ECS) is a folder beside kubernetes/ and a name here.
+ */
 const RUNTIMES = ["kubernetes"] as const;
 
 const SERVICE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$/;
@@ -53,15 +57,16 @@ const MAX_SERVICES = 100;
 const MAX_ENVIRONMENTS = 20;
 const MAX_HEALTH_CHARS = 500;
 
-const NOT_SET_UP = 'ops is not set up: add an "ops" section with "services" to jig.json (/jig lists configuration problems)';
+const NOT_SET_UP =
+    'ops is not set up: add an "ops" section with "services" to jig.json (/jig lists configuration problems)';
 
 export function notSetUp(): InputError {
     return new InputError(NOT_SET_UP);
 }
 
 /**
- * Why an address cannot be a health address, or undefined when it can. It must be an https address, with no user name or
- * password and no fragment. The health check asks this again for every request, whatever the catalog says.
+ * Why an address cannot be a health address, or undefined when it can. It must be an https address, with no user name
+ * or password and no fragment. The health check asks this again for every request, whatever the catalog says.
  */
 export function healthProblem(address: unknown): string | undefined {
     const notHttps = "must be an https address, such as https://api.staging.example.com/orders/health";
@@ -82,7 +87,9 @@ export function healthProblem(address: unknown): string | undefined {
 
 function checkCi(raw: unknown, at: string, errors: string[]): Record<string, string> | undefined {
     if (!isObject(raw)) {
-        errors.push(`${at}: must be an object with a system, such as { "system": "github-actions", "workflow": "build.yml" }`);
+        errors.push(
+            `${at}: must be an object with a system, such as { "system": "github-actions", "workflow": "build.yml" }`,
+        );
         return undefined;
     }
     const before = errors.length;
@@ -119,7 +126,13 @@ function checkRuntime(raw: unknown, at: string, errors: string[]): Omit<Target, 
     return checkKubernetes(raw.kubernetes, `${at}.kubernetes`, errors);
 }
 
-function checkEnvironment(service: string, name: string, raw: unknown, at: string, errors: string[]): Environment | undefined {
+function checkEnvironment(
+    service: string,
+    name: string,
+    raw: unknown,
+    at: string,
+    errors: string[],
+): Environment | undefined {
     if (!isObject(raw)) {
         errors.push(`${at}: must be an object with deploy, runtime or health`);
         return undefined;
@@ -140,7 +153,10 @@ function checkEnvironment(service: string, name: string, raw: unknown, at: strin
     }
     // Both deploy methods change a cluster, and take the context and the namespace from its runtime.
     if (raw.deploy !== undefined && raw.runtime === undefined) {
-        errors.push(`${at}.deploy: deploys to a Kubernetes cluster, so the environment needs runtime.kubernetes (the context and the namespace)`);
+        errors.push(
+            `${at}.deploy: deploys to a Kubernetes cluster, ` +
+                "so the environment needs runtime.kubernetes (the context and the namespace)",
+        );
     }
 
     if (errors.length > before) return undefined;
@@ -164,19 +180,25 @@ function checkService(name: string, raw: unknown, at: string, errors: string[]):
     let repo: string | undefined;
     if (raw.repo !== undefined) {
         if (typeof raw.repo === "string" && REPO.test(raw.repo)) repo = raw.repo;
-        else errors.push(`${at}.repo: must be text of 1 to 200 characters with no white space, such as acme/orders-api`);
+        else errors.push(`${at}.repo: must be text of 1 to 200 characters, no white space, such as acme/orders-api`);
     }
     const ci = raw.ci === undefined ? undefined : checkCi(raw.ci, `${at}.ci`, errors);
 
     const environments = new Map<string, Environment>();
     if (!isObject(raw.environments) || Object.keys(raw.environments).length === 0) {
-        errors.push(`${at}.environments: ${raw.environments === undefined ? "required, " : "must be "}an object that maps an environment name to its deploy, runtime and health`);
+        const need = raw.environments === undefined ? "required, " : "must be ";
+        errors.push(
+            `${at}.environments: ${need}an object that maps an environment name to its deploy, runtime and health`,
+        );
     } else if (Object.keys(raw.environments).length > MAX_ENVIRONMENTS) {
         errors.push(`${at}.environments: at most ${MAX_ENVIRONMENTS} environments`);
     } else {
         for (const [environment, entry] of Object.entries(raw.environments)) {
             if (!ENVIRONMENT_NAME.test(environment)) {
-                errors.push(`${at}.environments: ${shown(environment, 30)} is not a usable environment name (letters, digits, _ and -)`);
+                errors.push(
+                    `${at}.environments: ${shown(environment, 30)} is not a usable environment name ` +
+                        "(letters, digits, _ and -)",
+                );
                 continue;
             }
             const read = checkEnvironment(name, environment, entry, `${at}.environments.${environment}`, errors);
@@ -189,8 +211,8 @@ function checkService(name: string, raw: unknown, at: string, errors: string[]):
 }
 
 /**
- * Checks a raw `ops` section and reads it. `errors` name their key; with any error there is no catalog. A misspelt field
- * is an error and not a silent default: `namespce` would otherwise leave a service without its namespace.
+ * Checks a raw `ops` section and reads it. `errors` name their key; with any error there is no catalog. A misspelt
+ * field is an error and not a silent default: `namespce` would otherwise leave a service without its namespace.
  */
 export function readOps(raw: unknown): { catalog?: Catalog; errors: string[] } {
     if (!isObject(raw)) return { errors: ["ops: must be an object"] };
@@ -198,7 +220,8 @@ export function readOps(raw: unknown): { catalog?: Catalog; errors: string[] } {
     for (const key of Object.keys(raw)) if (!SECTION_FIELDS.has(key)) errors.push(`ops.${key}: unknown field`);
 
     if (!isObject(raw.services)) {
-        errors.push(`ops.services: ${raw.services === undefined ? "required, " : "must be "}an object that maps a service name to its entry`);
+        const need = raw.services === undefined ? "required, " : "must be ";
+        errors.push(`ops.services: ${need}an object that maps a service name to its entry`);
         return { errors };
     }
     const entries = Object.entries(raw.services);
@@ -238,7 +261,9 @@ export function catalogOf(raw: unknown): Catalog | undefined {
 /** `orders-api (staging, production), billing (staging)`: what a message offers when a service name is wrong. */
 export function describeServices(catalog: Catalog): string {
     return shortList(
-        [...catalog.services.values()].map((service) => `${service.name} (${shortList([...service.environments.keys()], 60)})`),
+        [...catalog.services.values()].map(
+            (service) => `${service.name} (${shortList([...service.environments.keys()], 60)})`,
+        ),
     );
 }
 
@@ -249,7 +274,9 @@ export function describeServices(catalog: Catalog): string {
 export function findEnvironment(catalog: Catalog, who: string, service: unknown, environment: unknown): Environment {
     const found = typeof service === "string" ? catalog.services.get(service) : undefined;
     if (found === undefined) {
-        throw new InputError(`${who}: no service named ${shown(service, 30)}. Known services: ${describeServices(catalog)}`);
+        throw new InputError(
+            `${who}: no service named ${shown(service, 30)}. Known services: ${describeServices(catalog)}`,
+        );
     }
     const target = typeof environment === "string" ? found.environments.get(environment) : undefined;
     if (target === undefined) {

@@ -82,7 +82,7 @@ describe("plan", () => {
         assert.equal(
             ok(production),
             [
-                "Deploy plan for orders-api in production (production):",
+                "Deploy plan for orders-api in production:",
                 "A deploy run would be refused: orders-api in production is production: the agent never changes production.",
                 "Running now: 1.4.2",
             ].join("\n"),

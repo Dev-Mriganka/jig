@@ -166,7 +166,7 @@ describe("the code", () => {
 
     test("names the helm commands it can start in one list, and the runner asks the list", () => {
         const text = codeOf(all.find((source) => source.file === "deploy/helm.ts")?.text ?? "");
-        assert.match(text, /return \(command === "upgrade" && next === "--install"\) \|\| command === "rollback" \|\| command === "history" \|\| \(command === "get" && next === "values"\);/);
+        assert.match(text, /return \(\s*\(command === "upgrade" && next === "--install"\) \|\|\s*command === "rollback" \|\|\s*command === "history" \|\|\s*\(command === "get" && next === "values"\)\s*\);/);
         assert.match(text, /if \(!allowed\(args\)\) \{\s*throw/);
         for (const word of ["install", "uninstall", "delete", "template", "pull", "push", "repo", "plugin", "dependency", "registry"]) {
             assert.ok(!new RegExp(`["'\`]${word}["'\`]`).test(text), `helm.ts has the string "${word}"`);

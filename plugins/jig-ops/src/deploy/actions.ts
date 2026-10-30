@@ -1,5 +1,5 @@
-// The five actions of the deploy tool. `plan` and `status` read; `run` and `rollback` change a cluster, once, after the user
-// approved a preview of exactly that; `watch` starts a background watch on jig-core's engine and changes nothing.
+// The five actions of the deploy tool. `plan` and `status` read; `run` and `rollback` change a cluster, once, after the
+// user approved a preview of exactly that; `watch` starts a background watch on jig-core's engine and changes nothing.
 import { jig } from "../../../jig-core/src/client.ts";
 import { explain } from "../runtime/kubernetes/failure.ts";
 import { age } from "../runtime/kubernetes/pods.ts";
@@ -11,7 +11,7 @@ import { KIND, titleOf } from "../watch.ts";
 import type { RolloutSpec } from "../watch.ts";
 import { checkUnchanged, lookOnce, outputOf, startCommand } from "./execute.ts";
 import type { Call } from "./params.ts";
-import { planRollback, planRun, refusal, runningText } from "./plan.ts";
+import { environmentText, planRollback, planRun, refusal, runningText } from "./plan.ts";
 import type { Plan } from "./plan.ts";
 import type { DeployRecord, RecordedOutcome, Records } from "./records.ts";
 
@@ -25,13 +25,16 @@ export interface Context {
 
 const kindOf = (name: string) => jig().environments.kindOf(name);
 
-// ---- plan -----------------------------------------------------------------------------------------------------------------
+/** What a plan says when the version asked for is the only one running. */
+const SAME = " (already running: a deploy would change the release and not the version)";
+
+// ---- plan -----------------------------------------------------------------------------------------------------------
 
 /** `plan`: the versions running now and the one requested, and the command that would deploy it. */
 export async function planAction(call: Extract<Call, { action: "plan" }>, kube: Kube): Promise<Outcome> {
     const { env, version } = call;
     const kind = kindOf(env.name);
-    const head = `Deploy plan for ${env.service} in ${env.name} (${kind}):`;
+    const head = `Deploy plan for ${env.service} in ${environmentText(env.name, kind)}:`;
     const why = refusal("run", env, kind);
     if (why !== undefined) {
         // There is no command to show, but what runs now is still worth knowing.
@@ -47,7 +50,7 @@ export async function planAction(call: Extract<Call, { action: "plan" }>, kube: 
         text: [
             `${head} method ${plan.method}.`,
             `Running now: ${plan.from}`,
-            `Requested:   ${version}${plan.same ? " (already running: a deploy would change the release and not the version)" : ""}`,
+            `Requested:   ${version}${plan.same ? SAME : ""}`,
             `Rollout now: ${verdictLine(plan.rollout, kube.target, undefined)}`,
             `Command:     ${plan.line}`,
             "deploy run asks the user first and does not wait for the rollout; deploy watch does.",
@@ -57,7 +60,7 @@ export async function planAction(call: Extract<Call, { action: "plan" }>, kube: 
     };
 }
 
-// ---- run and rollback -----------------------------------------------------------------------------------------------------
+// ---- run and rollback -----------------------------------------------------------------------------------------------
 
 /** The name of the program and its first word, for a message: `helm upgrade`, `kubectl set`. */
 function nameOf(plan: Plan): string {
@@ -65,8 +68,9 @@ function nameOf(plan: Plan): string {
 }
 
 /**
- * Runs the command of a plan, once, after checking that it is still what the user approved. A command that fails is an error
- * that says why. One whose outcome is unknown is an error too, with one read of the rollout, and it is never run again.
+ * Runs the command of a plan, once, after checking that it is still what the user
+ * approved. A command that fails is an error that says why. One whose outcome is
+ * unknown is an error too, with one read of the rollout, and it is never run again.
  */
 async function change(plan: Plan, kube: Kube, toolCallId: string, ctx: Context): Promise<Outcome> {
     checkUnchanged(toolCallId, plan);
@@ -83,8 +87,8 @@ async function change(plan: Plan, kube: Kube, toolCallId: string, ctx: Context):
             outcome,
         };
         ctx.records.remember(env.service, env.name, record);
-        // A call that ends in an error cannot hand its facts back, so they are added here. A call that started the command
-        // hands them back in its outcome.
+        // A call that ends in an error cannot hand its facts back, so they are added here. A call that started the
+        // command hands them back in its outcome.
         if (outcome !== "started") jig().addFacts(toolCallId, { method: plan.method, outcome });
     };
 
@@ -94,9 +98,10 @@ async function change(plan: Plan, kube: Kube, toolCallId: string, ctx: Context):
         const seen = await lookOnce(kube, plan.version, ctx.now());
         const what = plan.action === "run" ? `the deploy of ${plan.to}` : "the rollback";
         throw new Error(
-            `deploy ${plan.action}: ${ended.why}, so it is unknown whether ${what} took effect in ${where}. It was not run again. ` +
-                `One look at the rollout now:\n${seen}\n` +
-                "Check with deploy status before doing anything else, and tell the user. Do not run it again unless the user says so",
+            `deploy ${plan.action}: ${ended.why}, so it is unknown whether ${what} took effect in ${where}. ` +
+                `It was not run again. One look at the rollout now:\n${seen}\n` +
+                "Check with deploy status before doing anything else, and tell the user. " +
+                "Do not run it again unless the user says so",
         );
     }
     if (ended.result.code !== 0) {
@@ -112,31 +117,48 @@ async function change(plan: Plan, kube: Kube, toolCallId: string, ctx: Context):
     const next =
         plan.version === undefined
             ? "Nothing waits for the rollout: runtime rollout shows how it goes."
-            : `Nothing waits for the rollout: deploy watch with version ${plan.version} reports when it ends, or runtime rollout with waitFor.`;
+            : `Nothing waits for the rollout: deploy watch with version ${plan.version} reports when it ends, ` +
+              "or runtime rollout with waitFor.";
     const printed = outputOf(ended.result.stdout);
+    const told = `Started ${what} (it was running ${plan.from}). ${next}`;
     return {
-        text: [`Started ${what} (it was running ${plan.from}). ${next}`, ...(printed === "" ? [] : [printed])].join("\n"),
+        text: printed === "" ? told : `${told}\n${printed}`,
         facts: { method: plan.method, outcome: "started" },
         details: { method: plan.method, action: plan.action, from: plan.from, to: plan.to },
     };
 }
 
 /** `run`: deploys a version. */
-export async function runAction(call: Extract<Call, { action: "run" }>, kube: Kube, toolCallId: string, ctx: Context): Promise<Outcome> {
+export async function runAction(
+    call: Extract<Call, { action: "run" }>,
+    kube: Kube,
+    toolCallId: string,
+    ctx: Context,
+): Promise<Outcome> {
     return change(await planRun(call.env, call.version, kube, kindOf(call.env.name)), kube, toolCallId, ctx);
 }
 
 /** `rollback`: goes back one revision. */
-export async function rollbackAction(call: Extract<Call, { action: "rollback" }>, kube: Kube, toolCallId: string, ctx: Context): Promise<Outcome> {
+export async function rollbackAction(
+    call: Extract<Call, { action: "rollback" }>,
+    kube: Kube,
+    toolCallId: string,
+    ctx: Context,
+): Promise<Outcome> {
     return change(await planRollback(call.env, kube, kindOf(call.env.name)), kube, toolCallId, ctx);
 }
 
-// ---- status ---------------------------------------------------------------------------------------------------------------
+// ---- status ---------------------------------------------------------------------------------------------------------
 
 /** The last deploy or rollback run from here, as a sentence. */
 function recordLine(last: DeployRecord | undefined, now: number): string {
-    if (last === undefined) return "No deploy or rollback was run from here in this session. The rollout is as the cluster shows it now.";
-    const what = last.action === "run" ? `the deploy of ${last.to} with ${last.method}` : `the rollback with ${last.method} to ${last.to}`;
+    if (last === undefined) {
+        return "No deploy or rollback was run from here in this session. The rollout is as the cluster shows it now.";
+    }
+    const what =
+        last.action === "run"
+            ? `the deploy of ${last.to} with ${last.method}`
+            : `the rollback with ${last.method} to ${last.to}`;
     const how = {
         started: "started",
         failed: "failed",
@@ -146,7 +168,11 @@ function recordLine(last: DeployRecord | undefined, now: number): string {
 }
 
 /** `status`: the last deploy run from here, and the rollout. */
-export async function statusAction(call: Extract<Call, { action: "status" }>, kube: Kube, ctx: Context): Promise<Outcome> {
+export async function statusAction(
+    call: Extract<Call, { action: "status" }>,
+    kube: Kube,
+    ctx: Context,
+): Promise<Outcome> {
     const { env } = call;
     const last = ctx.records.last(env.service, env.name);
     // The rollout is judged against the version the last deploy put on, unless that one failed.
@@ -159,13 +185,15 @@ export async function statusAction(call: Extract<Call, { action: "status" }>, ku
     };
 }
 
-// ---- watch ----------------------------------------------------------------------------------------------------------------
+// ---- watch ----------------------------------------------------------------------------------------------------------
 
 /** `watch`: starts the background watch `ops-rollout`, and returns at once. */
 export function watchAction(call: Extract<Call, { action: "watch" }>, ctx: Context): Outcome {
     const { env, version, timeoutMinutes } = call;
     const title = titleOf(env.service, env.name, version);
-    const open = jig().watches.list().find((watch) => watch.kind === KIND && watch.status === "open" && watch.title === title);
+    const open = jig()
+        .watches.list()
+        .find((watch) => watch.kind === KIND && watch.status === "open" && watch.title === title);
     if (open !== undefined) {
         return {
             text: `Already watching the ${title} as ${open.id}. One message arrives when it ends.`,
@@ -174,13 +202,17 @@ export function watchAction(call: Extract<Call, { action: "watch" }>, ctx: Conte
         };
     }
     const startedAt = ctx.now();
-    // The watch gives up a few seconds before the engine does, so that the last poll is ours and can say how far it got.
-    const spec: RolloutSpec = { service: env.service, environment: env.name, version, startedAt, deadline: startedAt + timeoutMinutes * 60_000 - 5_000 };
-    const id = jig().watches.start({ kind: KIND, spec, title, timeoutMinutes, stallMinutes: Math.max(1, Math.ceil(timeoutMinutes / 2)) });
+    // The watch gives up a few seconds before the engine does,
+    // so that the last poll is ours and can say how far it got.
+    const deadline = startedAt + timeoutMinutes * 60_000 - 5_000;
+    const spec: RolloutSpec = { service: env.service, environment: env.name, version, startedAt, deadline };
+    // A notice to the user halfway, if the watch is still going.
+    const stallMinutes = Math.max(1, Math.ceil(timeoutMinutes / 2));
+    const id = jig().watches.start({ kind: KIND, spec, title, timeoutMinutes, stallMinutes });
     return {
         text:
-            `Watching the ${title} as ${id}. One message arrives when every pod is ready on ${version}, when a pod cannot come up, ` +
-            `or after ${timeoutMinutes} minutes. The watch tool lists and stops watches.`,
+            `Watching the ${title} as ${id}. One message arrives when every pod is ready on ${version}, ` +
+            `when a pod cannot come up, or after ${timeoutMinutes} minutes. The watch tool lists and stops watches.`,
         facts: { watch: "started" },
         details: { id, spec },
     };

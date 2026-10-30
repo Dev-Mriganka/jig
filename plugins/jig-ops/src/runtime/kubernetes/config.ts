@@ -30,7 +30,14 @@ export interface Target {
 /** What the catalog holds under `runtime.kubernetes`. */
 export type KubernetesEntry = Omit<Target, "service" | "environment">;
 
-const ENTRY_FIELDS: ReadonlySet<string> = new Set(["context", "namespace", "selector", "container", "port", "healthPath"]);
+const ENTRY_FIELDS: ReadonlySet<string> = new Set([
+    "context",
+    "namespace",
+    "selector",
+    "container",
+    "port",
+    "healthPath",
+]);
 
 /** A kubeconfig context name. Cloud contexts can be long and hold `:` and `/` (an ARN), but none starts with `-`, which
  *  kubectl would read as a flag. */
@@ -42,7 +49,10 @@ export const DNS_SUBDOMAIN = /^[a-z0-9]([-a-z0-9.]{0,251}[a-z0-9])?$/;
 const LABEL_PAIR = /^([A-Za-z0-9][A-Za-z0-9._/-]{0,252})=([A-Za-z0-9][A-Za-z0-9._-]{0,62})$/;
 const MAX_LABELS = 10;
 
-/** The characters a health path and its query may hold. No `[ ] { }` (curl would read them as a pattern), no `#`, no `\`. */
+/**
+ * The characters a health path and its query may hold. No `[
+ * ] { }` (curl would read them as a pattern), no `#`, no `\`.
+ */
 const CHARS = "A-Za-z0-9._~/!$&'()*+,;=:@%-";
 const PATH_AND_QUERY = new RegExp(`^/[${CHARS}]{0,400}(\\?[${CHARS}]{0,400})?$`);
 /** How many times a path is percent-decoded when it is searched for "..". */
@@ -76,14 +86,20 @@ function labelsOf(selector: string): Array<[string, string]> | undefined {
     return pairs.length <= MAX_LABELS ? pairs : undefined;
 }
 
-function checkSelector(value: unknown, key: string, errors: string[]): { text: string; labels: Array<[string, string]> } | undefined {
+function checkSelector(
+    value: unknown,
+    key: string,
+    errors: string[],
+): { text: string; labels: Array<[string, string]> } | undefined {
     if (value === undefined) {
         errors.push(`${key}: required, a label selector for the pods, such as app=orders-api`);
         return undefined;
     }
     const labels = typeof value === "string" ? labelsOf(value) : undefined;
     if (typeof value === "string" && labels !== undefined) return { text: value, labels };
-    errors.push(`${key}: must be 1 to ${MAX_LABELS} comma-separated key=value pairs, such as app=orders-api (equality only)`);
+    errors.push(
+        `${key}: must be 1 to ${MAX_LABELS} comma-separated key=value pairs, such as app=orders-api (equality only)`,
+    );
     return undefined;
 }
 
@@ -115,25 +131,47 @@ export function checkKubernetes(raw: unknown, at: string, errors: string[]): Kub
     const before = errors.length;
     for (const key of Object.keys(raw)) if (!ENTRY_FIELDS.has(key)) errors.push(`${at}.${key}: unknown field`);
 
-    const context = checkPattern(raw.context, CONTEXT, `${at}.context`, "a kubectl context name, such as prod-cluster", errors);
-    const namespace = checkPattern(raw.namespace, DNS_LABEL, `${at}.namespace`, "a namespace name, such as orders", errors);
+    const context = checkPattern(
+        raw.context,
+        CONTEXT,
+        `${at}.context`,
+        "a kubectl context name, such as prod-cluster",
+        errors,
+    );
+    const namespace = checkPattern(
+        raw.namespace,
+        DNS_LABEL,
+        `${at}.namespace`,
+        "a namespace name, such as orders",
+        errors,
+    );
     const selector = checkSelector(raw.selector, `${at}.selector`, errors);
     const container = raw.container === undefined
         ? undefined
         : checkPattern(raw.container, DNS_LABEL, `${at}.container`, "a container name", errors);
     const port = raw.port === undefined ? undefined : checkPort(raw.port, `${at}.port`, errors);
-    const healthPath = raw.healthPath === undefined ? undefined : checkHealthPath(raw.healthPath, `${at}.healthPath`, errors);
+    const healthPath = raw.healthPath === undefined
+        ? undefined
+        : checkHealthPath(raw.healthPath, `${at}.healthPath`, errors);
 
     // A health check inside a pod needs all three: the path to call, the port it listens on, and the container to run
     // curl in. One of them alone is a half-finished setting, and the check would never run.
     const inPod = raw.healthPath !== undefined || raw.port !== undefined;
     if (inPod) {
-        if (raw.healthPath === undefined) errors.push(`${at}.healthPath: required with port, the path of the health check`);
-        if (raw.port === undefined) errors.push(`${at}.port: required with healthPath, the port the service listens on in the pod`);
-        if (raw.container === undefined) errors.push(`${at}.container: required with healthPath and port, the container curl runs in`);
+        if (raw.healthPath === undefined) {
+            errors.push(`${at}.healthPath: required with port, the path of the health check`);
+        }
+        if (raw.port === undefined) {
+            errors.push(`${at}.port: required with healthPath, the port the service listens on in the pod`);
+        }
+        if (raw.container === undefined) {
+            errors.push(`${at}.container: required with healthPath and port, the container curl runs in`);
+        }
     }
 
-    if (errors.length > before || context === undefined || namespace === undefined || selector === undefined) return undefined;
+    if (errors.length > before || context === undefined || namespace === undefined || selector === undefined) {
+        return undefined;
+    }
     return {
         context,
         namespace,

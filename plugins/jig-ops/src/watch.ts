@@ -1,14 +1,14 @@
-// The watch kind `ops-rollout`: waits in the background until a service's rollout is complete. jig-core's watch engine calls
-// `poll` on a timer, saves the state it returns, and sends the result to the agent once.
+// The watch kind `ops-rollout`: waits in the background until a service's rollout is complete. jig-core's watch engine
+// calls `poll` on a timer, saves the state it returns, and sends the result to the agent once.
 //
 // The watch finishes with:
 //   passed     every pod is ready and runs the version, and there are as many as the workloads want;
 //   failed     a pod waits for a reason that does not pass by itself (CrashLoopBackOff, ImagePullBackOff, ...);
-//   timed-out  the deadline in the spec came and the rollout was still going. The poll says how far it got; the engine would
-//              only say that Pi stopped watching.
+//   timed-out  the deadline in the spec came and the rollout was still going. The poll says how far it got, where
+//              the engine would only say that Pi stopped watching.
 //
-// The spec holds names, never a context or a namespace: each poll finds them in the catalog as it is now, so a watch always
-// reads where the catalog says, and a saved watch file cannot point it elsewhere.
+// The spec holds names, never a context or a namespace: each poll finds them in the catalog as it is now, so a watch
+// always reads where the catalog says, and a saved watch file cannot point it elsewhere.
 import { jig } from "../../jig-core/src/client.ts";
 import type { JigApi, PollOutcome, WatchKind, WatchResult } from "../../jig-core/src/contract.ts";
 import { catalogOf, findEnvironment, notSetUp } from "./catalog.ts";
@@ -54,23 +54,28 @@ async function pollRollout(
     const catalog = catalogOf(jig().config.section("ops"));
     if (catalog === undefined) throw notSetUp();
     const env = findEnvironment(catalog, KIND, spec.service, spec.environment);
-    if (env.kubernetes === undefined) throw new Error(`${spec.service} in ${spec.environment} has no Kubernetes runtime in the catalog`);
+    if (env.kubernetes === undefined) {
+        throw new Error(`${spec.service} in ${spec.environment} has no Kubernetes runtime in the catalog`);
+    }
 
     const kube = { target: env.kubernetes, signal };
     const { pods, workloads, rollout } = await look(kube, spec.version);
     const state: RolloutState = { polls: (previous?.polls ?? 0) + 1 };
     const facts = { verdict: rollout.verdict, pods: rollout.live.length, ready: rollout.settled, polls: state.polls };
     const where = `${spec.service} in ${spec.environment}`;
-    const details = [workloadLines(workloads), podLines(pods, spec.version, now())].filter((line) => line !== "").join("\n");
+    const details = [workloadLines(workloads), podLines(pods, spec.version, now())].filter(Boolean).join("\n");
 
     let done: WatchResult | undefined;
     if (rollout.verdict === "running") {
-        done = { outcome: "passed", summary: `${where}: ${verdictLine(rollout, kube.target, spec.version)}`, details, facts };
+        const summary = `${where}: ${verdictLine(rollout, kube.target, spec.version)}`;
+        done = { outcome: "passed", summary, details, facts };
     } else if (rollout.verdict === "failing") {
-        done = { outcome: "failed", summary: `${where}: ${verdictLine(rollout, kube.target, spec.version)}`, details, facts };
+        const summary = `${where}: ${verdictLine(rollout, kube.target, spec.version)}`;
+        done = { outcome: "failed", summary, details, facts };
     } else if (now() >= spec.deadline) {
         const waited = duration(now() - spec.startedAt);
-        done = { outcome: "timed-out", summary: `${where}: ${verdictLine(rollout, kube.target, spec.version, waited)}`, details, facts };
+        const summary = `${where}: ${verdictLine(rollout, kube.target, spec.version, waited)}`;
+        done = { outcome: "timed-out", summary, details, facts };
     }
     return done === undefined ? { state } : { state, done };
 }

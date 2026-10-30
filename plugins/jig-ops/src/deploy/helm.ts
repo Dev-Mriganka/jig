@@ -1,9 +1,9 @@
-// The Helm deploy method: `helm upgrade --install` to deploy a version, `helm rollback` to go back one revision. This is
-// also the only module that builds helm arguments and starts helm.
+// The Helm deploy method: `helm upgrade --install` to deploy a version, `helm rollback` to go back one revision. This
+// is also the only module that builds helm arguments and starts helm.
 //
-// The release, the chart, the values file and the `--set` pairs come from the catalog; the context and the namespace from
-// the environment's Kubernetes runtime; the version from a call, after it was checked to be an image tag. Nothing else
-// reaches the command line, and helm is started from an argument list, never a shell.
+// The release, the chart, the values file and the `--set` pairs come from the catalog; the context and the namespace
+// from the environment's Kubernetes runtime; the version from a call, after it was checked to be an image tag. Nothing
+// else reaches the command line, and helm is started from an argument list, never a shell.
 import { jig } from "../../../jig-core/src/client.ts";
 import type { RunResult } from "../../../jig-core/src/contract.ts";
 import type { Target } from "../runtime/kubernetes/config.ts";
@@ -30,7 +30,9 @@ const RELEASE = /^[a-z0-9]([-a-z0-9]{0,51}[a-z0-9])?$/;
 const LOCATION = /^[^\s-]\S{0,299}$/;
 const CONTROL = /[\u0000-\u001f\u007f]/;
 const SET_KEY = /^[A-Za-z_][A-Za-z0-9_.[\]\\-]{0,99}$/;
-/** Helm splits `--set` on commas and reads braces and backslashes, so a value that holds none of them is what it says. */
+/**
+ * Helm splits `--set` on commas and reads braces and backslashes, so a value that holds none of them is what it says.
+ */
 const SET_VALUE = /^[A-Za-z0-9._:/@+%~=-]{0,200}$/;
 const MAX_SET = 20;
 /** The key the deploy sets from the version, so that the catalog cannot set it to something else. */
@@ -46,6 +48,12 @@ function checkLocation(value: unknown, key: string, what: string, errors: string
     return undefined;
 }
 
+/** A value of the catalog as the text helm gets, or undefined when it is not a number, a boolean or text. */
+function scalarText(value: unknown): string | undefined {
+    if (typeof value === "string" || typeof value === "boolean") return String(value);
+    return typeof value === "number" && Number.isFinite(value) ? String(value) : undefined;
+}
+
 function checkSet(raw: unknown, key: string, errors: string[]): Array<[string, string]> | undefined {
     if (!isObject(raw)) {
         errors.push(`${key}: must be an object of Helm values, such as { "replicaCount": 2 }`);
@@ -59,15 +67,16 @@ function checkSet(raw: unknown, key: string, errors: string[]): Array<[string, s
     const before = errors.length;
     const pairs: Array<[string, string]> = [];
     for (const [name, value] of entries) {
-        const text = typeof value === "string" || typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value))
-            ? String(value)
-            : undefined;
+        const text = scalarText(value);
         if (name === VERSION_KEY) {
             errors.push(`${key}.${name}: the deploy sets this from the version it is given, so it cannot be set here`);
         } else if (!SET_KEY.test(name)) {
             errors.push(`${key}: ${JSON.stringify(name.slice(0, 30))} is not a usable Helm value name`);
         } else if (text === undefined || !SET_VALUE.test(text)) {
-            errors.push(`${key}.${name}: must be a number, a boolean or text of letters, digits and . _ : / @ + % ~ = - (up to 200)`);
+            errors.push(
+                `${key}.${name}: must be a number, a boolean or text of letters, digits and . _ : / @ + % ~ = - ` +
+                    "(up to 200)",
+            );
         } else {
             pairs.push([name, text]);
         }
@@ -88,7 +97,9 @@ export function checkHelm(raw: Record<string, unknown>, at: string, errors: stri
         errors,
     );
     const chart = checkLocation(raw.chart, `${at}.chart`, "the chart, such as deploy/chart or acme/orders-api", errors);
-    const valuesFile = raw.valuesFile === undefined ? undefined : checkLocation(raw.valuesFile, `${at}.valuesFile`, "a values file", errors);
+    const valuesFile = raw.valuesFile === undefined
+        ? undefined
+        : checkLocation(raw.valuesFile, `${at}.valuesFile`, "a values file", errors);
     const set = raw.set === undefined ? [] : checkSet(raw.set, `${at}.set`, errors);
 
     if (errors.length > before || release === undefined || chart === undefined || set === undefined) return undefined;
@@ -115,7 +126,10 @@ export function rollbackArgs(config: HelmDeploy, target: Target): string[] {
 
 /** The last two revisions, oldest first. */
 function historyArgs(config: HelmDeploy, target: Target): string[] {
-    return ["history", config.release, "--kube-context", target.context, "--namespace", target.namespace, "--max", "2", "-o", "json"];
+    return [
+        "history", config.release, "--kube-context", target.context, "--namespace", target.namespace,
+        "--max", "2", "-o", "json",
+    ];
 }
 
 /** The values a revision ran with, the chart's defaults included. */
@@ -135,19 +149,30 @@ export interface HelmLimits {
 }
 
 export const HELM_READ: HelmLimits = { timeoutMs: 30_000, maxBytes: 4 * 1024 * 1024 };
-/** Long enough for helm's own five minutes for hooks, so that it is helm that gives up and not this plugin that kills it. */
+/**
+ * Long enough for helm's own five minutes for hooks, so that
+ * it is helm that gives up and not this plugin that kills it.
+ */
 export const HELM_CHANGE: HelmLimits = { timeoutMs: 6 * 60_000, maxBytes: 1024 * 1024 };
 
 /** The helm commands that can be started: the two that change a release, and the two that read its history. */
 function allowed(args: readonly string[]): boolean {
     const [command, next] = args;
-    return (command === "upgrade" && next === "--install") || command === "rollback" || command === "history" || (command === "get" && next === "values");
+    return (
+        (command === "upgrade" && next === "--install") ||
+        command === "rollback" ||
+        command === "history" ||
+        (command === "get" && next === "values")
+    );
 }
 
 /** Starts helm and returns what it did, a timeout included: for a change that means the outcome is unknown. */
 export async function startHelm(kube: Kube, args: readonly string[], limits: HelmLimits): Promise<RunResult> {
     if (!allowed(args)) {
-        throw new Error(`helm ${args.slice(0, 2).join(" ")} is not allowed: the tools run only upgrade --install, rollback, history and get values`);
+        throw new Error(
+            `helm ${args.slice(0, 2).join(" ")} is not allowed: ` +
+                "the tools run only upgrade --install, rollback, history and get values",
+        );
     }
     return jig().exec.run("helm", args, {
         timeoutMs: limits.timeoutMs,
@@ -161,7 +186,9 @@ export async function startHelm(kube: Kube, args: readonly string[], limits: Hel
 async function readHelmJson(kube: Kube, args: readonly string[]): Promise<unknown> {
     const what = `helm ${args[0]}`;
     const result = await startHelm(kube, args, HELM_READ);
-    if (result.timedOut) throw new Error(`${what} timed out after ${HELM_READ.timeoutMs / 1000} s: the cluster is slow or unreachable`);
+    if (result.timedOut) {
+        throw new Error(`${what} timed out after ${HELM_READ.timeoutMs / 1000} s: the cluster is slow or unreachable`);
+    }
     if (result.code !== 0) throw explain(result.stderr, result.code, what, kube.target);
     try {
         return JSON.parse(result.stdout);
@@ -196,9 +223,11 @@ export function helmDeployer(config: HelmDeploy): Deployer {
                 .sort((a, b) => a.revision - b.revision);
             const previous = history.length < 2 ? undefined : history[history.length - 2];
             if (previous === undefined || previous.revision < 1) {
-                throw new Error(`The Helm release ${config.release} has one revision, so there is nothing to go back to`);
+                throw new Error(
+                    `The Helm release ${config.release} has one revision, so there is nothing to go back to`,
+                );
             }
-            // What the revision ran with is in its values. A chart that does not take the version as image.tag shows none.
+            // The values say what the revision ran. A chart that does not take the version as image.tag shows none.
             const values = await readHelmJson(kube, valuesArgs(config, kube.target, previous.revision));
             return {
                 command: { program: "helm", args: rollbackArgs(config, kube.target) },

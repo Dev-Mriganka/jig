@@ -1,8 +1,8 @@
-// The kubectl-image deploy method: `kubectl set image` to deploy a version, `kubectl rollout undo` to go back one revision.
+// The kubectl-image deploy method. A deploy is `kubectl set image`, and a rollback is `kubectl rollout undo`.
 //
 // Only the tag changes. The image is read from the workload as it is now, its tag and digest are taken off, and the
-// version is put on instead, so a deploy cannot move a service to another registry or repository. kubectl's own commands
-// are built and started in kubectl.ts; this module only chooses their arguments.
+// version is put on instead, so a deploy cannot move a service to another registry or repository. kubectl's own
+// commands are built and started in kubectl.ts; this module only chooses their arguments.
 import { DNS_LABEL } from "../runtime/kubernetes/config.ts";
 import { getJson } from "../runtime/kubernetes/kubectl.ts";
 import type { Kube } from "../runtime/kubernetes/kubectl.ts";
@@ -21,16 +21,36 @@ export interface KubectlImageDeploy {
 const FIELDS: ReadonlySet<string> = new Set(["method", "workload", "container"]);
 /** The two kinds of workload the rollout code reads too. */
 const WORKLOAD = /^(deployment|statefulset)\/[a-z0-9]([-a-z0-9.]{0,251}[a-z0-9])?$/;
-/** An image without its tag: what a registry path can hold. No white space, and not something kubectl reads as a flag. */
+/**
+ * An image without its tag: what a registry path can hold. No white space, and not something kubectl reads as a flag.
+ */
 const REPOSITORY = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,250}$/;
 
-/** Checks the `deploy` object of a kubectl-image environment. The catalog has seen that its `method` is `kubectl-image`. */
-export function checkKubectlImage(raw: Record<string, unknown>, at: string, errors: string[]): KubectlImageDeploy | undefined {
+/**
+ * Checks the `deploy` object of a kubectl-image environment. The catalog has seen that its `method` is `kubectl-image`.
+ */
+export function checkKubectlImage(
+    raw: Record<string, unknown>,
+    at: string,
+    errors: string[],
+): KubectlImageDeploy | undefined {
     const before = errors.length;
     for (const key of Object.keys(raw)) if (!FIELDS.has(key)) errors.push(`${at}.${key}: unknown field`);
 
-    const workload = checkPattern(raw.workload, WORKLOAD, `${at}.workload`, "deployment/<name> or statefulset/<name>, such as deployment/orders-api", errors);
-    const container = checkPattern(raw.container, DNS_LABEL, `${at}.container`, "a container name of that workload", errors);
+    const workload = checkPattern(
+        raw.workload,
+        WORKLOAD,
+        `${at}.workload`,
+        "deployment/<name> or statefulset/<name>, such as deployment/orders-api",
+        errors,
+    );
+    const container = checkPattern(
+        raw.container,
+        DNS_LABEL,
+        `${at}.container`,
+        "a container name of that workload",
+        errors,
+    );
 
     if (errors.length > before || workload === undefined || container === undefined) return undefined;
     return { method: "kubectl-image", workload, container };
@@ -94,16 +114,20 @@ export function kubectlImageDeployer(config: KubectlImageDeploy): Deployer {
             const containers = containersOf(templateContainers(await getJson(kube, config.workload)));
             const current = containers.find((container) => container.name === config.container);
             if (current === undefined) {
+                const have = shortList(containers.map((container) => container.name), 120);
                 throw new Error(
-                    `${config.workload} has no container ${config.container} (it has ${shortList(containers.map((container) => container.name), 120)}): ` +
+                    `${config.workload} has no container ${config.container} (it has ${have}): ` +
                         'fix "container" in the ops catalog of jig.json (deploy)',
                 );
             }
             const repository = withoutTag(current.image);
             if (!REPOSITORY.test(repository)) {
-                throw new Error(`The image of ${config.container} in ${config.workload} is not one a deploy can put a tag on`);
+                throw new Error(
+                    `The image of ${config.container} in ${config.workload} is not one a deploy can put a tag on`,
+                );
             }
-            return { program: "kubectl", verb: "set", args: ["image", config.workload, `${config.container}=${repository}:${version}`] };
+            const assignment = `${config.container}=${repository}:${version}`;
+            return { program: "kubectl", verb: "set", args: ["image", config.workload, assignment] };
         },
 
         async rollback(kube: Kube): Promise<Rollback> {

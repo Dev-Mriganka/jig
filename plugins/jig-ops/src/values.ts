@@ -15,10 +15,15 @@ export class InputError extends TypeError {
     }
 }
 
-/** What leaves a tool's classify or preview: an InputError as it is, so jig-core blocks the call without asking, and any
- *  other TypeError as an ordinary error, because it is a bug here and not the model's mistake. */
+/**
+ * What leaves a tool's classify or preview: an InputError as it is, so jig-core blocks the call without asking, and any
+ * other TypeError as an ordinary error, because it is a bug here and not the model's mistake.
+ */
 function reported(error: unknown): unknown {
-    return error instanceof TypeError && !(error instanceof InputError) ? new Error(`internal error: ${error.message}`) : error;
+    if (error instanceof TypeError && !(error instanceof InputError)) {
+        return new Error(`internal error: ${error.message}`);
+    }
+    return error;
 }
 
 /** Runs the checks of a tool's classify. */
@@ -48,7 +53,13 @@ export function isObject(value: unknown): value is Record<string, unknown> {
  * missing is "required"; one that is wrong is "must be". The message never repeats the value: a configuration error may
  * be shown to the model, and a value pasted into the wrong place may be a secret.
  */
-export function checkPattern(value: unknown, pattern: RegExp, key: string, what: string, errors: string[]): string | undefined {
+export function checkPattern(
+    value: unknown,
+    pattern: RegExp,
+    key: string,
+    what: string,
+    errors: string[],
+): string | undefined {
     if (value === undefined) {
         errors.push(`${key}: required, ${what}`);
         return undefined;

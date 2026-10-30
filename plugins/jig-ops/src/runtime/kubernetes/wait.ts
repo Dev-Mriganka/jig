@@ -41,7 +41,13 @@ export async function look(kube: Kube, version: string | undefined): Promise<Sna
 }
 
 /** The rollout as the text the model reads: the verdict, the workloads and the pods. */
-export function render(kube: Kube, snapshot: Snapshot, version: string | undefined, now: number, waited?: string): string {
+export function render(
+    kube: Kube,
+    snapshot: Snapshot,
+    version: string | undefined,
+    now: number,
+    waited?: string,
+): string {
     const { target } = kube;
     const verdict = verdictLine(snapshot.rollout, target, version, waited);
     const head = `${target.service} in ${target.environment} (namespace ${target.namespace}): ${verdict}`;

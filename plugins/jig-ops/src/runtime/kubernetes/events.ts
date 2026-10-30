@@ -22,8 +22,10 @@ interface Event {
     at: number | undefined;
 }
 
-/** The time an event last happened. The core API and the events API each keep it in a different field, and in the events
- *  API `eventTime` is the first time of an event that has a series, so the series' last time comes before it. */
+/**
+ * The time an event last happened. The core API and the events API each keep it in a different field, and in the events
+ * API `eventTime` is the first time of an event that has a series, so the series' last time comes before it.
+ */
 function timeOf(raw: Record<string, unknown>): number | undefined {
     const series = isObject(raw.series) ? str(raw.series.lastObservedTime) : undefined;
     const metadata = isObject(raw.metadata) ? str(raw.metadata.creationTimestamp) : undefined;
@@ -87,7 +89,9 @@ export async function eventsAction(kube: Kube, now: number): Promise<Outcome> {
         .sort((a, b) => (a.at ?? 0) - (b.at ?? 0));
     if (found.length === 0) {
         return {
-            text: `No recent events about the pods and workloads of ${where}. The cluster keeps events for about an hour.`,
+            text:
+                `No recent events about the pods and workloads of ${where}. ` +
+                "The cluster keeps events for about an hour.",
             facts: { events: 0, warnings: 0 },
             details: { events: 0 },
         };

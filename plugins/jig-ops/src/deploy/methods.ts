@@ -1,6 +1,6 @@
-// The deploy methods there are, in one place: the catalog checks an environment's `deploy` object with checkDeploy, and the
-// deploy tool turns it into a Deployer with deployerOf. A new method (a GitOps pull request, a CI deploy job) is a file
-// beside helm.ts, a case in each of the two functions below, and its name in METHODS.
+// The deploy methods there are, in one place: the catalog checks an environment's `deploy` object with checkDeploy, and
+// the deploy tool turns it into a Deployer with deployerOf. A new method (a GitOps pull request, a CI deploy job) is a
+// file beside helm.ts, a case in each of the two functions below, and its name in METHODS.
 import { isObject } from "../values.ts";
 import type { Deployer } from "./command.ts";
 import { checkHelm, helmDeployer } from "./helm.ts";

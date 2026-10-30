@@ -1,8 +1,11 @@
-// What this plugin remembers of the deploys and rollbacks it ran, for `deploy status`. It is kept in memory, for the length of
-// the session: the cluster is the truth, and `status` always reads it. The record only says what was done from here, and how it
-// ended as far as this plugin could tell. Every call is also in jig-core's records.
+// What this plugin remembers of the deploys and rollbacks it ran, for `deploy status`. It is kept in memory, for the
+// length of the session: the cluster is the truth, and `status` always reads it. The record only says what was done
+// from here, and how it ended as far as this plugin could tell. Every call is also in jig-core's records.
 
-/** How a deploy ended, as far as this plugin could tell. `unknown` is a command that was cut short, and was not run again. */
+/**
+ * How a deploy ended, as far as this plugin could tell. `unknown`
+ * is a command that was cut short, and was not run again.
+ */
 export type RecordedOutcome = "started" | "failed" | "unknown";
 
 export interface DeployRecord {

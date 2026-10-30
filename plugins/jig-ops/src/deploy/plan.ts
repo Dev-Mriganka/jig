@@ -1,10 +1,11 @@
 // What a deploy or a rollback would do, worked out before anything is done. The same plan serves two callers:
 //   - jig-core asks for the preview when a rule says "ask", and shows it to the user;
 //   - execute() plans again, and refuses to run if the plan differs from the one the user approved.
-// So whatever changed while the user was reading (a new version running, a moved revision) is caught, not deployed over.
+// So whatever changed while the user was reading (a new version running, a moved revision) is caught, and the deploy
+// does not go over it.
 //
-// A plan reads the cluster and changes nothing. Its fingerprint covers what the user is shown that can matter: the service, the
-// environment, the method, the exact argument list, the versions running now, and where the command goes.
+// A plan reads the cluster and changes nothing. Its fingerprint covers what the user is shown that can matter: the
+// service, the environment, the method, the exact argument list, the versions running now, and where the command goes.
 import { createHash } from "node:crypto";
 import type { EnvironmentKind, Preview } from "../../../jig-core/src/contract.ts";
 import type { Environment } from "../catalog.ts";
@@ -23,20 +24,34 @@ export function digest(...parts: readonly unknown[]): string {
 }
 
 /**
- * Why a deploy or a rollback may not be run in this environment, or undefined when it may. The floor of jig-core denies a
- * write to production anyway; this says so before anyone is asked, and says why. An environment the catalog gives no
+ * Why a deploy or a rollback may not be run in this environment, or undefined when it may. The floor of jig-core denies
+ * a write to production anyway; this says so before anyone is asked, and says why. An environment the catalog gives no
  * deploy method is one the agent does not deploy to.
  */
 export function refusal(action: "run" | "rollback", env: Environment, kind: EnvironmentKind): string | undefined {
     const where = `${env.service} in ${env.name}`;
     if (kind === "production") {
-        // jig-core counts a name it does not know as production, so a test environment that was never defined looks like this.
-        const unknown = env.name === "production" ? "" : `. jig-core counts a name it does not know as production: if ${env.name} is a test environment, define it under "environments" in jig.json with kind test`;
-        return `${where} is production: the agent never changes production${unknown}`;
+        // jig-core counts a name it does not know as production, so a test environment that was never defined looks
+        // like this one.
+        const hint =
+            env.name === "production"
+                ? ""
+                : `. jig-core counts a name it does not know as production: if ${env.name} is a test environment, ` +
+                  'define it under "environments" in jig.json with kind test';
+        return `${where} is production: the agent never changes production${hint}`;
     }
-    if (env.deploy === undefined) return `the catalog gives ${where} no deploy method: the agent deploys only where the catalog names one`;
-    if (action === "rollback" && kind !== "test") return `a rollback works in test environments only, and ${env.name} is ${kind} for jig-core`;
+    if (env.deploy === undefined) {
+        return `the catalog gives ${where} no deploy method: the agent deploys only where the catalog names one`;
+    }
+    if (action === "rollback" && kind !== "test") {
+        return `a rollback works in test environments only, and ${env.name} is ${kind} for jig-core`;
+    }
     return undefined;
+}
+
+/** `staging (test)`, or just `production` when the name says what it is. */
+export function environmentText(name: string, kind: EnvironmentKind): string {
+    return name === kind ? name : `${name} (${kind})`;
 }
 
 /** The exact argument list that is started for a command. */
@@ -98,20 +113,31 @@ function build(inputs: PlanInputs): Plan {
     const row = (label: string, value: string): string => `${label}:`.padEnd(15) + value;
     const body = [
         row("Service", env.service),
-        row("Environment", `${env.name} (${kind})`),
+        row("Environment", environmentText(env.name, kind)),
         row("Method", method),
         row("Running now", from),
         row(action === "run" ? "Deploying" : "Going back to", to),
         row("Command", line),
         "",
-        "The command runs once, without a shell. If it is cut short, whether it took effect is unknown, and it is not run again.",
+        "The command runs once, without a shell. If it is cut short, whether it took effect is unknown, " +
+            "and it is not run again.",
         ...(same ? ["", `Note: ${version} is already running, so this changes the release and not the version.`] : []),
     ].join("\n");
     const summary =
         action === "run"
             ? `deploy ${to} to ${env.service} in ${env.name} with ${method} (now ${from})`
             : `roll ${env.service} in ${env.name} back to ${to} with ${method} (now ${from})`;
-    const fingerprint = digest("deploy", action, env.service, env.name, method, argvOfCommand(command, kube.target), [...rollout.tags].sort(), rollout.live.length === 0, to);
+    const fingerprint = digest(
+        "deploy",
+        action,
+        env.service,
+        env.name,
+        method,
+        argvOfCommand(command, kube.target),
+        [...rollout.tags].sort(),
+        rollout.live.length === 0,
+        to,
+    );
     return {
         action,
         env,
@@ -143,6 +169,9 @@ export async function planRollback(env: Environment, kube: Kube, kind: Environme
     if (deploy === undefined) throw new Error(`${env.service} in ${env.name} has no deploy method`);
     const { rollout } = await look(kube, undefined);
     const back = await deployerOf(deploy).rollback(kube);
-    const to = back.version === undefined ? `${back.revision} (its version could not be read)` : `${back.revision}, which ran ${back.version}`;
+    const to =
+        back.version === undefined
+            ? `${back.revision} (its version could not be read)`
+            : `${back.revision}, which ran ${back.version}`;
     return build({ action: "rollback", env, kube, kind, command: back.command, rollout, to, version: back.version });
 }

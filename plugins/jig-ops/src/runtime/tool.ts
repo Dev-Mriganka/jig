@@ -1,8 +1,8 @@
-// The `runtime` tool: what Pi registers, and the classification that jig-core's declaration is made of besides its name.
+// The `runtime` tool: what Pi registers, and the classification that makes up jig-core's declaration of it.
 //
 // Every action reads. The tool says where each call acts (the environment of the catalog, which is also the name that
-// jig-core knows the environment by) and that it is a read; jig-core decides what that means. A production read is allowed
-// and jig-core masks the result, so this plugin masks nothing itself (`masksOwnResults` stays unset).
+// jig-core knows the environment by) and that it is a read; jig-core decides what that means. A production read is
+// allowed and jig-core masks the result, so this plugin masks nothing itself (`masksOwnResults` stays unset).
 //
 // One thing is refused here and not left to the rules: curl inside a pod, in an environment that jig-core counts as
 // production. jig-core can tell the kind of any environment name, so the tool asks it, and the call is blocked in
@@ -70,15 +70,16 @@ function timerSleep(ms: number, signal: AbortSignal | undefined): Promise<void> 
 }
 
 /**
- * Throws an InputError for a call that must not run. curl inside a pod does not run in production, whatever the rules say:
- * an environment jig-core counts as production (a name it does not know included) gets its health from an address.
+ * Throws an InputError for a call that must not run. curl inside a pod does not run in production, whatever the rules
+ * say: an environment jig-core counts as production (a name it does not know included) gets its health from an address.
  */
 function refuse(call: Call): void {
     if (call.action !== "health" || call.how.kind !== "pod") return;
     if (jig().environments.kindOf(call.env.name) !== "production") return;
     throw new InputError(
-        `runtime health is refused in production (${call.env.service} in ${call.env.name}): without a health address it would ` +
-            'run curl inside a pod, and nothing is run in a production pod. Add "health" (an https address) to its entry in the ops catalog',
+        `runtime health is refused in production (${call.env.service} in ${call.env.name}): ` +
+            "without a health address it would run curl inside a pod, and nothing is run in a production pod. " +
+            'Add "health" (an https address) to its entry in the ops catalog',
     );
 }
 
@@ -100,15 +101,18 @@ export function createRuntimeTool(options: RuntimeOptions = {}): RuntimeTool {
             case "events":
                 return eventsAction({ target: call.target, signal }, now());
             case "health":
-                if (call.how.kind === "url") return urlHealth(call.how.url, signal, { fetch: fetchHealth, timeoutMs: healthTimeoutMs });
+                if (call.how.kind === "url") {
+                    return urlHealth(call.how.url, signal, { fetch: fetchHealth, timeoutMs: healthTimeoutMs });
+                }
                 return inPodHealth({ target: call.how.target, signal });
         }
     }
 
     return {
         classify(input) {
-            // An unknown service or environment, a call that breaks the limits, and a health check that would run in a
-            // production pod all throw a TypeError that says what to change, and jig-core blocks the call without asking.
+            // An unknown service or environment, a call that breaks the limits, and a
+            // health check that would run in a production pod all throw a TypeError
+            // that says what to change, and jig-core blocks the call without asking.
             return classifying(() => {
                 const call = parseCall(input, currentCatalog());
                 refuse(call);
@@ -123,7 +127,8 @@ export function createRuntimeTool(options: RuntimeOptions = {}): RuntimeTool {
             promptSnippet: "runtime: read a service's pods, rollout, logs, events and health from the ops catalog",
             promptGuidelines: [
                 "runtime: run pods first; after a deploy call rollout with waitFor once instead of polling pods.",
-                "runtime: read the ops skill. A health check in a pod runs in test environments only; sign-in failures are the user's.",
+                "runtime: read the ops skill. A health check in a pod runs in test environments only; " +
+                    "sign-in failures are the user's.",
             ],
             parameters,
             async execute(toolCallId, params, signal, onUpdate) {

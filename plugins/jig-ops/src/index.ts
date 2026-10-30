@@ -1,5 +1,5 @@
-// Pi entry point of jig-ops. The factory only registers: the `ops` section, the tools' declarations and the watch kind go to
-// jig-core, the tools go to Pi. Nothing is read from a cluster until a call is made.
+// Pi entry point of jig-ops. The factory only registers: the `ops` section, the tools' declarations and the watch kind
+// go to jig-core, the tools go to Pi. Nothing is read from a cluster until a call is made.
 import type { ExtensionAPI, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { withJig } from "../../jig-core/src/client.ts";
 import { validateOps } from "./catalog.ts";
@@ -17,7 +17,8 @@ export function jigOps(options: OpsOptions = {}): ExtensionFactory {
     return (pi: ExtensionAPI) => {
         const runtime = createRuntimeTool(options);
         const deploy = createDeployTool(options);
-        // jig-core may load after this plugin; withJig waits for it. What the tools declare is how jig-core classifies them.
+        // jig-core may load after this plugin; withJig waits for it.
+        // What the tools declare is how jig-core classifies them.
         withJig((api) => {
             api.config.registerSection("ops", validateOps);
             api.declareTool({ tool: "runtime", plugin: "jig-ops", classify: runtime.classify });

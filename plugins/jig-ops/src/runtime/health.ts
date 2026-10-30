@@ -1,10 +1,10 @@
 // `health` by address: one GET on the https address the catalog gives, to see whether the service answers.
 //
-// The address is the catalog's: the model gives no path, header or body. A redirect is never followed, so a request cannot
-// be sent on to another host. The wait is ten seconds, and the answer is its status and the first part of its body, with
-// terminal sequences and control characters taken out. A status that is not 2xx is a result, not an error: that is what
-// the check is for. A request that gets no answer is an error that says why, in words of this plugin and never Node's,
-// which can quote the address.
+// The address is the catalog's: the model gives no path, header or body. A redirect is never followed, so a request
+// cannot be sent on to another host. The wait is ten seconds, and the answer is its status and the first part of its
+// body, with terminal sequences and control characters taken out. A status that is not 2xx is a result, not an error:
+// that is what the check is for. A request that gets no answer is an error that says why, in words of this plugin and
+// never Node's, which can quote the address.
 import { healthProblem } from "../catalog.ts";
 import { clean, isObject } from "../values.ts";
 import type { Outcome } from "../values.ts";
@@ -27,7 +27,9 @@ export function shownAddress(address: string): string {
     return `${url.origin}${url.pathname}${url.search === "" ? "" : "?…"}`;
 }
 
-/** Rejects when `signal` aborts, whatever `work` is doing: the time limit must hold even if `fetch` ignores its signal. */
+/**
+ * Rejects when `signal` aborts, whatever `work` is doing: the time limit must hold even if `fetch` ignores its signal.
+ */
 function untilAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
     return new Promise<T>((resolve, reject) => {
         const onAbort = (): void => reject(signal.reason);
@@ -55,8 +57,15 @@ function codeOf(error: unknown): string {
 }
 
 const CERTIFICATE = new Set([
-    "DEPTH_ZERO_SELF_SIGNED_CERT", "SELF_SIGNED_CERT_IN_CHAIN", "UNABLE_TO_VERIFY_LEAF_SIGNATURE", "UNABLE_TO_GET_ISSUER_CERT",
-    "UNABLE_TO_GET_ISSUER_CERT_LOCALLY", "CERT_HAS_EXPIRED", "CERT_NOT_YET_VALID", "CERT_UNTRUSTED", "CERT_REVOKED",
+    "DEPTH_ZERO_SELF_SIGNED_CERT",
+    "SELF_SIGNED_CERT_IN_CHAIN",
+    "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+    "UNABLE_TO_GET_ISSUER_CERT",
+    "UNABLE_TO_GET_ISSUER_CERT_LOCALLY",
+    "CERT_HAS_EXPIRED",
+    "CERT_NOT_YET_VALID",
+    "CERT_UNTRUSTED",
+    "CERT_REVOKED",
     "ERR_TLS_CERT_ALTNAME_INVALID",
 ]);
 
@@ -67,7 +76,9 @@ function noAnswer(error: unknown, stop: AbortSignal, userStopped: boolean, timeo
     const code = codeOf(error);
     if (code === "ENOTFOUND" || code === "EAI_AGAIN") return `the name does not resolve (${code})`;
     if (code === "ECONNREFUSED") return "the connection was refused (ECONNREFUSED)";
-    if (CERTIFICATE.has(code)) return `the TLS certificate was not accepted (${code}); certificate checks are never turned off`;
+    if (CERTIFICATE.has(code)) {
+        return `the TLS certificate was not accepted (${code}); certificate checks are never turned off`;
+    }
     return code === "" ? "the connection failed" : `the connection failed (${code})`;
 }
 
@@ -99,8 +110,9 @@ export async function urlHealth(address: string, cancel: AbortSignal | undefined
     let response: Response;
     let body: { bytes: Uint8Array; more: boolean };
     try {
+        const headers = { accept: "*/*", "user-agent": "jig-ops" };
         response = await untilAborted(
-            deps.fetch(address, { method: "GET", redirect: "manual", signal: stop, headers: { accept: "*/*", "user-agent": "jig-ops" } }),
+            deps.fetch(address, { method: "GET", redirect: "manual", signal: stop, headers }),
             stop,
         );
         body = await untilAborted(readStart(response), stop);
@@ -110,12 +122,13 @@ export async function urlHealth(address: string, cancel: AbortSignal | undefined
 
     const status = response.status;
     const location = response.headers.get("location");
-    const redirect = location === null ? "" : ` (a redirect, not followed; it points to ${clean(location).slice(0, 200)})`;
+    let redirect = "";
+    if (location !== null) redirect = ` (a redirect, not followed; it points to ${clean(location).slice(0, 200)})`;
     const binary = body.bytes.subarray(0, SNIFF_BYTES).includes(0);
-    const shown = binary ? "" : clean(new TextDecoder().decode(body.bytes));
+    const text = binary ? "" : clean(new TextDecoder().decode(body.bytes));
     const lines = [`${where} -> HTTP ${status}${redirect}`];
     if (binary) lines.push(`(not text: ${body.bytes.byteLength} bytes read)`);
-    else lines.push(shown === "" ? "(empty body)" : shown);
+    else lines.push(text === "" ? "(empty body)" : text);
     if (body.more) lines.push(`[the body goes on; only the first ${BODY_BYTES} bytes are shown]`);
     return {
         text: lines.join("\n"),

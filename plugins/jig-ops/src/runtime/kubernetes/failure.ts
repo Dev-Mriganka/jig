@@ -72,7 +72,9 @@ function where(target: Target): string {
     return `${target.service} in ${target.environment}`;
 }
 
-/** `what` names the command that failed, such as "kubectl get". `access` says what it was allowed to do, for a refusal. */
+/**
+ * `what` names the command that failed, such as "kubectl get". `access` says what it was allowed to do, for a refusal.
+ */
 export function explain(
     stderr: string,
     code: number,
@@ -96,7 +98,8 @@ export function explain(
     if (NO_CONTEXT.test(stderr)) {
         return new Error(
             `kubectl has no context ${target.context} (${where(target)}): ` +
-                'fix "context" in the ops catalog of jig.json (runtime.kubernetes), or add the context to the kubeconfig',
+                'fix "context" in the ops catalog of jig.json (runtime.kubernetes), ' +
+                "or add the context to the kubeconfig",
         );
     }
     if (FORBIDDEN.test(stderr)) {
@@ -116,8 +119,9 @@ export function explain(
     }
     if (LOCKED.test(stderr)) {
         return new Error(
-            `helm says another operation on the release of ${where(target)} is in progress: an interrupted deploy leaves it ` +
-                "locked. Nothing was retried; tell the user, who looks at the release with helm",
+            `helm says another operation on the release of ${where(target)} is in progress: ` +
+                "an interrupted deploy leaves it locked. Nothing was retried; " +
+                "tell the user, who looks at the release with helm",
         );
     }
     if (NO_RELEASE.test(stderr)) {

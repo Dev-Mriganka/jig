@@ -1,9 +1,9 @@
-// The health check inside a pod: a GET on the path the catalog gives, made from one of the service's Ready pods with curl,
-// on the port the catalog names. The pod must have curl; the tool adds nothing to the pod.
+// The health check inside a pod: a GET on the path the catalog gives, made from one of the service's Ready pods with
+// curl, on the port the catalog names. The pod must have curl; the tool adds nothing to the pod.
 //
-// The request is fixed. The container, the port and the path are the catalog's, checked when the catalog was read, and the
-// address is one argument of curl's command line, which no shell reads. The model gives no path, method, header or body,
-// so there is nothing to put on curl's standard input and nothing to hide from kubectl's.
+// The request is fixed. The container, the port and the path are the catalog's, checked when the catalog was read, and
+// the address is one argument of curl's command line, which no shell reads. The model gives no path, method, header or
+// body, so there is nothing to put on curl's standard input and nothing to hide from kubectl's.
 //
 // This runs a command in a pod, so it never runs in production: the runtime tool refuses it there (see ../tool.ts).
 import { clean, shortList } from "../../values.ts";
@@ -91,7 +91,9 @@ export async function inPodHealth(kube: Kube): Promise<Outcome> {
     const result = await runKubectl(kube, "exec", [pod.name, "-c", container, "--", ...curlArgs(url)], API);
     if (result.code !== 0) {
         if (NO_CURL.test(result.stderr)) {
-            throw new Error(`${pod.name} has no curl in container ${container}: the health check inside a pod needs curl`);
+            throw new Error(
+                `${pod.name} has no curl in container ${container}: the health check inside a pod needs curl`,
+            );
         }
         // curl's own failure comes back through kubectl; anything else is kubectl's (sign-in, network) and reads as
         // such.

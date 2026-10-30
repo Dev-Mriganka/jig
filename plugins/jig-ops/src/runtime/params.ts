@@ -1,6 +1,6 @@
-// The parameters of the `runtime` tool, and the checks that turn them into a Call. Everything that reaches kubectl or the
-// network has passed through parseCall: the service and the environment are the catalog's, and every other value has a
-// known shape and size. parseCall does no I/O.
+// The parameters of the `runtime` tool, and the checks that turn them into a Call. Everything that reaches kubectl or
+// the network has passed through parseCall: the service and the environment are the catalog's, and every other value
+// has a known shape and size. parseCall does no I/O.
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import { describeServices, findEnvironment, notSetUp } from "../catalog.ts";
@@ -132,14 +132,18 @@ function text(action: Action, value: unknown, name: string, pattern: RegExp, wha
 function kubernetesOf(action: Action, env: Environment): Target {
     if (env.kubernetes === undefined) {
         // The catalog needs a runtime for a deploy method, so an environment without one has a health address only.
-        fail(action, `${env.service} in ${env.name} has no Kubernetes runtime in the catalog (it has a health address only)`);
+        fail(
+            action,
+            `${env.service} in ${env.name} has no Kubernetes runtime in the catalog (it has a health address only)`,
+        );
     }
     return env.kubernetes;
 }
 
 /**
- * How `health` checks an environment: its https address when it has one, otherwise curl inside a pod when its Kubernetes
- * runtime names a health path. Whether curl in a pod is allowed is for the tool to decide, from the kind of environment.
+ * How `health` checks an environment: its https address when it has one, otherwise
+ * curl inside a pod when its Kubernetes runtime names a health path. Whether curl
+ * in a pod is allowed is for the tool to decide, from the kind of environment.
  */
 function healthHow(env: Environment): HealthHow {
     if (env.health !== undefined) return { kind: "url", url: env.health };
