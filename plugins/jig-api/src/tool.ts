@@ -1,39 +1,37 @@
-// The `http` tool: what Pi registers, and the two functions that jig-core's declaration is made of besides its name
-// (classify and preview). `execute` and `preview` check the call the same way and make the same plan, so what the person
-// approved is what is sent.
+// The `api` tool: what Pi registers, and the two functions that jig-core's declaration is made of besides its name (classify
+// and preview). `classify`, `preview` and `execute` plan the call the same way, from the same files, so what jig-core
+// classified and what the person approved is what is sent. Planning is where invalid input is found, and every such finding
+// is an InputError: jig-core blocks the call without asking.
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { jig } from "../../jig-core/src/client.ts";
 import type { CallClass, Preview } from "../../jig-core/src/contract.ts";
+import { loadCatalog } from "./catalog.ts";
 import { settingsOf } from "./config.ts";
-import type { HttpSettings } from "./config.ts";
+import type { ApiSettings } from "./config.ts";
 import { createHttp } from "./engine/http.ts";
 import type { HttpOptions, Sent } from "./engine/http.ts";
-import { findTarget, parameters, parseCall } from "./params.ts";
-import { planOf } from "./engine/plan.ts";
+import { fingerprintOfAll, READ_METHODS } from "./engine/plan.ts";
 import type { Plan } from "./engine/plan.ts";
-import { previewOf } from "./engine/preview.ts";
-import { renderResult } from "./engine/render.ts";
+import { previewOf, previewOfAll } from "./engine/preview.ts";
+import { renderResult, statusLine } from "./engine/render.ts";
 import { InputError } from "./engine/values.ts";
 import { LostReplyError, NotSentError } from "./engine/wire.ts";
+import { parameters, parseCall } from "./params.ts";
+import type { Call } from "./params.ts";
+import { planCall, planRequest } from "./planning.ts";
+import type { PlanContext } from "./planning.ts";
+import { listText, readsOf, showText } from "./show.ts";
+
+export type ApiOptions = HttpOptions;
 
 const DESCRIPTION =
-    "Call a named HTTP API with a method, path, JSON body and headers. GET reads; other methods write. " +
-    "The tool adds the sign-in. A non-2xx answer is a result, not an error.";
+    "Run your team's saved API requests by name, filling only their variables: list, show, run, run-folder. " +
+    "call sends an ad-hoc request where allowed. The tool signs in. A non-2xx answer is a result.";
 
-export interface HttpTool {
+export interface ApiTool {
     definition: ToolDefinition<typeof parameters>;
     classify(input: Readonly<Record<string, unknown>>): CallClass;
     preview(input: Readonly<Record<string, unknown>>, signal: AbortSignal): Promise<Preview>;
-}
-
-/** The section as jig-core loaded it. Read on every call, so a configuration change applies. */
-function currentSettings(): HttpSettings | undefined {
-    return settingsOf(jig().config.section("http"));
-}
-
-/** `http POST billing /v1/accounts`: names a call in a message, without its query or its body. */
-function where(plan: Plan): string {
-    return `http ${plan.call.method} ${plan.call.target.name} ${plan.call.path}`;
 }
 
 /** An error's message without its closing full stop, so a sentence can follow it. */
@@ -44,72 +42,178 @@ const sentence = (error: Error): string => error.message.replace(/[.\s]+$/, "");
  * never sent again: the model is told to read the resource instead.
  */
 function describeFailure(plan: Plan, error: unknown): unknown {
-    if (error instanceof NotSentError) return new Error(`${where(plan)}: ${sentence(error)}. Nothing was sent.`);
+    if (error instanceof NotSentError) return new Error(`${plan.label}: ${sentence(error)}. Nothing was sent.`);
     if (!(error instanceof LostReplyError)) return error;
-    const why = error.reason === "timeout" ? `timed out after ${plan.call.timeoutSec} s` : error.message;
-    const lead = `${where(plan)}: no answer (${why}).`;
-    if (plan.call.method === "GET") return new Error(`${lead} A GET changes nothing, so it can be sent again.`);
+    const why = error.reason === "timeout" ? `timed out after ${plan.timeoutSec} s` : error.message;
+    const lead = `${plan.label}: no answer (${why}).`;
+    if (READ_METHODS.has(plan.method)) return new Error(`${lead} A ${plan.method} changes nothing, so it can be sent again.`);
     return new Error(
         `${lead} The outcome is unknown: the server may have carried it out. It was not sent again. ` +
             "Check with a GET before trying again.",
     );
 }
 
-export function createTool(options: HttpOptions = {}): HttpTool {
+/** The section as jig-core loaded it. Read on every call, so a configuration change applies. */
+function requiredSettings(): ApiSettings {
+    const settings = settingsOf(jig().config.section("api"));
+    if (settings === undefined) {
+        throw new InputError('api is not set up: add an "api" section with "collections" to jig.json (/jig lists configuration problems)');
+    }
+    return settings;
+}
+
+function contextOf(): PlanContext {
+    const settings = requiredSettings();
+    return { settings, catalog: loadCatalog(settings), kindOf: (name) => jig().environments.kindOf(name) };
+}
+
+/** The plans a `run`, `run-folder` or `call` makes, and what to call them. */
+interface Prepared {
+    plans: Plan[];
+    /** The class of the call: its action and effect. */
+    action: string;
+    effect: "read" | "write";
+    environment: string;
+    /** `Orders/Smoke` for a folder; undefined for one request. */
+    folder?: string;
+}
+
+/** Plans every request the call sends. Throws an InputError for anything invalid. */
+function prepare(ctx: PlanContext, call: Extract<Call, { action: "run" | "run-folder" | "call" }>): Prepared {
+    if (call.action === "call") {
+        const plan = planCall(ctx, {
+            environment: call.environment, collection: call.collection, method: call.method, url: call.url, body: call.body,
+            headers: call.headers, timeoutSec: call.timeoutSec,
+        });
+        // Only the method decides an ad-hoc call: a name in `reads` cannot turn every call into a read.
+        return { plans: [plan], action: "call", effect: READ_METHODS.has(plan.method) ? "read" : "write", environment: plan.jigEnvironment };
+    }
+    if (call.action === "run") {
+        const request = ctx.catalog.request(call.request, call.collection, call.folder);
+        const plan = planRequest(ctx, request, call);
+        return { plans: [plan], action: request.name, effect: readsOf(ctx.settings, request) ? "read" : "write", environment: plan.jigEnvironment };
+    }
+    const found = ctx.catalog.folder(call.folder, call.collection);
+    const plans = found.requests.map((request) => planRequest(ctx, request, call));
+    const writes = found.requests.some((request) => !readsOf(ctx.settings, request));
+    const first = plans[0] as Plan;
+    // A folder is as strict as its strictest request: one write makes it a write.
+    return {
+        plans, action: `${found.collection.name}/${found.folder}`, effect: writes ? "write" : "read", environment: first.jigEnvironment, folder: found.folder,
+    };
+}
+
+/** jig-core takes any TypeError to mean that the input is invalid. Only an InputError may say so: a TypeError from a bug here
+ *  is an ordinary failure, which shows as "preview unavailable" and leaves the decision to the person. */
+function asInvalidInput(error: unknown): unknown {
+    if (error instanceof TypeError && !(error instanceof InputError)) return new Error(`internal error: ${error.message}`);
+    return error;
+}
+
+/** Summary lines for a folder run: one per request, stopping at the first failure. */
+async function runFolder(http: ReturnType<typeof createHttp>, prepared: Prepared, signal: AbortSignal | undefined): Promise<{ text: string; ran: number; failed: boolean }> {
+    const lines: string[] = [];
+    let failure: string | undefined;
+    let ran = 0;
+    for (const [index, plan] of prepared.plans.entries()) {
+        const number = `${index + 1}. ${plan.request}`;
+        if (failure !== undefined) {
+            lines.push(`${number}: skipped`);
+            continue;
+        }
+        try {
+            const sent: Sent = await http.send(plan, signal);
+            ran++;
+            lines.push(`${number}: ${statusLine(plan, sent.answer)}`);
+            if (sent.answer.status < 200 || sent.answer.status >= 300) failure = renderResult(plan, sent);
+        } catch (error) {
+            const described = describeFailure(plan, error);
+            lines.push(`${number}: ${described instanceof Error ? described.message.replace(`${plan.label}: `, "") : "failed"}`);
+            failure = described instanceof Error ? described.message : "failed";
+            ran++;
+        }
+    }
+    const first = prepared.plans[0] as Plan;
+    const head = `Folder ${prepared.folder ?? ""} in ${first.environment} (${first.jigEnvironment}): ${ran} of ${prepared.plans.length} ran${failure === undefined ? ", all answered 2xx" : ", stopped at the first failure"}`;
+    return { text: [head, ...lines, ...(failure === undefined ? [] : ["", "Failed request:", failure])].join("\n"), ran, failed: failure !== undefined };
+}
+
+export function createTool(options: ApiOptions = {}): ApiTool {
     const http = createHttp(options);
+
+    /** Nothing is sent if what would be sent now is not what was approved. */
+    function guard(toolCallId: string, label: string, fingerprint: string): void {
+        const approved = jig().approvedPreview(toolCallId);
+        if (approved?.fingerprint !== undefined && approved.fingerprint !== fingerprint) {
+            throw new Error(`${label}: changed since the preview; run it again to see the new preview. Nothing was sent.`);
+        }
+    }
 
     return {
         classify(input) {
-            // An unknown target throws a TypeError that names the known ones, and jig-core blocks the call without asking.
-            // The target is the action, so a rule, or "Allow for this session", covers one API and not every API in its
-            // environment.
-            const target = findTarget(currentSettings(), input.target);
-            return { action: target.name, environment: target.environment, effect: input.method === "GET" ? "read" : "write" };
+            const call = parseCall(input);
+            switch (call.action) {
+                case "list":
+                case "show":
+                    requiredSettings();
+                    return { action: call.action, environment: "local", effect: "read" };
+                default: {
+                    // The call is planned in full, so that anything invalid is found now and blocks the call without asking.
+                    const prepared = prepare(contextOf(), call);
+                    return { action: prepared.action, environment: prepared.environment, effect: prepared.effect };
+                }
+            }
         },
 
         async preview(input) {
             try {
-                return previewOf(planOf(parseCall(input, currentSettings())));
+                const call = parseCall(input);
+                if (call.action === "list" || call.action === "show") return { summary: `api ${call.action}` };
+                const prepared = prepare(contextOf(), call);
+                return prepared.folder === undefined
+                    ? previewOf(prepared.plans[0] as Plan)
+                    : previewOfAll(`Folder ${prepared.folder}`, prepared.plans);
             } catch (error) {
-                // jig-core takes any TypeError from a preview to mean that the input is invalid, and blocks the call without
-                // asking. Only an InputError may say so: a TypeError from a bug here is an ordinary failure, which shows as
-                // "preview unavailable" and leaves the decision to the person.
-                if (error instanceof TypeError && !(error instanceof InputError)) {
-                    throw new Error(`internal error: ${error.message}`);
-                }
-                throw error;
+                throw asInvalidInput(error);
             }
         },
 
         definition: {
-            name: "http",
-            label: "HTTP",
+            name: "api",
+            label: "API",
             description: DESCRIPTION,
-            promptSnippet: "http: call a named HTTP API: GET reads, POST, PUT, PATCH and DELETE write",
+            promptSnippet: "api: run the team's saved API requests by name (list, show, run, run-folder); call for an ad-hoc one",
             parameters,
             // One call at a time and in order: a write must be done before the read that checks it.
             executionMode: "sequential",
             async execute(toolCallId, params, signal) {
-                const plan = planOf(parseCall(params, currentSettings()));
-
-                const approved = jig().approvedPreview(toolCallId);
-                if (approved?.fingerprint !== undefined && approved.fingerprint !== plan.fingerprint) {
-                    throw new Error(
-                        `${where(plan)}: changed since the preview; run it again to see the new preview. Nothing was sent.`,
-                    );
+                const call = parseCall(params);
+                const text = (value: string, details: Record<string, unknown> = {}) => ({ content: [{ type: "text" as const, text: value }], details });
+                if (call.action === "list" || call.action === "show") {
+                    const ctx = contextOf();
+                    if (call.action === "list") return text(listText(ctx.catalog, ctx.settings, { collection: call.collection, folder: call.folder, text: call.text }), { action: "list" });
+                    const request = ctx.catalog.request(call.request, call.collection, call.folder);
+                    return text(showText(ctx.catalog, ctx.settings, request, call.environment), { action: "show", request: request.name });
                 }
 
+                const prepared = prepare(contextOf(), call);
+                const first = prepared.plans[0] as Plan;
+                if (prepared.folder !== undefined) {
+                    guard(toolCallId, `api run-folder ${prepared.folder}`, fingerprintOfAll(prepared.plans));
+                    const folder = await runFolder(http, prepared, signal);
+                    jig().addFacts(toolCallId, { requests: prepared.plans.length, ran: folder.ran, failed: folder.failed ? 1 : 0 });
+                    return text(folder.text, { folder: prepared.folder, requests: prepared.plans.length, ran: folder.ran, failed: folder.failed });
+                }
+
+                guard(toolCallId, first.label, first.fingerprint);
                 let sent: Sent;
                 try {
-                    sent = await http.send(plan, signal);
+                    sent = await http.send(first, signal);
                 } catch (error) {
-                    throw describeFailure(plan, error);
+                    throw describeFailure(first, error);
                 }
                 jig().addFacts(toolCallId, { status: sent.answer.status });
-                return {
-                    content: [{ type: "text", text: renderResult(plan, sent) }],
-                    details: { target: plan.call.target.name, method: plan.call.method, status: sent.answer.status },
-                };
+                return text(renderResult(first, sent), { request: first.request, method: first.method, status: sent.answer.status });
             },
         },
     };

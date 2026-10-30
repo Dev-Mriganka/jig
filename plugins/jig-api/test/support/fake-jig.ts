@@ -1,9 +1,9 @@
 // A stand-in for jig-core's run-time API, published on the same process-wide slot, so the plugin runs as it would under
-// jig-core. Only what jig-http uses is real: the section of jig.json, secrets, sign-in services, transports, the approved
-// preview and the facts. Everything the plugin tells jig-core or asks of it is recorded for the tests.
+// jig-core. Only what jig-api uses is real: the section of jig.json, secrets, sign-in services, transports, the kind of an
+// environment, the approved preview and the facts. Everything the plugin tells jig-core or asks of it is recorded for the tests.
 import { publishJig, withdrawJig } from "../../../jig-core/src/client.ts";
 import type {
-    Facts, JigApi, Preview, SignInRequest, ToolDeclaration, Transport, TransportRequest, TransportResponse,
+    EnvironmentKind, Facts, JigApi, Preview, SignInRequest, ToolDeclaration, Transport, TransportRequest, TransportResponse,
 } from "../../../jig-core/src/contract.ts";
 
 type Headers = Record<string, string>;
@@ -25,6 +25,8 @@ export interface FakeJig {
     /** Transports by name. Every request sent through one is recorded, as the transport received it. */
     transports: Map<string, Transport>;
     transportCalls: Array<{ name: string; request: TransportRequest }>;
+    /** The kind of each environment jig-core knows. A name that is not here counts as production, as in jig-core. */
+    kinds: Map<string, EnvironmentKind>;
     /** What `config.section(name)` returns once the section passes its check, as at jig-core's session start. */
     setSection(name: string, value: unknown): void;
     /** Makes this the jig-core that plugins reach. Only one can be: a test with two fakes calls this before it uses either. */
@@ -51,6 +53,11 @@ export function installFakeJig(): FakeJig {
     const signInCalls: FakeJig["signInCalls"] = [];
     const transports = new Map<string, Transport>();
     const transportCalls: FakeJig["transportCalls"] = [];
+    const defaultKinds = (): Map<string, EnvironmentKind> => new Map<string, EnvironmentKind>([
+        ["local", "local"], ["external", "external"], ["production", "production"], ["prod", "production"],
+        ["staging", "test"], ["qa", "test"], ["dev", "test"],
+    ]);
+    const kinds = defaultKinds();
 
     const api: JigApi = {
         version: 1,
@@ -80,7 +87,7 @@ export function installFakeJig(): FakeJig {
             },
         },
         environments: {
-            kindOf: (name: string) => (name === "local" || name === "external" ? name : name === "production" || name === "prod" ? "production" : "test"),
+            kindOf: (name: string) => kinds.get(name) ?? "production",
         },
         transports: {
             register: () => {},
@@ -140,6 +147,7 @@ export function installFakeJig(): FakeJig {
         signInCalls,
         transports,
         transportCalls,
+        kinds,
         setSection: (name, value) => void values.set(name, value),
         publish: () => void publishJig(api),
         reset() {
@@ -152,6 +160,8 @@ export function installFakeJig(): FakeJig {
             signInCalls.length = 0;
             transports.clear();
             transportCalls.length = 0;
+            kinds.clear();
+            for (const [name, kind] of defaultKinds()) kinds.set(name, kind);
         },
         remove: () => withdrawJig(api),
     };

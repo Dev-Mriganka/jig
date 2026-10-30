@@ -9,8 +9,8 @@
 // A redirect is never followed, so that a token or a signature cannot be sent to another host or in the clear.
 import { jig } from "../../../jig-core/src/client.ts";
 import type { TransportRequest, TransportResponse } from "../../../jig-core/src/contract.ts";
-import { addressProblem } from "../config.ts";
-import type { Method } from "../params.ts";
+import { addressProblem } from "./address.ts";
+import type { Method } from "./plan.ts";
 import { errorMessage, isObject, oneLine } from "./values.ts";
 
 /** A longer answer is cut here. The model reads far less, and jig-core caps what it shows. */
@@ -53,7 +53,8 @@ export interface Wire {
     method: Method;
     url: string;
     headers: Readonly<Record<string, string>>;
-    body?: string;
+    /** Text, or the bytes of a file or a multipart form. */
+    body?: string | Uint8Array;
     /** The company transport that carries the request. Without one, the request goes out with `fetch`. */
     transport?: string;
     allowPlainLocal: boolean;
@@ -159,9 +160,16 @@ async function readBody(response: Response, maxBytes: number): Promise<{ bytes: 
     }
 }
 
+/** The cookies a server sets are never kept, shown or passed on: there is no cookie jar, and a session cookie is a credential. */
+const COOKIE_HEADERS: ReadonlySet<string> = new Set(["set-cookie", "set-cookie2"]);
+
+function withoutCookies(headers: Readonly<Record<string, string>>): Readonly<Record<string, string>> {
+    return Object.fromEntries(Object.entries(headers).filter(([name]) => !COOKIE_HEADERS.has(name.toLowerCase())));
+}
+
 function answerOf(status: number, headers: Readonly<Record<string, string>>, bytes: Uint8Array, cut: boolean): Answer {
     const binary = bytes.subarray(0, SNIFF_BYTES).includes(0);
-    return { status, headers, text: binary ? "" : new TextDecoder().decode(bytes), bytes: bytes.byteLength, cut, binary };
+    return { status, headers: withoutCookies(headers), text: binary ? "" : new TextDecoder().decode(bytes), bytes: bytes.byteLength, cut, binary };
 }
 
 async function viaFetch(wire: Wire, signal: AbortSignal, maxBytes: number): Promise<Answer> {
@@ -202,10 +210,19 @@ function answerFromTransport(response: TransportResponse, maxBytes: number): Ans
     return answerOf(response.status, response.headers, bytes, cut);
 }
 
+/** What a transport can carry: its contract has these five methods and a text body. */
+const TRANSPORT_METHODS: ReadonlySet<string> = new Set(["GET", "POST", "PUT", "PATCH", "DELETE"]);
+
 async function viaTransport(wire: Wire, name: string, signal: AbortSignal, maxBytes: number): Promise<Answer> {
+    if (!TRANSPORT_METHODS.has(wire.method)) {
+        throw new NotSentError(`a transport carries GET, POST, PUT, PATCH and DELETE, and not ${wire.method}`);
+    }
+    if (wire.body !== undefined && typeof wire.body !== "string") {
+        throw new NotSentError("a transport carries a text body, and not a file or a multipart form");
+    }
     const request: TransportRequest = {
         system: wire.system,
-        method: wire.method,
+        method: wire.method as TransportRequest["method"],
         url: wire.url,
         headers: wire.headers,
         ...(wire.body === undefined ? {} : { body: wire.body }),

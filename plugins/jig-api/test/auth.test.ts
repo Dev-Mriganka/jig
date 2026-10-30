@@ -6,7 +6,7 @@ import type { Transport, TransportRequest, TransportResponse } from "../../jig-c
 import { closedPort } from "./support/fake-api.ts";
 import type { FakeApi, Recorded } from "./support/fake-api.ts";
 import {
-    CLIENT_SECRET, CLIENT_SECRET_REFERENCE, ok, PASSWORD, PASSWORD_REFERENCE, SECRET, SECRET_REFERENCE, setupHarness, TARGET, USER, USER_REFERENCE,
+    CLIENT_SECRET, CLIENT_SECRET_REFERENCE, ok, PASSWORD, PASSWORD_REFERENCE, SECRET, SECRET_REFERENCE, setupHarness, USER, USER_REFERENCE,
 } from "./support/harness.ts";
 import type { CallResult, Harness } from "./support/harness.ts";
 
@@ -83,9 +83,8 @@ describe("no sign-in", () => {
         assert.equal(request.headers["content-type"], "application/merge-patch+json");
     });
 
-    test("a base address with a path keeps it, and the request goes below it", async () => {
-        h.configure(h.section({ none: true }, { baseUrl: `${h.api.origin}/v2/` }));
-        ok(await h.call({ method: "GET", path: "/accounts/1?x=2" }));
+    test("an address with a path and a query is sent as it is", async () => {
+        ok(await h.call({ method: "GET", path: "/v2/accounts/1?x=2" }));
         assert.equal(last().target, "/v2/accounts/1?x=2");
     });
 });
@@ -108,7 +107,7 @@ describe("a bearer token", () => {
     test("a secret that cannot be read stops the call before anything is sent", async () => {
         h.jig.secrets.clear();
         const result = await h.call(GET);
-        assert.equal(result.error?.message, "http GET api /v1/me: could not sign in (the secret could not be read: no such entry). Nothing was sent.");
+        assert.equal(result.error?.message, "api call GET /v1/me: could not sign in (the secret could not be read: no such entry). Nothing was sent.");
         assert.equal(h.api.requests.length, 0);
         const write = await h.call(POST, { ask: false });
         assert.match(write.error?.message ?? "", /Nothing was sent\.$/);
@@ -119,7 +118,7 @@ describe("a bearer token", () => {
     test("a secret with a character a header cannot hold stops the call, and the error does not repeat it", async () => {
         h.jig.secrets.set(SECRET_REFERENCE, "bad-token\r\nX-Injected: 1");
         const result = await h.call(GET);
-        assert.equal(result.error?.message, "http GET api /v1/me: a header holds a character that cannot be sent. Nothing was sent.");
+        assert.equal(result.error?.message, "api call GET /v1/me: a header holds a character that cannot be sent. Nothing was sent.");
         assert.equal(h.api.requests.length, 0);
     });
 
@@ -141,8 +140,8 @@ describe("a company sign-in service", () => {
         ok(await h.call({ method: "GET", path: "/v1/me?x=1" }));
         ok(await h.call(POST, { ask: false }));
         assert.deepEqual(h.jig.signInCalls, [
-            { name: "company-sso", request: { system: "http:api", url: `${h.api.origin}/v1/me?x=1` } },
-            { name: "company-sso", request: { system: "http:api", url: `${h.api.origin}/v1/items` } },
+            { name: "company-sso", request: { system: "api:base", url: `${h.api.origin}/v1/me?x=1` } },
+            { name: "company-sso", request: { system: "api:base", url: `${h.api.origin}/v1/items` } },
         ]);
         assert.deepEqual(h.jig.secretCalls, [], "no secret is involved");
     });
@@ -166,7 +165,7 @@ describe("a company sign-in service", () => {
         h.jig.signIn.set("company-sso", () => ({ "X-Sso-Session": "sess-4711-abcdef", "X-Tenant": "acme-corp" }));
         for (const name of ["X-Sso-Session", "x-sso-session", "X-TENANT"]) {
             const result = await h.call({ ...GET, headers: { [name]: "mine" } });
-            assert.match(result.error?.message ?? "", /^http GET api \/v1\/me: header (X-Sso-Session|X-Tenant) is set by the sign-in of this target, so it cannot be given\. Nothing was sent\.$/);
+            assert.match(result.error?.message ?? "", /^api call GET \/v1\/me: header (X-Sso-Session|X-Tenant) is set by the sign-in, so the request cannot have it too\. Nothing was sent\.$/);
         }
         const write = await h.call({ ...POST, headers: { "x-sso-session": "mine" } });
         assert.match(write.error?.message ?? "", /Nothing was sent\.$/);
@@ -178,7 +177,7 @@ describe("a company sign-in service", () => {
     test("an unknown service stops the call before anything is sent", async () => {
         h.configure(h.section({ signIn: "no-such-service" }));
         const result = await h.call(GET);
-        assert.equal(result.error?.message, 'http GET api /v1/me: could not sign in (no sign-in service is named "no-such-service"). Nothing was sent.');
+        assert.equal(result.error?.message, 'api call GET /v1/me: could not sign in (no sign-in service is named "no-such-service"). Nothing was sent.');
         assert.equal(h.api.requests.length, 0);
     });
 
@@ -187,7 +186,7 @@ describe("a company sign-in service", () => {
             throw new Error("the session has expired");
         });
         const read = await h.call(GET);
-        assert.equal(read.error?.message, 'http GET api /v1/me: could not sign in (sign-in service "company-sso" failed: the session has expired). Nothing was sent.');
+        assert.equal(read.error?.message, 'api call GET /v1/me: could not sign in (sign-in service "company-sso" failed: the session has expired). Nothing was sent.');
         const write = await h.call(POST);
         assert.match(write.error?.message ?? "", /the session has expired\)\. Nothing was sent\.$/);
         assert.equal(h.api.requests.length, 0);
@@ -208,7 +207,7 @@ describe("a company transport", () => {
         const [call] = h.jig.transportCalls;
         assert.equal(call?.name, "company-proxy");
         assert.deepEqual(call?.request, {
-            system: "http:api",
+            system: "api:base",
             method: "POST",
             url: `${h.api.origin}/v1/items?x=1`,
             headers: { Accept: "application/json, text/plain, */*", "User-Agent": "jig-api", "Content-Type": "application/json", "X-Trace": "t" },
@@ -257,11 +256,11 @@ describe("a company transport", () => {
     test("an error from the transport is reported in its own words, and says the outcome is unknown for a write", async () => {
         h.jig.transports.set("company-proxy", { request: async () => { throw new Error("the proxy is not running"); } });
         const read = await h.call(GET);
-        assert.equal(read.error?.message, 'http GET api /v1/me: no answer (transport "company-proxy" failed: the proxy is not running). A GET changes nothing, so it can be sent again.');
+        assert.equal(read.error?.message, 'api call GET /v1/me: no answer (transport "company-proxy" failed: the proxy is not running). A GET changes nothing, so it can be sent again.');
         const write = await h.call(POST);
         assert.equal(
             write.error?.message,
-            'http POST api /v1/items: no answer (transport "company-proxy" failed: the proxy is not running). ' +
+            'api call POST /v1/items: no answer (transport "company-proxy" failed: the proxy is not running). ' +
                 "The outcome is unknown: the server may have carried it out. It was not sent again. Check with a GET before trying again.",
         );
         assert.equal(h.jig.transportCalls.length, 2, "never sent again");
@@ -270,7 +269,7 @@ describe("a company transport", () => {
     test("a name no company plugin registered means nothing was sent", async () => {
         h.configure(h.section({ transport: "missing-proxy" }));
         const result = await h.call(POST);
-        assert.equal(result.error?.message, 'http POST api /v1/items: no transport named "missing-proxy" (none is registered); a company plugin registers it. Nothing was sent.');
+        assert.equal(result.error?.message, 'api call POST /v1/items: no transport named "missing-proxy" (none is registered); a company plugin registers it. Nothing was sent.');
     });
 
     test("an answer that is larger than the limit is cut", async () => {
@@ -417,15 +416,23 @@ describe("the OAuth password grant", () => {
         assert.equal(h.auth.requests.length, 1);
     });
 
-    test("each target has its own token, and other sign-in settings need another token", async () => {
-        const target = (extra: Record<string, unknown> = {}) => ({ baseUrl: h.api.origin, environment: "staging", allowPlainLocal: true, auth: { oauthPassword: h.oauth(extra) } });
-        h.configure({ targets: { api: target(), other: target() } });
+    test("each collection and environment has its own token, and other sign-in settings need another token", async () => {
         ok(await h.call(GET));
-        ok(await h.call({ ...GET, target: "other" }));
-        assert.equal(h.auth.requests.length, 2);
+        assert.equal(h.auth.requests.length, 1);
         ok(await h.call(GET));
-        assert.equal(h.auth.requests.length, 2);
-        h.configure({ targets: { api: target({ clientId: "another-client" }), other: target() } });
+        assert.equal(h.auth.requests.length, 1, "the same sign-in reuses the token");
+        // Another environment of the same collection signs in again.
+        const staging = h.section({ oauthPassword: h.oauth() });
+        const other = JSON.parse(JSON.stringify(staging)) as Record<string, unknown>;
+        const files = (staging.collections as { base: { environments: { Staging: string } } }).base.environments;
+        (other.collections as { base: { environments: Record<string, string> } }).base.environments.Qa = files.Staging;
+        (other.environments as Record<string, unknown>).Qa = "staging";
+        h.configure(other);
+        ok(await h.call({ ...GET, environment: "Qa" }));
+        assert.equal(h.auth.requests.length, 2, "another environment has its own token");
+        ok(await h.call(GET));
+        assert.equal(h.auth.requests.length, 2, "and the first one still has its");
+        h.configure(h.section({ oauthPassword: h.oauth({ clientId: "another-client" }) }));
         ok(await h.call(GET));
         assert.equal(h.auth.requests.length, 3, "the settings changed");
         assert.equal(form(last(h.auth)).client_id, "another-client");
@@ -452,21 +459,21 @@ describe("when the OAuth sign-in fails", () => {
     test("a refusal is one line, with the standard error code and none of the endpoint's own words", async () => {
         h.auth.respond = () => ({ status: 401, body: JSON.stringify({ error: "invalid_grant", error_description: `${USER} ${PASSWORD} is wrong` }) });
         const message = failure(await h.call(POST));
-        assert.equal(message, "http POST api /v1/items: could not sign in (the token endpoint answered HTTP 401, invalid_grant). Nothing was sent.");
+        assert.equal(message, "api call POST /v1/items: could not sign in (the token endpoint answered HTTP 401, invalid_grant). Nothing was sent.");
         for (const secret of [USER, PASSWORD, CLIENT_SECRET]) assert.ok(!message.includes(secret));
     });
 
     test("an error code that is not in the standard is not repeated", async () => {
         h.auth.respond = () => ({ status: 400, body: JSON.stringify({ error: PASSWORD }) });
-        assert.equal(failure(await h.call(GET)), "http GET api /v1/me: could not sign in (the token endpoint answered HTTP 400). Nothing was sent.");
+        assert.equal(failure(await h.call(GET)), "api call GET /v1/me: could not sign in (the token endpoint answered HTTP 400). Nothing was sent.");
         h.auth.respond = () => ({ status: 500, body: "<html>oops</html>" });
-        assert.equal(failure(await h.call(GET)), "http GET api /v1/me: could not sign in (the token endpoint answered HTTP 500). Nothing was sent.");
+        assert.equal(failure(await h.call(GET)), "api call GET /v1/me: could not sign in (the token endpoint answered HTTP 500). Nothing was sent.");
     });
 
     test("an answer without a usable access token", async () => {
         for (const body of ["not json", "{}", "[]", '{"access_token":""}', '{"access_token":5}', '{"access_token":"has space"}', '{"access_token":"a\\nb"}', "null"]) {
             h.auth.respond = () => ({ body });
-            assert.equal(failure(await h.call(GET)), "http GET api /v1/me: could not sign in (the token endpoint answered without a usable access_token). Nothing was sent.", body);
+            assert.equal(failure(await h.call(GET)), "api call GET /v1/me: could not sign in (the token endpoint answered without a usable access_token). Nothing was sent.", body);
         }
         h.auth.respond = () => ({ body: JSON.stringify({ access_token: "T".repeat(70_000) }) });
         assert.match(failure(await h.call(GET)), /without a usable access_token/, "the answer is capped at 64 KiB");
@@ -474,7 +481,7 @@ describe("when the OAuth sign-in fails", () => {
 
     test("a token that is not a bearer token is not sent", async () => {
         h.auth.respond = () => ({ body: JSON.stringify({ access_token: "abcdef123456", token_type: "mac" }) });
-        assert.equal(failure(await h.call(GET)), "http GET api /v1/me: could not sign in (the token endpoint answered with a token that is not a bearer token, and only bearer tokens are sent). Nothing was sent.");
+        assert.equal(failure(await h.call(GET)), "api call GET /v1/me: could not sign in (the token endpoint answered with a token that is not a bearer token, and only bearer tokens are sent). Nothing was sent.");
         h.auth.respond = () => ({ body: JSON.stringify({ access_token: "abcdef123456", token_type: "bearer" }) });
         ok(await h.call(GET));
         assert.equal(last().headers.authorization, "Bearer abcdef123456");
@@ -482,7 +489,7 @@ describe("when the OAuth sign-in fails", () => {
 
     test("secrets that cannot be read stop the sign-in before the endpoint is asked", async () => {
         h.jig.secrets.delete(PASSWORD_REFERENCE);
-        assert.equal(failure(await h.call(GET)), "http GET api /v1/me: could not sign in (the secret could not be read: no such entry). Nothing was sent.");
+        assert.equal(failure(await h.call(GET)), "api call GET /v1/me: could not sign in (the secret could not be read: no such entry). Nothing was sent.");
         assert.equal(h.auth.requests.length, 0);
     });
 
@@ -490,7 +497,7 @@ describe("when the OAuth sign-in fails", () => {
         h.configure(h.section({ oauthPassword: h.oauth({ tokenUrl: `http://127.0.0.1:${await closedPort()}/oauth/token` }) }));
         // A refused connection is reported as ECONNREFUSED, or as ECONNRESET where a local forwarder answers for the port.
         const message = failure(await h.call(POST));
-        assert.match(message, /^http POST api \/v1\/items: could not sign in \((could not connect \(ECONNREFUSED\)|the token request got no answer: the connection failed \(ECONNRESET\))\)\. Nothing was sent\.$/);
+        assert.match(message, /^api call POST \/v1\/items: could not sign in \((could not connect \(ECONNREFUSED\)|the token request got no answer: the connection failed \(ECONNRESET\))\)\. Nothing was sent\.$/);
         assert.doesNotMatch(message, /unknown/);
     });
 });

@@ -1,14 +1,19 @@
-// The OAuth 2.0 password grant (RFC 6749, section 4.3): the tool trades an account's name and password for an access
-// token, keeps the token in memory until shortly before it expires, and sends it as a Bearer token.
+// OAuth 2.0 without a browser: the tool trades a client's credentials (RFC 6749, section 4.4) or an account's name and
+// password (section 4.3) for an access token, keeps the token in memory until shortly before it expires, and sends it as a
+// Bearer token. A grant that needs a browser (the authorization code, the implicit grant) is not here: the sources refuse
+// those requests by name.
 //
 // The token is never written anywhere, never logged and never put in a result or an error. jig-core cannot hide it, because
 // it did not resolve it, so http.ts removes it from every answer (see scrub.ts). Every failure here is a NotSentError:
 // whether or not the token endpoint got the request, nothing has gone to the API yet.
-import { jig } from "../../../jig-core/src/client.ts";
-import type { OAuthPassword, Target } from "../config.ts";
 import { errorMessage, isObject } from "./values.ts";
 import { exchange, LostReplyError, NotSentError } from "./wire.ts";
 import type { Answer, Stops, Wire } from "./wire.ts";
+import type { SignIn } from "./plan.ts";
+import { fillString } from "./text.ts";
+import type { Fillers, Text } from "./text.ts";
+
+export type OAuth = Extract<SignIn, { kind: "oauth" }>;
 
 /** A token is replaced this long before it expires, so that it does not run out on the way. */
 export const REPLACE_EARLY_MS = 60_000;
@@ -27,11 +32,20 @@ export interface Token {
     fresh: boolean;
 }
 
+/** What a login needs besides the grant: whose token it is, and how to read the secrets. */
+export interface Login {
+    /** The scope of the cache entry: one collection's environment. */
+    scope: string;
+    system: string;
+    allowPlainLocal: boolean;
+    fillers: Fillers;
+}
+
 export interface Tokens {
-    /** The target's access token: the cached one while it is good, else a new one. */
-    get(target: Target, oauth: OAuthPassword, stops: Stops): Promise<Token>;
-    /** Drops the target's cached token, such as after a 401. */
-    forget(target: Target): void;
+    /** The access token for this sign-in: the cached one while it is good, else a new one. */
+    get(login: Login, oauth: OAuth, stops: Stops): Promise<Token>;
+    /** Drops the cached token of a scope, such as after a 401. */
+    forget(scope: string): void;
 }
 
 interface Cached {
@@ -44,9 +58,10 @@ interface Cached {
 
 /** The account the grant signs in with, as the secrets gave it. */
 interface Account {
-    username: string;
-    password: string;
+    clientId: string;
     clientSecret: string | undefined;
+    username: string | undefined;
+    password: string | undefined;
 }
 
 /** The text in the form of `application/x-www-form-urlencoded`. */
@@ -74,14 +89,15 @@ function expiryOf(data: Record<string, unknown>, now: number): number {
     return valid ? now + seconds * 1000 : Number.POSITIVE_INFINITY;
 }
 
-/** The grant, as the form the token endpoint takes. A client with a secret signs in with HTTP Basic. */
-function tokenRequest(target: Target, oauth: OAuthPassword, account: Account): Wire {
-    const form = new URLSearchParams({
-        grant_type: "password",
-        username: account.username,
-        password: account.password,
-        client_id: oauth.clientId,
-    });
+/** The grant, as the form the token endpoint takes. A client with a secret signs in with HTTP Basic unless the sign-in says
+ *  to put it in the form. */
+function tokenRequest(login: Login, oauth: OAuth, account: Account): Wire {
+    const form = new URLSearchParams({ grant_type: oauth.grant });
+    if (oauth.grant === "password") {
+        form.set("username", account.username ?? "");
+        form.set("password", account.password ?? "");
+    }
+    form.set("client_id", account.clientId);
     if (oauth.scope !== undefined) form.set("scope", oauth.scope);
     const headers: Record<string, string> = {
         Accept: "application/json",
@@ -89,17 +105,21 @@ function tokenRequest(target: Target, oauth: OAuthPassword, account: Account): W
         "User-Agent": "jig-api",
     };
     if (account.clientSecret !== undefined) {
-        // RFC 6749, section 2.3.1: the client's id and secret are form-encoded before they are joined.
-        const pair = `${formEncoded(oauth.clientId)}:${formEncoded(account.clientSecret)}`;
-        headers.Authorization = `Basic ${Buffer.from(pair).toString("base64")}`;
+        if (oauth.clientAuth === "body") {
+            form.set("client_secret", account.clientSecret);
+        } else {
+            // RFC 6749, section 2.3.1: the client's id and secret are form-encoded before they are joined.
+            const pair = `${formEncoded(account.clientId)}:${formEncoded(account.clientSecret)}`;
+            headers.Authorization = `Basic ${Buffer.from(pair).toString("base64")}`;
+        }
     }
     return {
-        system: `http:${target.name}`,
+        system: login.system,
         method: "POST",
         url: oauth.tokenUrl,
         headers,
         body: form.toString(),
-        allowPlainLocal: target.allowPlainLocal,
+        allowPlainLocal: login.allowPlainLocal,
         maxBytes: MAX_TOKEN_ANSWER_BYTES,
     };
 }
@@ -132,25 +152,27 @@ function tokenFrom(answer: Answer, now: number): { value: string; expiresAt: num
 export function createTokens(now: () => number): Tokens {
     const cache = new Map<string, Cached>();
 
-    /** Asks the token endpoint for a token. */
-    async function login(target: Target, oauth: OAuthPassword, stops: Stops): Promise<{ value: string; expiresAt: number }> {
-        // Only the user's cancel applies while the secrets are read: a store may wait for the user to unlock it.
-        const secret = (reference: string): Promise<string> => jig().secrets.resolve(reference, stops.cancel);
-        let account: Account;
+    /** Reads the account's secrets. The fillers carry the user's cancel and no deadline: a store may wait for the user to
+     *  unlock it, and that is not the API's time. */
+    async function accountOf(oauth: OAuth, login: Login): Promise<Account> {
+        const read = (text: Text | undefined): Promise<string | undefined> =>
+            text === undefined ? Promise.resolve(undefined) : fillString(text, login.fillers);
         try {
-            const [username, password, clientSecret] = await Promise.all([
-                secret(oauth.username),
-                secret(oauth.password),
-                oauth.clientSecret === undefined ? undefined : secret(oauth.clientSecret),
+            const [clientId, clientSecret, username, password] = await Promise.all([
+                read(oauth.clientId), read(oauth.clientSecret), read(oauth.username), read(oauth.password),
             ]);
-            account = { username, password, clientSecret };
+            return { clientId: clientId ?? "", clientSecret, username, password };
         } catch (error) {
             throw refused(errorMessage(error));
         }
+    }
 
+    /** Asks the token endpoint for a token. */
+    async function request(login: Login, oauth: OAuth, stops: Stops): Promise<{ value: string; expiresAt: number }> {
+        const account = await accountOf(oauth, login);
         let answer: Answer;
         try {
-            answer = await exchange(tokenRequest(target, oauth, account), stops.deadline());
+            answer = await exchange(tokenRequest(login, oauth, account), stops.deadline());
         } catch (error) {
             if (error instanceof LostReplyError) throw refused(`the token request got no answer: ${error.message}`);
             throw refused(errorMessage(error));
@@ -159,20 +181,23 @@ export function createTokens(now: () => number): Tokens {
     }
 
     return {
-        async get(target, oauth, stops) {
-            const { tokenUrl, clientId, clientSecret, username, password, scope } = oauth;
-            const key = JSON.stringify([tokenUrl, clientId, clientSecret, username, password, scope]);
-            const kept = cache.get(target.name);
+        async get(login, oauth, stops) {
+            // The key holds the references of the secrets and never their values.
+            const key = JSON.stringify([
+                oauth.grant, oauth.tokenUrl, oauth.clientId, oauth.clientSecret, oauth.username, oauth.password, oauth.scope,
+                oauth.clientAuth,
+            ]);
+            const kept = cache.get(login.scope);
             if (kept !== undefined && kept.key === key && now() < kept.expiresAt - REPLACE_EARLY_MS) {
                 return { value: kept.value, fresh: false };
             }
-            const made = await login(target, oauth, stops);
-            cache.set(target.name, { key, ...made });
+            const made = await request(login, oauth, stops);
+            cache.set(login.scope, { key, ...made });
             return { value: made.value, fresh: true };
         },
 
-        forget(target) {
-            cache.delete(target.name);
+        forget(scope) {
+            cache.delete(scope);
         },
     };
 }

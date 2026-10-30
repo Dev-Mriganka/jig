@@ -1,0 +1,29 @@
+### Upload receipt
+POST {{baseUrl}}/v1/orders/{{orderId}}/receipt
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=ReceiptBoundary
+
+--ReceiptBoundary
+Content-Disposition: form-data; name="note"
+
+{{note}}
+--ReceiptBoundary
+Content-Disposition: form-data; name="receipt"; filename="receipt.txt"
+Content-Type: text/plain
+
+< ./receipt.txt
+--ReceiptBoundary--
+
+### Import orders
+PUT {{baseUrl}}/v1/orders/import
+Authorization: Bearer {{token}}
+Content-Type: text/csv
+
+< ./receipt.txt
+
+### Upload outside
+PUT {{baseUrl}}/v1/orders/import
+Authorization: Bearer {{token}}
+Content-Type: text/csv
+
+< ../outside.txt

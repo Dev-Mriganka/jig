@@ -21,12 +21,12 @@ const GET = { method: "GET", path: "/v1/x" };
 const lines = (count: number, prefix = "line"): string => Array.from({ length: count }, (_, index) => `${prefix} ${index + 1}`).join("\n");
 
 describe("the status line", () => {
-    test("names the method, the full address and the status with its words, then the target and its environment", async () => {
+    test("names the method, the full address and the status with its words, then the request and its environment", async () => {
         h.api.respond = () => ({ status: 201, body: '{"id":7}' });
         const text = ok(await h.call({ method: "POST", path: "/v1/items?x=1", body: {} }));
         const [first, second] = text.split("\n");
         assert.equal(first, `POST ${h.api.origin}/v1/items?x=1 -> HTTP 201 Created`);
-        assert.equal(second, "Target: api (staging)");
+        assert.equal(second, "Request: call (base) in Staging (staging)");
     });
 
     test("a status without words has none", async () => {
@@ -220,19 +220,19 @@ describe("an answer that is not a success", () => {
     test("a redirect is a result too: it says where the server points, and that it was not followed", async () => {
         h.api.respond = () => ({ status: 301, headers: { location: "https://elsewhere.example.test/new" }, body: "" });
         const text = ok(await h.call(GET));
-        assert.match(text, /-> HTTP 301 Moved Permanently\nTarget: api \(staging\)\nRedirects are not followed: the location header says where the server points\.\ncontent-type: application\/json\nlocation: https:\/\/elsewhere\.example\.test\/new\n/);
+        assert.match(text, /-> HTTP 301 Moved Permanently\nRequest: call \(base\) in Staging \(staging\)\nRedirects are not followed: the location header says where the server points\.\ncontent-type: application\/json\nlocation: https:\/\/elsewhere\.example\.test\/new\n/);
         h.api.respond = () => ({ status: 304, body: "" });
         assert.doesNotMatch(ok(await h.call(GET)), /Redirects are not followed/, "a 304 has no place to go");
     });
 });
 
 describe("what the call's record carries", () => {
-    test("the status, as a fact, and the target, the method and the status in the details", async () => {
+    test("the status, as a fact, and the request, the method and the status in the details", async () => {
         h.api.respond = () => ({ status: 201, body: "{}" });
         const result = await h.call({ method: "POST", path: "/v1/items", body: {} });
         ok(result);
         assert.deepEqual(h.jig.facts.get(result.id), [{ status: 201 }]);
-        assert.deepEqual(result.details, { target: "api", method: "POST", status: 201 });
+        assert.deepEqual(result.details, { request: "call", method: "POST", status: 201 });
     });
 
     test("nothing, when there was no answer to take a status from", async () => {
@@ -248,7 +248,7 @@ describe("an answer through a transport", () => {
         h.configure(h.section({ transport: "company-proxy" }));
         h.jig.transports.set("company-proxy", { request: async () => ({ status: 200, headers: { "Content-Type": "text/plain" }, body: lines(210) }) });
         const text = ok(await h.call(GET));
-        assert.match(text, /^GET \S+ -> HTTP 200 OK\nTarget: api \(staging\)\ncontent-type: text\/plain\n\nline 1\n/);
+        assert.match(text, /^GET \S+ -> HTTP 200 OK\nRequest: call \(base\) in Staging \(staging\)\ncontent-type: text\/plain\n\nline 1\n/);
         assert.ok(text.endsWith("line 200\n[10 more lines not shown]"));
     });
 

@@ -17,22 +17,23 @@ const POST = { method: "POST", path: "/v1/items?dryRun=true", body: { name: "Zed
 
 /** The preview of a call, as jig-core asks the tool for it. */
 async function previewOf(input: Record<string, unknown>) {
-    return h.declaration.preview?.({ target: "api", ...input }, new AbortController().signal);
+    return h.declaration.preview?.(h.input(input), new AbortController().signal);
 }
 const fingerprintOf = async (input: Record<string, unknown>): Promise<string | undefined> => (await previewOf(input))?.fingerprint;
 
 describe("what the preview shows", () => {
-    test("the target, the sign-in, the method, the full address, the headers the model gave and the body", async () => {
+    test("the request, the sign-in, the method, the full address, the headers and the body", async () => {
         const preview = await previewOf(POST);
         assert.equal(preview?.summary, `POST ${h.api.origin}/v1/items?dryRun=true`);
         assert.equal(preview?.format, "text");
         assert.equal(preview?.body, [
-            "Target: api (staging)",
+            "Request: call (base) in Staging (staging)",
             "Sign-in: none",
             "Method: POST",
             `URL: ${h.api.origin}/v1/items?dryRun=true`,
             "Headers:",
             "  X-Request-Id: t1",
+            "  Content-Type: application/json",
             "Body (JSON, 14 bytes):",
             "{",
             '  "name": "Zed"',
@@ -41,10 +42,9 @@ describe("what the preview shows", () => {
         assert.match(preview?.fingerprint ?? "", /^[0-9a-f]{32}$/);
     });
 
-    test("a call with no headers and no body shows neither, and a description names the target", async () => {
-        h.configure(h.section({ none: true }, { description: "The test API" }));
+    test("a call with no headers and no body shows neither", async () => {
         const preview = await previewOf({ method: "DELETE", path: "/v1/items/7" });
-        assert.equal(preview?.body, ["Target: api (staging): The test API", "Sign-in: none", "Method: DELETE", `URL: ${h.api.origin}/v1/items/7`].join("\n"));
+        assert.equal(preview?.body, ["Request: call (base) in Staging (staging)", "Sign-in: none", "Method: DELETE", `URL: ${h.api.origin}/v1/items/7`].join("\n"));
     });
 
     test("the body is re-indented with its numbers untouched, and a body that is not an object is shown as it is", async () => {
@@ -64,7 +64,7 @@ describe("what the preview shows", () => {
         assert.deepEqual(JSON.parse(h.api.requests[0]?.body ?? ""), body, "all 300 keys were sent");
     });
 
-    test("names how each target signs in, and never a reference, a token or an address of the sign-in", async () => {
+    test("names how each request signs in, and never a reference, a token or an address of the sign-in", async () => {
         const modes: Array<[Record<string, unknown>, string]> = [
             [{ none: true }, "Sign-in: none"],
             [{ bearer: SECRET_REFERENCE }, "Sign-in: a bearer token, added by the tool"],
@@ -76,7 +76,7 @@ describe("what the preview shows", () => {
             h.configure(h.section(auth));
             const preview = await previewOf(POST);
             assert.ok(preview?.body?.split("\n").includes(line), `${line} in ${preview?.body}`);
-            for (const hidden of ["pass:", SECRET, "/oauth/token", "portal", "Authorization"]) {
+            for (const hidden of ["pass:", SECRET, "/oauth/token", "portal", "Authorization", "{{token}}"]) {
                 assert.ok(!`${preview?.summary}\n${preview?.body}`.includes(hidden), `${hidden} in ${preview?.body}`);
             }
         }
@@ -129,44 +129,48 @@ describe("the fingerprint", () => {
         assert.equal(new Set(prints).size, variants.length, "every variant has its own fingerprint");
     });
 
-    test("changes with the target, its environment, its address and its way to sign in", async () => {
-        const target = { baseUrl: h.api.origin, environment: "staging", allowPlainLocal: true, auth: { none: true } };
-        h.configure({ targets: { api: target, other: target } });
+    test("changes with the environment, the address and the way to sign in", async () => {
         const base = await fingerprintOf({ method: "POST", path: "/x" });
-        assert.notEqual(await fingerprintOf({ target: "other", method: "POST", path: "/x" }), base);
-        const changed: Array<Record<string, unknown>> = [
-            { ...target, environment: "production" },
-            { ...target, baseUrl: h.auth.origin },
-            { ...target, baseUrl: `${h.api.origin}/v2` },
-            { ...target, auth: { bearer: SECRET_REFERENCE } },
-            { ...target, auth: { signIn: "company-sso" } },
-            { ...target, auth: { signIn: "another-sso" } },
-            { ...target, auth: { transport: "company-proxy" } },
+        const changed: Array<[Record<string, unknown>, Record<string, unknown>]> = [
+            [{ none: true }, { environment: "qa" }],
+            [{ bearer: SECRET_REFERENCE }, {}],
+            [{ signIn: "company-sso" }, {}],
+            [{ signIn: "another-sso" }, {}],
+            [{ transport: "company-proxy" }, {}],
+            [{ oauthPassword: h.oauth() }, {}],
+            [{ oauthPassword: h.oauth({ clientId: "other" }) }, {}],
         ];
         const prints = new Set<string | undefined>([base]);
-        for (const variant of changed) {
-            h.configure({ targets: { api: variant } });
+        for (const [signIn, extra] of changed) {
+            h.configure(h.section(signIn, extra));
             prints.add(await fingerprintOf({ method: "POST", path: "/x" }));
         }
         assert.equal(prints.size, changed.length + 1);
+        h.configure();
+        assert.notEqual(await fingerprintOf({ method: "POST", path: "/y" }), base, "the address");
+    });
+
+    test("changes with the secret a variable is bound to, though no secret is read", async () => {
+        h.configure(h.section({ bearer: SECRET_REFERENCE }));
+        const first = await fingerprintOf({ method: "POST", path: "/x" });
+        h.configure(h.section({ bearer: "pass:api/other-token" }));
+        assert.notEqual(await fingerprintOf({ method: "POST", path: "/x" }), first);
+        assert.deepEqual(h.jig.secretCalls, []);
     });
 });
 
 describe("changed since the preview", () => {
-    const refusal = (call: string) => `http ${call}: changed since the preview; run it again to see the new preview. Nothing was sent.`;
+    const refusal = (call: string) => `${call}: changed since the preview; run it again to see the new preview. Nothing was sent.`;
 
-    test("a body, a path, a header, a method or a target that a later hook changed is not sent", async () => {
+    test("a body, a path, a header or a method that a later hook changed is not sent", async () => {
         // What a later hook changes, and the call as the refusal names it: the call as it would now be sent.
         const changes: Array<[string, (input: Record<string, unknown>) => void, string]> = [
-            ["the body", (input) => void (input.body = { name: "Other" }), "POST api /v1/items"],
-            ["the path", (input) => void (input.path = "/v1/other"), "POST api /v1/other"],
-            ["a header", (input) => void (input.headers = { "X-Request-Id": "t2" }), "POST api /v1/items"],
-            ["an added header", (input) => void (input.headers = { "X-Request-Id": "t1", "X-More": "1" }), "POST api /v1/items"],
-            ["the method", (input) => void (input.method = "DELETE"), "DELETE api /v1/items"],
-            ["the target", (input) => void (input.target = "other"), "POST other /v1/items"],
+            ["the body", (input) => void (input.body = { name: "Other" }), "api call POST /v1/items"],
+            ["the path", (input) => void (input.url = `${h.api.origin}/v1/other`), "api call POST /v1/other"],
+            ["a header", (input) => void (input.headers = { "X-Request-Id": "t2" }), "api call POST /v1/items"],
+            ["an added header", (input) => void (input.headers = { "X-Request-Id": "t1", "X-More": "1" }), "api call POST /v1/items"],
+            ["the method", (input) => void (input.method = "DELETE"), "api call DELETE /v1/items"],
         ];
-        const target = { baseUrl: h.api.origin, environment: "staging", allowPlainLocal: true, auth: { none: true } };
-        h.configure({ targets: { api: target, other: target } });
         for (const [what, change, call] of changes) {
             const result = await h.call({ method: "POST", path: "/v1/items", body: { name: "Zed" }, headers: { "X-Request-Id": "t1" } }, { between: change });
             assert.equal(result.error?.message, refusal(call), what);
@@ -175,28 +179,31 @@ describe("changed since the preview", () => {
         assert.equal(h.jig.facts.size, 0, "nothing happened, so nothing is recorded");
     });
 
-    test("a configuration that changed while the person read is not sent: the environment, the address or the sign-in", async () => {
+    test("a configuration that changed while the person read is not sent: the environment, the sign-in or a secret's reference", async () => {
         const changes: Array<[string, () => void]> = [
-            ["the environment", () => h.configure(h.section({ none: true }, { environment: "production" }))],
-            ["the address", () => h.configure(h.section({ none: true }, { baseUrl: `${h.api.origin}/other` }))],
+            ["the environment", () => h.configure(h.section({ none: true }, { environment: "qa" }))],
             ["the sign-in", () => h.configure(h.section({ bearer: SECRET_REFERENCE }))],
+            ["the sign-in service", () => h.configure(h.section({ signIn: "company-sso" }))],
         ];
         for (const [what, change] of changes) {
             h.configure();
             const result = await h.call(POST, { between: change });
-            assert.equal(result.error?.message, refusal("POST api /v1/items"), what);
+            assert.equal(result.error?.message, refusal("api call POST /v1/items"), what);
         }
+        h.configure(h.section({ bearer: SECRET_REFERENCE }));
+        const rebound = await h.call(POST, { between: () => h.configure(h.section({ bearer: "pass:api/other-token" })) });
+        assert.equal(rebound.error?.message, refusal("api call POST /v1/items"), "the reference");
         assert.equal(h.api.requests.length, 0);
     });
 
     test("the refusal names the call without its body, its query or its headers", async () => {
-        const result = await h.call({ method: "POST", path: "/v1/items?token=QUERY-SECRET", body: { password: "BODY-SECRET" } }, { between: (input) => void (input.body = {}) });
+        const result = await h.call({ method: "POST", path: "/v1/items?token=QUERY-SECRET", body: { password: "BODY-SECRET" }, headers: { "X-Key": "HEADER-SECRET" } }, { between: (input) => void (input.body = {}) });
         assert.match(result.error?.message ?? "", /run it again to see the new preview/);
-        for (const secret of ["BODY-SECRET", "QUERY-SECRET", "token="]) assert.ok(!(result.error?.message ?? "").includes(secret), secret);
+        for (const secret of ["BODY-SECRET", "QUERY-SECRET", "HEADER-SECRET", "token="]) assert.ok(!(result.error?.message ?? "").includes(secret), secret);
     });
 
     test("running the call again shows the new preview, and a call that then matches goes through", async () => {
-        const refused = await h.call(POST, { between: (input) => void (input.path = "/v1/other") });
+        const refused = await h.call(POST, { between: (input) => void (input.url = `${h.api.origin}/v1/other`) });
         assert.ok(refused.error);
         const again = await h.call({ ...POST, path: "/v1/other" });
         assert.match(again.preview?.summary ?? "", /\/v1\/other$/);
@@ -212,14 +219,14 @@ describe("changed since the preview", () => {
     });
 
     test("a call that did not ask has nothing to compare, and runs as it finds the configuration", async () => {
-        const result = await h.call({ method: "GET", path: "/v1/x" }, { between: () => h.configure(h.section({ none: true }, { environment: "production" })) });
+        const result = await h.call({ method: "GET", path: "/v1/x" }, { between: () => h.configure(h.section({ none: true }, { environment: "qa" })) });
         assert.equal(result.preview, undefined);
-        assert.match(ok(result), /Target: api \(production\)/);
+        assert.match(ok(result), /Request: call \(base\) in Staging \(qa\)/);
     });
 
     test("a preview that could not be built has no fingerprint, and the person's choice stands", async () => {
         h.jig.approved.set("manual-1", { summary: "preview unavailable: it took longer than 15 s" });
-        const result = await h.tool.execute("manual-1", { target: "api", method: "POST", path: "/v1/items" } as never, undefined, undefined, {} as never);
+        const result = await h.tool.execute("manual-1", h.input({ method: "POST", path: "/v1/items" }) as never, undefined, undefined, {} as never);
         assert.match(result.content[0]?.type === "text" ? result.content[0].text : "", /-> HTTP 200 OK/);
         assert.equal(h.api.requests.length, 1);
     });
@@ -234,16 +241,16 @@ describe("changed since the preview", () => {
 describe("a call that cannot run is not asked about", () => {
     test("invalid input in a write blocks the call with the reason, and nothing is sent", async () => {
         const cases: Array<[Record<string, unknown>, RegExp]> = [
-            [{ method: "POST", path: "/a/%252e%252e/b" }, /path must start with \//],
+            [{ method: "POST", path: "/a/%252e%252e/b" }, /the path must hold only letters/],
             [{ method: "POST", path: "/x", headers: { Authorization: "Bearer x" } }, /header Authorization is set by the tool/],
             [{ method: "POST", path: "/x", body: { s: "a".repeat(300_000) } }, /body is larger than 256 KiB/],
             [{ method: "POST", path: "/x", timeoutSec: 500 }, /timeoutSec must be a whole number from 1 to 120/],
-            [{ method: "POST", path: "/x", extra: 1 }, /http does not use extra\. Usage: http \{target/],
-            [{ method: "HEAD", path: "/x" }, /method must be one of GET, POST, PUT, PATCH, DELETE/],
+            [{ method: "POST", path: "/x", extra: 1 }, /api call does not use extra\. Usage: api call \{environment, method, url/],
+            [{ method: "TRACE", path: "/x" }, /method must be one of GET, HEAD, OPTIONS, POST, PUT, PATCH, DELETE/],
         ];
         for (const [input, reason] of cases) {
             const result = await h.call(input);
-            assert.match(result.blocked ?? "", /^Blocked by jig-core: http cannot run with this input: http/);
+            assert.match(result.blocked ?? "", /^jig-core could not decide: api/);
             assert.match(result.blocked ?? "", reason);
             assert.equal(result.error, undefined, "the tool did not run");
         }

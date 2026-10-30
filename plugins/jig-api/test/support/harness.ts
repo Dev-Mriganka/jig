@@ -1,17 +1,25 @@
-// Everything a tool test needs: a fake API and a fake token endpoint on this machine, the fake jig-core, and the plugin loaded
+// Everything a tool test needs: fake APIs and a fake token endpoint on this machine, the fake jig-core, and the plugin loaded
 // into a fake Pi the way Pi loads it. `call` then runs a tool call the way jig-core runs one: classify it, build the preview
-// when the call asks (a write outside the machine), block it when the preview says the input is invalid, keep the approved
-// preview, and execute.
+// when the call asks (a write outside the machine), block it when the classification or the preview says the input is
+// invalid, keep the approved preview, and execute.
+//
+// Two ways to configure it. `section` builds a small collection of one request in a folder of its own (`base`, in the
+// environment `Staging`), signed in the way a test asks, and is what the tests of the sending engine use together with the
+// ad-hoc `call` action. `acmeSection` (see acme.ts) copies the fixture collections of an example company.
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import type { ExtensionAPI, ExtensionToolContext, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import type { CallClass, Preview, ToolDeclaration } from "../../../jig-core/src/contract.ts";
-import { jigHttp } from "../../src/index.ts";
+import { jigApi } from "../../src/index.ts";
 import { startFakeApi } from "./fake-api.ts";
 import type { FakeApi } from "./fake-api.ts";
 import { installFakeJig } from "./fake-jig.ts";
 import type { FakeJig } from "./fake-jig.ts";
 
-/** The name of the default target. */
-export const TARGET = "api";
+/** The collection's name for its test environment, and the collection that `section` writes. */
+export const ENVIRONMENT = "Staging";
+export const COLLECTION = "base";
 export const SECRET = "tok-4f9c2a71d3e8";
 export const SECRET_REFERENCE = "pass:api/token";
 export const USER = "svc-user@example.test";
@@ -54,36 +62,47 @@ export interface CallResult {
 }
 
 export interface Harness {
-    /** The fake API that the default target points to. */
+    /** The fake API that the test environment points to. */
     api: FakeApi;
+    /** A second fake API, for production. */
+    prod: FakeApi;
     /** The fake OAuth token endpoint. */
     auth: FakeApi;
     /** The tokens the token endpoint issued, in order. */
     issued: string[];
     jig: FakeJig;
     clock: Clock;
+    /** A folder for this test's files; it is emptied by `reset`. */
+    dir: string;
     /** The tool Pi registered and the declaration jig-core holds. Both are made again by `reset`. */
     tool: ToolDefinition;
     declaration: ToolDeclaration;
-    /** The default section: one target, `api`, in `staging`, with the given sign-in. */
-    section(auth?: Record<string, unknown>, extra?: Record<string, unknown>): Record<string, unknown>;
-    /** The `oauthPassword` settings that point at the fake token endpoint. */
+    /** An `api` section of one collection, `base`, in the environment `Staging` (jig-core's `staging`), signed in as asked:
+     *  `{ none: true }`, `{ bearer: ref }`, `{ oauthPassword: ... }`, `{ signIn: name }` or `{ transport: name }`. Its files
+     *  are written to `dir`. `extra.environment` names the jig-core environment instead. */
+    section(signIn?: Record<string, unknown>, extra?: Record<string, unknown>): Record<string, unknown>;
+    /** The OAuth settings that point at the fake token endpoint. */
     oauth(extra?: Record<string, unknown>): Record<string, unknown>;
-    /** Sets the `http` section as jig.json holds it, and the secrets its references name. */
+    /** Sets the `api` section as jig.json holds it, and the secrets that the references of these tests name. */
     configure(section?: Record<string, unknown>): void;
-    /** Back to the fixtures, the default configuration, and no request or fact recorded. */
+    /** Back to the defaults: no request or fact recorded, the default configuration. */
     reset(): void;
-    /** `target` is `api` unless the input says otherwise. */
+    /** The tool input that `call` makes of a shorter ad-hoc form, for a test that asks the declaration directly. */
+    input(given: Record<string, unknown>): Record<string, unknown>;
+    /** A tool call. An input without an `action` is an ad-hoc call to the test API: `{ method, path, body?, headers?,
+     *  timeoutSec? }`, or to another address of the environment with `origin`. */
     call(input: Record<string, unknown>, options?: CallOptions): Promise<CallResult>;
     close(): Promise<void>;
 }
 
 export async function setupHarness(options: { timeoutScale?: number } = {}): Promise<Harness> {
     const api = await startFakeApi();
+    const prod = await startFakeApi();
     const auth = await startFakeApi();
     const jig = installFakeJig();
     const clock: Clock = { now: 1_700_000_000_000 };
     const issued: string[] = [];
+    let dir = fs.mkdtempSync(path.join(os.tmpdir(), "jig-api-test-"));
 
     /** A token endpoint that issues a new token for every request. */
     const issueTokens = (): void => {
@@ -100,16 +119,13 @@ export async function setupHarness(options: { timeoutScale?: number } = {}): Pro
         jig.publish();
         const tools: ToolDefinition[] = [];
         const pi = { registerTool: (tool: ToolDefinition) => void tools.push(tool) } as unknown as ExtensionAPI;
-        void jigHttp({ now: () => clock.now, ...(options.timeoutScale === undefined ? {} : { timeoutScale: options.timeoutScale }) })(pi);
+        void jigApi({ now: () => clock.now, ...(options.timeoutScale === undefined ? {} : { timeoutScale: options.timeoutScale }) })(pi);
         const tool = tools[0];
-        const declaration = jig.declared.get("http");
+        const declaration = jig.declared.get("api");
         if (tool === undefined || declaration === undefined) throw new Error("the plugin did not register its tool");
         return { tool, declaration };
     }
 
-    const section = (signIn: Record<string, unknown> = { none: true }, extra: Record<string, unknown> = {}): Record<string, unknown> => ({
-        targets: { [TARGET]: { baseUrl: api.origin, environment: "staging", allowPlainLocal: true, auth: signIn, ...extra } },
-    });
     const oauth = (extra: Record<string, unknown> = {}): Record<string, unknown> => ({
         tokenUrl: `${auth.origin}/oauth/token`,
         clientId: "portal",
@@ -118,8 +134,68 @@ export async function setupHarness(options: { timeoutScale?: number } = {}): Pro
         password: PASSWORD_REFERENCE,
         ...extra,
     });
-    const configure = (value: Record<string, unknown> = section()): void => {
-        jig.setSection("http", value);
+
+    const section = (signIn: Record<string, unknown> = { none: true }, extra: Record<string, unknown> = {}): Record<string, unknown> => {
+        const baseUrl = typeof extra.baseUrl === "string" ? extra.baseUrl : api.origin;
+        const values: Array<Record<string, unknown>> = [{ key: "baseUrl", value: baseUrl, type: "default", enabled: true }];
+        const secrets: Record<string, string> = {};
+        const secretValue = (key: string): void => void values.push({ key, value: "", type: "secret", enabled: true });
+        let auth_: Record<string, unknown> = { type: "noauth" };
+        let mapping: string | Record<string, unknown> = typeof extra.environment === "string" ? extra.environment : "staging";
+
+        if (typeof signIn.bearer === "string") {
+            auth_ = { type: "bearer", bearer: [{ key: "token", value: "{{token}}", type: "string" }] };
+            secretValue("token");
+            secrets.token = signIn.bearer;
+        } else if (isRecord(signIn.oauthPassword)) {
+            const settings = signIn.oauthPassword;
+            const token = new URL(String(settings.tokenUrl));
+            values.push({ key: "authUrl", value: token.origin, type: "default", enabled: true });
+            values.push({ key: "clientId", value: String(settings.clientId), type: "default", enabled: true });
+            const attributes: Array<Record<string, string>> = [
+                { key: "grant_type", value: "password_credentials" },
+                { key: "accessTokenUrl", value: `{{authUrl}}${token.pathname}${token.search}` },
+                { key: "clientId", value: "{{clientId}}" },
+                { key: "username", value: "{{username}}" },
+                { key: "password", value: "{{password}}" },
+            ];
+            if (typeof settings.scope === "string") attributes.push({ key: "scope", value: settings.scope });
+            for (const [name, reference] of [["username", settings.username], ["password", settings.password], ["clientSecret", settings.clientSecret]] as const) {
+                if (typeof reference === "string") {
+                    secretValue(name);
+                    secrets[name] = reference;
+                }
+            }
+            if (typeof settings.clientSecret === "string") attributes.push({ key: "clientSecret", value: "{{clientSecret}}" });
+            auth_ = { type: "oauth2", oauth2: attributes };
+        } else if (typeof signIn.signIn === "string") {
+            mapping = { environment: typeof extra.environment === "string" ? extra.environment : "staging", signIn: signIn.signIn };
+        } else if (typeof signIn.transport === "string") {
+            mapping = { environment: typeof extra.environment === "string" ? extra.environment : "staging", transport: signIn.transport };
+        }
+
+        const collection = {
+            info: { name: "Base", schema: "https://schema.postman.com/json/collection/v2.1.0/collection.json" },
+            auth: auth_,
+            item: [{ name: "Ping", request: { method: "GET", url: { raw: "{{baseUrl}}/ping" } } }],
+        };
+        const collectionFile = path.join(dir, "base.postman_collection.json");
+        const environmentFile = path.join(dir, "base-staging.postman_environment.json");
+        fs.writeFileSync(collectionFile, JSON.stringify(collection));
+        fs.writeFileSync(environmentFile, JSON.stringify({ name: "Staging", values }));
+        const adHoc = Array.isArray(extra.adHoc) ? extra.adHoc : [typeof extra.environment === "string" ? extra.environment : "staging"];
+        return {
+            collections: { [COLLECTION]: { postman: collectionFile, environments: { [ENVIRONMENT]: environmentFile } } },
+            environments: { [ENVIRONMENT]: mapping },
+            secrets,
+            adHoc,
+            allowPlainLocal: true,
+            ...(Array.isArray(extra.reads) ? { reads: extra.reads } : {}),
+        };
+    };
+
+    const configure = (value?: Record<string, unknown>): void => {
+        jig.setSection("api", value ?? section());
         jig.secrets.set(SECRET_REFERENCE, SECRET);
         jig.secrets.set(USER_REFERENCE, USER);
         jig.secrets.set(PASSWORD_REFERENCE, PASSWORD);
@@ -128,22 +204,36 @@ export async function setupHarness(options: { timeoutScale?: number } = {}): Pro
     configure();
     let counter = 0;
 
+    /** The input of an ad-hoc call to the test API, from the shorter form most tests use. */
+    const adHoc = (given: Record<string, unknown>): Record<string, unknown> => {
+        const { path: target, origin, ...rest } = given;
+        return { action: "call", environment: ENVIRONMENT, collection: COLLECTION, url: `${typeof origin === "string" ? origin : api.origin}${String(target)}`, ...rest };
+    };
+
     const harness: Harness = {
         api,
+        prod,
         auth,
         issued,
         jig,
         clock,
+        get dir() {
+            return dir;
+        },
         ...load(),
         section,
         oauth,
         configure,
+        input: (given) => (given.action === undefined ? adHoc(given) : given),
         reset() {
             api.reset();
+            prod.reset();
             auth.reset();
             issued.length = 0;
             issueTokens();
             jig.reset();
+            fs.rmSync(dir, { recursive: true, force: true });
+            dir = fs.mkdtempSync(path.join(os.tmpdir(), "jig-api-test-"));
             clock.now = 1_700_000_000_000;
             configure();
             Object.assign(harness, load());
@@ -151,7 +241,7 @@ export async function setupHarness(options: { timeoutScale?: number } = {}): Pro
         async call(given, callOptions = {}) {
             jig.publish();
             const { tool, declaration } = harness;
-            const input = { target: TARGET, ...given };
+            const input = harness.input(given);
             const id = `call-${++counter}`;
 
             let cls: CallClass | undefined;
@@ -171,7 +261,7 @@ export async function setupHarness(options: { timeoutScale?: number } = {}): Pro
                     // What jig-core does: the message is cut to one line of 200 characters; a TypeError blocks the call,
                     // anything else shows "preview unavailable" and the person can still decide.
                     const reason = (error instanceof Error ? error.message : String(error)).replace(/\s+/g, " ").slice(0, 200);
-                    if (error instanceof TypeError) return { id, text: "", blocked: `Blocked by jig-core: http cannot run with this input: ${reason}`, cls };
+                    if (error instanceof TypeError) return { id, text: "", blocked: `Blocked by jig-core: api cannot run with this input: ${reason}`, cls };
                     preview = { summary: `preview unavailable: ${reason}` };
                 }
                 jig.approved.set(id, preview);
@@ -188,10 +278,15 @@ export async function setupHarness(options: { timeoutScale?: number } = {}): Pro
         },
         close: async () => {
             jig.remove();
-            await Promise.all([api.close(), auth.close()]);
+            fs.rmSync(dir, { recursive: true, force: true });
+            await Promise.all([api.close(), prod.close(), auth.close()]);
         },
     };
     return harness;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /** The text of a call that must have worked; a failure or a block fails the test with the message. */

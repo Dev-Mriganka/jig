@@ -1,8 +1,9 @@
-// What the model reads: a status line, the target, a few headers and the body. A non-2xx answer is a normal result, not an
+// What the model reads: a status line, the request and its environment, a few headers and the body. A non-2xx answer is a normal result, not an
 // error: the status and the body are what the model reasons from. JSON is re-indented with its numbers untouched and is not
 // cut here, because jig-core cuts a very long result and keeps the whole text in a file. Other text is cut at 200 lines.
 import { STATUS_CODES } from "node:http";
 import { prettyJson } from "./json.ts";
+import { READ_METHODS } from "./plan.ts";
 import type { Plan } from "./plan.ts";
 import type { Sent } from "./http.ts";
 import { SHOWN_LINES } from "./values.ts";
@@ -41,7 +42,7 @@ function notesFor(plan: Plan, sent: Sent): string[] {
     if (status >= 300 && status < 400 && headers.location !== undefined) {
         notes.push("Redirects are not followed: the location header says where the server points.");
     }
-    if (plan.call.method !== "GET" && (status >= 500 || status === 408)) {
+    if (!READ_METHODS.has(plan.method) && (status >= 500 || status === 408)) {
         notes.push(
             "The server reported an error, but a write may still have been carried out: " +
                 "check with a GET before sending it again.",
@@ -50,13 +51,22 @@ function notesFor(plan: Plan, sent: Sent): string[] {
     return notes;
 }
 
-export function renderResult(plan: Plan, sent: Sent): string {
-    const { call } = plan;
-    const { answer } = sent;
+/** `Get order (orders) in Staging (staging)`: which request ran, and where. */
+export function whereOf(plan: Plan): string {
+    const from = plan.collection === undefined ? "" : ` (${plan.collection})`;
+    return `${plan.request}${from} in ${plan.environment} (${plan.jigEnvironment})`;
+}
+
+export function statusLine(plan: Plan, answer: Answer): string {
     const statusText = STATUS_CODES[answer.status];
+    return `${plan.method} ${plan.url} -> HTTP ${answer.status}${statusText === undefined ? "" : ` ${statusText}`}`;
+}
+
+export function renderResult(plan: Plan, sent: Sent): string {
+    const { answer } = sent;
     const lines = [
-        `${call.method} ${plan.url} -> HTTP ${answer.status}${statusText === undefined ? "" : ` ${statusText}`}`,
-        `Target: ${call.target.name} (${call.target.environment})`,
+        statusLine(plan, answer),
+        `Request: ${whereOf(plan)}`,
         ...notesFor(plan, sent),
         ...shownHeaders(answer.headers),
         "",

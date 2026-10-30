@@ -1,0 +1,327 @@
+{
+  "info": {
+    "_postman_id": "0b8c1c2e-3333-4d5e-8f10-cccccccccccc",
+    "name": "Acme Orders",
+    "description": "The orders API of Acme, an example company.",
+    "schema": "https://schema.postman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "apiVersion", "value": "v1", "type": "string" },
+    { "key": "pageSize", "value": "10", "type": "string", "disabled": true }
+  ],
+  "item": [
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "Get order",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('status is 200', function () {", "  pm.response.to.have.status(200);", "});"] }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/{{apiVersion}}/orders/:orderId",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "orders", ":orderId"],
+              "variable": [{ "key": "orderId", "value": "{{orderId}}" }]
+            },
+            "description": "Reads one order by its id."
+          }
+        },
+        {
+          "name": "List orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/{{apiVersion}}/orders?status={{status}}&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "orders"],
+              "query": [
+                { "key": "status", "value": "{{status}}" },
+                { "key": "limit", "value": "10" },
+                { "key": "debug", "value": "1", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create order",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"sku\": \"{{sku}}\",\n  \"quantity\": {{quantity}},\n  \"note\": \"{{note}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/{{apiVersion}}/orders",
+            "description": "Creates an order for a customer."
+          }
+        },
+        {
+          "name": "Search orders",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"text\": \"{{text}}\"}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/{{apiVersion}}/orders/search" }
+          }
+        },
+        {
+          "name": "Cancel order",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/{{apiVersion}}/orders/{{orderId}}" }
+          }
+        },
+        {
+          "name": "Upload receipt",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "note", "value": "{{note}}", "type": "text" },
+                { "key": "receipt", "type": "file", "src": "files/receipt.txt" }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/{{apiVersion}}/orders/{{orderId}}/receipt" }
+          }
+        },
+        {
+          "name": "Upload outside",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [{ "key": "receipt", "type": "file", "src": "../outside.txt" }]
+            },
+            "url": { "raw": "{{baseUrl}}/{{apiVersion}}/orders/{{orderId}}/receipt" }
+          }
+        },
+        {
+          "name": "Import orders",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "text/csv" }],
+            "body": { "mode": "file", "file": { "src": "files/receipt.txt" } },
+            "url": { "raw": "{{baseUrl}}/{{apiVersion}}/orders/import" }
+          }
+        },
+        {
+          "name": "Place order (form)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "customer", "value": "{{customerId}}" },
+                { "key": "note", "value": "{{note}}" },
+                { "key": "draft", "value": "1", "disabled": true }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/{{apiVersion}}/orders/form" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Smoke",
+      "item": [
+        {
+          "name": "Health",
+          "request": { "method": "GET", "header": [], "auth": { "type": "noauth" }, "url": { "raw": "{{baseUrl}}/health" } }
+        },
+        {
+          "name": "Latest orders",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/{{apiVersion}}/orders?limit=1" } }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "event": [
+        { "listen": "prerequest", "script": { "type": "text/javascript", "exec": ["pm.variables.set('adminKey', 'abc');"] } }
+      ],
+      "item": [
+        {
+          "name": "Rebuild index",
+          "request": { "method": "POST", "header": [], "url": { "raw": "{{baseUrl}}/admin/rebuild" } }
+        }
+      ]
+    },
+    {
+      "name": "Auth styles",
+      "item": [
+        {
+          "name": "Basic status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                { "key": "username", "value": "{{serviceUser}}", "type": "string" },
+                { "key": "password", "value": "{{servicePassword}}", "type": "string" }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/status" }
+          }
+        },
+        {
+          "name": "Key status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "apikey",
+              "apikey": [
+                { "key": "key", "value": "X-Api-Key", "type": "string" },
+                { "key": "value", "value": "{{apiKey}}", "type": "string" },
+                { "key": "in", "value": "header", "type": "string" }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/status" }
+          }
+        },
+        {
+          "name": "Key in query",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "apikey",
+              "apikey": [
+                { "key": "key", "value": "api_key", "type": "string" },
+                { "key": "value", "value": "{{apiKey}}", "type": "string" },
+                { "key": "in", "value": "query", "type": "string" }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/status" }
+          }
+        },
+        {
+          "name": "Partner stock",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "oauth2",
+              "oauth2": [
+                { "key": "grant_type", "value": "client_credentials", "type": "string" },
+                { "key": "accessTokenUrl", "value": "{{authUrl}}/oauth/token", "type": "string" },
+                { "key": "clientId", "value": "{{clientId}}", "type": "string" },
+                { "key": "clientSecret", "value": "{{clientSecret}}", "type": "string" },
+                { "key": "scope", "value": "stock.read", "type": "string" },
+                { "key": "client_authentication", "value": "header", "type": "string" }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/stock" }
+          }
+        },
+        {
+          "name": "Browser sign-in",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "oauth2",
+              "oauth2": [
+                { "key": "grant_type", "value": "authorization_code", "type": "string" },
+                { "key": "authUrl", "value": "{{authUrl}}/authorize", "type": "string" }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/stock" }
+          }
+        },
+        {
+          "name": "Signed export",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "awsv4", "awsv4": [{ "key": "region", "value": "eu-west-1", "type": "string" }] },
+            "url": { "raw": "{{baseUrl}}/export" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reports",
+      "item": [
+        {
+          "name": "Orders by status",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query ($status: String!) {\n  orders(status: $status) { id total }\n}",
+                "variables": "{\"status\": \"{{status}}\"}"
+              }
+            },
+            "url": { "raw": "{{baseUrl}}/graphql" }
+          }
+        },
+        {
+          "name": "Orders in a status",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "graphql",
+              "graphql": { "query": "{ orders(status: {{status}}) { id } }" }
+            },
+            "url": { "raw": "{{baseUrl}}/graphql" }
+          }
+        },
+        {
+          "name": "Watch orders",
+          "request": { "method": "GET", "header": [], "url": { "raw": "ws://stream.staging.acme.example.test/orders" } }
+        },
+        {
+          "name": "Stream profile",
+          "protocolProfileBehavior": { "protocol": "websocket" },
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/stream" } }
+        },
+        {
+          "name": "With its own script",
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": ["pm.environment.set('x', 1);"] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('x', () => {});"] } }
+          ],
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/reports" } }
+        },
+        {
+          "name": "Random number",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/random/{{$randomInt}}" } }
+        },
+        {
+          "name": "Other host",
+          "request": { "method": "GET", "header": [], "url": { "raw": "https://api.other.example.test/orders" } }
+        }
+      ]
+    }
+  ]
+}
