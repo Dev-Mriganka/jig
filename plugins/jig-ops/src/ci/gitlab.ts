@@ -293,7 +293,7 @@ function gitlab(service: CiService, ctx: CiContext): CiAdapter {
 
     async function watch(params: Params): Promise<WatchPlan> {
         const finishName =
-            params.finish ?? (params.run_id !== undefined ? "run" : params.check !== undefined ? "check" : "required");
+            params.finish ?? (params.check !== undefined ? "check" : params.run_id !== undefined ? "run" : "required");
         let finish: GitlabFinish;
         switch (finishName) {
             case "run":

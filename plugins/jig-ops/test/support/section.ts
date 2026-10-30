@@ -94,3 +94,31 @@ export function withCopy(raw: Raw, service: string, from: string, name: string):
     environments[name] = structuredClone(environments[from]);
     return raw;
 }
+
+// ---- CI --------------------------------------------------------------------------------------------------------------
+
+/** The address a CI entry names. The fake server answers it through `routeTo`. */
+export const CI_URL = "https://ci.example.test";
+
+/** The `ci` entry of a GitLab project whose token is the secret `env:GITLAB_TOKEN`. */
+export function gitlabCi(more: Raw = {}): Raw {
+    return { system: "gitlab", url: CI_URL, project: "acme/orders-api", auth: { token: "env:GITLAB_TOKEN" }, ...more };
+}
+
+/** The `ci` entry of a Jenkins job, signed in as `ci-bot` with the secret `env:JENKINS_TOKEN`. */
+export function jenkinsCi(more: Raw = {}): Raw {
+    return {
+        system: "jenkins",
+        url: CI_URL,
+        job: "orders/build",
+        auth: { user: "ci-bot", token: "env:JENKINS_TOKEN" },
+        ...more,
+    };
+}
+
+/** A copy of the default section where orders-api has this `ci` entry, and the other settings given. */
+export function withCi(ci: Raw, more: Raw = {}): Raw {
+    const raw = section(more);
+    ((raw.services as Record<string, Raw>)["orders-api"] as Raw).ci = ci;
+    return raw;
+}

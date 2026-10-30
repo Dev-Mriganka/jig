@@ -82,6 +82,11 @@ export function systemList(): string {
     return CI_SYSTEMS.join(", ");
 }
 
+/** A key as a message may show it: plain when it is an ordinary name, quoted and cut when it is something else. */
+function fieldName(key: string): string {
+    return /^[A-Za-z][A-Za-z0-9_]{0,39}$/.test(key) ? key : shown(key, 30);
+}
+
 function text(value: unknown, max: number): value is string {
     return typeof value === "string" && value !== "" && value.length <= max && !CONTROL.test(value);
 }
@@ -148,7 +153,7 @@ function checkAuth(raw: unknown, jenkins: boolean, at: string, errors: string[])
     }
     const before = errors.length;
     const known = jenkins ? ["user", "token", "signIn", "transport"] : ["token", "signIn", "transport"];
-    for (const key of Object.keys(raw)) if (!known.includes(key)) errors.push(`${at}.${shown(key, 30)}: unknown field`);
+    for (const key of Object.keys(raw)) if (!known.includes(key)) errors.push(`${at}.${fieldName(key)}: unknown field`);
     const modes = [
         ...(raw.token !== undefined || raw.user !== undefined ? [jenkins ? "user with token" : "token"] : []),
         ...(raw.signIn !== undefined ? ["signIn"] : []),
@@ -215,7 +220,7 @@ export function checkCi(raw: unknown, at: string, repo: string | undefined, erro
     const kind = system as CiSystem;
     const before = errors.length;
     for (const key of Object.keys(raw)) {
-        if (!FIELDS[kind].includes(key)) errors.push(`${at}.${shown(key, 30)}: unknown field for ${kind}`);
+        if (!FIELDS[kind].includes(key)) errors.push(`${at}.${fieldName(key)}: unknown field for ${kind}`);
     }
     let environment: string | undefined;
     if (raw.environment !== undefined) {
