@@ -46,10 +46,9 @@ export function jigCore(options: JigCoreOptions = {}): ExtensionFactory {
         registerCommands(pi, state);
 
         // Last, so the hooks are in place before other plugins start declaring their tools. A plugin whose start-up
-        // callback throws must not take the tool manager down with it: the error is kept for `/jig`.
-        try {
-            publishJig(api);
-        } catch (error) {
+        // callback throws must not take the tool manager, or the other plugins, down with it: the error is kept
+        // for `/jig`.
+        for (const error of publishJig(api)) {
             state.startupProblems.push(`a plugin failed while loading: ${errorMessage(error)}`);
         }
     };

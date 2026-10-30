@@ -41,8 +41,8 @@ which the agent's shell can reach.
 
 - **Decline with a reason.** After `n` you can type why, and the model reads
   it.
-- **Allow for this session.** An ask for that tool and action becomes allow
-  until the session ends. It never reaches past the floor.
+- **Allow for this session.** An ask for that tool, action and environment
+  becomes allow until the session ends. It never reaches past the floor.
 
 ## One dialog at a time
 

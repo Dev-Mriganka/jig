@@ -68,9 +68,9 @@ tool_execution_start → tool_call → tool_execution_update → tool_result →
         │
         ▼
  tool_result hook ─ jig-core
-   6. mask       production results: personal data becomes tokens
+   6. redact     every known secret value is removed, before masking can split one
+   7. mask       production results: personal data becomes tokens
                    (the backstop for tools that do not mask themselves)
-   7. redact     every known secret value is removed
    8. cap        long output is cut, and the full result goes to a spill file
         │
         ▼

@@ -33,12 +33,21 @@ export function withJig(use: (api: JigApi) => void): void {
     (slot[PENDING] ??= []).push(use);
 }
 
-/** For jig-core only: publishes the API and runs what plugins queued before it loaded. */
-export function publishJig(api: JigApi): void {
+/** For jig-core only: publishes the API and runs what plugins queued before it loaded. One plugin's failing
+ *  callback does not stop the others: every callback runs, and the errors come back for jig-core to report. */
+export function publishJig(api: JigApi): unknown[] {
     slot[API] = api;
     const pending = slot[PENDING] ?? [];
     slot[PENDING] = [];
-    for (const use of pending) use(api);
+    const errors: unknown[] = [];
+    for (const use of pending) {
+        try {
+            use(api);
+        } catch (error) {
+            errors.push(error);
+        }
+    }
+    return errors;
 }
 
 /** For jig-core only: withdraws the API when its runtime ends (reload, session replacement, exit), so a plugin

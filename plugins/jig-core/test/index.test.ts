@@ -159,3 +159,18 @@ describe("the API that plugins get", () => {
     });
 });
 
+
+describe("plugins that load before jig-core", () => {
+    test("each queued callback runs even when an earlier one throws, and the errors come back", async () => {
+        const { withJig, publishJig: publish, withdrawJig: withdraw } = await import("../src/client.ts");
+        const ran: string[] = [];
+        withJig(() => { throw new Error("first plugin broke"); });
+        withJig(() => { ran.push("second"); });
+        const fake = { version: 1 } as never;
+        const errors = publish(fake);
+        assert.deepEqual(ran, ["second"]);
+        assert.equal(errors.length, 1);
+        assert.match(String(errors[0]), /first plugin broke/);
+        withdraw(fake);
+    });
+});

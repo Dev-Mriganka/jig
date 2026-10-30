@@ -27,7 +27,7 @@
   <circle cx="70" cy="219" r="11" fill="#5C9CAB"/>
   <text x="70" y="223.5" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">3</text>
   <text x="92" y="224" font-size="14.5" fill="#1A1F1D" font-weight="700">decide</text>
-  <text x="200" y="224" font-size="13" fill="#3A4440">the rules table gives allow, ask or deny; your configuration can only make it stricter</text>
+  <text x="200" y="224" font-size="13" fill="#3A4440">the rules table gives allow, ask or deny; your configuration can change it, never below the floor</text>
   <text x="60" y="254" font-size="13" fill="#1A1F1D" font-weight="700">4 ask, only when the rule says ask   ·   5 block, or let it run</text>
   <rect x="60" y="264" width="270" height="62" rx="6" fill="#E2F1E7" stroke="#2C7A4B" stroke-width="1.6"/>
   <text x="195" y="288" font-size="15" fill="#2C7A4B" font-weight="700" text-anchor="middle">allow</text>
@@ -64,12 +64,12 @@
   <text x="944" y="505" font-size="13" fill="#D9E3E8" text-anchor="end">after the tool runs</text>
   <circle cx="70" cy="539" r="11" fill="#5C9CAB"/>
   <text x="70" y="543.5" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">6</text>
-  <text x="92" y="544" font-size="14.5" fill="#1A1F1D" font-weight="700">mask</text>
-  <text x="200" y="544" font-size="13" fill="#3A4440">production results: personal data becomes tokens, the backstop for tools that do not mask</text>
+  <text x="92" y="544" font-size="14.5" fill="#1A1F1D" font-weight="700">redact</text>
+  <text x="200" y="544" font-size="13" fill="#3A4440">every known secret value is removed, before masking can split one</text>
   <circle cx="70" cy="567" r="11" fill="#5C9CAB"/>
   <text x="70" y="571.5" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">7</text>
-  <text x="92" y="572" font-size="14.5" fill="#1A1F1D" font-weight="700">redact</text>
-  <text x="200" y="572" font-size="13" fill="#3A4440">every known secret value is removed</text>
+  <text x="92" y="572" font-size="14.5" fill="#1A1F1D" font-weight="700">mask</text>
+  <text x="200" y="572" font-size="13" fill="#3A4440">production results: personal data becomes tokens, the backstop for tools that do not mask</text>
   <circle cx="70" cy="595" r="11" fill="#5C9CAB"/>
   <text x="70" y="599.5" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">8</text>
   <text x="92" y="600" font-size="14.5" fill="#1A1F1D" font-weight="700">cap</text>
