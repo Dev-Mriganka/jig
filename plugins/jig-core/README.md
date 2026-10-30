@@ -321,6 +321,25 @@ sign-on gateway, for example. A company plugin supplies that code as a
   and carries its message. A header whose value is not a string is an error
   that names the header.
 
+## Transports
+
+Some companies keep the session for their systems in a local sign-in proxy:
+the agent's tools must send requests through it, and never hold a token at
+all. A company plugin supplies that path as a **transport**.
+- **The company plugin registers it** with `transports.register(name,
+  transport)`. Registering the same name again replaces it.
+- **A tool sends through it by name,** with `transports.request(name, { system,
+  method, url, headers, body }, signal)`, when its configuration names a
+  transport. Tools build the same HTTP request either way, so only the path
+  changes.
+- **The answer is checked:** a status from 100 to 599, headers as text (their
+  names in lower case) and a text body. Anything else is an error that names
+  the transport.
+- **Errors never repeat the request.** Its URL or body may hold data that is
+  masked only in the tool's result.
+- **The result is governed like any other:** it goes through the result hook,
+  so it is redacted, masked where needed and capped.
+
 ## What asks, what is blocked
 
 The default table:

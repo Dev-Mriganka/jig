@@ -24,6 +24,8 @@ import { createSecrets } from "./secrets.ts";
 import type { Secrets } from "./secrets.ts";
 import { createSignIn } from "./signin.ts";
 import type { SignIn } from "./signin.ts";
+import { createTransports } from "./transports.ts";
+import type { Transports } from "./transports.ts";
 import { createWatchEngine } from "./watch/engine.ts";
 import type { WatchEngine } from "./watch/engine.ts";
 import { createWatchStore } from "./watch/store.ts";
@@ -92,6 +94,7 @@ export interface JigState {
     redactor: Redactor;
     secrets: Secrets;
     signIn: SignIn;
+    transports: Transports;
     approvals: Approvals;
     watches: WatchEngine;
     /** Field names that company plugins added to the masker, in the order they came. */
@@ -157,6 +160,7 @@ export function createState(pi: ExtensionAPI, options: JigCoreOptions = {}): Jig
         redactor,
         secrets: createSecrets({ backends: () => state.personal.config.secrets.backends, redactor }),
         signIn: createSignIn({ redactor }),
+        transports: createTransports(),
         approvals: createApprovals({
             now: () => Date.now(),
             openPreview: options.openPreview ?? (async (preview, header) => openInBrowser(writePreviewPage(preview, header))),

@@ -185,6 +185,29 @@ export interface SignInService {
     headers(request: SignInRequest, signal?: AbortSignal): Promise<Readonly<Record<string, string>>>;
 }
 
+/** One HTTP request a transport carries. */
+export interface TransportRequest {
+    /** The system, as the tool calls it, such as `jira` or `logs`. */
+    system: string;
+    method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+    /** The full URL the tool would have called itself. */
+    url: string;
+    headers?: Readonly<Record<string, string>>;
+    body?: string;
+}
+
+export interface TransportResponse {
+    status: number;
+    headers: Readonly<Record<string, string>>;
+    body: string;
+}
+
+/** Carries requests to a company's systems itself, such as through a local sign-in proxy that holds the session, so
+ *  the tool never sees a credential. */
+export interface Transport {
+    request(request: TransportRequest, signal?: AbortSignal): Promise<TransportResponse>;
+}
+
 /** jig-core's run-time API, reached through `jig()` in client.ts. */
 export interface JigApi {
     readonly version: 1;
@@ -205,6 +228,15 @@ export interface JigApi {
         /** Resolves a reference such as `pass:github/token` through an allowed backend. The value is
          *  redacted from every tool result until Pi exits. */
         resolve(ref: string, signal?: AbortSignal): Promise<string>;
+    };
+
+    /** Transports a company plugin provides for its systems. A tool configured with a transport's name sends its HTTP
+     *  requests through it instead of calling the network itself. */
+    readonly transports: {
+        /** Registering the same name again replaces the transport. */
+        register(name: string, transport: Transport): void;
+        /** Sends one request through a registered transport. Throws when no transport has this name. */
+        request(name: string, request: TransportRequest, signal?: AbortSignal): Promise<TransportResponse>;
     };
 
     /** Sign-in services a company plugin provides for its systems, such as a single sign-on gateway. Tools such

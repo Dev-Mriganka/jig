@@ -41,6 +41,11 @@ export function buildApi(state: JigState): JigApi {
             resolve: (ref, signal) => state.secrets.resolve(ref, signal),
         },
 
+        transports: {
+            register: (name, transport) => state.transports.register(name, transport),
+            request: (name, request, signal) => state.transports.request(name, request, signal),
+        },
+
         signIn: {
             register: (name, service) => state.signIn.register(name, service),
             headers: (name, request, signal) => state.signIn.headers(name, request, signal),

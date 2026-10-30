@@ -205,6 +205,12 @@ export function installFakeJig(): FakeJig {
             register: () => {},
             headers: async () => ({}),
         },
+        transports: {
+            register: () => {},
+            request: async () => {
+                throw new Error("no transports in tests");
+            },
+        },
         secrets: {
             resolve: async () => {
                 throw new Error("no secrets in tests");
