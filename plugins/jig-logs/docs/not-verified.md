@@ -11,28 +11,34 @@ and a fake transport. Nothing has been tried against a real backend.
 - **Each kind of `auth` against a real server,** and TLS with a certificate
   authority of its own.
 - **Masking of the lines.** A line is cut so that no JSON body or quoted value is
-  left open, because `jig-core` withholds a line it cannot read. A random test
-  outside this plugin cut about 41 000 lines of nested JSON, escaped JSON and
-  `key="value"` text, and `jig-core`'s masker withheld none of them; cutting the
-  same messages with a plain slice made it withhold them at once. The test suite
-  does not run it, because a plugin reaches `jig-core` only through its contract.
+  left open, because `jig-core` withholds a line it cannot read.
+  - A random test outside this plugin cut about 41 000 lines of nested JSON,
+    escaped JSON and `key="value"` text, and `jig-core`'s masker withheld none of
+    them. Cutting the same messages with a plain slice made it withhold them at
+    once.
+  - The test suite does not run it, because a plugin reaches `jig-core` only
+    through its contract.
 - **What `jig-core` does when classifying throws.** An unknown environment, and a
   Loki query that could reach beyond the selector, throw a `TypeError` from the
-  declaration. `jig-core`'s `classify.ts` turns a `TypeError` into an invalid-input
-  block, and its gate blocks the call with "Blocked by jig-core: logs cannot run
-  with this input: ..." and records it as `invalid`, without asking. Any other
-  error blocks with "jig-core could not decide". This was read in `jig-core`'s
-  code and tested with a fake, not run in a session. `execute` refuses the same
-  call the same way. The message the model reads names the environments that exist.
+  declaration.
+  - `jig-core`'s `classify.ts` turns a `TypeError` into an invalid-input block, and
+    its gate blocks the call with "Blocked by jig-core: logs cannot run with this
+    input: ..." and records it as `invalid`, without asking.
+  - Any other error blocks with "jig-core could not decide".
+  - This was read in `jig-core`'s code and tested with a fake, not run in a
+    session. `execute` refuses the same call the same way.
+  - The message the model reads names the environments that exist.
 
 ## Elasticsearch and OpenSearch
 
 - **A real OpenSearch or Elasticsearch.** The request bodies follow the search
   API and an earlier harness that ran them against OpenSearch, but these parts
-  are new and have never run against a real backend: the `format` on the time
-  range, `analyze_wildcard` on a Lucene query, the 25 second search timeout, the
-  check for data as a `size: 0` search (the earlier harness used a count),
-  fields named in the configuration, and the `term` filter.
+  are new and have never run against a real backend:
+  - the `format` on the time range;
+  - `analyze_wildcard` on a Lucene query;
+  - the 25 second search timeout;
+  - the check for data as a `size: 0` search (the earlier harness used a count);
+  - fields named in the configuration, and the `term` filter.
 
 ## Loki
 
@@ -42,15 +48,39 @@ an error differently or answer a parameter differently.
 
 What the adapter relies on, and the page that says it:
 
-| Fact | Page |
-|---|---|
-| `GET /loki/api/v1/query_range` takes `query`, `limit` (default 100), `start` (included), `end` (excluded) and `direction` (`forward` or `backward`, default `backward`). An epoch value is in nanoseconds | [Loki HTTP API](https://grafana.com/docs/loki/latest/reference/loki-http-api/) |
-| A log query is answered with `data.resultType` `streams` and `data.result[]` of `stream` (the labels) and `values` (pairs of a nanosecond epoch string and a line), each stream sorted by time | [Loki HTTP API](https://grafana.com/docs/loki/latest/reference/loki-http-api/) |
-| A query is a stream selector, then an optional pipeline. Line filters are `\|=`, `!=`, `\|~` and `!~`. Matching is case-sensitive; `(?i)` before a regular expression ignores case. A backtick string needs no escapes, and `` `\w+` `` is `"\\w+"` | [LogQL](https://grafana.com/docs/loki/latest/query/) and [Log queries](https://grafana.com/docs/loki/latest/query/log_queries/) |
-| `max_entries_limit_per_query` is 5000 by default; `max_query_length` is 30d1h (721 hours) and a longer query is rejected; `query_timeout` is 1 minute | [Configuration](https://grafana.com/docs/loki/latest/configure/) and [Configuration limits](https://grafana.com/docs/loki/latest/configure/loki-limits/) |
-| The tenant is the header `X-Scope-OrgID`. With `auth_enabled: false` there is one tenant, `fake`, and the header is not needed. Without the header in multi-tenant mode a request fails with 401 | [Multi-tenancy](https://grafana.com/docs/loki/latest/operations/multi-tenancy/) |
-| Errors, all HTTP 400 and not retryable until the query changes: "the query time range exceeds the limit", "max entries limit per query exceeded", parse errors, "queries require at least one regexp or equality matcher". Also HTTP 413 "response larger than the max message size", HTTP 504 "context deadline exceeded", HTTP 503 "index not ready", HTTP 401 "no org id" | [Troubleshoot queries](https://grafana.com/docs/loki/latest/operations/troubleshooting/troubleshoot-query/) |
-| Grafana Cloud uses basic authentication with the user of the stack's Loki details and an API token | [Python client examples](https://grafana.com/docs/loki/latest/reference/python-client-examples) |
+- **`GET /loki/api/v1/query_range`** takes `query`, `limit` (default 100), `start`
+  (included), `end` (excluded) and `direction` (`forward` or `backward`, default
+  `backward`). An epoch value is in nanoseconds. Page: [Loki HTTP
+  API](https://grafana.com/docs/loki/latest/reference/loki-http-api/).
+- **A log query is answered** with `data.resultType` `streams` and `data.result[]`
+  of `stream` (the labels) and `values` (pairs of a nanosecond epoch string and a
+  line), each stream sorted by time. Page: [Loki HTTP
+  API](https://grafana.com/docs/loki/latest/reference/loki-http-api/).
+- **A query is a stream selector,** then an optional pipeline. Pages:
+  [LogQL](https://grafana.com/docs/loki/latest/query/) and
+  [Log queries](https://grafana.com/docs/loki/latest/query/log_queries/).
+  - Line filters are `|=`, `!=`, `|~` and `!~`.
+  - Matching is case-sensitive; `(?i)` before a regular expression ignores case.
+  - A backtick string needs no escapes, and `` `\w+` `` is `"\\w+"`.
+- **The limits** are on the pages [Configuration](https://grafana.com/docs/loki/latest/configure/)
+  and [Configuration limits](https://grafana.com/docs/loki/latest/configure/loki-limits/).
+  - `max_entries_limit_per_query` is 5000 by default.
+  - `max_query_length` is 30d1h (721 hours), and a longer query is rejected.
+  - `query_timeout` is 1 minute.
+- **The tenant** is the header `X-Scope-OrgID`. With `auth_enabled: false` there is
+  one tenant, `fake`, and the header is not needed. Without the header in
+  multi-tenant mode a request fails with 401. Page:
+  [Multi-tenancy](https://grafana.com/docs/loki/latest/operations/multi-tenancy/).
+- **The errors** are on the page
+  [Troubleshoot queries](https://grafana.com/docs/loki/latest/operations/troubleshooting/troubleshoot-query/).
+  - All HTTP 400, and not retryable until the query changes: "the query time range
+    exceeds the limit", "max entries limit per query exceeded", parse errors,
+    "queries require at least one regexp or equality matcher".
+  - Also HTTP 413 "response larger than the max message size", HTTP 504 "context
+    deadline exceeded", HTTP 503 "index not ready", HTTP 401 "no org id".
+- **Grafana Cloud** uses basic authentication with the user of the stack's Loki
+  details and an API token. Page:
+  [Python client examples](https://grafana.com/docs/loki/latest/reference/python-client-examples).
 
 What was not found in the documentation, so it is assumed:
 - **A search is a GET.** The `query_range` section describes parameters in the

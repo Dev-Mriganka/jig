@@ -15,13 +15,21 @@ list of parts:
 
 | Part | What it holds |
 |---|---|
-| `size` | How many hits this request still wants. Once `size` hits are collected, the buckets that remain ask for 0 and only add their exact total |
-| `timeout` | `25s`. The backend gives up on a shard search after this and answers with what it has, marked `timed_out`. It is shorter than the 30 seconds one request may take, so the backend's answer comes before the tool's own timeout cuts the connection |
-| `track_total_hits` | `true`, so totals are exact. A backend that counts only up to a limit reports a lower bound, and the result says "at least" |
-| `filter` | The time range, then one `term` for each entry of the environment's `filter`, in the configured order |
+| `size` | How many hits this request still wants |
+| `timeout` | `25s`: the backend gives up on a shard search after this |
+| `track_total_hits` | `true`, so totals are exact |
+| `filter` | The time range, then one `term` per entry of the environment's `filter` |
 | `must` | One clause: a `match_phrase` for a `phrase`, or a `query_string` for a `query` |
 | `sort` | The time field, in the call's `order`, with `unmapped_type: date` |
 | `_source` | The time field and the message field, and nothing else |
+
+- **`size`:** once `size` hits are collected, the buckets that remain ask for 0 and
+  only add their exact total.
+- **`timeout`:** the backend answers with what it has, marked `timed_out`. It is
+  shorter than the 30 seconds one request may take, so the backend's answer comes
+  before the tool's own timeout cuts the connection.
+- **`track_total_hits`:** a backend that counts only up to a limit reports a lower
+  bound, and the result says "at least".
 
 `sort` and `_source` are left out when `size` is 0. The time range is a `range`
 on the environment's `timeField`, from `gte` the start to `lt` the end, with
@@ -55,7 +63,7 @@ environments:
 | | `phrase` | `query` |
 |---|---|---|
 | Becomes | `{ "match_phrase": { "<messageField>": "<phrase>" } }` | `{ "query_string": { "query": "<query>", "default_field": "<messageField>", "analyze_wildcard": true } }` |
-| Syntax | None: the text is matched as a phrase | Lucene: `AND`, `OR` and `NOT` in capitals, quotes around phrases, wildcards such as `timeout*`, fields such as `level:ERROR` |
+| Syntax | None: matched as a phrase | Lucene: `AND`, `OR`, `NOT` in capitals, quotes, wildcards, fields such as `level:ERROR` |
 | Use it for | One identifier or an exact error text | Terms that are combined |
 
 `analyze_wildcard` lets `Timeout*` find the lower-cased terms that a text field

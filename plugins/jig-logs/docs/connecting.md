@@ -13,27 +13,33 @@ name.
 
 | `auth` | What is sent |
 |---|---|
-| `{ "username": "reader", "password": "pass:logs/reader" }` | `Authorization: Basic ...`. The user name cannot hold a colon. Grafana Cloud's Loki takes this form, with the user of the stack and an API token |
+| `{ "username": "reader", "password": "pass:logs/reader" }` | `Authorization: Basic ...` |
 | `{ "apiKey": "pass:logs/api-key" }` | `Authorization: ApiKey <the secret>`. The secret is the key as Elasticsearch gives it (`encoded`) |
 | `{ "token": "pass:logs/token" }` | `Authorization: Bearer <the secret>` |
-| `{ "signIn": "<service name>" }` | The headers of the company sign-in service of that name (for example a single sign-on gateway), asked for on every request |
+| `{ "signIn": "<service name>" }` | The headers of a company sign-in service, asked for on every request |
+
+- **The user name** of the first form cannot hold a colon. Grafana Cloud's Loki
+  takes this form, with the user of the stack and an API token.
+- **A sign-in service**, such as a single sign-on gateway, is asked for the system
+  `logs` and the full address of the request.
 
 The request carries `accept: application/json`, and `content-type:
-application/json` when it has a body. The adapter may add headers of its own, such
-as Loki's tenant, `X-Scope-OrgID`, which is sent through a transport too; the
-sign-in's headers come last and win. A sign-in service is asked for the system
-`logs` and the full address of the request. The tool uses Node's certificate store, so
-`NODE_EXTRA_CA_CERTS` applies to a private certificate authority as it does to
-the rest of Pi.
+application/json` when it has a body.
+- **The adapter may add headers of its own,** such as Loki's tenant,
+  `X-Scope-OrgID`, which is sent through a transport too. The sign-in's headers
+  come last and win.
+- **The tool uses Node's certificate store,** so `NODE_EXTRA_CA_CERTS` applies to
+  a private certificate authority as it does to the rest of Pi.
 
 ## Through a transport
 
 A company plugin registers a transport with `jig-core`: code that carries the
-request, for example through a local sign-in proxy that holds the session. Every
-request goes to `jig().transports.request(name, { system: "logs", method, url,
-headers, body })`, with the same headers as a direct request. No authorization
-header is added, because the transport signs in. What it answers is read like a
-direct reply.
+request, for example through a local sign-in proxy that holds the session.
+
+Every request goes to `jig().transports.request(name, { system: "logs", method,
+url, headers, body })`, with the same headers as a direct request. No
+authorization header is added, because the transport signs in. What it answers is
+read like a direct reply.
 
 ## Time and cancellation
 
@@ -50,11 +56,13 @@ Stopping the call stops the request, and the wait for a secret, at once.
 ## Secrets and sign-in
 
 A secret reference is resolved once per call, by `jig-core`, and only through a
-backend that its `secrets.backends` allows. A search of many buckets asks the
-secret store once, and the next call asks again: nothing is kept between calls. A
-lookup that failed is made again by the next request. A sign-in service is asked
-for every request, because it is the one that knows when a token has run out. A
-mistake in a reference never repeats the value.
+backend that its `secrets.backends` allows.
+- **A search of many buckets** asks the secret store once, and the next call asks
+  again: nothing is kept between calls.
+- **A lookup that failed** is made again by the next request.
+- **A sign-in service** is asked for every request, because it is the one that
+  knows when a token has run out.
+- **A mistake in a reference** never repeats the value.
 
 ## Replies
 

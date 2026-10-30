@@ -2,9 +2,10 @@
 
 `jig-logs` searches one kind of log store at a time, named by `logs.backend.type`.
 Everything that differs between stores is behind one interface, `LogBackend` in
-`src/backends/backend.ts`, and each store has one file in `src/backends/`. This
-page says what an adapter must do, so that a contributor can add one. Back to the
-[jig-logs overview](../README.md).
+`src/backends/backend.ts`, and each store has one file in `src/backends/`.
+
+This page says what an adapter must do, so that a contributor can add one. Back to
+the [jig-logs overview](../README.md).
 
 ## The built backends
 
@@ -13,54 +14,95 @@ page says what an adapter must do, so that a contributor can add one. Back to th
 | `elasticsearch` (the default) | Elasticsearch and OpenSearch | `elasticsearch.ts` | Lucene (see [Query grammar](query-grammar.md)) |
 | `loki` | Grafana Loki | `loki.ts`, `logql.ts` | LogQL (see [Loki](loki.md)) |
 
-`phrase`, `match` and `exclude` are portable. An adapter turns `phrase` into the
-store's own filter. `match` and `exclude` are applied to the hits fetched, and an
-adapter that can may send them to the store too (Loki does). `query` is in the
-language of the store, which the model learns from the logs skill and from the
-`Next:` line of a rejected query. Stores differ in what they can promise, and the
-result says so: Elasticsearch counts exactly, and Loki cannot count, so its totals
-are lower bounds ("at least").
+`phrase`, `match` and `exclude` are portable.
+- **`phrase`:** an adapter turns it into the store's own filter.
+- **`match` and `exclude`** are applied to the hits fetched, and an adapter that
+  can may send them to the store too (Loki does).
+- **`query`** is in the language of the store, which the model learns from the logs
+  skill and from the `Next:` line of a rejected query.
+
+Stores differ in what they can promise, and the result says so: Elasticsearch
+counts exactly, and Loki cannot count, so its totals are lower bounds ("at least").
 
 ## What is shared, and what an adapter owns
 
 The search does not know which store it talks to. It decides what to ask next; the
 adapter says how to ask, and how to read the answer.
 
-| Shared, the same for every backend | The adapter's |
-|---|---|
-| The checks on a call, windows, buckets, halving and retrying, the budgets | The settings an environment needs, and their checks |
-| Paging, excerpts around a term, clipping, hit lines | The request for one bucket, and the check for data |
-| The sender: where the credential comes from, timeouts, the size of a reply, and what each failure means (`jig-core` sends the request and reads the secret) | How a request travels: method, path, body, headers |
-| The words of a failure, and the facts a call records | Reading a reply into hits |
-| | What an error reply means |
-| | The limits of the store |
+**Shared, the same for every backend:**
+- the checks on a call, windows, buckets, halving and retrying, the budgets;
+- paging, excerpts around a term, clipping, hit lines;
+- the sender: where the credential comes from, timeouts, the size of a reply, and
+  what each failure means (`jig-core` sends the request and reads the secret);
+- the words of a failure, and the facts a call records.
+
+**The adapter's:**
+- the settings an environment needs, and their checks;
+- the request for one bucket, and the check for data;
+- how a request travels: method, path, body, headers;
+- reading a reply into hits, and what an error reply means;
+- the limits of the store.
 
 ## What an adapter must do
 
 An adapter is an object of the type `LogBackend`. Its members, in the order a call
 uses them:
 
-| Member | It must |
-|---|---|
-| `type` | Be the value of `logs.backend.type` that selects it, and the key it is listed under in `src/backends/index.ts` |
-| `config` | Name the fields it adds to `logs.backend` and to each environment, say what an environment needs at least (`"an index"`), and give an example address for the messages |
-| `checkBackendFields`, `checkEnvironmentFields` | Report every problem in its own fields, one message each, each starting with the key (`logs.environments.staging.index must be ...`). Never repeat a value that may be a secret |
-| `environment` | Fill in the defaults and return the environment as the search reads it. `jigEnvironment` defaults to the environment's name. Add no key the settings did not need |
-| `limits` | Say the most hits one request returns (never below the tool's `size` limit, 200: a test fails if it is) and the longest time span one request may cover (`Number.POSITIVE_INFINITY` for none). Buckets are cut to the span |
-| `checkQuery` | Only when the language of `query` can reach beyond what configuration allows (Loki's can name another stream selector). Throw an `InputError`, a `TypeError`: it is called when the call is classified, so `jig-core` blocks the call without asking, and when the request is built. Omit it when the text can only ever be a value in the request |
-| `search` | Build the request for one bucket: the time range from `from` up to, not including, `to`; the environment's own scope; the phrase or the query; up to `size` hits in the call's order. With `size` 0 it only counts; a store that cannot count asks for one hit |
-| `probe` | Build the check for data: the time range and the environment's scope, and nothing the model wrote |
-| `wire` | Say how a request of one environment travels: `GET` or `POST`, a path that starts with `/` (and may end in a query string), an optional JSON body, optional headers. The sender adds `backend.url` and the sign-in, so no address or credential belongs in it |
-| `parse` | Read the body of a successful reply into a page: how many hits there are, whether that count is exact or a lower bound (`gte`; a store that cannot count says `gte` whenever the request filled its limit), the hits with their time, message and other fields, and `incomplete` when the store says it lost data. Return `undefined` for anything that is not a result, even when only one part of it is wrong, so that no hit is dropped quietly. Never throw |
-| `classify` | Say what an error reply means in the store's words, as a `Failure` (see below). Return `undefined` to leave it to the HTTP rules, which cover sign-in, redirects, timeouts, busy and rejected |
-| `words` | Name the store in four messages: what a refused sign-in lacked access to, which settings to check after a 401, the `Next:` line for a rejected query, and for an HTTP 404 |
+- **`type`** is the value of `logs.backend.type` that selects it, and the key it is
+  listed under in `src/backends/index.ts`.
+- **`config`** names the fields it adds to `logs.backend` and to each environment,
+  says what an environment needs at least (`"an index"`), and gives an example
+  address for the messages.
+- **`checkBackendFields`, `checkEnvironmentFields`** report every problem in its
+  own fields, one message each, each starting with the key
+  (`logs.environments.staging.index must be ...`). They never repeat a value that
+  may be a secret.
+- **`environment`** fills in the defaults and returns the environment as the search
+  reads it. `jigEnvironment` defaults to the environment's name. Add no key the
+  settings did not need.
+- **`limits`** says the most hits one request returns and the longest time span one
+  request may cover (`Number.POSITIVE_INFINITY` for none). Buckets are cut to the
+  span. The hit limit is never below the tool's `size` limit, 200: a test fails if
+  it is.
+- **`checkQuery`** is needed only when the language of `query` can reach beyond what
+  configuration allows (Loki's can name another stream selector).
+  - It throws an `InputError`, a `TypeError`. It is called when the call is
+    classified, so `jig-core` blocks the call without asking, and when the request
+    is built.
+  - Omit it when the text can only ever be a value in the request.
+- **`search`** builds the request for one bucket: the time range from `from` up to,
+  not including, `to`; the environment's own scope; the phrase or the query; up to
+  `size` hits in the call's order. With `size` 0 it only counts; a store that cannot
+  count asks for one hit.
+- **`probe`** builds the check for data: the time range and the environment's scope,
+  and nothing the model wrote.
+- **`wire`** says how a request of one environment travels: `GET` or `POST`, a path
+  that starts with `/` (and may end in a query string), an optional JSON body,
+  optional headers. The sender adds `backend.url` and the sign-in, so no address or
+  credential belongs in it.
+- **`parse`** reads the body of a successful reply into a page.
+  - It gives how many hits there are, and whether that count is exact or a lower
+    bound (`gte`; a store that cannot count says `gte` whenever the request filled
+    its limit).
+  - It gives the hits with their time, message and other fields, and `incomplete`
+    when the store says it lost data.
+  - It returns `undefined` for anything that is not a result, even when only one
+    part of it is wrong, so that no hit is dropped quietly. It never throws.
+- **`classify`** says what an error reply means in the store's words, as a `Failure`
+  (see below). Return `undefined` to leave it to the HTTP rules, which cover
+  sign-in, redirects, timeouts, busy and rejected.
+- **`words`** names the store in four messages: what a refused sign-in lacked access
+  to, which settings to check after a 401, the `Next:` line for a rejected query,
+  and the line for an HTTP 404.
 
-A `Failure` says why a request gave no usable answer: `transient(reason)` for a
-bucket that a smaller request may get past (it is halved and tried again), and
-`final(reason, fatal)` for one that halving does not help, `fatal` when every other
-window would fail the same way. The reasons are in
-[Failures](failures.md#gaps-and-their-reasons); an adapter picks the closest one
-and does not invent a message.
+A `Failure` says why a request gave no usable answer:
+- **`transient(reason)`** is for a bucket that a smaller request may get past (it
+  is halved and tried again).
+- **`final(reason, fatal)`** is for one that halving does not help. `fatal` means
+  every other window would fail the same way.
+
+The reasons are in [Failures](failures.md#gaps-and-their-reasons); an adapter picks
+the closest one and does not invent a message.
 
 ## Rules an adapter keeps
 
