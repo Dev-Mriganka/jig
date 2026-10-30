@@ -241,8 +241,20 @@ describe("changed since the preview", () => {
 describe("a command whose outcome is unknown is never run again", () => {
     beforeEach(() => void (h = setupHarness({ writeTimeoutMs: 250 })));
 
+    /** What jig-core returns for a program that took too long and was stopped, for the commands that change the cluster. */
+    const TOO_SLOW = { code: 124, stdout: "", stderr: "", timedOut: true };
+    const changes = (file: string, args: readonly string[]) =>
+        (file === "helm" && (args[0] === "upgrade" || args[0] === "rollback")) || (file === "kubectl" && (args[3] === "set" || args[3] === "rollout"));
+    /** Makes every command that changes the cluster run out of time. The reads work. */
+    const tooSlow = () => {
+        h.jig.script = (file, args) => (changes(file, args) ? TOO_SLOW : undefined);
+    };
+    /** How many times a command that changes the cluster was started, by the plugin, whatever it did. */
+    const started = (file: string) => h.jig.started.filter((one) => changes(one.file, one.args) && one.file === file).length;
+
     test("helm that runs too long is stopped, the rollout is read once, and nothing is sent again", async () => {
-        h.cluster.answer(orders("1.4.2", { helmUpgrade: { stdout: UPGRADED, delayMs: 5000 } }));
+        h.cluster.answer(orders("1.4.2"));
+        tooSlow();
         const result = await run("1.4.3");
         const message = result.error?.message ?? "";
         assert.match(
@@ -251,15 +263,28 @@ describe("a command whose outcome is unknown is never run again", () => {
         );
         assert.match(message, /\norders-api in staging \(namespace orders-staging\): Still rolling: 0 of 2 pods ready on 1\.4\.3; pods run 1\.4\.2\.\n/);
         assert.match(message, /\nCheck with deploy status before doing anything else, and tell the user\. Do not run it again unless the user says so$/);
-        assert.equal(h.cluster.helmCalls().length, 1, "helm was started once");
+        assert.equal(started("helm"), 1, "helm was started once");
         // The preview read the rollout, the run read it again before it started helm, and the look after it read it once.
         assert.equal(getsOf("pods"), 3);
         assert.equal(getsOf("deployments,statefulsets"), 3);
         assert.deepEqual(h.jig.facts.get(result.id), [{ method: "helm", outcome: "unknown" }]);
     });
 
+    test("the same with a helm that really takes too long: the time limit stops the process", async () => {
+        h.close();
+        h = setupHarness({ writeTimeoutMs: 1500 });
+        h.cluster.answer(orders("1.4.2", { helmUpgrade: { stdout: UPGRADED, delayMs: 20_000 } }));
+        const started_ = Date.now();
+        const result = await run("1.4.3");
+        assert.match(result.error?.message ?? "", /^deploy run: helm ran longer than 1\.5 s and was stopped, so it is unknown whether the deploy of 1\.4\.3 took effect/);
+        assert.ok(Date.now() - started_ < 15_000, "the process was stopped at the limit, not left to finish");
+        assert.equal(h.jig.started.filter((one) => one.file === "helm").length, 1);
+        assert.match(result.error?.message ?? "", /Still rolling: 0 of 2 pods ready on 1\.4\.3/);
+    });
+
     test("status afterwards says it was cut short, and that it was not run again", async () => {
-        h.cluster.answer(orders("1.4.2", { helmUpgrade: { stdout: UPGRADED, delayMs: 5000 } }));
+        h.cluster.answer(orders("1.4.2"));
+        tooSlow();
         await run("1.4.3");
         h.cluster.answer(orders("1.4.2"));
         const first = ok(await h.deploy.call({ action: "status", ...ORDERS })).split("\n")[0];
@@ -267,7 +292,7 @@ describe("a command whose outcome is unknown is never run again", () => {
     });
 
     test("a call the user cancelled while helm ran is the same, and the one look is made even so", async () => {
-        h.cluster.answer(orders("1.4.2", { helmUpgrade: { stdout: UPGRADED, delayMs: 5000 } }));
+        h.cluster.answer(orders("1.4.2", { helmUpgrade: { stdout: UPGRADED, delayMs: 20_000 } }));
         const controller = new AbortController();
         const running = run("1.4.3", ORDERS, { signal: controller.signal });
         // The user cancels once helm has started, however long the reads before it took.
@@ -280,41 +305,48 @@ describe("a command whose outcome is unknown is never run again", () => {
         clearInterval(watching);
         assert.match(result.error?.message ?? "", /^deploy run: the call was cancelled while helm ran, so it is unknown whether the deploy of 1\.4\.3 took effect/);
         assert.match(result.error?.message ?? "", /Still rolling: 0 of 2 pods ready on 1\.4\.3/, "the look was made with the signal already aborted");
-        assert.equal(h.cluster.helmCalls().length, 1);
+        assert.equal(started("helm"), 1);
         assert.equal(getsOf("pods"), 3);
         const lookStart = h.jig.started.filter((one) => one.file === "kubectl").at(-1);
         assert.equal(lookStart?.options.signal, undefined, "the look does not carry the signal that was aborted");
     });
 
     test("kubectl set image that runs too long is the same, and is not set again", async () => {
-        h.cluster.answer(billing("2.0.0", { setImage: { stdout: "deployment.apps/billing image updated\n", delayMs: 5000 } }));
+        h.cluster.answer(billing("2.0.0"));
+        tooSlow();
         const result = await run("2.1.0", BILLING);
         assert.match(result.error?.message ?? "", /^deploy run: kubectl ran longer than 0\.25 s and was stopped, so it is unknown whether the deploy of 2\.1\.0 took effect in billing in staging\. It was not run again\./);
-        assert.equal(h.cluster.calls().filter((call) => call.argv[3] === "set").length, 1);
+        assert.equal(started("kubectl"), 1);
     });
 
     test("a rollback that runs too long is the same, with no version to judge the look by", async () => {
-        h.cluster.answer(rollbackWorld({ helmRollback: { stdout: "ok\n", delayMs: 5000 } }));
+        h.cluster.answer(rollbackWorld());
+        tooSlow();
         const result = await rollback();
         assert.match(result.error?.message ?? "", /^deploy rollback: helm ran longer than 0\.25 s and was stopped, so it is unknown whether the rollback took effect in orders-api in staging\. It was not run again\./);
-        assert.equal(h.cluster.helmCalls().filter((call) => call.argv[0] === "rollback").length, 1);
+        assert.equal(started("helm"), 1);
     });
 
     test("when the look fails too, that is said, and the look is not repeated", async () => {
-        h.cluster.answer(orders("1.4.2", { helmUpgrade: { stdout: UPGRADED, delayMs: 5000 } }));
+        h.cluster.answer(orders("1.4.2"));
         let reads = 0;
-        h.jig.script = (_file, args) => {
+        h.jig.script = (file, args) => {
+            if (changes(file, args)) return TOO_SLOW;
             // The first two reads (preview, then plan) work; the one after the cut-short helm does not.
-            if (args[3] === "get" && args[4] === "pods" && ++reads > 2) return { code: 1, stdout: "", stderr: "Unable to connect to the server: dial tcp: i/o timeout", timedOut: false };
+            if (file === "kubectl" && args[3] === "get" && args[4] === "pods" && ++reads > 2) {
+                return { code: 1, stdout: "", stderr: "Unable to connect to the server: dial tcp: i/o timeout", timedOut: false };
+            }
             return undefined;
         };
         const result = await run("1.4.3");
         assert.match(result.error?.message ?? "", /One look at the rollout now:\nThe rollout could not be read either: Cannot reach the cluster of context test-cluster for orders-api in staging/);
         assert.equal(reads, 3, "one failed look, and no second try");
-        assert.equal(h.cluster.helmCalls().length, 1);
+        assert.equal(started("helm"), 1);
     });
 
     test("a command that finishes in time is not an unknown outcome", async () => {
+        h.close();
+        h = setupHarness();
         h.cluster.answer(orders("1.4.2", { helmUpgrade: { stdout: UPGRADED, delayMs: 50 } }));
         const result = await run("1.4.3");
         assert.equal(result.error, undefined);
