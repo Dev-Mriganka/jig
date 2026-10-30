@@ -56,7 +56,11 @@ interface Given {
     id: string;
     name: string;
     converted: Converted;
+    /** True when the value is the person's configured default, not something the call set. */
+    fromDefaults: boolean;
 }
+
+const FROM_DEFAULTS = "from your defaults";
 
 /** The names of the fields a call may set: the project and the type are given by their own parameters. */
 function screenNames(screen: Screen): string {
@@ -75,24 +79,26 @@ export async function planCreate(env: Env, call: CallOf<"create">, preview: bool
     const given = new Map<string, Given>();
 
     /** The id of the field a name means: a known name, else a field on the screen by its name or id. */
-    const idOf = (name: string): string => {
+    const lookup = (name: string): string | undefined => {
         const known = knownFieldId(name, settings.fields);
         if (screen === undefined) {
             if (known !== undefined) return known;
-            if (/^[A-Za-z][A-Za-z0-9_]*$/.test(name.trim())) return name.trim();
-            throw new InputError(`jira create: "${name.slice(0, 40)}" is not a field name or id`);
+            return /^[A-Za-z][A-Za-z0-9_]*$/.test(name.trim()) ? name.trim() : undefined;
         }
-        const found = screenField(screen, known ?? name);
-        if (found === undefined) {
-            throw new InputError(
-                `jira create: "${name.slice(0, 40)}" is not on the create screen of ${where}; ` +
-                    `its fields: ${screenNames(screen)}`,
-            );
-        }
-        return found.id;
+        return screenField(screen, known ?? name)?.id;
+    };
+    const idOf = (name: string): string => {
+        const id = lookup(name);
+        if (id !== undefined) return id;
+        throw new InputError(
+            screen === undefined
+                ? `jira create: "${name.slice(0, 40)}" is not a field name or id`
+                : `jira create: "${name.slice(0, 40)}" is not on the create screen of ${where}; ` +
+                      `its fields: ${screenNames(screen)}`,
+        );
     };
 
-    const add = async (name: string, id: string, raw: unknown): Promise<void> => {
+    const add = async (name: string, id: string, raw: unknown, fromDefaults = false): Promise<void> => {
         if (id === "project" || id === "issuetype")
             throw new InputError(`jira create: ${id} is set by project and type`);
         if (given.has(id)) throw new InputError(`jira create: ${id} is given twice`);
@@ -102,15 +108,36 @@ export async function planCreate(env: Env, call: CallOf<"create">, preview: bool
             const field = screen?.fields.get(id);
             if (field !== undefined) converted = checkAllowed(field, converted);
             // The screen's own name for a field is the clearest label; without a screen, the name the call used.
-            given.set(id, { id, name: field?.name ?? name, converted });
+            given.set(id, { id, name: field?.name ?? name, converted, fromDefaults });
         } catch (error) {
-            throw error instanceof InputError ? new InputError(`jira create: ${error.message}`) : error;
+            if (!(error instanceof InputError)) throw error;
+            // A default is not something the call wrote, so the message says where it comes from and how to override it.
+            const origin = fromDefaults
+                ? ` (the value of "${name.slice(0, 40)}" in createDefaults in jig.json; set that field in the call to use another)`
+                : "";
+            throw new InputError(`jira create: ${error.message}${origin}`);
         }
     };
 
     await add("summary", "summary", call.summary);
     if (call.description !== undefined) await add("description", "description", call.description);
     for (const [name, raw] of Object.entries(call.fields)) await add(name, idOf(name), raw);
+
+    // The person's defaults fill the fields the call left alone, and may satisfy a field the screen requires. A default
+    // for a field that is not on this screen is left out and said so, because it was meant for every create.
+    const notApplied: string[] = [];
+    for (const [name, raw] of Object.entries(settings.createDefaults)) {
+        const id = lookup(name);
+        if (id === undefined) {
+            notApplied.push(name);
+        } else if (given.get(id)?.fromDefaults === true) {
+            throw new InputError(
+                `jira create: createDefaults names ${id} twice, as "${name.slice(0, 40)}" and another`,
+            );
+        } else if (!given.has(id)) {
+            await add(name, id, raw, true);
+        }
+    }
 
     if (screen !== undefined) {
         const missing = missingRequired(screen, new Set(given.keys()));
@@ -133,6 +160,12 @@ export async function planCreate(env: Env, call: CallOf<"create">, preview: bool
     const textual = (field: Given): boolean => isWikiField(field.id) && typeof field.converted.send === "string";
 
     const notes = preview ? await duplicateNotes(env, call.project, summary) : [];
+    if (notApplied.length > 0) {
+        const names = notApplied.map((name) => `"${name.slice(0, 40)}"`).join(", ");
+        notes.push(
+            `Defaults not applied: ${names} ${notApplied.length === 1 ? "is" : "are"} not on the create screen of ${where}.`,
+        );
+    }
     if (screen === undefined) {
         notes.push(
             "The create screen could not be read, so the values are shown as given " +
@@ -140,9 +173,12 @@ export async function planCreate(env: Env, call: CallOf<"create">, preview: bool
         );
     }
     const shownFields = [...given.values()];
-    const fact = (field: Given): [string, string] => [field.name, field.converted.shown];
+    const fact = (field: Given): [string, string] => [
+        field.name,
+        field.fromDefaults ? `${field.converted.shown} (${FROM_DEFAULTS})` : field.converted.shown,
+    ];
     const text = (field: Given): { label: string; source: string } => ({
-        label: field.name,
+        label: field.fromDefaults ? `${field.name} (${FROM_DEFAULTS})` : field.name,
         source: String(field.converted.send),
     });
 

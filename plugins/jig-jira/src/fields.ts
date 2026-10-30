@@ -71,7 +71,7 @@ const MAX_DEPTH = 6;
 const MAX_NODES = 500;
 
 /** Throws unless `value` is plain JSON of a sensible size: a field value is sent as it is, so it is bounded here. */
-function checkJson(id: string, value: unknown): void {
+export function checkJson(id: string, value: unknown): void {
     let nodes = 0;
     const visit = (node: unknown, depth: number): void => {
         if (depth > MAX_DEPTH || ++nodes > MAX_NODES) {

@@ -82,6 +82,8 @@ The rules for writes in full, and what each preview shows. Back to the
 - **`link`, `unlink`:** the note under the rows says what Jira receives: which
   issue is `outwardIssue` (the one that reads "blocks") and which `inwardIssue`.
   There is no text, so the dialog is enough and there is no page of its own.
+- **`create`:** a value from `createDefaults` is marked `(from your defaults)`,
+  and a default that did not fit the issue type is named in a note.
 - **`create`:** a priority or component is shown as the create screen spells it.
   Possible duplicates are a summary search in the project over the last 30 days,
   up to 5.

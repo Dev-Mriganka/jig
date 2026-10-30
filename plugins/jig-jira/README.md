@@ -72,6 +72,7 @@ tool then does nothing until the file is fixed (`/jig` lists the problems).
 | `auth` | required | How requests are signed in: exactly one of the four forms below |
 | `updateFields` | `summary`, `description`, `labels`, `priority`, `assignee` | The fields `update` may set, by name or id |
 | `fields` | none | Friendly names for field ids, such as `"Story Points": "customfield_10016"` |
+| `createDefaults` | none | Values `create` gives a field when the call does not set it, by field name or id |
 | `privateNames` | none | Folder or host names to flag in outgoing text, up to 100 |
 | `environment` | `external` | The environment name that rules and classification know this Jira by |
 

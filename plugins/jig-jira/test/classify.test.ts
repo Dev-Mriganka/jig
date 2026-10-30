@@ -201,7 +201,15 @@ describe("the README", () => {
 
     test("its configuration table names exactly the fields the section accepts", () => {
         const documented = table("| Field | Default |").map((row) => names(row[0])[0]);
-        assert.deepEqual(documented, ["site", "auth", "updateFields", "fields", "privateNames", "environment"]);
+        assert.deepEqual(documented, [
+            "site",
+            "auth",
+            "updateFields",
+            "fields",
+            "createDefaults",
+            "privateNames",
+            "environment",
+        ]);
         const valid = { site: "https://example.test", auth: { token: "pass:x/y" } };
         for (const field of documented) {
             assert.ok(

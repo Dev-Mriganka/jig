@@ -65,6 +65,15 @@ generic fix, in its own commit.
     `outwardIssue`.
   - **Unverified:** that `outwardIssue` is the issue that reads "blocks". It is
     listed in the not-verified page, with where to swap it.
+- **jig-jira: `createDefaults`.** A map of field name to value that `create`
+  applies when the call does not set that field.
+  - **Names resolve like the call's own `fields`,** so a default and a field in a
+    call mean the same thing by the same name.
+  - **Shown as "from your defaults"** and part of the request, so the person
+    approves them and a change while they read voids the approval.
+  - **A default that does not fit** (not on this issue type's screen) is left
+    out with a note, because it was meant for every create. A value the screen
+    refuses stops the call and says where it came from.
 
 ## 2026-10-30: Jig never signs in; it reads a credential and keeps it from the agent
 

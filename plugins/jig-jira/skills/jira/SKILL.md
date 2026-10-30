@@ -55,6 +55,7 @@ Traps:
 - `create` needs `project`, `type` and `summary`. Ask the user for any value you would have to guess, such as the components or the priority.
 - The preview shows every field with its final value and the possible duplicates. If one looks like the same issue, tell the user instead of creating another.
 - Other fields go in `fields`, by name or id.
+- The user may have defaults for some fields. The preview marks them `(from your defaults)`; do not set those fields again unless the user wants a different value, and say if a default looks wrong for this issue.
 
 ## Updating fields
 
