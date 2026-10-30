@@ -60,10 +60,11 @@ export function createTool(options: HttpOptions = {}): HttpTool {
 
     return {
         classify(input) {
-            // An unknown target throws a TypeError that names the known ones. jig-core cannot decide such a call, so it is
-            // blocked without asking.
+            // An unknown target throws a TypeError that names the known ones, and jig-core blocks the call without asking.
+            // The target is the action, so a rule, or "Allow for this session", covers one API and not every API in its
+            // environment.
             const target = findTarget(currentSettings(), input.target);
-            return { environment: target.environment, effect: input.method === "GET" ? "read" : "write" };
+            return { action: target.name, environment: target.environment, effect: input.method === "GET" ? "read" : "write" };
         },
 
         async preview(input) {

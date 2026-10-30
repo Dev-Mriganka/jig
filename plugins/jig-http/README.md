@@ -43,6 +43,10 @@ them.
   the target's environment, so the rules table decides. A write to a test
   environment asks you by default, and a write to production is denied by the
   floor. A read of production is allowed, and always masked.
+- **One target, one action.** A call's action is its target's name, so a rule
+  such as `{ "tool": "http", "action": "orders-api", "decision": "allow" }`, or
+  "Allow for this session", covers that one API and not every API in its
+  environment.
 - **Sign-in is added by the tool,** never typed by the model.
 - **Invalid input is not asked about.** A call to a target that is not
   configured, or one whose path, body or headers break the limits above, is

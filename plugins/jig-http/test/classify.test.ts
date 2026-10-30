@@ -27,17 +27,17 @@ function configureMany(): void {
 describe("the class of a call", () => {
     test("a GET reads, in the environment of its target", () => {
         configureMany();
-        assert.deepEqual(h.declaration.classify({ target: "api", method: "GET", path: "/x" }), { environment: "staging", effect: "read" });
-        assert.deepEqual(h.declaration.classify({ target: "live", method: "GET", path: "/x" }), { environment: "production", effect: "read" });
-        assert.deepEqual(h.declaration.classify({ target: "tracker", method: "GET", path: "/x" }), { environment: "external", effect: "read" });
+        assert.deepEqual(h.declaration.classify({ target: "api", method: "GET", path: "/x" }), { action: "api", environment: "staging", effect: "read" });
+        assert.deepEqual(h.declaration.classify({ target: "live", method: "GET", path: "/x" }), { action: "live", environment: "production", effect: "read" });
+        assert.deepEqual(h.declaration.classify({ target: "tracker", method: "GET", path: "/x" }), { action: "tracker", environment: "external", effect: "read" });
     });
 
     test("every other method writes, in the environment of its target", () => {
         configureMany();
         for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
-            assert.deepEqual(h.declaration.classify({ target: "api", method, path: "/x" }), { environment: "staging", effect: "write" }, method);
-            assert.deepEqual(h.declaration.classify({ target: "live", method, path: "/x" }), { environment: "production", effect: "write" }, method);
-            assert.deepEqual(h.declaration.classify({ target: "tracker", method, path: "/x" }), { environment: "external", effect: "write" }, method);
+            assert.deepEqual(h.declaration.classify({ target: "api", method, path: "/x" }), { action: "api", environment: "staging", effect: "write" }, method);
+            assert.deepEqual(h.declaration.classify({ target: "live", method, path: "/x" }), { action: "live", environment: "production", effect: "write" }, method);
+            assert.deepEqual(h.declaration.classify({ target: "tracker", method, path: "/x" }), { action: "tracker", environment: "external", effect: "write" }, method);
         }
     });
 
@@ -53,9 +53,9 @@ describe("the class of a call", () => {
         assert.deepEqual(decorated, plain);
     });
 
-    test("the class names no action, so a rule applies to the tool in an environment", () => {
+    test("the target is the action, so a rule or a session approval covers one API, not its whole environment", () => {
         const cls = h.declaration.classify({ target: "api", method: "POST", path: "/x" });
-        assert.deepEqual(Object.keys(cls ?? {}).sort(), ["effect", "environment"]);
+        assert.deepEqual(cls, { action: "api", environment: "staging", effect: "write" });
     });
 
     test("is made from the configuration, and reads it again for every call", () => {
