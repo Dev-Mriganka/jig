@@ -1,5 +1,6 @@
 // The API other plugins reach through `jig()` (see client.ts and contract.ts). Each function is a thin step onto the
 // state the hooks work on.
+import { layered } from "./section-defaults.ts";
 import { addCompanyClassifyRules, addCompanyEnvironments, addCompanyRules, OWN_SECTIONS } from "./config.ts";
 import type { Facts, JigApi } from "./contract.ts";
 import { git, run } from "./exec.ts";
@@ -43,6 +44,11 @@ export function buildApi(state: JigState): JigApi {
 
         environments: {
             kindOf: (name) => state.policy().environments.kindOf(name),
+        },
+
+        tunnels: {
+            register: (name, provider) => state.tunnels.register(name, provider),
+            open: (name, target, signal) => state.tunnels.open(name, target, signal),
         },
 
         transports: {
@@ -93,9 +99,28 @@ export function buildApi(state: JigState): JigApi {
                 // A section registered after the file was read is checked now, so the order plugins load in does not matter.
                 if (state.configLoaded) loadPersonalConfig(state, state.personal.file);
             },
+            addSectionDefaults(name, defaults) {
+                if (typeof name !== "string" || name === "") throw new TypeError("addSectionDefaults: the section needs a name");
+                if (OWN_SECTIONS.includes(name)) {
+                    throw new Error(`addSectionDefaults: "${name}" is a jig-core field, not a plugin's section`);
+                }
+                state.sectionDefaults.set(name, defaults);
+            },
             section(name) {
                 ensureConfigLoaded(state);
-                return state.personal.sections.get(name);
+                const mine = state.personal.sections.get(name);
+                if (!state.sectionDefaults.has(name)) return mine;
+                const merged = layered(state.sectionDefaults.get(name), mine);
+                const check = state.sectionChecks.get(name);
+                const problems = check === undefined ? [] : check(merged);
+                if (problems.length === 0) return merged;
+                // The company's defaults and your settings do not fit together: your own section, as you wrote it, wins.
+                const report = `the company defaults for "${name}", with your settings laid over them, are not valid: ${problems.join("; ")}`;
+                if (!state.sectionDefaultProblems.has(report)) {
+                    state.sectionDefaultProblems.add(report);
+                    state.startupProblems.push(report);
+                }
+                return mine;
             },
         },
 

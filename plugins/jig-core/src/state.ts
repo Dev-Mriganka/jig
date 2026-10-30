@@ -25,6 +25,8 @@ import type { Secrets } from "./secrets.ts";
 import { createSignIn } from "./signin.ts";
 import type { SignIn } from "./signin.ts";
 import { createTransports } from "./transports.ts";
+import { createTunnels } from "./tunnels.ts";
+import type { Tunnels } from "./tunnels.ts";
 import type { Transports } from "./transports.ts";
 import { createWatchEngine } from "./watch/engine.ts";
 import type { WatchEngine } from "./watch/engine.ts";
@@ -79,6 +81,10 @@ export interface JigState {
     /** The sections of jig.json that plugins registered, with their checks. Registered when plugins load, before
      *  the file is read at session start. */
     sectionChecks: Map<string, SectionCheck>;
+    /** Company defaults per plugin section, laid under the personal section. */
+    sectionDefaults: Map<string, unknown>;
+    /** Problems already reported for a section's merged value, so each is reported once. */
+    sectionDefaultProblems: Set<string>;
     /** Where jig.json is. The extension sets it, because only it knows Pi's agent folder. Empty until then. */
     configPath: () => string;
     /** True once jig.json has been read in this runtime. */
@@ -95,6 +101,7 @@ export interface JigState {
     secrets: Secrets;
     signIn: SignIn;
     transports: Transports;
+    tunnels: Tunnels;
     approvals: Approvals;
     watches: WatchEngine;
     /** Field names that company plugins added to the masker, in the order they came. */
@@ -150,6 +157,8 @@ export function createState(pi: ExtensionAPI, options: JigCoreOptions = {}): Jig
         personal: { file: "", found: false, config: defaultConfig(), problems: [], sections: new Map() },
         company: emptyAdditions(),
         sectionChecks: new Map(),
+        sectionDefaults: new Map(),
+        sectionDefaultProblems: new Set(),
         configPath: () => "",
         configLoaded: false,
         sessionId: undefined,
@@ -161,6 +170,7 @@ export function createState(pi: ExtensionAPI, options: JigCoreOptions = {}): Jig
         secrets: createSecrets({ backends: () => state.personal.config.secrets.backends, redactor }),
         signIn: createSignIn({ redactor }),
         transports: createTransports(),
+        tunnels: createTunnels(),
         approvals: createApprovals({
             now: () => Date.now(),
             openPreview: options.openPreview ?? (async (preview, header) => openInBrowser(writePreviewPage(preview, header))),

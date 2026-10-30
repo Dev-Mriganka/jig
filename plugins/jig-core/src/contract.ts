@@ -203,6 +203,18 @@ export interface TransportResponse {
     body: string;
 }
 
+/** A local port that reaches a host the machine cannot reach directly, such as a database behind a bastion. */
+export interface Tunnel {
+    /** The port on 127.0.0.1 to connect to. */
+    port: number;
+    close(): void | Promise<void>;
+}
+
+/** Opens tunnels for a company, such as an SSH forward through its jump host or a cloud port forward. */
+export interface TunnelProvider {
+    open(target: { host: string; port: number }, signal?: AbortSignal): Promise<Tunnel>;
+}
+
 /** Carries requests to a company's systems itself, such as through a local sign-in proxy that holds the session, so
  *  the tool never sees a credential. */
 export interface Transport {
@@ -239,6 +251,15 @@ export interface JigApi {
         /** The kind of an environment name: built in, configured or added by a company plugin. A name nobody defined
          *  counts as production. */
         kindOf(name: EnvironmentName): EnvironmentKind;
+    };
+
+    /** Tunnel providers a company plugin registers, for tools that need a network route of their own, such as a
+     *  database connection. */
+    readonly tunnels: {
+        /** Registering the same name again replaces the provider. */
+        register(name: string, provider: TunnelProvider): void;
+        /** Opens a tunnel through a registered provider. Throws when no provider has this name. */
+        open(name: string, target: { host: string; port: number }, signal?: AbortSignal): Promise<Tunnel>;
     };
 
     readonly transports: {
@@ -286,6 +307,10 @@ export interface JigApi {
          *  neither jig-core nor a plugin registered as an unknown field. `validate` returns error messages that
          *  name the key; with errors, `section()` returns undefined and the plugin uses its defaults. */
         registerSection(name: string, validate: (raw: unknown) => readonly string[]): void;
+        /** A company plugin's defaults for a plugin's section, such as its log backend or its service catalog. Your own
+         *  section in jig.json is laid over them: objects merge key by key, and any other value of yours replaces
+         *  theirs. The merged section is checked by the plugin's own validation. */
+        addSectionDefaults(name: string, defaults: unknown): void;
         /** The section as loaded at the last session start, after validation. Undefined when absent or invalid. */
         section(name: string): unknown;
     };

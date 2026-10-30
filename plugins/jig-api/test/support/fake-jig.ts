@@ -89,6 +89,12 @@ export function installFakeJig(): FakeJig {
         environments: {
             kindOf: (name: string) => kinds.get(name) ?? "production",
         },
+        tunnels: {
+            register: () => {},
+            open: async () => {
+                throw new Error("no tunnels in tests");
+            },
+        },
         transports: {
             register: () => {},
             request: async (name, request, signal) => {
@@ -116,6 +122,7 @@ export function installFakeJig(): FakeJig {
             addRules: () => {},
             addClassifyRules: () => {},
             addMaskFields: () => {},
+            addSectionDefaults: () => {},
             registerSection: (name, validate) => void sections.set(name, validate),
             section: (name) => {
                 const value = values.get(name);

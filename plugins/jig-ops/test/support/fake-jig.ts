@@ -198,6 +198,12 @@ export function installFakeJig(): FakeJig {
             // As in jig-core: a name nobody defined counts as production.
             kindOf: (name) => (Object.hasOwn(environments, name) ? (environments[name] as EnvironmentKind) : "production"),
         },
+        tunnels: {
+            register: () => {},
+            open: async () => {
+                throw new Error("no tunnels in tests");
+            },
+        },
         transports: {
             register: (name, transport) => void transports.set(name, transport),
             async request(name, request, signal): Promise<TransportResponse> {
@@ -252,6 +258,7 @@ export function installFakeJig(): FakeJig {
             addRules: () => {},
             addClassifyRules: () => {},
             addMaskFields: () => {},
+            addSectionDefaults: () => {},
             registerSection: (name, validate) => void sections.set(name, validate),
             section: (name) => {
                 const value = values.get(name);

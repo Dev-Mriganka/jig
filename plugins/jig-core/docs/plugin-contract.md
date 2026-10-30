@@ -39,7 +39,8 @@ closed instead of running ungoverned.
 | `mask.text`, `mask.value` | The masker, for a tool that masks its own results (see [Masking](masking.md)) |
 | `watches` | `registerKind`, `start`, `list` and `stop` (see [Watches](watches.md)) |
 | `environments` | `kindOf(name)`: the kind of an environment (`local`, `external`, `test` or `production`), built in, configured or added by a company plugin. A name nobody defined counts as production. A tool uses it to refuse an action by kind, such as never in production, whatever a company names its environments |
-| `config` | What a company plugin adds at start-up (`addEnvironments`, `addRules`, `addClassifyRules`, `addMaskFields`), and a plugin's own section (`registerSection`, `section`) |
+| `tunnels` | `register(name, provider)` and `open(name, { host, port })`: a company plugin's network route for tools that need a port of their own, such as a database behind a jump host or a cloud port forward. The tool connects to `127.0.0.1` on the port it gets, and closes the tunnel when done |
+| `config` | What a company plugin adds at start-up (`addEnvironments`, `addRules`, `addClassifyRules`, `addMaskFields`), a plugin's own section (`registerSection`, `section`), and a company's defaults for any plugin's section (`addSectionDefaults`), which your own section is laid over: objects merge key by key, anything else of yours replaces theirs, and the plugin's check still applies |
 | `exec` | `run` and `git`, which start programs without a shell (see [Running programs](running-programs.md)) |
 
 ## Events
