@@ -13,9 +13,10 @@ The tool list comes from two sources:
   run about 225 of these calls. It is ported, not redesigned.
 - **What was missing is the wait.** Nothing watched GitHub CI, so you were the
   signal: about 15 "is it done?" nudges in one month. One build was ready 7
-  minutes after the push and reached the agent 2 hours 16 minutes later. The
-  wait is the CI watch, which started here and moved to `jig-ops` with the rest of
-  CI; this plugin announces the push that starts it.
+  minutes after the push and reached the agent 2 hours 16 minutes later.
+  - The wait is the CI watch, which started here and moved to `jig-ops` with the
+    rest of CI.
+  - This plugin announces the push that starts it.
 - **"All checks done" is the wrong finish line.** Six background
   `gh pr checks --watch` runs never finished. In one pull request, two of ten
   checks were still pending 20 hours after the build the next step needed had
@@ -33,11 +34,12 @@ In the sessions, a "tool not found" cost the agent extra calls.
 - **A table of parameters per action,** with errors that show the correct
   usage.
 - **A hardened git runner,** now `jig-core`'s `exec.git`, which every git call
-  goes through. Every `gh` call goes through `jig-core`'s `exec.run`. They run
-  from an argument list, never a shell, with hooks, `core.fsmonitor` and
-  prompts switched off, and refuse a repository whose `.git/config` would run a
-  command. [Running programs](../../jig-core/docs/running-programs.md) has the
-  details.
+  goes through. Every `gh` call goes through `jig-core`'s `exec.run`.
+  - They run from an argument list, never a shell, with hooks, `core.fsmonitor`
+    and prompts switched off.
+  - They refuse a repository whose `.git/config` would run a command.
+    [Running programs](../../jig-core/docs/running-programs.md) has the
+    details.
 - **Preview, then run.** A write shows what it will do, and refuses if anything
   changed since the preview.
 - **A lost reply is checked with one read, never retried.**
