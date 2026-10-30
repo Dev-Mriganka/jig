@@ -278,6 +278,20 @@ describe("the broker's life", () => {
         assert.match(lines[0] ?? "", /network off \(network mode filtered is not built yet, so the network is off\)/);
     });
 
+    test("docker: true is accepted and not in effect, and /sandbox says so", async () => {
+        const s = setup({ settings: { docker: true } });
+        await s.start();
+        const lines = await s.command("");
+        assert.ok(lines.some((line) => line.includes("sandbox.docker is not supported")));
+        const config = (s.brokers.log.requests.find((request) => request.type === "init")?.fields.config ??
+            {}) as Record<string, any>;
+        assert.equal(
+            JSON.stringify(config).includes("allowAllUnixSockets"),
+            false,
+            "all Unix sockets are never allowed",
+        );
+    });
+
     test("the runtime is told to remove the credential variables a second time", async () => {
         const s = setup();
         await s.start();
@@ -313,6 +327,30 @@ describe("the broker's life", () => {
             /bwrap, socat, rg are not installed; install them with: sudo apt install bubblewrap socat ripgrep/,
         );
         assert.equal(s.brokers.log.launches.length, 0);
+    });
+
+    test("the doctor names each missing program with the command that installs it", async () => {
+        const s = setup({ settings: { programs: {} }, env: { PATH: "/nonexistent" } });
+        await s.start();
+        const lines = await s.command("doctor");
+        assert.ok(
+            lines.includes(
+                "FAIL program bwrap: not found; install it with: sudo apt install bubblewrap, or give its path in sandbox.programs.bwrap in jig.json",
+            ),
+            lines.join("\n"),
+        );
+        assert.ok(
+            lines.some((line) =>
+                line.startsWith("FAIL program socat: not found; install it with: sudo apt install socat"),
+            ),
+        );
+        assert.ok(
+            lines.some((line) =>
+                line.startsWith("FAIL program rg: not found; install it with: sudo apt install ripgrep"),
+            ),
+        );
+        assert.ok(lines.some((line) => line.startsWith("FAIL start: bwrap, socat, rg are not installed")));
+        assert.ok(lines.some((line) => /^\d+ checks? failed\.$/.test(line)));
     });
 
     test("a platform without a sandbox is said plainly", async () => {

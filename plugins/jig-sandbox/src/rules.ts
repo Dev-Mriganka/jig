@@ -326,9 +326,13 @@ export function computeRules(input: RulesInput): RuleSet {
     // manager ask first instead, and folders in the project are the user's own choice of where to run things from.
     const askFirstPaths = [...byPath.values()].filter((rule) => rule.kind === "ask-first").map((rule) => rule.path);
     const writableBase = [home, cwd, ...input.tmp, input.sessionTmp];
+    const hiddenPlaces = [...byPath.values()].filter((rule) => rule.kind === "hidden").map((rule) => rule.path);
     const pathRules: Rule[] = [];
     for (const entry of (input.env.PATH ?? "").split(":")) {
         if (!path.posix.isAbsolute(entry)) continue;
+        // Nothing under a hidden folder can be written or run from the sandbox, and on WSL the Windows part of PATH is
+        // slow to resolve: leave it alone.
+        if (hiddenPlaces.some((place) => inside(entry, place))) continue;
         const candidate: Candidate = {
             kind: "locked",
             absolute: path.posix.resolve(entry),

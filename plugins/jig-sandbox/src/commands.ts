@@ -74,6 +74,7 @@ export function statusLines(deps: CommandDeps, cwd: string): string[] {
         lines.push(`  the rules could not be computed: ${(error as Error).message}`);
     }
     if (rules === undefined) return lines;
+    for (const note of sandbox.notes) lines.push(`  ${note}`);
     for (const problem of rules.problems) lines.push(`  ${problem}`);
     const problem = deps.allowed.problem();
     if (problem !== undefined) lines.push(`  ${problem}`);

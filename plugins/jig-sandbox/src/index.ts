@@ -125,7 +125,7 @@ export function sandbox(options: SandboxOptions = {}): ExtensionFactory {
 
         // jig-core announces every decision; the tool reads them, so that what it runs is only what jig-core let through.
         const decisions = new Map<string, Decision>();
-        pi.events.on("jig:decision", (event) => {
+        const unlisten = pi.events.on("jig:decision", (event) => {
             const decision = event as Decision & { toolCallId?: string };
             if (typeof decision?.toolCallId !== "string") return;
             decisions.set(decision.toolCallId, decision);
@@ -216,6 +216,7 @@ export function sandbox(options: SandboxOptions = {}): ExtensionFactory {
         });
         pi.on("session_shutdown", async () => {
             // Stopping the broker is the one thing this plugin does when a session ends. It is safe to run twice.
+            unlisten?.();
             await core.stop();
         });
     };

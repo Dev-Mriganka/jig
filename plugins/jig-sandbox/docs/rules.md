@@ -8,8 +8,10 @@ exist: a rule for a path that is not on this machine adds nothing to the sandbox
 
 ## Hidden: never readable
 
-The first group is the same list `jig-core` protects from Pi's file tools, so the two
-cannot disagree. A company plugin's additions to that list apply here too.
+Everything `jig-core` protects as secret from Pi's file tools is hidden here too, so the
+two cannot disagree: a company plugin's additions apply, and so does your `protectedPaths`.
+The lists below are what `jig-sandbox` adds to it. `/sandbox` shows each rule with its
+source: built in, `jig-core`, your section, the project, `PATH`.
 
 **Credential stores and logins**
 - `~/.ssh`, `~/.gnupg`, `~/.password-store`
@@ -33,8 +35,9 @@ levels below it:
   (`.env.example`, `.env.sample`, `.env.template`, `.env.dist`);
 - `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.jks`, `*.keystore`.
 
-A secret file the agent creates itself during the session is its own and is not
-hidden.
+Only the top of each of those folders is searched, not every folder below. A secret
+file the agent creates itself during the session is its own and is not hidden: the
+audit notes the files a command created, and the next command can read them.
 
 **Doors to other systems**
 - On WSL: `/mnt` (the Windows drives, where Windows-side tokens live) and `/run/WSL`
@@ -43,7 +46,8 @@ hidden.
   at it and without it no name resolves; and folders you `share`.
 - Agent and desktop sockets: `/run/user/<you>` (the session bus and the desktop
   keyring), `/tmp/ssh-*` (the SSH agent), the GPG agent's sockets.
-- The Docker socket (`/var/run/docker.sock`, `/run/docker.sock`), unless `docker: true`.
+- The Docker socket (`/var/run/docker.sock`, `/run/docker.sock`). Docker is root, so the
+  agent runs a Docker command by [asking to run it outside](when-blocked.md#running-one-command-outside).
 
 ## Locked: readable, never written
 
@@ -58,7 +62,9 @@ out of it.
   `~/.xprofile`, `~/.xinitrc`, `~/.xsessionrc`, `~/.tmux.conf`, `~/.config/tmux`
 
 **Programs that run outside**
-- Every folder on `PATH` that is not a toolchain manager (those ask first, below)
+- Every folder on `PATH` in your home folder that is not a toolchain manager (those ask
+  first, below) and not inside the working folder (a project's `node_modules/.bin` is
+  yours to run from). Folders outside your home are read-only already.
 - The Node.js and Pi installs that run Pi
 - `~/.gitconfig`, `~/.config/git`
 
@@ -98,7 +104,9 @@ to do, so these ask instead of refusing:
   `~/.local/share/mise`, `~/.volta`, `~/.bun`, `~/.deno`, `~/go/bin`
 
 The question names the folder and says why it matters. Your answer counts for this
-session, or always (kept in Pi's agent folder, listed by `/sandbox allowed`).
+session, or always (kept in Pi's agent folder, listed by `/sandbox allowed`). A manager
+whose own variable moves it (`SDKMAN_DIR`, `NVM_DIR`, `PYENV_ROOT`, `CARGO_HOME`, ...)
+asks where it now is. A manager that is not installed has nothing to ask about.
 
 ## Writable: everything else
 
@@ -127,4 +135,24 @@ writable although a rule says otherwise, for example a Windows work folder:
 }
 ```
 
-`share` cannot open a hidden credential path: those are the floor.
+`share` cannot open a hidden credential path, and it cannot unlock a locked one: those
+are the floor. It can make a folder under a hidden door such as `/mnt` readable and
+writable, and a toolchain folder it names counts as your answer in advance.
+
+## What the audit covers
+
+The sandbox mounts a rule only for a path that exists, so a command can still make what
+a rule would have protected, in a place that was not there. After each command
+`jig-sandbox` takes away (to `<agent folder>/jig-sandbox/removed`, never deleting) and
+reports:
+- a locked path that did not exist and does now: a missing `~/.zshrc`, a Gradle `init.d`,
+  a `PATH` folder, `.pi/extensions` in a project;
+- a locked link that was removed and made again as a file (the sandbox mounts what a link
+  points at, so the link itself is not protected): it is put back;
+- a new hook in a watched repository's `.git/hooks`, also in one made by `git init` in the
+  same command, and a new `*.pth` file where Python reads them;
+- a setting that runs a program, added to a repository's git configuration: only that
+  setting is taken out.
+
+A toolchain folder that does not exist yet is not audited: nothing there runs until you
+install the manager, which writes over it.

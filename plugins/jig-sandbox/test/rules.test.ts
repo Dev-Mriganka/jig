@@ -546,6 +546,36 @@ describe("WSL", () => {
     });
 });
 
+describe("the cost of looking", () => {
+    test("the Windows part of PATH on WSL is not resolved at all: it is hidden, and slow to resolve", () => {
+        const machine = fakeMachine({
+            dirs: [
+                HOME,
+                CWD,
+                "/tmp",
+                "/mnt/c/Windows/System32",
+                "/mnt/c/Users/me/bin",
+                "/run/WSL",
+                SESSION,
+                `${SESSION}/tmp`,
+                `${SESSION}/broker`,
+            ],
+        });
+        const asked: string[] = [];
+        const counting = { ...machine, real: (place: string) => (asked.push(place), machine.real(place)) };
+        computeRules({
+            ...input(machine),
+            wsl: true,
+            env: { PATH: "/mnt/c/Windows/System32:/mnt/c/Users/me/bin:/usr/bin" },
+            files: counting,
+        });
+        assert.deepEqual(
+            asked.filter((place) => place.startsWith("/mnt/c")),
+            [],
+        );
+    });
+});
+
 describe("share", () => {
     test("a folder inside a credential path is refused and the reason is said", () => {
         const files = linux({ dirs: [`${HOME}/.ssh/keys`] });

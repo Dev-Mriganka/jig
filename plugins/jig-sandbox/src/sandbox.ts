@@ -83,6 +83,8 @@ export class Sandbox {
     state: SandboxState = { kind: "stopped" };
     /** Why the network mode is not the one asked for, when it is not. */
     modeNote: string | undefined;
+    /** Settings that are accepted and not in effect, for `/sandbox` to say. */
+    notes: string[] = [];
     mode: NetworkMode = "open";
     sessionDir: string | undefined;
     programs: FoundPrograms = { found: {}, missing: [] };
@@ -160,6 +162,14 @@ export class Sandbox {
         const settings = deps.settings();
         this.mode = settings.network.mode;
         this.modeNote = undefined;
+        this.notes = [];
+        if (settings.docker) {
+            // The runtime cannot allow one Unix socket by path on Linux, and allowing all of them would also let a command start
+            // Windows programs on WSL: the socket stays closed, and Docker goes through running a command outside.
+            this.notes.push(
+                "sandbox.docker is not supported: the runtime cannot open the Docker socket alone. The agent can ask to run a Docker command outside the sandbox.",
+            );
+        }
         if (settings.network.mode === "filtered" || settings.network.mode === "ask") {
             // Fail closed: a mode that is asked for and not built never means a more open one.
             this.mode = SAFE_NETWORK;

@@ -22,13 +22,14 @@ taught, and how it is tested. Back to the [jig-sandbox overview](../README.md).
 
 ```text
 agent calls bash
-  -> jig-core's rules (bash: local write, allowed)
-  -> jig-sandbox's bash tool: Pi's createBashToolDefinition with a spawn hook
+  -> jig-core's rules (bash: local write, allowed; with outside: true it asks)
+  -> jig-sandbox's bash tool: Pi's createBashToolDefinition with operations of its own
+       (Pi's BashSpawnHook is synchronous and wrapping a command is not)
        rules   = jig-core's protected paths + the lists + your config + your approvals
        before  = snapshot of locked paths that do not exist yet, hooks, .git/config
        wrapped = the session broker wraps the command (sandbox runtime)
        env     = the session environment, credentials removed
-  -> Pi spawns the wrapped command in the project; output streams as usual
+  -> Pi's local operations run the wrapped command in the project; output streams as usual
   -> after: the broker cleans up after the command
             audit: locked paths created, new hooks, program-running git settings -> undone, reported
             blocks explained: network from the runtime's records, files from the error lines
@@ -72,11 +73,13 @@ it is still `0.0.x`. An upgrade is its own change, with the escape tests run on 
 | Ask first | `filesystem.denyWrite` until you approve, then left out of it |
 | `/mnt/wsl/resolv.conf`; `share` under a hidden path | `filesystem.allowRead` (and `allowWrite` for `share`), always on the real file, never on a link to it: an allowed link binds its target's content at the link's place |
 | `.git/config` writable | `filesystem.allowGitConfig: true`, with the audit below |
-| Unix sockets closed | the runtime's socket filter (seccomp); `docker: true` allows the Docker socket's path only. `allowAllUnixSockets` is never set: on WSL it would let a command start Windows programs |
+| Unix sockets closed | the runtime's socket filter (seccomp), which blocks making a Unix socket at all. `allowAllUnixSockets` is never set: on WSL it would let a command start Windows programs. The runtime cannot allow one socket by path on Linux, so `docker: true` is not supported: Docker goes through [running a command outside](when-blocked.md#running-one-command-outside) |
 | Network `open` | no `network.allowedDomains` at all: the runtime then leaves the network namespace alone |
 | Network `filtered`, `ask` | `network.allowedDomains` set, the proxy on, and an ask callback (below) |
-| Network `off` | `strictAllowlist` with an empty allow list |
-| Temporary folder | the runtime's temporary folder variable set to the session's private folder (its default, `/tmp/claude`, does not exist on most machines) |
+| Network `off` | `allowedDomains: []` with `strictAllowlist`: the command gets a network namespace with nothing in it |
+| Temporary folder | the runtime's temporary folder variable set to the session's private folder for the broker (its default, `/tmp/claude`, does not exist on most machines); in `open` mode the runtime sets no `TMPDIR` for the command, so the plugin sets it |
+| Every path | `{ path, literal: true }`, absolute, links followed, only when the path exists; a deny for a path outside every writable folder is left out, since it is read-only already |
+| Credentials in the environment | the command is started with a copy of Pi's environment without them, and the runtime's `credentials.envVars` removes the same names a second time |
 
 Runtime limits that shape the rules:
 - **Literal paths only on Linux** for write rules, and a rule for a path that does not
@@ -136,8 +139,15 @@ What the runtime cannot prevent, `jig-sandbox` undoes and reports:
   [When a command hits a rule](when-blocked.md#git-configuration) are taken out, and
   the rest of the change stays.
 
-Watched repositories are the working folder's and those one and two levels below it.
-Each removal is one line to the agent and a notice to you.
+- **A locked link removed and made again as a file** (`rm ~/.bashrc; echo ... > ~/.bashrc`
+  when `~/.bashrc` is a link to a dotfiles repository): the runtime mounts what a link
+  points at, so the link itself is not protected. It is put back.
+- **A new `*.pth` file** in your user site-packages, which Python runs at every start.
+
+Watched repositories are the working folder's, the repository around it, and those one
+and two levels below it. Each removal is one line to the agent and a notice to you, and
+what was taken away is moved to `<agent folder>/jig-sandbox/removed`, not deleted. The audit
+also runs for a command that was aborted or timed out.
 
 ## Explaining a block
 
@@ -160,10 +170,13 @@ Each removal is one line to the agent and a notice to you.
   approvals, so two questions never overlap.
 - **No screen:** the answer is no, and the line says how a person allows it.
 - **Kept answers:** `<agent folder>/jig-sandbox/allowed.json`, which Pi's file tools
-  and the sandbox can only read. `/sandbox allowed` lists and forgets them.
+  and the sandbox can only read. `/sandbox allowed` lists them, and `add` and `forget` change them.
 
 ## Environment
 
+- **Set:** `TMPDIR` is the session's private temporary folder (in `open` mode the runtime sets
+  none), and a `PATH` entry under a hidden folder, such as the Windows part on WSL, is dropped,
+  since nothing in it can run.
 - **Removed:** variables whose names look like credentials, matched without regard to
   case: `*TOKEN*`, `*SECRET*`, `*PASSWORD*`, `*PASSWD*`, `*_KEY`, `*APIKEY*`,
   `*CREDENTIAL*`, `AWS_*`, `AZURE_*`, `GOOGLE_APPLICATION_CREDENTIALS`, `GH_*`, `GITHUB_*`,
@@ -180,10 +193,13 @@ Each removal is one line to the agent and a notice to you.
 | Addition | Use |
 |---|---|
 | `jig().protectedPaths.list()` | The sandbox reads the protected paths, with kind and source, so both share one list |
-| `jig().sandbox.register(provider)` | The sandbox says it is active and answers `canWrite(path)` |
-| `exec.run` checks `canWrite` | A program in a folder the sandbox lets bash write is refused, so a planted `git` never runs outside |
-| `/jig` and session start | Say whether bash is sandboxed, and in which network mode |
+| `jig().sandbox.register(provider)` | The sandbox says it is active, in which mode, why not when it is not, and answers `canWrite(path)` |
+| `exec.run` checks `canWrite` | A program in a folder the sandbox lets bash write is refused, found on `PATH` or by absolute path, so a planted `git` never runs outside |
+| `/jig` and session start | Say whether bash is sandboxed, and in which network mode; a plain warning when there is no sandbox |
 | `bash` action `outside` | Classified as a local write that asks; allowed without asking only by a rule naming `bash`, action `outside` and a command pattern; refused with no screen; recorded |
+| A rule's `command` | A pattern for the call's `command`, whose `*` does not reach across `;`, `&`, `\|`, `<`, `>`, a backquote, `$(` or a line break |
+| A preview's `answers` | The words on the three buttons, so the dialog says `Run once` and not `Allow` |
+| A declaration's `extendsDefaults` and `examples` | `bash` is classified only for `outside`; the rest stays with the user's rules and the built-in default. `/jig rules` shows the action |
 
 ## What the earlier sandbox and the spike taught
 
@@ -210,36 +226,65 @@ Each command adds about 45 ms (13 ms to wrap, the rest to start the sandbox), an
 about 18 ms more in a working folder of 20,000 files. Twenty commands in parallel ran
 without errors.
 
+Measured on the built plugin, on the same machine through the whole path (the rules for
+the command, the broker, the sandbox, Pi's own bash tool and the explanations), for `true`
+in a small folder:
+- **Session start:** about 0.7 to 0.9 s, in the background: the broker process (loading the
+  runtime is most of it), the runtime, and a test command. A command sent earlier waits.
+- **Each command:** a median of 60 to 90 ms with a machine that is busy, against 4 to 11 ms
+  for a bare `bash -c true`. The rules take 8 to 25 ms of that.
+- **Twenty at once:** about 0.9 s, and none failed.
+- **Resolving paths** is what costs on WSL: the Windows part of `PATH` takes seconds to
+  resolve cold. Folders under a hidden folder are skipped, and far-away paths are remembered
+  for half a minute.
+
 ## Tests
 
 - **Rules as data:** for a given home, working folder and environment, the computed
   runtime configuration, with links, missing paths, WSL and macOS layouts, company
-  additions and your config.
+  additions and your config (`rules.test.ts`, on a file system made in memory).
 - **Escapes, run for real** in the real sandbox, with fake credentials made at run
-  time in the real home's places mapped to a test folder. Each must fail: read
-  `~/.ssh/id_*`, `~/.aws/credentials`, Pi's `auth.json`, a project `.env` (also through
-  a symbolic link); write `~/.bashrc`, a missing `~/.zshrc` (audited away),
-  `~/.gradle/init.d/x.gradle`, `.git/hooks/pre-commit` (also in a repository made in the
-  same command), `.pi/extensions/x.ts`, a program into a `PATH` folder, Pi's agent
-  folder; set `core.fsmonitor` (audited away); connect to a Unix socket and to the
-  Docker socket; read the Pi process's environment through `/proc`; reach
-  `169.254.169.254` and `127.0.0.1` in `filtered`; run a Windows program on WSL; create
-  a user namespace.
-- **Keeps working, for real:** a Gradle build (wrapper and caches), `npm install`,
-  `git init/add/commit/branch/config/remote add`, `curl` to a public host, a background
-  server reached by the next command in each network mode, no file left in the project
-  that the command did not write.
-- **Pi itself:** a session with the plugin starts, runs commands, and exits on
-  `SIGTERM` and on quitting.
-- **CI:** Ubuntu with bubblewrap, `socat` and ripgrep, unprivileged user namespaces on,
-  runs the escape and keep-working tests on every push.
+  time in a fake home (`escapes.test.ts`). Each must fail: read `~/.ssh/id_*`,
+  `~/.aws/credentials`, Pi's `auth.json`, a project `.env` (also through a symbolic link,
+  made before or in the same command); write `~/.bashrc`, a missing `~/.zshrc` (audited
+  away), `~/.gradle/init.d/x.gradle`, `.git/hooks/pre-commit` (also in a repository made
+  in the same command), `.pi/extensions/x.ts`, a program into a `PATH` folder, Pi's agent
+  folder; set `core.fsmonitor` (audited away); connect to a Unix socket; read the Pi
+  process's environment through `/proc`; run a Windows program on WSL; create a user
+  namespace. The rules of every test also hide the real home's credential places, and a
+  test never reads a file under it.
+- **Keeps working, for real** (`keep-working.test.ts`): a Gradle build, `npm install` of a
+  local package, `git init/add/commit/branch/config/remote add`, a connection to a server
+  on `localhost` in `open` mode and none in `off`, twelve commands at once, and no file
+  left in the project that the command did not write.
+- **The whole path:** the plugin in a fake Pi with the real broker and the real runtime;
+  the broker is started and stopped, and Pi's signal handling is untouched.
+- **CI:** Ubuntu 24.04 with bubblewrap, `socat` and ripgrep installed and unprivileged user
+  namespaces on runs all of it on every push. In CI a missing program fails the tests;
+  on a machine without them they skip with the reason.
+- **Locally,** `JIG_SANDBOX_TEST_BWRAP`, `JIG_SANDBOX_TEST_SOCAT` and `JIG_SANDBOX_TEST_RG`
+  name the programs when they are not on `PATH`.
 
 ## Build order
 
-1. The broker, rules, bash tool, environment, explanations, `/sandbox`, the doctor, and
-   the jig-core additions. `open` and `off` network modes.
-2. The audit and asking you (writes).
+1. **Built:** the broker, rules, bash tool, environment, explanations, `/sandbox`, the
+   doctor, the `jig-core` additions, and the `open` and `off` network modes.
+2. **Built:** the audit, and asking you (writes). Running one command outside is built
+   with it.
 3. Background tasks and `/ps`.
 4. `filtered` and `ask`, with the callback and the `localhost` bridge.
 
 Each step ships with its escape and keep-working tests.
+
+## What building it changed
+
+| The design said | What is so |
+|---|---|
+| `docker: true` opens the Docker socket | The runtime cannot allow one Unix socket by path on Linux, and `allowAllUnixSockets` is never set. `docker` is reserved; the agent runs Docker through `outside` |
+| A spawn hook wraps the command | Pi's hook is synchronous; the tool is Pi's own definition with operations that wrap first |
+| macOS needs `brew install ripgrep` | The runtime uses ripgrep on Linux only; macOS needs nothing |
+| `filtered` and `ask` are modes | Not built: they mean `off`, and `/sandbox` says so |
+| A moved-aside folder could replace a locked file | The kernel refuses to move a folder that holds a mounted path; what can be replaced is a locked link, which the audit puts back |
+| `PATH` folders are locked | Those in your home folder, outside the working folder |
+| The question about a host shares `jig-core`'s queue | The question about a write has a queue of its own; it can overlap a `jig-core` question until the host questions arrive |
+| A server started by a command is reachable by the next one | Commands end with their processes until background tasks exist |

@@ -4,6 +4,7 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 
 ## Contents
 
+- [2026-10-31: jig-sandbox, as built](#2026-10-31-jig-sandbox-as-built)
 - [2026-10-31: jig-sandbox, built on Anthropic's sandbox runtime](#2026-10-31-jig-sandbox-built-on-anthropics-sandbox-runtime)
 - [2026-10-31: gaps a company plugin found in jig-core, closed](#2026-10-31-gaps-a-company-plugin-found-in-jig-core-closed)
 - [2026-10-31: filter lists, Jira links and a pull request title rule](#2026-10-31-filter-lists-jira-links-and-a-pull-request-title-rule)
@@ -30,6 +31,35 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 - [2026-10-30: jig-git's tools, and a watch that knows when it is done](#2026-10-30-jig-gits-tools-and-a-watch-that-knows-when-it-is-done)
 - [2026-10-30: built clean, beside the existing harness](#2026-10-30-built-clean-beside-the-existing-harness)
 - [Earlier decisions that still hold (2026-10-29)](#earlier-decisions-that-still-hold-2026-10-29)
+
+## 2026-10-31: jig-sandbox, as built
+
+The first two build steps (everything except background tasks and the `filtered` and
+`ask` network modes) are built and tested. What building them changed in the design:
+- **Docker goes through `outside`, not `docker: true`.** The runtime cannot allow one Unix
+  socket by path on Linux, and `allowAllUnixSockets` would let a command start Windows
+  programs on WSL. The `docker` field is reserved.
+- **The tool is Pi's own definition with operations of its own,** not a spawn hook: the hook
+  is synchronous and wrapping a command is not.
+- **A mode that is not built means `off`,** never a more open mode.
+- **Rules are computed for every command,** from the file system as it is, and a path under
+  a hidden folder is not resolved (on WSL the Windows part of `PATH` takes seconds).
+- **`share` cannot unlock either.** It cannot open a credential and it cannot make a locked
+  path writable, since locked is the second promise.
+- **`PATH` folders are locked only in the home folder, outside the working folder.**
+  A project's `node_modules/.bin` is the user's own choice of where to run things from.
+- **The audit takes away and keeps.** What a command planted is moved into the agent folder,
+  which the sandbox cannot write, so a file the user made at the same moment is not lost. A
+  locked link that was removed and made again is put back. Moving a locked path's folder
+  aside is refused by the kernel, so that case needs no code.
+- **The question about a write has its own queue,** one at a time, and can overlap a
+  `jig-core` question. The host questions of `ask` mode will share `jig-core`'s queue.
+- **`outside` is hardened where the design left it open:** a command pattern's `*` does not
+  reach across `;`, `&`, `|`, `<`, `>`, a backquote, `$(` or a line break; the dialog shows
+  control characters as escapes and refuses a command too long to read (1,000 characters,
+  8 lines); `jig-sandbox` runs it only for the tool call `jig-core` announced an allow for,
+  and only if the command is the one shown. A declaration can extend the built-in
+  classification of `bash`, so the user's own classification rules still apply to it.
 
 ## 2026-10-31: jig-sandbox, built on Anthropic's sandbox runtime
 
