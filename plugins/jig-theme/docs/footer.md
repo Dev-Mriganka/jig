@@ -16,14 +16,22 @@ two-line footer.
 |---|---|---|---|
 | `model` | The model's name, or its id; `No model` when there is none | `mdHeading` | yes |
 | `thinking` | The thinking level: `off`, `minimal`, `low`, `medium`, `high`, `xhigh` | `warning` | yes |
-| `context` | The context size in tokens, `ctx 182k`. With only a share known, `ctx 42%`. Right after a compaction, before Pi has measured it, `ctx ?`. Past the window, `ctx 210k OVER` | `toolTitle`, `warning` from the warn limits, `error` from the high limits | yes |
-| `cache` | The time left on the model's prompt cache, `cache 3:41`, counting down every second while it is warm. `cache cold` once it has expired, after a model switch, or after a compaction. Hidden when there is nothing to say: no reply yet, or the last reply used no cache | `muted`, `warning` in the last minute | yes |
-| `cost` | The session's estimated cost, `est. $4.21`, over every reply, tool result, summary and cache refresh in the session. `est. $?` as soon as one of them had no price | `mdQuoteBorder` | yes |
+| `context` | The context size in tokens, `ctx 182k` | `toolTitle`, `warning` from the warn limits, `error` from the high limits | yes |
+| `cache` | The time left on the prompt cache, `cache 3:41`; `cache cold` once it has expired | `muted`, `warning` in the last minute | yes |
+| `cost` | The session's estimated cost, `est. $4.21` | `mdQuoteBorder` | yes |
 | `tokens` | Tokens in, with cache writes, and out: `↑12.4k ↓3.1k` | `muted` | yes |
 | `branch` | The git branch Pi shows, and nothing outside a repository | `accent` | no |
 | `cwd` | The name of the folder Pi runs in, without its path | `muted` | no |
-| `statuses` | What other extensions set with Pi's `setStatus`, one part each, in the order of their keys, with escapes removed | `success` | yes |
+| `statuses` | What other extensions set with Pi's `setStatus`, one part each | `success` | yes |
 | `plugins` | Parts other plugins add ([below](#parts-from-other-plugins)) | `text`, or the part's own tone | yes |
+
+- **`context`:** with only a share known it reads `ctx 42%`. Right after a compaction, before Pi has measured it, `ctx ?`. Past
+  the window, `ctx 210k OVER`.
+- **`cache`:** it counts down every second while it is warm. `cache cold` also shows after a model switch or a compaction. It is
+  hidden when there is nothing to say: no reply yet, or the last reply used no cache.
+- **`cost`:** it adds every reply, tool result, summary and cache refresh in the session. `est. $?` shows as soon as one of them
+  had no price.
+- **`statuses`:** one part each, in the order of their keys, with escapes removed.
 
 The colours are Pi's text roles, so they are the colours of the palette in use:
 `mdHeading` is a palette's `heading`, `toolTitle` its `info`, `mdQuoteBorder` its
@@ -126,16 +134,20 @@ pi.events.emit("jig-theme:segment", { id: "spend", label: "" });
 
 | Field | Meaning |
 |---|---|
-| `id` | Required. Up to 40 letters, digits, `.`, `_`, `:` and `-`, starting with a letter or digit. One part for each id; a new event for the same id replaces it |
+| `id` | Required. Up to 40 letters, digits, `.`, `_`, `:` and `-`, starting with a letter or digit |
 | `label` | The text. An empty or missing label removes the part |
-| `tone` | `normal`, `muted`, `accent`, `success`, `warning` or `error`. Anything else is `normal`. A tone is a Pi text role: `normal` takes the colour set for `plugins`, the others `muted`, `accent`, `success`, `warning` and `error` |
+| `tone` | `normal`, `muted`, `accent`, `success`, `warning` or `error`. Anything else is `normal` |
 | `order` | A number, 0 when missing. Parts are shown by `order`, then by `id` |
 
-The text comes from other code, so it is checked before it is drawn: terminal escapes,
-control characters and bidirectional controls are removed, the label is cut to 40 cells,
-and an event that is not an object with a string `id` is ignored. At most 12 parts are
-kept; the 13th id is ignored until one is removed. An event that changes nothing does
-not redraw the footer.
+- **`id`:** one part for each id; a new event for the same id replaces it.
+- **`tone`** is a Pi text role: `normal` takes the colour set for `plugins`, the others `muted`, `accent`, `success`, `warning`
+  and `error`.
+
+The text comes from other code, so it is checked before it is drawn:
+- terminal escapes, control characters and bidirectional controls are removed, and the label is cut to 40 cells;
+- an event that is not an object with a string `id` is ignored;
+- at most 12 parts are kept, and the 13th id is ignored until one is removed;
+- an event that changes nothing does not redraw the footer.
 
 All plugin parts sit together, at the place of `plugins` in `segments`, and go
 together when `plugins` is given up on a narrow terminal. A part sent before the session
