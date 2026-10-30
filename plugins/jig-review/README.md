@@ -2,20 +2,23 @@
 
 **Status: design.**
 
-A browser review of the agent's changes:
+`jig-review` opens a browser review of the agent's changes:
 - a file tree;
 - split or unified diffs;
 - line comments, then Ask (one comment now) or Finish review (all of them);
 - Approve.
 
-The agent answers each comment, and a new round shows what changed.
+The agent answers each comment, and a new round shows what changed. For example,
+after the agent changes `orders-api`, `/code-review --branch` opens everything
+since the branch left the main branch; you comment on two lines and Finish
+review, and the agent fixes one and answers the other.
 
 ## Tools
 
-| Tool | What it does |
-|---|---|
-| `start_interactive_code_review` | Opens the review in your browser. Its result never contains the page link, so the agent cannot use the page |
-| `record_interactive_review_resolution` | The agent records how it handled each comment: fixed, answered, or won't fix |
+| Tool | Kind | What it does |
+|---|---|---|
+| `start_interactive_code_review` | local write | Opens the review in your browser. Its result never contains the page link, so the agent cannot use the page |
+| `record_interactive_review_resolution` | local write | The agent records how it handled each comment: fixed, answered, or won't fix |
 
 ## Commands
 
@@ -30,22 +33,22 @@ The agent answers each comment, and a new round shows what changed.
 
 `/code-review settings` opens the review settings.
 
+## Rules
+
+- **The page is local.** It is served on `127.0.0.1`, on a random port.
+- **Its link carries a per-session secret,** which is exchanged for a cookie.
+  The link goes only to you, and requests from another host or origin are
+  refused.
+- **Approve is a click in the page,** so it is protected only by the secret
+  never reaching the agent. When `jig-flow` arrives, the approval that opens a
+  gate becomes a `y` inside the waiting call, as everywhere else (see
+  [Approvals](../../docs/approvals.md)).
+
 ## Later: after a checker agent
 
 ![A fresh-context checker reviews the change first: a pass goes to your code review, a revise goes back to the maker, and after two rounds you decide](../../docs/img/fresh-checker.svg)
 
 *A read-only checker agent in a fresh context reviews the change before this review (see [`jig-flow`](../jig-flow/README.md)): a pass goes to your code review, a revise goes back to the maker with findings, and after two rounds the decision comes to you with both reports.*
-
-## Security
-
-The page is served on `127.0.0.1`, on a random port. Its link carries a
-per-session secret, which is exchanged for a cookie. The link goes only to you,
-and requests from another host or origin are refused.
-
-Approve is a click in the page, so it is protected only by the secret never
-reaching the agent. When `jig-flow` arrives, the approval that opens a gate
-becomes a `y` inside the waiting call, as everywhere else (see
-[Approvals](../../docs/approvals.md)).
 
 ## Origin
 
