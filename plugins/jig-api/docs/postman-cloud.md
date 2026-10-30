@@ -11,18 +11,23 @@ How a collection kept in a Postman workspace becomes saved requests. Back to the
 | Field | Meaning |
 |---|---|
 | `cloud` | The collection's id (`<owner>-<uuid>`): letters, digits and `-` only |
-| `apiKey` | A secret **reference** for the Postman API key, such as `pass:postman/api-key`. A key pasted here is refused without being repeated |
+| `apiKey` | A secret **reference** for the Postman API key, such as `pass:postman/api-key` |
 | `environments` | Your collections' environment names to the ids of the environments in Postman |
-| `region` | `"us"` (default) or `"eu"`, the region of your Postman data. The key is sent to `api.postman.com` or `api.eu.postman.com` only |
-| `transport`, `signIn` | Optional, one of them: a company transport or sign-in service that carries the fetch ([Sign-in](auth.md)) |
+| `region` | `"us"` (default) or `"eu"`, the region of your Postman data |
+| `transport`, `signIn` | Optional, one of them: a company transport or sign-in service for the fetch |
+
+- **`apiKey`:** a key pasted here is refused without being repeated.
+- **`region`:** the key is sent to `api.postman.com` or `api.eu.postman.com` only.
+- **`transport`, `signIn`:** they carry the fetch (see [Sign-in](auth.md)).
 
 ## Reading, and the local copy
 
 Reading never touches the network. It reads the copy in `<state>/api/postman-cloud/<id>.json`, where `<state>` is `$JIG_STATE_DIR`,
-else `jig` under `$XDG_STATE_HOME` or `~/.local/state`. The copy is private to you (mode 0600, folders 0700) and is written whole or
-not at all. It holds the answers of the API: the collection (format v2.1) and each environment, **except the value of a secret
-variable**, which is never kept; the copy is read by the Postman reader ([Postman](postman.md)). Environments are named as you
-named them.
+else `jig` under `$XDG_STATE_HOME` or `~/.local/state`.
+- **The copy is private to you** (mode 0600, folders 0700) and is written whole or not at all.
+- **It holds the answers of the API:** the collection (format v2.1) and each environment, **except the value of a secret
+  variable**, which is never kept.
+- **The Postman reader reads it** ([Postman](postman.md)). Environments are named as you named them.
 
 A collection with no copy is listed with one problem, `has not been fetched yet: run /api refresh <name>`, and has no requests. A
 request that uploads a file is refused: a cloud collection has no folder for files.
