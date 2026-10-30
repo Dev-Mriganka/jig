@@ -4,7 +4,7 @@ Jig is a set of plugins for the [Pi](https://pi.dev) coding agent. They decide
 what the agent may do, ask you when it matters, keep secrets out of its reach,
 and record what happened so you can see it later.
 
-**Status:** five of the thirteen plugins are built. Each plugin's README is the
+**Status:** eight of the twelve plugins are built. Each plugin's README is the
 specification that its code follows.
 
 ## What works today
@@ -16,8 +16,9 @@ watches CI until it finishes. `jig-memory` keeps a folder of notes and evidence
 for each ticket. `jig-lens` shows cost, tool failures and the time spent waiting
 for you. `jig-jira` reads and changes Jira issues, with rendered previews.
 `jig-logs` searches Elasticsearch, OpenSearch or Loki logs, and `jig-http` calls
-named APIs with sign-in added by the tool. `jig-ops` is being built. The other
-plugins are designs.
+named APIs with sign-in added by the tool. `jig-ops` deploys a version to a test
+environment and reads what runs, from one service catalog (CI is planned). The
+other plugins are designs.
 
 ## Where Jig sits
 
@@ -44,7 +45,7 @@ plugins are designs.
 | [`jig-jira`](plugins/jig-jira/README.md) | built | Jira issues: reads, comments, transitions, updates, with rendered previews |
 | [`jig-logs`](plugins/jig-logs/README.md) | built | Log search over Elasticsearch, OpenSearch or Grafana Loki; another backend is one adapter |
 | [`jig-http`](plugins/jig-http/README.md) | built | Calls to named APIs, with sign-in added by the tool |
-| [`jig-ops`](plugins/jig-ops/README.md) | design | Build, deploy and run on any CI and platform, from one service catalog |
+| [`jig-ops`](plugins/jig-ops/README.md) | built: runtime and deploy; ci planned | Build, deploy and run on any CI and platform, from one service catalog |
 | [`jig-review`](plugins/jig-review/README.md) | design | Code review in the browser |
 | [`jig-agents`](plugins/jig-agents/README.md) | design | Subagents in terminal panes |
 

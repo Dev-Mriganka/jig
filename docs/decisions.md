@@ -2,6 +2,22 @@
 
 Dated so the reasons stay attached.
 
+## 2026-10-30: jig-ops runtime and deploy, as built
+
+- **The Kubernetes reads are the first runtime adapter,** and `jig-k8s` was never a
+  plugin of its own.
+- **An environment's name in the catalog is its `jig-core` name.** The reads kept a
+  second table from service environments to `jig-core` environments. The catalog
+  has none, so there is one name to keep right.
+- **`jig-core` says what is production.** The reads listened for decision events to
+  refuse a command in a pod in production, because a plugin could not ask.
+  `environments.kindOf` lets `classify` refuse it, so the call is blocked before
+  anyone is asked and nothing listens. A name nobody defined counts as production.
+- **A call gives a version and no more.** The release, chart, values, workload,
+  context, namespace and health address are the catalog's, and the health path too.
+- **A command is started once.** One that is cut short has an unknown outcome: the
+  rollout is read once, and the model is told not to run it again.
+
 ## 2026-10-30: jig-ops, one plugin for build, deploy and run
 
 - **`jig-k8s` alone was too small.** The real use is the loop: the change
