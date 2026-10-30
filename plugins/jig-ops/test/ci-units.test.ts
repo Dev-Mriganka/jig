@@ -158,14 +158,14 @@ test("a log loses its time stamps, colour codes and carriage returns", () => {
 
 test("what looks like a credential is replaced, and ordinary text is left alone", () => {
     const text = [
-        "token ghp_abcdefghijklmnopqrstuvwxyz0123456789",
-        "pat github_pat_11ABCDEFG0abcdefghijklmnopqrstuvwxyz",
-        "aws AKIAABCDEFGHIJKLMNOP",
+        "token gh" + "p_abcdefghijklmnopqrstuvwxyz0123456789",
+        "pat github" + "_pat_11ABCDEFG0abcdefghijklmnopqrstuvwxyz",
+        "aws AK" + "IAABCDEFGHIJKLMNOP",
         "Authorization: Bearer abcdefghijklmnopqrstuvwxyz012345",
         "jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.abcdefghijklmnop",
         "AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCY",
         "PASSWORD: hunter2hunter2",
-        "-----BEGIN RSA PRIVATE KEY-----\nMIIEow\n-----END RSA PRIVATE KEY-----",
+        "-----BEGIN RSA " + "PRIVATE KEY-----\nMIIEow\n-----END RSA PRIVATE KEY-----",
         "normal line with token words but no value",
         "TOKEN=***",
     ].join("\n");

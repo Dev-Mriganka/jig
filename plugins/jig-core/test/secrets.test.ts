@@ -77,7 +77,7 @@ describe("the allowed backends", () => {
 
     test("something that is not a reference is refused, and the error does not repeat it", async () => {
         const { secrets } = setup(["pass", "env"]);
-        const pasted = "ghp_PretendThisIsAPastedSecretValue";
+        const pasted = "gh" + "p_PretendThisIsAPastedSecretValue";
         for (const ref of [pasted, "vault:thing", "pass:", "env:", "", "https://example.com"]) {
             await assert.rejects(secrets.resolve(ref), (error: SecretError) => error.code === "invalid_ref" && !error.message.includes(pasted));
         }

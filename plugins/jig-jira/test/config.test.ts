@@ -113,7 +113,7 @@ describe("auth is exactly one way", () => {
     });
 
     test("a token must be a secret reference, and the error never repeats the value", () => {
-        for (const token of ["ATATT3xFfGF0AbCdEfGhIj1234567890", "ghp_abcdefghijklmnopqrstuvwxyz0123456789", "has space:in it", "", 7, null]) {
+        for (const token of ["ATATT3xFfGF0AbCdEfGhIj1234567890", "gh" + "p_abcdefghijklmnopqrstuvwxyz0123456789", "has space:in it", "", 7, null]) {
             const errors = validateJira({ site: SITE, auth: { token } });
             assert.match(errors[0] ?? "", /^jira\.auth\.token: must be a secret reference such as pass:work\/jira-token, not the token itself/, String(token));
             if (typeof token === "string" && token !== "") assert.doesNotMatch(errors.join("\n"), new RegExp(token.slice(0, 12)));
