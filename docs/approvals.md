@@ -26,10 +26,11 @@ in Pi.
 A rule can choose which kind its calls use. For example, Jira comments use
 the review screen with a rendered preview.
 
-The form is built on `@adeildo/pi-ask-questions`, on trial. It is a deliberate
-port of `@juicesharp/rpiv-ask-user-question`'s question format into a framed
-dialog, and its README says other packages can open it. If it does not hold up,
-Pi's own select and input dialogs take its place (see [Reuse](reuse.md)).
+The form screen will be built on `@adeildo/pi-ask-questions`, on trial. It is a
+deliberate port of `@juicesharp/rpiv-ask-user-question`'s question format into a
+framed dialog, and its README says other packages can open it. If it does not
+hold up, Pi's own select and input dialogs take its place (see
+[Reuse](reuse.md)).
 
 In the first version the form kind is shown with Pi's own selector, like a
 dialog. The dedicated form screen comes later.
@@ -74,7 +75,7 @@ in `jig-lens`.
 
 ![Today an approval sits on every push; with one approval per change, pushes need only passing tests and you approve once, with all the evidence](img/one-approval.svg)
 
-*The same ticket under two rules: today each push asks, because the approval must cover the exact commit; with `jig-flow`, pushes need only passing tests and you approve once, with all the evidence on one page, before teammates see the pull request. Writes to a shared QA environment still ask you.*
+*The same ticket under two rules: today each push asks, because the approval must cover the exact commit; with `jig-flow`, pushes need only passing tests and you approve once, with all the evidence on one page, before teammates see the pull request. Writes to a test environment such as `staging` still ask you.*
 
 ## Later
 

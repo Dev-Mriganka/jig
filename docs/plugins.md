@@ -20,21 +20,23 @@ parts live in a private company plugin kept at the company.
 
 ## Generic plugins (this repository)
 
-| Plugin | Tools and actions | What the company plugin supplies | Order |
-|---|---|---|---|
-| [`jig-core`](../plugins/jig-core/README.md) | `watch`: list, stop; the tool manager, the watch engine and the `/jig` commands | environments, extra personal-data field names for masking, the sign-in service | 1 |
-| [`jig-git`](../plugins/jig-git/README.md) | `git`: status, diff, log, show, blame, branches, fetch, clone, branch, worktree, commit, stash, sync, merge, rebase, cherry_pick, restore, push · `pr`: view, list, comments, create, edit, ready, comment, reply, resolve, review, merge · `checks`: status, runs, run, artifacts, log, rerun, watch · `release`: tags, releases, tag_create, tag_push, release_create | the GitHub organization, branch names, protected branches, the pull request template, the "artifact ready" rules | 2 |
-| [`jig-lens`](../plugins/jig-lens/README.md) | none: the dashboard over `jig-core`'s records | none | 2 |
-| [`jig-flow`](../plugins/jig-flow/README.md) | `flow`: status, start, bind, submit-plan, test, scenario, advance, and the gates | ticket kinds, stage sets, acceptance environments | 3 |
-| [`jig-memory`](../plugins/jig-memory/README.md) | no tools today: ticket folders, notes, evidence; later cards and recall | ticket key patterns, folder location | 3 |
-| [`jig-mongo`](../plugins/jig-mongo/README.md) | `mongo`: describe, count, find, distinct, aggregate | connection routes, jump hosts, approved collections and fields | 4 |
-| [`jig-jira`](../plugins/jig-jira/README.md) | `jira`: get, search, comments, transitions, changelog, attachments, assignable, find_field · create, comment, edit_comment, delete_comment, transition, update | the Jira site and its sign-in | 5 |
-| [`jig-logs`](../plugins/jig-logs/README.md) | `logs`: search by phrase or query, time window, filters, paging | the log backend: address, indexes, environment names, sign-in | 6 |
-| [`jig-http`](../plugins/jig-http/README.md) | `http`: a method, path, body and headers to a named target | the named targets and their sign-in | 7 |
-| [`jig-k8s`](../plugins/jig-k8s/README.md) | `k8s`: pods, status, logs, api | the services table | 7 |
-| [`jig-scripts`](../plugins/jig-scripts/README.md) | `script`: list, run | the scripts themselves | 7 |
-| [`jig-review`](../plugins/jig-review/README.md) | `start_interactive_code_review`, `record_interactive_review_resolution` | none | 8 |
-| [`jig-agents`](../plugins/jig-agents/README.md) | `subagent`, `subagent_message`, `subagent_status`, `subagent_interrupt`, `subagent_done`, `caller_ping` | which model each role uses | 8, unless a store package replaces it |
+| Plugin | Status | Tools and actions | What the company plugin supplies | Order |
+|---|---|---|---|---|
+| [`jig-core`](../plugins/jig-core/README.md) | built | `watch`: list, stop; the tool manager, the watch engine and the `/jig` commands | environments, classification rules, extra personal-data field names for masking, sign-in services and transports | 1 |
+| [`jig-git`](../plugins/jig-git/README.md) | built | `git`: status, diff, log, show, blame, branches, fetch, clone, branch, worktree, commit, stash, sync, merge, rebase, cherry_pick, restore, push · `pr`: view, list, comments, create, edit, ready, comment, reply, resolve, review, merge · `checks`: status, runs, run, artifacts, log, rerun, watch · `release`: tags, releases, tag_create, tag_push, release_create | the GitHub organization, branch names, protected branches, the pull request template, the "artifact ready" rules | 2 |
+| [`jig-lens`](../plugins/jig-lens/README.md) | built | none: the `/lens` command, over `jig-core`'s records | none | 2 |
+| [`jig-flow`](../plugins/jig-flow/README.md) | design | `flow`: status, start, bind, submit-plan, test, scenario, advance, and the gates | ticket kinds, stage sets, acceptance environments | 3 |
+| [`jig-memory`](../plugins/jig-memory/README.md) | built | no tools: ticket folders, notes and evidence, and the `/ticket` command; later cards and recall | ticket key patterns, folder location | 3 |
+| [`jig-mongo`](../plugins/jig-mongo/README.md) | design | `mongo`: describe, count, find, distinct, aggregate | connection routes (for example through a bastion host or a VPN), approved collections and fields | 4 |
+| [`jig-jira`](../plugins/jig-jira/README.md) | built | `jira`: get, search, comments, transitions, changelog, attachments, assignable, find_field · create, comment, edit_comment, delete_comment, transition, update | the Jira site and its sign-in | 5 |
+| [`jig-logs`](../plugins/jig-logs/README.md) | design | `logs`: search by phrase or query, time window, filters, paging | the log backend: address, indexes, environment names, sign-in | 6 |
+| [`jig-http`](../plugins/jig-http/README.md) | design | `http`: a method, path, body and headers to a named target | the named targets and their sign-in | 7 |
+| [`jig-k8s`](../plugins/jig-k8s/README.md) | design | `k8s`: pods, status, logs, api | the service map: for each service and environment, the cluster context, namespace and pod selector | 7 |
+| [`jig-scripts`](../plugins/jig-scripts/README.md) | design | `script`: list, run | the scripts themselves | 7 |
+| [`jig-review`](../plugins/jig-review/README.md) | design | `start_interactive_code_review`, `record_interactive_review_resolution` | none | 8 |
+| [`jig-agents`](../plugins/jig-agents/README.md) | design | `subagent`, `subagent_message`, `subagent_status`, `subagent_interrupt`, `subagent_done`, `caller_ping` | which model each role uses | 8, unless a store package replaces it |
+
+`jig-logs` and `jig-http` are being built.
 
 ## How company parts plug in
 
@@ -47,12 +49,13 @@ parts live in a private company plugin kept at the company.
 Some tools exist only because of one employer, and never come into this
 repository:
 - internal databases and billing systems;
-- the deploy repository and its pipelines;
+- a company deploy tool and its pipelines (for example, one that deploys a
+  built image to `staging` after CI passes);
 - the model provider account and budget;
 - the sign-in service.
 
-CI products such as Concourse or Jenkins are generic. If they are needed at
-more than one job, their tools move into a generic plugin then, not before.
+Another CI system (GitLab CI, Jenkins, Buildkite) is generic. If it is needed at
+more than one job, its tools move into a generic plugin then, not before.
 
 ## Order, and why
 
