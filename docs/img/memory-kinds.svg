@@ -52,7 +52,7 @@
   <text x="995" y="462" font-size="20" fill="#1A1F1D" font-weight="700" text-anchor="middle">Organizational memory</text>
   <text x="995" y="482" font-size="12.5" fill="#3A4440" text-anchor="middle">true for every ticket</text>
   <text x="805" y="512" font-size="13" fill="#1A1F1D">an order reference has at most 20 characters</text>
-  <text x="805" y="536" font-size="13" fill="#1A1F1D">test logs live in the qa index</text>
+  <text x="805" y="536" font-size="13" fill="#1A1F1D">test logs live in the staging index</text>
   <text x="805" y="560" font-size="13" fill="#1A1F1D">3 tests have failed on main since last week</text>
   <text x="805" y="584" font-size="13" fill="#1A1F1D">releases are cut from the main branch</text>
   <path d="M778 470 H735 V300 H694" fill="none" stroke="#1D3B4D" stroke-width="3" marker-end="url(#memkinds-head-1d3b4d-11)"/>

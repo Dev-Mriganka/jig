@@ -199,8 +199,8 @@ start Pi with `NODE_EXTRA_CA_CERTS` pointing at its certificate.
 ## Company part (in the company plugin)
 
 - **The values of the targets:** their base addresses and their environment
-  names, and which of them sit behind a jump host or are called from inside the
-  cluster.
+  names. A target that is only reachable through a bastion host or a VPN is
+  given a company transport.
 - **The code a target's sign-in needs:** the sign-in services and the
   transports, registered with `jig-core` under the names a target gives.
 - **The environments** those targets name, added to `jig-core`.

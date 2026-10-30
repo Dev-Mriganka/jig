@@ -1,8 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="404" viewBox="0 0 1100 404" role="img" aria-label="Two timelines of one ticket. Today, your approval is needed at every push, three times in this example, plus a confirmation for writes to the shared QA environment. With one approval per change, pushes need only passing tests, the checker runs before the test environment, scenarios run there, and you approve once before the pull request goes to teammates, with all the evidence. Writes to the QA environment are still confirmed." font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="404" viewBox="0 0 1100 404" role="img" aria-label="Two timelines of one ticket. Today, your approval is needed at every push, three times in this example, plus a confirmation for writes to staging. With one approval per change, pushes need only passing tests, the checker runs before the test environment, scenarios run there, and you approve once before the pull request goes to teammates, with all the evidence. Writes to staging are still confirmed." font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">
   <rect x="0.5" y="0.5" width="1099" height="403" rx="10" fill="#FAFBFA" stroke="#D2D9D3"/>
   <!-- today: an approval at every push -->
   <text x="30" y="104" font-size="20" fill="#1A1F1D" font-weight="700">Today</text>
-  <text x="170" y="40" font-size="13" fill="#A93C27">an approval on every push, and a confirmation for QA writes</text>
+  <text x="170" y="40" font-size="13" fill="#A93C27">an approval on every push, and a confirmation for staging writes</text>
   <line x1="170" y1="120" x2="1070" y2="120" stroke="#8C979D" stroke-width="3"/>
   <circle cx="220" cy="120" r="6" fill="#1D3B4D"/>
   <text x="220" y="146" font-size="12.5" fill="#3A4440" text-anchor="middle">commit</text>
@@ -19,9 +19,9 @@
   <circle cx="680" cy="120" r="6" fill="#1D3B4D"/>
   <text x="680" y="146" font-size="12.5" fill="#3A4440" text-anchor="middle">PR</text>
   <circle cx="780" cy="120" r="6" fill="#1D3B4D"/>
-  <text x="780" y="146" font-size="12.5" fill="#3A4440" text-anchor="middle">test</text>
+  <text x="780" y="146" font-size="12.5" fill="#3A4440" text-anchor="middle">dev</text>
   <circle cx="880" cy="120" r="6" fill="#1D3B4D"/>
-  <text x="880" y="146" font-size="12.5" fill="#3A4440" text-anchor="middle">QA</text>
+  <text x="880" y="146" font-size="12.5" fill="#3A4440" text-anchor="middle">staging</text>
   <circle cx="980" cy="120" r="6" fill="#1D3B4D"/>
   <text x="980" y="146" font-size="12.5" fill="#3A4440" text-anchor="middle">merge</text>
   <circle cx="290" cy="80" r="8" fill="#C08326"/>
@@ -58,7 +58,7 @@
   <circle cx="870" cy="300" r="6" fill="#1D3B4D"/>
   <text x="870" y="326" font-size="12.5" fill="#3A4440" text-anchor="middle">PR</text>
   <circle cx="960" cy="300" r="6" fill="#1D3B4D"/>
-  <text x="960" y="326" font-size="12.5" fill="#3A4440" text-anchor="middle">QA</text>
+  <text x="960" y="326" font-size="12.5" fill="#3A4440" text-anchor="middle">staging</text>
   <circle cx="1040" cy="300" r="6" fill="#1D3B4D"/>
   <text x="1040" y="326" font-size="12.5" fill="#3A4440" text-anchor="middle">merge</text>
   <rect x="264" y="264" width="52" height="22" rx="4" fill="#5C9CAB"/>

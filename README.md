@@ -15,7 +15,9 @@ secret references, masking of production results and background watches.
 watches CI until it finishes. `jig-memory` keeps a folder of notes and evidence
 for each ticket. `jig-lens` shows cost, tool failures and the time spent waiting
 for you. `jig-jira` reads and changes Jira issues, with rendered previews.
-`jig-logs` and `jig-http` are being built. The other plugins are designs.
+`jig-logs` searches OpenSearch or Elasticsearch logs, and `jig-http` calls named
+APIs with sign-in added by the tool. `jig-k8s` is being built. The other
+plugins are designs.
 
 ## Where Jig sits
 
@@ -40,8 +42,8 @@ for you. `jig-jira` reads and changes Jira issues, with rendered previews.
 | [`jig-memory`](plugins/jig-memory/README.md) | built | Ticket folders, notes and evidence; later, recall of related tickets |
 | [`jig-mongo`](plugins/jig-mongo/README.md) | design | MongoDB reads, with production limited to approved fields |
 | [`jig-jira`](plugins/jig-jira/README.md) | built | Jira issues: reads, comments, transitions, updates, with rendered previews |
-| [`jig-logs`](plugins/jig-logs/README.md) | design | Log search over a backend such as Elasticsearch |
-| [`jig-http`](plugins/jig-http/README.md) | design | Calls to named APIs, with sign-in added by the tool |
+| [`jig-logs`](plugins/jig-logs/README.md) | built | Log search over a backend such as Elasticsearch |
+| [`jig-http`](plugins/jig-http/README.md) | built | Calls to named APIs, with sign-in added by the tool |
 | [`jig-k8s`](plugins/jig-k8s/README.md) | design | Kubernetes reads: pods, rollout status, logs |
 | [`jig-scripts`](plugins/jig-scripts/README.md) | design | Your own scripts as tools, pinned by hash |
 | [`jig-review`](plugins/jig-review/README.md) | design | Code review in the browser |

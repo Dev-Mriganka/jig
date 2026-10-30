@@ -42,9 +42,11 @@ before it gave:
   "preview unavailable: <reason>" and can still decide. A tool without a
   preview gets a summary made from the call, with its arguments cut to 200
   characters.
-- **Invalid input is not asked about.** A tool's preview that throws a
-  `TypeError` says the input is invalid: the call is blocked with the tool's
-  message, and nobody is asked.
+- **Invalid input is not asked about.** A tool's `classify` or preview that
+  throws a `TypeError` says the input is invalid: the call is blocked with the
+  tool's message, recorded with the error kind `invalid`, and nobody is asked.
+  `classify` matters for reads, which never ask and so never build a preview.
+  Any other error from either is a fault in the tool.
 - **A tool's own page.** A tool can render its preview itself, such as Jira
   wiki markup turned into HTML. `o` then opens that page. Tags that could run,
   load or navigate are removed from it, and the page's policy blocks scripts

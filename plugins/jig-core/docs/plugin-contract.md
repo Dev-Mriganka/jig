@@ -30,7 +30,7 @@ closed instead of running ungoverned.
 
 | Call | What it gives a plugin |
 |---|---|
-| `declareTool(declaration)` | How the tool's calls are classified (`classify`, pure and fast, because it runs before every call), an optional `preview` for the review screen, and whether the tool masks its own results. Declaring a tool again replaces the declaration |
+| `declareTool(declaration)` | How the tool's calls are classified (`classify`, pure and fast, because it runs before every call; a `TypeError` from it means invalid input), an optional `preview` for the review screen, and whether the tool masks its own results. Declaring a tool again replaces the declaration |
 | `approvedPreview(toolCallId)` | The preview you approved for this call, or nothing when the call did not ask. A tool compares it with what it would do now, and refuses with "changed since the preview" when they differ |
 | `addFacts(toolCallId, facts)` | Facts for this call's record |
 | `setTicket(key)` | The ticket the session works on. Records carry it |

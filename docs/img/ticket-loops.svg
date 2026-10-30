@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1140" height="756" viewBox="0 0 1140 756" role="img" aria-label="A ticket over time. Feedforward guides on the left go into Pi before it writes code. Feedback comes back on the right at four points: the edit loop with its checks; the checker loop; your one approval; and after the pull request, where CI, reviews, teammates and the QA environment report back as new commits through the review ledger." font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="1140" height="756" viewBox="0 0 1140 756" role="img" aria-label="A ticket over time. Feedforward guides on the left go into Pi before it writes code. Feedback comes back on the right at four points: the edit loop with its checks; the checker loop; your one approval; and after the pull request, where CI, reviews, teammates and staging report back as new commits through the review ledger." font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">
   <rect x="0.5" y="0.5" width="1139" height="755" rx="10" fill="#FAFBFA" stroke="#D2D9D3"/>
   <defs>
     <marker id="loops-head-5d4b7c-28" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="28" markerHeight="28" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#5D4B7C"/></marker>
@@ -89,9 +89,9 @@
   <polygon points="836,572 956,572 956,606 836,606 826,589" fill="#DF6A7C"/>
   <text x="894" y="593.55" font-size="13" fill="#FFFFFF" text-anchor="middle">Copilot review</text>
   <polygon points="696,616 816,616 816,650 696,650 686,633" fill="#5C9CAB"/>
-  <text x="754" y="637.55" font-size="13" fill="#FFFFFF" text-anchor="middle">deploy to QA</text>
+  <text x="754" y="637.55" font-size="12.5" fill="#FFFFFF" text-anchor="middle">deploy to staging</text>
   <polygon points="836,616 956,616 956,650 836,650 826,633" fill="#FFFFFF" stroke="#5C9CAB" stroke-width="2" stroke-dasharray="6 4"/>
-  <text x="894" y="637.55" font-size="13" fill="#3B7C8A" text-anchor="middle">QA scenarios</text>
+  <text x="894" y="637.55" font-size="13" fill="#3B7C8A" text-anchor="middle">scenarios</text>
   <polygon points="696,660 816,660 816,694 696,694 686,677" fill="#5C9CAB"/>
   <text x="754" y="681.55" font-size="13" fill="#FFFFFF" text-anchor="middle">logs</text>
   <polygon points="836,660 956,660 956,694 836,694 826,677" fill="#C08326"/>

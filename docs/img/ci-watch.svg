@@ -48,8 +48,8 @@
   <text x="526" y="276" font-size="14" fill="#FFFFFF" font-weight="700" text-anchor="middle">a company plugin (private)</text>
   <text x="526" y="297" font-size="12.5" fill="#FFFFFF" text-anchor="middle">always tells the agent. It may deploy</text>
   <text x="526" y="312.5" font-size="12.5" fill="#FFFFFF" text-anchor="middle">by itself only if its setting is on, you asked</text>
-  <text x="526" y="328" font-size="12.5" fill="#FFFFFF" text-anchor="middle">for the deploy, and the target is the first</text>
-  <text x="526" y="343.5" font-size="12.5" fill="#FFFFFF" text-anchor="middle">shared test environment</text>
+  <text x="526" y="328" font-size="12.5" fill="#FFFFFF" text-anchor="middle">for the deploy, and the target is staging</text>
+  <text x="526" y="343.5" font-size="12.5" fill="#FFFFFF" text-anchor="middle">(never production)</text>
   <path d="M676 304 H718" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#ciwatch-head-1d3b4d-11)"/>
   <!-- jig-core still decides -->
   <rect x="722" y="250" width="348" height="168" rx="6" fill="#1D3B4D"/>
