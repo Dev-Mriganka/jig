@@ -1,10 +1,12 @@
 # Jig
 
+[![CI](https://github.com/Dev-Mriganka/jig/actions/workflows/ci.yml/badge.svg)](https://github.com/Dev-Mriganka/jig/actions/workflows/ci.yml)
+
 Jig is a set of plugins for the [Pi](https://pi.dev) coding agent. They decide
 what the agent may do, ask you when it matters, keep secrets out of its reach,
 and record what happened so you can see it later.
 
-**Status:** eleven of the thirteen plugins are built. Each plugin's README is the
+**Status:** eleven of the fourteen plugins are built, and `jig-sandbox` is being built. Each plugin's README is the
 specification that its code follows. New to a word? See the [glossary](docs/glossary.md).
 
 ## What works today
@@ -12,7 +14,12 @@ specification that its code follows. New to a word? See the [glossary](docs/glos
 In short:
 - **Safety:** [`jig-core`](plugins/jig-core/README.md) governs every tool call.
   It applies rules per environment, asks you when a rule says so, keeps secrets
-  out of the model's reach and masks production results.
+  out of the model's reach and masks production results. Pi's own file tools
+  cannot read your credential folders or change Pi's settings.
+- **Sign-in:** Jig never signs in. A credential comes from where you already keep
+  it: an environment variable, a password manager, a command such as
+  `gh auth token`, or a company's sign-in service. `jig-core` attaches it to the
+  request, and no plugin sees its value.
 - **Code:** `jig-git` (git, pull requests, releases), `jig-review` (a code
   review in the browser, approved with a passkey) and `jig-ops` (CI, deploy and
   what runs, from one service catalog).
@@ -23,8 +30,38 @@ In short:
   waiting for you. `jig-memory` keeps a folder of notes and evidence per ticket.
 - **How Pi looks:** `jig-theme` gives six palettes, a one-line footer and your
   own colours.
+- **Checked on every push:** the type check, Biome, over 5,000 tests, the
+  review page's build and every link in these docs run on GitHub Actions.
 
-The other two plugins, `jig-workflow` and `jig-agents`, are designs.
+Being built: [`jig-sandbox`](plugins/jig-sandbox/README.md), which runs the
+agent's `bash` in an operating-system sandbox. Designs: `jig-workflow` and
+`jig-agents`.
+
+## Install
+
+Jig needs Pi 1.4 or later and Node.js 22.19 or later.
+
+```bash
+pi install git:github.com/Dev-Mriganka/jig
+```
+
+Then start Pi and run `/jig`: it shows the rules in force and anything that
+needs fixing. Each plugin's README says what it needs in `~/.pi/agent/jig.json`
+and which programs it uses, such as `git` and `gh` for `jig-git`.
+
+To load only some plugins, filter the package in Pi's settings. Keep `jig-core`
+first in the list, because every other plugin needs it:
+
+```json
+{
+  "packages": [
+    {
+      "source": "git:github.com/Dev-Mriganka/jig",
+      "extensions": ["plugins/jig-core/src/index.ts", "plugins/jig-git/src/index.ts"]
+    }
+  ]
+}
+```
 
 ## Where Jig sits
 
@@ -43,6 +80,7 @@ The other two plugins, `jig-workflow` and `jig-agents`, are designs.
 | Plugin | Status | What it gives you |
 |---|---|---|
 | [`jig-core`](plugins/jig-core/README.md) | built | The tool manager: rules per environment, approvals, secrets, masking, watches, records |
+| [`jig-sandbox`](plugins/jig-sandbox/README.md) | building | The agent's `bash` in an operating-system sandbox: credentials hidden, start-up files locked, everything else as outside |
 | [`jig-git`](plugins/jig-git/README.md) | built | Local git, GitHub pull requests and reviews, tags and releases |
 | [`jig-lens`](plugins/jig-lens/README.md) | built | Cost, tool failures and time spent waiting for you, inside Pi; Grafana optional |
 | [`jig-workflow`](plugins/jig-workflow/README.md) | design | Named workflows you define: stages, exit conditions, holds, test runs |
