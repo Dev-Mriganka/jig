@@ -13,6 +13,7 @@ import type { Auth, Body, Collection, Environment, FormField, Problem, SavedRequ
 import { unsupportedVariable, variablesIn } from "../template.ts";
 import { expandHome, readText, whyNotRead } from "./files.ts";
 import type { Source } from "./source.ts";
+import { authTexts, bodyTexts } from "./texts.ts";
 
 export interface PostmanConfig {
     file: string;
@@ -239,20 +240,6 @@ function authOf(raw: unknown, reading: Reading, key: string): AuthResult | undef
     }
 }
 
-/** The variables an auth setting uses: all of them fill the sign-in. */
-function authTexts(auth: Auth): string[] {
-    switch (auth.kind) {
-        case "none": return [];
-        case "bearer": return [auth.token];
-        case "basic": return [auth.username, auth.password];
-        case "apiKey": return [auth.name, auth.value];
-        case "oauth2": {
-            const fields = [auth.tokenUrl, auth.clientId, auth.clientSecret, auth.username, auth.password, auth.scope];
-            return fields.filter((item): item is string => item !== undefined);
-        }
-    }
-}
-
 /** True when an event list holds a script that is switched on and has something in it. */
 function scriptOf(events: unknown, listen: string): boolean {
     if (!Array.isArray(events)) return false;
@@ -410,18 +397,6 @@ function bodyOf(raw: unknown): BodyResult {
         }
         default:
             return { unsupported: `the body type "${raw.mode}" is not sent`, notes };
-    }
-}
-
-/** The texts of a body in which variables may appear. */
-function bodyTexts(body: Body | undefined): string[] {
-    if (body === undefined) return [];
-    switch (body.kind) {
-        case "raw":
-        case "json": return [body.text];
-        case "file": return [];
-        case "graphql": return [body.query, ...(body.variables === undefined ? [] : [body.variables])];
-        case "form": return body.fields.flatMap((field) => (field.kind === "text" ? [field.value] : []));
     }
 }
 

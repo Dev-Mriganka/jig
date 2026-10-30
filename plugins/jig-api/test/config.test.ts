@@ -100,10 +100,10 @@ describe("a valid section", () => {
 });
 
 describe("the collections", () => {
-    test("a source is exactly one of postman and http", () => {
-        assert.deepEqual(errorsOf({ collections: { a: {} } }), ["api.collections.a: needs a source: one of postman, http"]);
+    test("a source is exactly one of the sources there are", () => {
+        assert.deepEqual(errorsOf({ collections: { a: {} } }), ["api.collections.a: needs a source: one of postman, http, bruno"]);
         assert.deepEqual(errorsOf({ collections: { a: { yaml: "/work/x" } } }), [
-            "api.collections.a: needs a source: one of postman, http",
+            "api.collections.a: needs a source: one of postman, http, bruno",
             "api.collections.a.yaml: unknown field",
         ]);
         assert.deepEqual(errorsOf({ collections: { a: { http: HTTP, postman: POSTMAN } } }), ["api.collections.a: use exactly one source (got http, postman)"]);
@@ -117,6 +117,14 @@ describe("the collections", () => {
         assert.deepEqual(errorsOf({ collections: { a: { http: HTTP, folder: "x" } } }), ["api.collections.a.folder: unknown field"]);
         assert.deepEqual(errorsOf({ collections: { a: { postman: POSTMAN, enviroments: {} } } }), ["api.collections.a.enviroments: unknown field"]);
         assert.deepEqual(errorsOf(section({ environments: { Staging: { environment: "staging", signin: "x" } } })), ["api.environments.Staging.signin: unknown field"]);
+    });
+
+    test("a Bruno collection is a folder, by an absolute path or ~/, and has no other field", () => {
+        const settings = found({ collections: { a: { bruno: "~/work/bruno" }, b: { bruno: "/work/bruno" } } });
+        assert.equal(settings.collections.get("a")?.kind, "bruno");
+        assert.deepEqual(errorsOf({ collections: { a: { bruno: "work/bruno" } } }), ["api.collections.a.bruno: must be an absolute path or start with ~/"]);
+        assert.deepEqual(errorsOf({ collections: { a: { bruno: 7 } } }), ["api.collections.a.bruno: must be the path of a Bruno collection folder"]);
+        assert.deepEqual(errorsOf({ collections: { a: { bruno: "/work/bruno", environments: {} } } }), ["api.collections.a.environments: unknown field"]);
     });
 
     test("a path is absolute or starts with ~/, and is not text of no use", () => {

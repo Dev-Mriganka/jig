@@ -1,0 +1,15 @@
+meta {
+  name: Rebuild index
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/admin/rebuild
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+}

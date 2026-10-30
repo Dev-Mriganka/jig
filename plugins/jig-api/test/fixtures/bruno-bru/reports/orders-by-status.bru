@@ -1,0 +1,27 @@
+meta {
+  name: Orders by status
+  type: graphql
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/graphql
+  body: graphql
+  auth: inherit
+}
+
+body:graphql {
+  query Orders($status: String!) {
+    orders(status: $status) { id total }
+  }
+}
+
+body:graphql:vars {
+  {
+    "status": "{{status}}"
+  }
+}
+
+settings {
+  encodeUrl: true
+}

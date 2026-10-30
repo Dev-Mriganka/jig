@@ -1,0 +1,21 @@
+info:
+  name: Upload receipt
+  type: http
+  seq: 6
+http:
+  method: POST
+  url: "{{baseUrl}}/{{apiVersion}}/orders/{{orderId}}/receipt"
+  body:
+    type: multipart-form
+    data:
+      - name: note
+        type: text
+        value: "{{note}}"
+      - name: receipt
+        type: file
+        value:
+          - files/receipt.txt
+        contentType: text/plain
+  auth: inherit
+settings:
+  encodeUrl: true

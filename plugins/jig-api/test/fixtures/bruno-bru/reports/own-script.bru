@@ -1,0 +1,19 @@
+meta {
+  name: With its own script
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/reports
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  req.setHeader("X-Now", Date.now());
+}
+
+settings {
+  encodeUrl: true
+}

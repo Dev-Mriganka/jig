@@ -1,0 +1,9 @@
+info:
+  name: Partner
+  type: folder
+  seq: 3
+request:
+  auth:
+    type: basic
+    username: "{{serviceUser}}"
+    password: "{{servicePassword}}"

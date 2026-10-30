@@ -1,0 +1,10 @@
+info:
+  name: Rebuild index
+  type: http
+  seq: 1
+http:
+  method: POST
+  url: "{{baseUrl}}/admin/rebuild"
+  auth: inherit
+settings:
+  encodeUrl: true

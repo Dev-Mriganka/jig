@@ -1,0 +1,15 @@
+meta {
+  name: Watch orders
+  type: ws
+  seq: 2
+}
+
+ws {
+  url: ws://stream.staging.acme.example.test/orders
+  body: ws
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+}
