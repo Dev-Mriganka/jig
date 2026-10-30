@@ -48,15 +48,7 @@ function check(entry: Readonly<Record<string, unknown>>, at: string, errors: str
     const before = errors.length;
     for (const key of Object.keys(entry)) if (key !== "postman" && key !== "environments") errors.push(`${at}.${key}: unknown field`);
 
-    let file: string | undefined;
-    if (isObject(entry.postman)) {
-        errors.push(
-            `${at}.postman: a Postman cloud collection ({ "cloud", "apiKey" }) is coming in part 2; ` +
-                "for now give the path of an exported collection file",
-        );
-    } else {
-        file = absolutePath(entry.postman, `${at}.postman`, errors);
-    }
+    const file = absolutePath(entry.postman, `${at}.postman`, errors);
 
     const environments: Array<readonly [string, string]> = [];
     const raw = entry.environments;
@@ -123,7 +115,11 @@ function readJson(file: string, maxBytes: number, problems: Problem[]): unknown 
 function readEnvironment(name: string, file: string, problems: Problem[]): Environment | undefined {
     const shown = path.basename(file);
     const raw = readJson(file, ENVIRONMENT_MAX_BYTES, problems);
-    if (raw === undefined) return undefined;
+    return raw === undefined ? undefined : environmentFrom(name, shown, raw, problems);
+}
+
+/** The environment in an export that is already read, such as one kept by the Postman cloud source. */
+export function environmentFrom(name: string, shown: string, raw: unknown, problems: Problem[]): Environment | undefined {
     if (!isObject(raw) || !Array.isArray(raw.values)) {
         problems.push({ file: shown, key: "values", message: "is missing: this is not an exported environment", level: "error" });
         return undefined;
@@ -571,21 +567,20 @@ function walk(items: unknown, inherited: Inherited, reading: Reading, prefix: st
     });
 }
 
-function load(config: PostmanConfig, name: string): Collection {
-    const problems: Problem[] = [];
-    const shown = path.basename(config.file);
-    const root = path.dirname(config.file);
+/** What a Postman collection is read from: the exported JSON as parsed, and the environments exported beside it. */
+export interface PostmanContent {
+    /** Undefined when it could not be read; the reason is already in `problems`. */
+    collection: unknown;
+    /** By the name the configuration gives them; an environment that could not be read is not here. */
+    environments: ReadonlyMap<string, Environment>;
+}
 
-    // Environments first: which variables are secret decides how the requests are read.
-    const environments = new Map<string, Environment>();
-    for (const [environment, file] of config.environments) {
-        const read = readEnvironment(environment, file, problems);
-        if (read !== undefined) environments.set(environment, read);
-    }
+/** Reads a collection that is already parsed. `shown` names it in messages and `root` is the folder files must stay inside. */
+export function collectionFrom(name: string, shown: string, root: string, content: PostmanContent, problems: Problem[]): Collection {
+    const environments = new Map(content.environments);
     const secretNames = declaredSecrets(environments.values());
-
     const reading: Reading = { collection: name, shown, problems, secretNames };
-    const raw = readJson(config.file, COLLECTION_MAX_BYTES, problems);
+    const raw = content.collection;
     const requests: SavedRequest[] = [];
     const variables = new Map<string, Variable>();
     let auth: Auth = { kind: "none" };
@@ -624,6 +619,17 @@ function load(config: PostmanConfig, name: string): Collection {
         ...(authRefused === undefined ? {} : { authRefused }),
         problems,
     };
+}
+
+function load(config: PostmanConfig, name: string): Collection {
+    const problems: Problem[] = [];
+    const environments = new Map<string, Environment>();
+    for (const [environment, file] of config.environments) {
+        const read = readEnvironment(environment, file, problems);
+        if (read !== undefined) environments.set(environment, read);
+    }
+    const collection = readJson(config.file, COLLECTION_MAX_BYTES, problems);
+    return collectionFrom(name, path.basename(config.file), path.dirname(config.file), { collection, environments }, problems);
 }
 
 export const postman: Source<PostmanConfig> = { kind: "postman", check, load };

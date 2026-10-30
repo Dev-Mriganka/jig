@@ -4,14 +4,18 @@
 // call needs them (see catalog.ts).
 import { isObject, shown } from "./engine/values.ts";
 import type { Collection } from "./model.ts";
-import { COMING_LATER, SOURCES } from "./sources/index.ts";
+import { checkReference } from "./reference.ts";
+import { SOURCES } from "./sources/index.ts";
+import type { Refresher } from "./sources/source.ts";
 
 /** A collection as configured: what to call it and how to read it. */
 export interface ConfiguredCollection {
     name: string;
-    /** `postman` or `http`: the key of its source. */
+    /** The key of its source: `postman`, `http`, `bruno` or `openapi`. */
     kind: string;
     load(): Collection;
+    /** Set when the collection is a local copy of something fetched (Postman's cloud): what `/api refresh` runs. */
+    refresher?: Refresher;
 }
 
 /** What a collection's environment name means to jig-core's rules, and how its requests get to the network. */
@@ -58,28 +62,18 @@ const ENVIRONMENT_LABEL = /^[^\u0000-\u001f\u007f]{1,60}$/;
 /** The names jig-core's rules know environments by. */
 const ENVIRONMENT_NAME = /^[A-Za-z][A-Za-z0-9_-]{0,39}$/;
 const VARIABLE_NAME = /^[^\s{}\u0000-\u001f\u007f]{1,100}$/;
-/** A secret reference has a scheme and a name (`pass:work/api-token`, `env:API_TOKEN`, `op://vault/item/field`). A token
- *  pasted here instead has neither, and is refused without being repeated. */
-const SECRET_REFERENCE = /^[a-z][a-z0-9+.-]*:\S+$/;
 const CONTROL_CHARACTER = /[\u0000-\u001f\u007f]/;
 const MAX_COLLECTIONS = 50;
 const MAX_LIST = 200;
 
-/** A secret reference, never the secret itself. The value is not repeated: a mistaken reference may be the secret. */
-function checkReference(value: unknown, key: string, errors: string[]): string | undefined {
-    if (typeof value === "string" && SECRET_REFERENCE.test(value)) return value;
-    errors.push(`${key}: must be a secret reference such as pass:work/api-token, not the secret itself`);
-    return undefined;
-}
-
 function checkCollection(name: string, raw: unknown, errors: string[]): ConfiguredCollection | undefined {
     const at = `api.collections.${name}`;
-    const known = SOURCES.map((source) => source.kind);
+    const known = [...new Set(SOURCES.map((source) => source.kind))];
     if (!isObject(raw)) {
         errors.push(`${at}: must be an object with one source, such as { "postman": "<path>" } or { "http": "<folder>" }`);
         return undefined;
     }
-    const kinds = Object.keys(raw).filter((key) => known.includes(key) || COMING_LATER.has(key));
+    const kinds = Object.keys(raw).filter((key) => known.includes(key));
     if (kinds.length === 0) {
         errors.push(`${at}: needs a source: one of ${known.join(", ")}`);
         for (const key of Object.keys(raw)) errors.push(`${at}.${key}: unknown field`);
@@ -90,15 +84,14 @@ function checkCollection(name: string, raw: unknown, errors: string[]): Configur
         return undefined;
     }
     const kind = kinds[0] as string;
-    const later = COMING_LATER.get(kind);
-    if (later !== undefined) {
-        errors.push(`${at}.${kind}: ${later} collections are coming in part 2 of jig-api; for now use ${known.join(" or ")}`);
-        return undefined;
-    }
-    const source = SOURCES.find((candidate) => candidate.kind === kind);
+    const sharing = SOURCES.filter((candidate) => candidate.kind === kind);
+    // The first source with the key is the default, so an entry of the wrong shape gets that source's error.
+    const source = sharing.find((candidate) => candidate.handles?.(raw) === true) ?? sharing[0];
     if (source === undefined) return undefined;
     const config = source.check(raw, at, errors);
-    return config === undefined ? undefined : { name, kind, load: () => source.load(config, name) };
+    if (config === undefined) return undefined;
+    const refresher = source.refresher?.(config, name);
+    return { name, kind, load: () => source.load(config, name), ...(refresher === undefined ? {} : { refresher }) };
 }
 
 function checkCollections(raw: unknown, errors: string[]): Map<string, ConfiguredCollection> | undefined {
