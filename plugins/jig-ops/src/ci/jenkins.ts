@@ -1,10 +1,10 @@
-// The Jenkins adapter: the builds, stages and console logs of a job, through Jenkins' remote access API. Reads are plain;
-// `trigger` starts a build with a CSRF crumb, previewed and sent once.
+// The Jenkins adapter: the builds, stages and console logs of a job, through Jenkins' remote access API. Reads are
+// plain; `trigger` starts a build with a CSRF crumb, previewed and sent once.
 //
 // Jenkins has no commit, branch or pull request in the data of a plain job, so a build is found by its number or as the
 // last one. It has no rerun either: Jenkins' own rebuild is a plugin, and a build that took passwords as parameters
-// cannot be rebuilt from what the API shows, so `rerun` is not offered; `trigger` starts a new build with the parameters
-// the call names. Stages are read from the Pipeline REST API plugin when the server has it.
+// cannot be rebuilt from what the API shows, so `rerun` is not offered; `trigger` starts a new build with the
+// parameters the call names. Stages are read from the Pipeline REST API plugin when the server has it.
 import { digest, duration, InputError, plural } from "../values.ts";
 import type { Outcome } from "../values.ts";
 import type { CiService } from "../catalog.ts";
@@ -67,7 +67,8 @@ function jenkins(service: CiService, ctx: CiContext): CiAdapter {
 
     function headOf(build: Build): string {
         const took = build.duration ? `, took ${duration(build.duration)}` : "";
-        return `build #${build.number} of ${job}: ${resultOf(build)}${took}${when(build) === "" ? "" : ` (${when(build)})`}`;
+        const at = when(build) === "" ? "" : ` (${when(build)})`;
+        return `build #${build.number} of ${job}: ${resultOf(build)}${took}${at}`;
     }
 
     // ---- status ---------------------------------------------------------------------------------------------------
@@ -77,9 +78,10 @@ function jenkins(service: CiService, ctx: CiContext): CiAdapter {
         const stages = (await api.stages(build.number)) ?? [];
         const checks = stages.length > 0 ? stages.map(stageCheck) : [buildCheck(job, build)];
         const facts = { ...count(checks), conclusion: resultOf(build).toLowerCase() };
+        const counted = stages.length > 0 ? `; stages: ${describeCounts(count(checks))}` : "";
         const body = stages.length > 0 ? `\n${listChecks(checks)}` : "";
         return {
-            text: `${headOf(build)}${stages.length > 0 ? `; stages: ${describeCounts(count(checks))}` : ""}${body}${build.url ? `\n${build.url}` : ""}`,
+            text: headOf(build) + counted + body + (build.url ? `\n${build.url}` : ""),
             facts,
             details: { build: build.number },
         };
@@ -143,16 +145,24 @@ function jenkins(service: CiService, ctx: CiContext): CiAdapter {
         const parameters = Object.fromEntries(entries);
         const before = await api.job();
         if (before.buildable === false) throw new Error(`${job} is disabled in Jenkins, so it cannot be built`);
+        const shownParameters =
+            entries.length === 0
+                ? "none (a plain build)"
+                : entries.map(([key, value]) => `${key}=${value.slice(0, 80)}`).join(", ");
         const body = [
             `Service:    ${service.name} (Jenkins job ${job})`,
-            `Parameters: ${entries.length === 0 ? "none (a plain build)" : entries.map(([key, value]) => `${key}=${value.slice(0, 80)}`).join(", ")}`,
-            `Next build number: ${before.nextBuildNumber ?? "unknown"}${before.inQueue ? "; a build is already waiting in the queue" : ""}`,
+            `Parameters: ${shownParameters}`,
+            `Next build number: ${before.nextBuildNumber ?? "unknown"}` +
+                (before.inQueue ? "; a build is already waiting in the queue" : ""),
             "",
-            "A build is queued once. If the reply is lost, whether it was queued is checked once and it is not queued again.",
+            "A build is queued once. If the reply is lost, whether it was queued is checked once,",
+            "and it is not queued again.",
         ].join("\n");
         return {
             preview: {
-                summary: `start a build of ${job}${entries.length > 0 ? ` with ${plural(entries.length, "parameter")}` : ""}`,
+                summary:
+                    `start a build of ${job}` +
+                    (entries.length > 0 ? ` with ${plural(entries.length, "parameter")}` : ""),
                 body,
                 format: "text",
                 fingerprint: digest(
@@ -184,7 +194,8 @@ function jenkins(service: CiService, ctx: CiContext): CiAdapter {
                     throw error;
                 }
                 if (reply.status >= 500) return lost(`HTTP ${reply.status}`);
-                // Jenkins answers 201 with the address of the queue item, or 303 when the same request is already queued.
+                // Jenkins answers 201 with the address of the queue item, or 303 when the same request is already
+                // queued.
                 if (reply.status !== 201 && reply.status !== 303)
                     throw httpFailure("Jenkins", `POST build of ${job}`, reply);
                 const item = reply.headers.location;
@@ -212,7 +223,8 @@ function jenkins(service: CiService, ctx: CiContext): CiAdapter {
             case "check":
                 if (params.check === undefined) {
                     throw new InputError(
-                        "ci watch with finish check needs check, the name of the stage. Usage: ci watch {service, finish: check, check, ...}",
+                        "ci watch with finish check needs check, the name of the stage. " +
+                            "Usage: ci watch {service, finish: check, check, ...}",
                     );
                 }
                 finish = { kind: "stages", names: [params.check] };

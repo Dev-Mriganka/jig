@@ -139,8 +139,8 @@ export async function testArtifacts(test: ArtifactTest): Promise<ArtifactReady[]
 }
 
 /**
- * Tests the artifact rules when a watch has passed, and adds what they found to the result. A rule that cannot be tested
- * (the log has expired, say) does not lose the watch's result: the message says so.
+ * Tests the artifact rules when a watch has passed, and adds what they found to the result. A rule that cannot be
+ * tested (the log has expired, say) does not lose the watch's result: the message says so.
  */
 export async function addArtifacts(result: WatchResult, test: ArtifactTest): Promise<WatchResult> {
     if (test.rules.length === 0) return result;

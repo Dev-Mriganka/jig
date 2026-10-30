@@ -1,6 +1,6 @@
-// Jenkins' remote access API, for the adapter and the watch: the requests they make, what the replies hold, and how a build
-// result or a stage status becomes one of the four words (pass, fail, pending, skipped). The job is the catalog's; a call
-// never names one.
+// Jenkins' remote access API, for the adapter and the watch: the requests they make, what the replies hold, and how a
+// build result or a stage status becomes one of the four words (pass, fail, pending, skipped). The job is the
+// catalog's; a call never names one.
 import type { CiContext } from "./adapter.ts";
 import type { JenkinsConfig } from "./config.ts";
 import { httpFailure, jsonOf } from "./http.ts";
@@ -96,7 +96,7 @@ export function stageCheck(stage: Stage): Check {
 }
 
 export interface JenkinsApi {
-    /** One build of the job, or undefined when there is none (a job with no build yet, or a number that was not built). */
+    /** One build of the job, or undefined when there is none (no build yet, or a number that was not built). */
     build(which: Which): Promise<Build | undefined>;
     /** The newest builds first. */
     builds(limit: number): Promise<Build[]>;
@@ -117,7 +117,8 @@ export type Crumb = Readonly<Record<string, string>>;
 export function jenkinsApi(config: JenkinsConfig, ctx: CiContext): JenkinsApi {
     const http = { system: "jenkins", url: config.url, auth: config.auth } as const;
     const send = sender(http, { signal: ctx.signal, fetch: ctx.fetch, timeoutMs: ctx.timeoutMs });
-    // A job in a folder is `/job/folder/job/name`. Each part is encoded, so a space or a slash in a name is only a name.
+    // A job in a folder is `/job/folder/job/name`. Each part is encoded, so a space or a slash in a name is only a
+    // name.
     const job = `/job/${config.job.split("/").map(encodeURIComponent).join("/job/")}`;
     const get = (path: string, accept = "application/json", maxBytes?: number) =>
         send({ method: "GET", path, headers: { accept }, ...(maxBytes === undefined ? {} : { maxBytes }) });
@@ -175,10 +176,10 @@ export function jenkinsApi(config: JenkinsConfig, ctx: CiContext): JenkinsApi {
 }
 
 /**
- * The CSRF crumb a POST needs, when the server asks for one. A crumb is requested from `/crumbIssuer/api/json`; a server
- * with no crumb issuer answers 404, and then none is needed. A crumb is tied to the web session it was issued in, so the
- * cookies of its reply go back with the POST. A request signed in with an API token needs no crumb, and one is sent
- * anyway: it does no harm. Nothing has been sent that changes anything when this fails.
+ * The CSRF crumb a POST needs, when the server asks for one. A crumb is requested from `/crumbIssuer/api/json`; a
+ * server with no crumb issuer answers 404, and then none is needed. A crumb is tied to the web session it was issued
+ * in, so the cookies of its reply go back with the POST. A request signed in with an API token needs no crumb, and one
+ * is sent anyway: it does no harm. Nothing has been sent that changes anything when this fails.
  */
 async function crumbFor(send: (request: { method: "GET"; path: string }) => Promise<Reply>): Promise<Crumb> {
     const reply = await send({ method: "GET", path: "/crumbIssuer/api/json" });

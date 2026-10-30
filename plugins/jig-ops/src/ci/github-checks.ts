@@ -25,7 +25,7 @@ export interface GithubState {
 
 interface Answer<T> {
     status: number;
-    /** The answer, or the one held from before when GitHub said nothing changed. Undefined for a status in `tolerate`. */
+    /** The answer, or the one held when GitHub said nothing changed. Undefined for a status in `tolerate`. */
     value: T | undefined;
 }
 
@@ -54,7 +54,8 @@ export function requester(state: GithubState, signal: AbortSignal) {
             }
         })();
         throw new Error(
-            `GitHub answered HTTP ${response.status} for ${path}${message ? `: ${message}` : ""}${response.status === 401 ? " (gh is not signed in: run gh auth login yourself)" : ""}`,
+            `GitHub answered HTTP ${response.status} for ${path}${message ? `: ${message}` : ""}` +
+                (response.status === 401 ? " (gh is not signed in: run gh auth login yourself)" : ""),
         );
     };
 }
@@ -220,8 +221,8 @@ export async function checksOf(get: Get, slug: string, sha: string): Promise<Che
 
 /**
  * The names of the checks that must pass before a branch takes a pull request, from its classic protection and from
- * rulesets. Both are read once and kept. When neither can be read or neither names a check, the list is empty, and every
- * check then counts.
+ * rulesets. Both are read once and kept. When neither can be read or neither names a check, the list is empty, and
+ * every check then counts.
  */
 export async function requiredNames(get: Get, slug: string, base: string, state: GithubState): Promise<string[]> {
     if (state.required !== undefined) return state.required;

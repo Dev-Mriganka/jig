@@ -1,12 +1,12 @@
 // A write whose reply was lost. A timeout, a broken connection, a gateway error or a cancelled call after the request
 // left may mean that the CI system did what it was asked. The request is never sent again, because a second rerun or a
-// second pipeline could land twice. One read says what the system shows now, and the result tells the model both what was
-// found and that nothing was sent twice.
+// second pipeline could land twice. One read says what the system shows now, and the result tells the model both what
+// was found and that nothing was sent twice.
 import type { Outcome } from "../values.ts";
 
 /**
- * `look` reads the system once and returns the success text when the change is there, or undefined when it is not. `where`
- * names the system for the message.
+ * `look` reads the system once and returns the success text when the change is there, or undefined when it is not.
+ * `where` names the system for the message.
  */
 export async function afterLostReply(
     what: string,

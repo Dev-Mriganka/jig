@@ -1,10 +1,11 @@
-// The watch kind `ops-ci`: waits in the background until a CI run ends, whatever the CI system. jig-core's watch engine calls
-// `poll` on a timer, saves the state it returns, and sends the result to the agent once. Each spec says which system it is
-// for, and the adapter of that system polls it. This kind was jig-git's `github`; the GitHub rules moved with it, and
-// GitLab and Jenkins have probes of their own.
+// The watch kind `ops-ci`: waits in the background until a CI run ends, whatever the CI system. jig-core's watch engine
+// calls `poll` on a timer, saves the state it returns, and sends the result to the agent once. Each spec says which
+// system it is for, and the adapter of that system polls it. This kind was jig-git's `github`; the GitHub rules moved
+// with it, and GitLab and Jenkins have probes of their own.
 //
-// The spec holds the name of a service and what to follow, never an address, a project or a job: each poll finds those in
-// the catalog as it is now, so a watch always reads where the catalog says, and a saved watch file cannot point it elsewhere.
+// The spec holds the name of a service and what to follow, never an address, a project or a job: each poll finds those
+// in the catalog as it is now, so a watch always reads where the catalog says, and a saved watch file cannot point it
+// elsewhere.
 import { jig } from "../../../jig-core/src/client.ts";
 import type { JigApi, PollOutcome, WatchKind } from "../../../jig-core/src/contract.ts";
 import { catalogOf, findCiService, notSetUp } from "../catalog.ts";
@@ -71,6 +72,9 @@ async function pollCi(
 ): Promise<PollOutcome<CiState>> {
     const catalog = catalogOf(jig().config.section("ops"));
     if (catalog === undefined) throw notSetUp();
+    // A saved watch is read from a file, so the system in it is checked before it is used.
+    if (!Object.hasOwn(SYSTEMS, spec.system))
+        throw new Error(`a watch of CI system ${JSON.stringify(spec.system)} cannot be polled`);
     const service = findCiService(catalog, "ci watch", spec.service);
     if (service.ci.system !== spec.system) {
         throw new Error(

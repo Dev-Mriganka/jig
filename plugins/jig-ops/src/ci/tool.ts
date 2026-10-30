@@ -6,8 +6,8 @@
 //
 // The CI host is `external` unless the catalog names the jig-core environment it is in (`ci.environment`), and then the
 // rules of that environment apply: a CI server that is production gets masked reads and no writes. An action the CI
-// system of the service does not have, a parameter it does not take, and a service nobody configured are refused in classify
-// with a TypeError, so jig-core blocks the call without asking.
+// system of the service does not have, a parameter it does not take, and a service nobody configured are refused in
+// classify with a TypeError, so jig-core blocks the call without asking.
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { jig } from "../../../jig-core/src/client.ts";
 import type { CallClass, Preview } from "../../../jig-core/src/contract.ts";
@@ -23,8 +23,8 @@ import { contextFor, CI_KIND } from "./watch.ts";
 import type { CiWatchOptions } from "./watch.ts";
 
 const DESCRIPTION =
-    "CI for a service from the ops catalog, on GitHub Actions, GitLab CI or Jenkins: status, runs, run, log, rerun (asks), " +
-    "trigger (asks), and watch, which waits in the background until a finish line and reports once.";
+    "CI for a service from the ops catalog, on GitHub Actions, GitLab CI or Jenkins: status, runs, run, log, " +
+    "rerun (asks), trigger (asks), and watch, which waits in the background until a finish line and reports once.";
 
 type Input = Readonly<Record<string, unknown>>;
 
@@ -45,7 +45,8 @@ function checkUnchanged(toolCallId: string, call: Call, plan: Plan): void {
     if (approved?.fingerprint === undefined || plan.preview.fingerprint === undefined) return;
     if (approved.fingerprint === plan.preview.fingerprint) return;
     throw new Error(
-        `ci ${call.action} of ${call.service.name} changed since the preview; run it again to see the new preview. Nothing was sent`,
+        `ci ${call.action} of ${call.service.name} changed since the preview; ` +
+            "run it again to see the new preview. Nothing was sent",
     );
 }
 
@@ -146,7 +147,7 @@ export function createCiTool(options: CiWatchOptions & { announce: Announce }): 
             promptSnippet:
                 "ci: status, runs, log, rerun, trigger and watch for a service's CI (GitHub Actions, GitLab, Jenkins)",
             promptGuidelines: [
-                "ci: after a push or a pull request a watch starts by itself for a service in the catalog; do not poll with status.",
+                "ci: a push or pull request starts a watch by itself for a catalog service; do not poll with status.",
                 "ci: rerun and trigger ask the user. When a reply is lost, check once and never send again.",
             ],
             parameters,

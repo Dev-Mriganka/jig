@@ -1,6 +1,6 @@
-// Job logs from any CI system: cleaned, cut down to what a person would look at, and scrubbed of anything that looks like
-// a credential. A CI system already masks the secrets a project registered; the scrub here is a second net for the tokens
-// a failing step printed by accident.
+// Job logs from any CI system: cleaned, cut down to what a person would look at, and scrubbed of anything that looks
+// like a credential. A CI system already masks the secrets a project registered; the scrub here is a second net for the
+// tokens a failing step printed by accident.
 import { clean } from "../values.ts";
 
 /** The first `maxLines` lines. `cut` counts the lines left out, so the caller can say how to see the rest. */
@@ -53,7 +53,7 @@ export function redactLog(text: string): string {
 const ERROR_LINE = /##\[error\]|^Error:|\bFAILED\b|\bfatal:|Traceback \(most recent call last\)/;
 
 /**
- * The part of a failed log worth reading first: the lines leading up to the first error and the error itself, or the end
+ * The part of a failed log worth reading first: the lines leading up to the first error and the error itself, or the
  * of the log when nothing says "error". Cut to `maxLines` lines and `maxChars` characters.
  */
 export function failureExcerpt(log: string, maxLines = 20, maxChars = 2000): string {

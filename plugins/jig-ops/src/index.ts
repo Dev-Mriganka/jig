@@ -1,6 +1,6 @@
-// Pi entry point of jig-ops. The factory only registers: the `ops` section, the tools' declarations and the watch kinds go
-// to jig-core, the tools go to Pi, and the listener for pushes goes to Pi's event bus. Nothing is read from a cluster or a
-// CI server until a call is made.
+// Pi entry point of jig-ops. The factory only registers: the `ops` section, the tools' declarations and the watch
+// kinds go to jig-core, the tools go to Pi, and the listener for pushes goes to Pi's event bus. Nothing is read from
+// a cluster or a CI server until a call is made.
 import type { ExtensionAPI, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { withJig } from "../../jig-core/src/client.ts";
 import { validateOps } from "./catalog.ts";

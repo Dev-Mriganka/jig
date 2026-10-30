@@ -1,6 +1,6 @@
 // GitHub, through the `gh` command. gh keeps its own sign-in, so this plugin never sees a token: it starts gh from an
-// argument list through jig-core, and reads what gh prints. Reads use gh's JSON output or `gh api`; a write that may have
-// reached GitHub without its answer reaching us is checked once and never sent again.
+// argument list through jig-core, and reads what gh prints. Reads use gh's JSON output or `gh api`; a write that may
+// have reached GitHub without its answer reaching us is checked once and never sent again.
 //
 // The repository is always named (`-R owner/name`, or a path under `repos/`), from the catalog. gh is started in no
 // repository of ours, so what it reads cannot depend on the folder Pi happens to be in.
@@ -134,8 +134,13 @@ export async function apiJson<T>(path: string, options: GhOptions = {}): Promise
 function mayHaveLanded(result: RunResult): boolean {
     if (result.timedOut) return true;
     if (result.code === 0) return false;
-    const reasons =
-        /timed? ?out|deadline exceeded|connection (?:reset|closed|aborted)|broken pipe|unexpected eof|\beof\b|hung up|tls handshake|HTTP 5\d\d|\b50[0-4]\b/i;
+    const reasons = new RegExp(
+        [
+            "timed? ?out|deadline exceeded|connection (?:reset|closed|aborted)|broken pipe|unexpected eof|\\beof\\b",
+            "hung up|tls handshake|HTTP 5\\d\\d|\\b50[0-4]\\b",
+        ].join("|"),
+        "i",
+    );
     return reasons.test(result.stderr);
 }
 
@@ -143,8 +148,8 @@ export type Sent = { kind: "sent"; result: RunResult } | { kind: "lost"; why: st
 
 /**
  * Runs a gh command that changes something on GitHub. A definite failure throws. When the answer was lost (a timeout, a
- * broken connection, a gateway error, a cancelled call) the request may have landed, so this returns `lost` and the caller
- * checks once; it never runs the command again.
+ * broken connection, a gateway error, a cancelled call) the request may have landed, so this returns `lost` and the
+ * caller checks once; it never runs the command again.
  */
 export async function ghWrite(what: string, args: readonly string[], options: GhOptions = {}): Promise<Sent> {
     let result: RunResult;

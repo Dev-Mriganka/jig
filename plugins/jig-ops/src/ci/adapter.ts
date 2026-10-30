@@ -21,7 +21,7 @@ export type CiAction = (typeof CI_ACTIONS)[number];
 export const FINISHES = ["required", "check", "run", "approved", "merged", "comment", "tag", "release"] as const;
 export type FinishName = (typeof FINISHES)[number];
 
-/** The parameters of a call besides `action` and `service`, each checked. An action reads only the ones its row names. */
+/** The parameters of a call besides `action` and `service`, each checked. An action reads only its row's. */
 export interface Params {
     /** A pull request number. */
     number?: number;
@@ -44,7 +44,6 @@ export interface Params {
     check?: string;
     pattern?: string;
     bot?: string;
-    timeoutMinutes?: number;
 }
 
 export interface ActionRow {
@@ -98,7 +97,7 @@ export interface CiAdapter {
     rerun?(params: Params): Promise<Plan>;
     trigger?(params: Params): Promise<Plan>;
     watch?(params: Params): Promise<WatchPlan>;
-    /** One poll of a watch this adapter planned. A throw is a failed poll: the engine counts three and pauses the watch. */
+    /** One poll of a watch this adapter planned. A throw is a failed poll; the engine counts three and pauses. */
     poll(spec: CiSpec, previous: CiState | undefined): Promise<PollOutcome<CiState>>;
 }
 

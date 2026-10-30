@@ -1,11 +1,12 @@
-// The GitHub Actions adapter: the checks, runs and logs of a repository on GitHub, through `gh`. It was jig-git's `checks`
-// tool. Reads are plain; `rerun` changes GitHub and is previewed; `watch` plans a watch that the kind in watch.ts polls.
+// The GitHub Actions adapter: the checks, runs and logs of a repository on GitHub, through `gh`. It was jig-git's
+// `checks` tool. Reads are plain; `rerun` changes GitHub and is previewed; `watch` plans a watch that the kind in
+// watch.ts polls.
 //
-// Pass, fail, pending and skipped are the four words for a check everywhere. A failed job's log is cut to its tail or to
-// the lines that match a search, capped at 400 lines, and scrubbed of anything that looks like a credential.
+// Pass, fail, pending and skipped are the four words for a check everywhere. A failed job's log is cut to its tail or
+// to the lines that match a search, capped at 400 lines, and scrubbed of anything that looks like a credential.
 //
-// There is no `trigger`: starting a workflow by hand can deploy, and deploys have their own tool and their own rules. The
-// `workflow` of the catalog narrows `runs` to one workflow.
+// There is no `trigger`: starting a workflow by hand can deploy, and deploys have their own tool and their own rules.
+// The `workflow` of the catalog narrows `runs` to one workflow.
 import type { CiService } from "../catalog.ts";
 import { digest, InputError, plural } from "../values.ts";
 import type { Outcome } from "../values.ts";
@@ -386,7 +387,8 @@ function githubActions(service: CiService, ctx: CiContext): CiAdapter {
                 fingerprint: digest("ci rerun", service.name, slug, id, found.attempt, failedOnly),
             },
             send: async () => {
-                const done = `Started a rerun of ${failedOnly ? "the failed jobs of " : ""}run #${id} (${found.name}) in ${slug}.`;
+                const what = failedOnly ? "the failed jobs of " : "";
+                const done = `Started a rerun of ${what}run #${id} (${found.name}) in ${slug}.`;
                 const sent = await ghWrite(
                     "gh run rerun",
                     ["run", "rerun", String(id), ...(failedOnly ? ["--failed"] : []), ...flags],
@@ -435,7 +437,8 @@ function githubActions(service: CiService, ctx: CiContext): CiAdapter {
             default:
                 finish = { kind, pattern: compiled(params.pattern, kind) };
         }
-        // The commit to watch is fixed now, so the watch is about what exists today and not about a branch that moves on.
+        // The commit to watch is fixed now, so the watch is about what exists today and not about a branch that moves
+        // on.
         const needsCommit = finish.kind === "required" || finish.kind === "check";
         const spec: GithubSpec = { system: "github-actions", service: service.name, finish };
         if (params.number !== undefined) spec.pr = params.number;

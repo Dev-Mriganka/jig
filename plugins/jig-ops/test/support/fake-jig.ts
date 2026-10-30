@@ -1,12 +1,14 @@
 // A stand-in for jig-core's run-time API, published on the same process-wide slot, so the plugin runs as it would under
-// jig-core. Only what jig-ops uses is real: the tools' declarations, the `ops` section, facts, the kind of an environment,
-// the approved preview of a call, the watch kinds and the watches it starts, and `exec.run`, which starts real programs from
-// an argument list with a short environment, as jig-core does. The programs are the fake kubectl and helm, found through a
-// PATH that starts with their folder.
+// jig-core. Only what jig-ops uses is real: the tools' declarations, the `ops` section, facts, the kind of an
+// environment, the approved preview of a call, the watch kinds and the watches it starts, secrets, sign-in services and
+// transports, and `exec.run`, which starts real programs from an argument list with a short environment, as jig-core
+// does. The programs are the fake kubectl, helm and gh, found through a PATH that starts with their folders.
 //
-// `exec.run` follows jig-core's rules where they matter to this plugin: no shell, the input on standard input, output cut
-// at `maxOutputBytes` with a marker, a program that runs too long ends with code 124 and `timedOut`, a missing program or
-// a stopped call is an error.
+// `exec.run` follows jig-core's rules where they matter to this plugin: no shell, the input on standard input, output
+// cut at `maxOutputBytes` with a marker, a program that runs too long ends with code 124 and `timedOut`, a missing
+// program or a stopped call is an error. A secret, a sign-in service or a transport that is not there is an error that
+// does not repeat what was asked, and every credential handed out is remembered in `issued`, so a test can check that
+// none of them reaches a result.
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { publishJig, withdrawJig } from "../../../jig-core/src/client.ts";

@@ -1,7 +1,7 @@
 // What a CI system says about a check, a job or a stage, in one shape. GitHub check runs (Actions and apps), commit
-// statuses (older CI systems) and the rows of `gh pr checks`, GitLab jobs and Jenkins stages all become a `Check` with one
-// of four buckets: pass, fail, pending or skipped. A check that is still running is never a pass, and a cancelled one is a
-// failure.
+// statuses (older CI systems) and the rows of `gh pr checks`, GitLab jobs and Jenkins stages all become a `Check` with
+// one of four buckets: pass, fail, pending or skipped. A check that is still running is never a pass, and a cancelled
+// one is a failure.
 
 export type Bucket = "pass" | "fail" | "pending" | "skipped";
 
@@ -135,9 +135,9 @@ export interface Judgement {
 }
 
 /**
- * Whether the checks that matter have passed. `required` names them; without names, every reported check matters. A required
- * check that has not been reported yet is pending, not absent: a build that has not started is not a build that passed. The
- * first failure among the relevant checks decides at once.
+ * Whether the checks that matter have passed. `required` names them; without names, every reported check matters. A
+ * required check that has not been reported yet is pending, not absent: a build that has not started is not a build
+ * that passed. The first failure among the relevant checks decides at once.
  */
 export function judge(checks: readonly Check[], required: readonly string[]): Judgement {
     const missing: string[] = [];

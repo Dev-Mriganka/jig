@@ -147,8 +147,12 @@ What the tests could not settle:
   [Job](https://javadoc.jenkins.io/hudson/model/Job.html)): a build's result "may be
   null if the build is ongoing", `isBuilding` is true until it is completed, and the
   timestamp is when it was scheduled. The results are `SUCCESS`, `UNSTABLE`,
-  `FAILURE`, `NOT_BUILT` and `ABORTED`. `tree=` limits the fields of a reply, with
-  `{0,10}` for a range.
+  `FAILURE`, `NOT_BUILT` and `ABORTED`.
+- **The API help page every Jenkins server serves** at `.../api/` (read on a public
+  server, [example](https://hub.spigotmc.org/jenkins/job/BuildTools/6/api)): `tree=`
+  limits the fields of a reply, with `jobs[name]{0,10}` for a range, and the console
+  of a running build is read in pieces with `start` and the `X-Text-Size` and
+  `X-More-Data` headers (not used: the tool reads a finished build's console whole).
 - **Stages** ([Pipeline REST API plugin](https://plugins.jenkins.io/pipeline-rest-api/)):
   `/job/<name>/<run>/wfapi/describe` has `stages`, each with `id`, `name`, `status`,
   `startTimeMillis` and `durationMillis`.

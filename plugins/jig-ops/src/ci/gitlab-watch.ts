@@ -105,7 +105,7 @@ function where(pipeline: Pipeline): string {
     return `pipeline #${pipeline.id} (${pipeline.ref} at ${pipeline.sha.slice(0, 7)})`;
 }
 
-/** The sources the artifact rules read, for a pipeline: its jobs and their logs. GitLab has no pull request comments here. */
+/** The sources the artifact rules read for a pipeline: its jobs and their logs. No pull request comments here. */
 function sourcesOf(api: GitlabApi, checks: readonly Check[]): ArtifactSources {
     return {
         checks: async () => checks,
@@ -159,7 +159,9 @@ async function evaluate(
         const others = failing.length - 1;
         return {
             outcome: "failed",
-            summary: `Job ${first.name} ${ending(first)} in ${where(pipeline)}${others > 0 ? ` (and ${others} more failing)` : ""}`,
+            summary:
+                `Job ${first.name} ${ending(first)} in ${where(pipeline)}` +
+                (others > 0 ? ` (and ${others} more failing)` : ""),
             details: await failureDetails(api, first),
             links: links(failing),
             facts: facts(relevant, pipeline),

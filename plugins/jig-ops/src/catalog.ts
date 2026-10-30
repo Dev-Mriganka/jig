@@ -292,13 +292,16 @@ function ciServiceOf(service: Service): CiService | undefined {
 export function findCiService(catalog: Catalog, who: string, name: unknown): CiService {
     const found = typeof name === "string" ? catalog.services.get(name) : undefined;
     const withCi = [...catalog.services.values()].flatMap((service) => ciServiceOf(service) ?? []);
-    const known = withCi.length === 0 ? "none have one" : shortList(withCi.map((service) => `${service.name} (${service.ci.system})`));
+    const named = withCi.map((service) => `${service.name} (${service.ci.system})`);
+    const known = withCi.length === 0 ? "none have one" : shortList(named);
     if (found === undefined) {
         throw new InputError(`${who}: no service named ${shown(name, 30)}. Services with a ci entry: ${known}`);
     }
     const service = ciServiceOf(found);
     if (service === undefined) {
-        throw new InputError(`${who}: ${found.name} has no ci entry in the catalog. Services with a ci entry: ${known}`);
+        throw new InputError(
+            `${who}: ${found.name} has no ci entry in the catalog. Services with a ci entry: ${known}`,
+        );
     }
     return service;
 }

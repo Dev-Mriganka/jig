@@ -1,6 +1,7 @@
-// A fake Jenkins: the remote access API paths that the adapter uses, answering from a world a test changes as it goes. A POST
-// needs the CSRF crumb the crumb issuer handed out, and the cookie it set, as Jenkins with a crumb issuer wants; without a
-// crumb issuer the world answers 404 there and takes any POST. The user and API token are checked as basic authentication.
+// A fake Jenkins: the remote access API paths that the adapter uses, answering from a world a test changes as it goes.
+// A POST needs the CSRF crumb the crumb issuer handed out, and the cookie it set, as Jenkins with a crumb issuer wants;
+// without a crumb issuer the world answers 404 there and takes any POST. The user and API token are checked as basic
+// authentication.
 import type { Answer, Recorded, Responder } from "./fake-server.ts";
 
 export interface JkBuild {

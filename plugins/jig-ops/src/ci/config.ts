@@ -2,12 +2,13 @@
 // has its own fields, and a closed list of systems: a new adapter is a file beside this one and a name in CI_SYSTEMS.
 //
 //   { "system": "github-actions", "workflow": "build.yml" }
-//   { "system": "gitlab",  "url": "https://gitlab.example.com", "project": "acme/orders-api", "auth": { "token": "pass:ci/gitlab" } }
+//   { "system": "gitlab", "url": "https://gitlab.example.com", "project": "acme/orders-api",
+//     "auth": { "token": "pass:ci/gitlab" } }
 //   { "system": "jenkins", "url": "https://jenkins.example.com", "job": "orders/build",
 //     "auth": { "user": "ci-bot", "token": "pass:ci/jenkins" } }
 //
-// A credential is only ever a reference to a secret. An error about it never repeats the value: a mistake there may well
-// be the secret itself, pasted by hand.
+// A credential is only ever a reference to a secret. An error about it never repeats the value: a mistake there may
+// well be the secret itself, pasted by hand.
 import { isObject, shown } from "../values.ts";
 
 export const CI_SYSTEMS = ["github-actions", "gitlab", "jenkins"] as const;
@@ -109,7 +110,8 @@ function checkUrl(value: unknown, at: string, secure: boolean, errors: string[])
     // The address is never repeated below: a user name and password in it are credentials.
     if (url.protocol !== "https:" && (secure || url.protocol !== "http:")) {
         errors.push(
-            `${at}: must start with ${secure ? "https://, because a credential travels with every request" : "http:// or https://"}`,
+            `${at}: must start with ` +
+                (secure ? "https://, because a credential travels with every request" : "http:// or https://"),
         );
         return undefined;
     }

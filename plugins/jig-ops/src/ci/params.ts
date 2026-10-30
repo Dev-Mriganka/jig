@@ -1,9 +1,9 @@
-// The parameters of the `ci` tool, and the checks that turn them into a Call. Everything that reaches `gh` or the network
-// has passed through parseCall: the service is the catalog's, which names the repository, the project or the job, and every
-// other value has a known shape and size. parseCall does no I/O.
+// The parameters of the `ci` tool, and the checks that turn them into a Call. Everything that reaches `gh` or the
+// network has passed through parseCall: the service is the catalog's, which names the repository, the project or the
+// job, and every other value has a known shape and size. parseCall does no I/O.
 //
-// What a call may carry depends on the action and on the CI system of the service, so the rows of the adapter's table are
-// the check: a parameter the action does not take is refused, and so is an action the system does not have.
+// What a call may carry depends on the action and on the CI system of the service, so the rows of the adapter's table
+// are the check: a parameter the action does not take is refused, and so is an action the system does not have.
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import { findCiService, notSetUp } from "../catalog.ts";
@@ -24,7 +24,7 @@ export const parameters = Type.Object(
         action: StringEnum(CI_ACTIONS, { description: "status, runs, run, log, rerun, trigger or watch" }),
         service: Type.String({
             description:
-                "A service from the ops catalog that has a ci entry. An unknown name is refused with the ones there are",
+                "A service from the ops catalog that has a ci entry. An unknown name is refused with the known ones",
         }),
         number: Type.Optional(Type.Integer({ minimum: 1, description: "A pull request number (GitHub Actions)." })),
         branch: Type.Optional(
@@ -86,14 +86,19 @@ export const parameters = Type.Object(
             }),
         ),
         parameters: Type.Optional(
-            Type.Record(Type.String(), Type.String(), {
-                description: `trigger: variables or build parameters, name to value (at most ${MAX_PARAMETERS}).`,
-            }),
+            Type.Object(
+                {},
+                {
+                    additionalProperties: Type.String(),
+                    description: `trigger: variables or build parameters, name to value (at most ${MAX_PARAMETERS}).`,
+                },
+            ),
         ),
         finish: Type.Optional(
             StringEnum(FINISHES, {
                 description:
-                    "watch: when it ends. required (default), check (the one in check), run (run_id); GitHub also approved, merged, comment, tag, release.",
+                    "watch: when it ends. required (default), check (the one in check), run (run_id); " +
+                    "GitHub also approved, merged, comment, tag, release.",
             }),
         ),
         check: Type.Optional(
@@ -186,7 +191,7 @@ function flag(action: CiAction, value: unknown, name: string): boolean {
     return value;
 }
 
-/** Variables or build parameters: a name and a one-line value each. They go to a CI system, so both are closed in shape. */
+/** Variables or build parameters: a name and a one-line value each. They go to a CI system, so both are checked. */
 function variables(action: CiAction, value: unknown): Record<string, string> {
     if (typeof value !== "object" || value === null || Array.isArray(value)) {
         fail(action, `parameters must be an object of names and values (got ${shown(value)})`);

@@ -1,8 +1,9 @@
-// The GitLab CI adapter: the pipelines, jobs and job logs of a project, through GitLab's REST API (v4). Reads are plain;
-// `rerun` retries the failed jobs of a pipeline and `trigger` creates a pipeline, and both are previewed and sent once.
+// The GitLab CI adapter: the pipelines, jobs and job logs of a project, through GitLab's REST API (v4). Reads are
+// plain; `rerun` retries the failed jobs of a pipeline and `trigger` creates a pipeline, and both are previewed and
+// sent once.
 //
-// GitLab has no "rerun everything": its retry runs the failed or cancelled jobs of a pipeline again, so `failed_only: false`
-// is refused, and `trigger` on the same ref is the way to run it all.
+// GitLab has no "rerun everything": its retry runs the failed or cancelled jobs of a pipeline again, so `failed_only:
+// false` is refused, and `trigger` on the same ref is the way to run it all.
 import { digest, InputError, oneLine, plural } from "../values.ts";
 import type { Outcome } from "../values.ts";
 import type { ActionTable, CiAdapter, CiContext, CiSystemInfo, Params, Plan, WatchPlan } from "./adapter.ts";
@@ -118,9 +119,10 @@ function gitlab(service: CiService, ctx: CiContext): CiAdapter {
         if (params.state !== undefined) filters.status = params.state;
         const found = await api.pipelines(filters);
         if (found.length === 0) return { text: `No pipelines match in ${where}.`, facts: {}, details: { ids: [] } };
-        const lines = found.map((pipeline) =>
-            `${describePipeline(pipeline).padEnd(48)} ${pipeline.source ?? ""}  ${(pipeline.created_at ?? "").slice(0, 16)}`.trimEnd(),
-        );
+        const lines = found.map((pipeline) => {
+            const created = (pipeline.created_at ?? "").slice(0, 16);
+            return `${describePipeline(pipeline).padEnd(48)} ${pipeline.source ?? ""}  ${created}`.trimEnd();
+        });
         return {
             text: `${where}: ${plural(found.length, "pipeline")}\n${lines.join("\n")}`,
             facts: {},
@@ -142,7 +144,12 @@ function gitlab(service: CiService, ctx: CiContext): CiAdapter {
         const jobs = await api.jobs(id);
         const out = [
             `Pipeline #${pipeline.id}: ${pipeline.status}`,
-            `${pipeline.ref} at ${short(pipeline.sha)}, ${pipeline.source ?? "unknown source"}; ${pipeline.web_url ?? ""}`.trimEnd(),
+            [
+                `${pipeline.ref} at ${short(pipeline.sha)}, ${pipeline.source ?? "unknown source"};`,
+                pipeline.web_url ?? "",
+            ]
+                .join(" ")
+                .trimEnd(),
             ...jobs.map(jobLine),
         ];
         return {
@@ -243,19 +250,27 @@ function gitlab(service: CiService, ctx: CiContext): CiAdapter {
     async function trigger(params: Params): Promise<Plan> {
         const ref = params.ref as string;
         const variables = Object.entries(params.parameters ?? {}).sort(([a], [b]) => (a < b ? -1 : 1));
-        // The newest pipeline of the ref is part of what the user approved: if another appears while they read, ask again.
+        // The newest pipeline of the ref is part of what the user approved: if another appears while they read, ask
+        // again.
         const latest = (await api.pipelines({ ref, per_page: 1 }))[0];
+        const shownVariables =
+            variables.length === 0
+                ? "none"
+                : variables.map(([key, value]) => `${key}=${oneLine(value, 80)}`).join(", ");
         const body = [
             `Service:   ${service.name} (GitLab project ${where})`,
             `Ref:       ${ref}`,
-            `Variables: ${variables.length === 0 ? "none" : variables.map(([key, value]) => `${key}=${oneLine(value, 80)}`).join(", ")}`,
-            `Latest on this ref: ${latest === undefined ? "none" : `${describePipeline(latest)}`}`,
+            `Variables: ${shownVariables}`,
+            `Latest on this ref: ${latest === undefined ? "none" : describePipeline(latest)}`,
             "",
-            "A new pipeline is created once. If the reply is lost, whether it was created is checked once and it is not created again.",
+            "A new pipeline is created once. If the reply is lost, whether it was created is checked once,",
+            "and it is not created again.",
         ].join("\n");
         return {
             preview: {
-                summary: `create a pipeline on ${ref} in ${where}${variables.length > 0 ? ` with ${plural(variables.length, "variable")}` : ""}`,
+                summary:
+                    `create a pipeline on ${ref} in ${where}` +
+                    (variables.length > 0 ? ` with ${plural(variables.length, "variable")}` : ""),
                 body,
                 format: "text",
                 fingerprint: digest("ci trigger", service.name, where, ref, variables, latest?.id ?? null),
@@ -266,7 +281,12 @@ function gitlab(service: CiService, ctx: CiContext): CiAdapter {
                         ? undefined
                         : { variables: variables.map(([key, value]) => ({ key, value, variable_type: "env_var" })) };
                 const created = (pipeline: Pipeline) =>
-                    `Created pipeline #${pipeline.id} on ${pipeline.ref} (${pipeline.status}) in ${where}: ${pipeline.web_url ?? ""}`.trimEnd();
+                    [
+                        `Created pipeline #${pipeline.id} on ${pipeline.ref} (${pipeline.status}) in ${where}:`,
+                        pipeline.web_url ?? "",
+                    ]
+                        .join(" ")
+                        .trimEnd();
                 // A pipeline newer than the one the user saw is taken to be the one this call created.
                 const lost = (why: string) =>
                     afterLostReply("GitLab create pipeline", why, "GitLab", async () => {
@@ -302,7 +322,8 @@ function gitlab(service: CiService, ctx: CiContext): CiAdapter {
             case "check":
                 if (params.check === undefined) {
                     throw new InputError(
-                        "ci watch with finish check needs check, the name of the job. Usage: ci watch {service, finish: check, check, ...}",
+                        "ci watch with finish check needs check, the name of the job. " +
+                            "Usage: ci watch {service, finish: check, check, ...}",
                     );
                 }
                 finish = { kind: "jobs", names: [params.check] };

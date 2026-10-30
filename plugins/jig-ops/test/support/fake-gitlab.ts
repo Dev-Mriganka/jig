@@ -1,7 +1,7 @@
-// A fake GitLab: the endpoints of the REST API (v4) that the adapter uses, answering from a world a test changes as it goes.
-// Pipelines are listed newest first and filtered by `ref`, `sha` and `status`; jobs and traces are kept by id. A retry puts
-// the failed jobs back to pending, and a create adds a pipeline. The token is checked as GitLab checks it: a request
-// without the right one gets 401.
+// A fake GitLab: the endpoints of the REST API (v4) that the adapter uses, answering from a world a test changes as it
+// goes. Pipelines are listed newest first and filtered by `ref`, `sha` and `status`; jobs and traces are kept by id. A
+// retry puts the failed jobs back to pending, and a create adds a pipeline. The token is checked as GitLab checks it: a
+// request without the right one gets 401.
 import type { Answer, Recorded, Responder } from "./fake-server.ts";
 
 export interface GlPipeline {

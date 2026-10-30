@@ -1,5 +1,6 @@
 // GitLab's REST API (v4), for the adapter and the watch: the requests they make, what the replies hold, and how a job's
-// status becomes one of the four words (pass, fail, pending, skipped). The project is the catalog's; a call never names one.
+// status becomes one of the four words (pass, fail, pending, skipped). The project is the catalog's; a call never names
+// one.
 import { InputError } from "../values.ts";
 import type { CiContext } from "./adapter.ts";
 import type { GitlabConfig } from "./config.ts";
@@ -51,7 +52,7 @@ export function fullSha(value: string, who: string): string {
     return value.toLowerCase();
 }
 
-/** One job as a check. A job that failed but may fail (`allow_failure`) does not fail the pipeline, so it does not fail here. */
+/** One job as a check. A job that may fail (`allow_failure`) does not fail the pipeline, so it does not fail here. */
 export function jobCheck(job: GitlabJob): Check {
     const status = job.status;
     let conclusion: string;

@@ -1,11 +1,11 @@
-// The Jenkins half of the CI watch: a build that finished, or the pipeline stages that must pass. jig-core's watch engine
-// calls `poll` on a timer, saves the state it returns and sends the result to the agent.
+// The Jenkins half of the CI watch: a build that finished, or the pipeline stages that must pass. jig-core's watch
+// engine calls `poll` on a timer, saves the state it returns and sends the result to the agent.
 //
 //   build    the build ends (its result is set and it is no longer running)
 //   stages   the named stages all pass, or the first of them fails. A build that ends without them is a failure
 //
-// A build is found by its number, or, with none, as the first one scheduled after the watch began. The spec holds the name
-// of the service and never the address or the job: each poll finds them in the catalog as it is now.
+// A build is found by its number, or, with none, as the first one scheduled after the watch began. The spec holds the
+// name of the service and never the address or the job: each poll finds them in the catalog as it is now.
 import type { PollOutcome, WatchResult } from "../../../jig-core/src/contract.ts";
 import { duration } from "../values.ts";
 import type { CiContext } from "./adapter.ts";
@@ -38,7 +38,7 @@ export interface JenkinsSpec {
 /** A Jenkins server and the agent may disagree on the time by a few seconds. */
 const SKEW_MS = 10_000;
 
-/** One line naming what is watched, such as "build #12 of orders-api" or "stage test of the next build of orders-api". */
+/** One line naming what is watched, such as "build #12 of orders-api" or "stage test of the next build of x". */
 export function titleOf(spec: JenkinsSpec): string {
     const build =
         spec.build !== undefined ? `build #${spec.build} of ${spec.service}` : `the next build of ${spec.service}`;
@@ -109,9 +109,10 @@ async function evaluate(
         relevant = judgement.relevant;
         if (judgement.verdict === "fail") {
             const first = judgement.failing[0] as Check;
+            const ending = first.detail === "failed" ? "failed" : `ended as ${first.detail}`;
             return {
                 outcome: "failed",
-                summary: `Stage ${first.name} ${first.detail === "failed" ? "failed" : `ended as ${first.detail}`} in ${where(job, build)}`,
+                summary: `Stage ${first.name} ${ending} in ${where(job, build)}`,
                 details: await failureDetails(api, build),
                 links,
                 facts: facts(relevant, build),

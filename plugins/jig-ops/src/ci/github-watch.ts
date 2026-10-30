@@ -1,6 +1,6 @@
-// The GitHub half of the CI watch: what to poll on GitHub, and when the watch is done. jig-core's watch engine calls `poll`
-// on a timer, saves the state it returns, and sends the result to the agent. A watch never ends on "all checks": its
-// finish line is named when it starts.
+// The GitHub half of the CI watch: what to poll on GitHub, and when the watch is done. jig-core's watch engine calls
+// `poll` on a timer, saves the state it returns, and sends the result to the agent. A watch never ends on "all checks":
+// its finish line is named when it starts.
 //
 //   required   the checks that branch protection requires, or every check when nothing is required
 //   check      one named check, such as the job that builds the image
@@ -9,9 +9,9 @@
 //   comment    a bot comment that matches a pattern
 //   tag, release   a new tag or release whose name matches a pattern
 //
-// Every request is a `gh api` call with the ETag of the last answer (see github-checks.ts). The spec holds the name of the
-// service and never its repository: each poll finds the repository in the catalog as it is now, so a saved watch file
-// cannot point a poll at another one.
+// Every request is a `gh api` call with the ETag of the last answer (see github-checks.ts). The spec holds the name of
+// the service and never its repository: each poll finds the repository in the catalog as it is now, so a saved watch
+// file cannot point a poll at another one.
 import type { Facts, PollOutcome, WatchResult } from "../../../jig-core/src/contract.ts";
 import type { CiContext } from "./adapter.ts";
 import { addArtifacts } from "./artifacts.ts";
@@ -132,7 +132,9 @@ async function failedChecks(
     const others = judgement.failing.length - 1;
     return {
         outcome: "failed",
-        summary: `Check ${first.name} ${ending(first)} for ${subject(spec, sha)}${others > 0 ? ` (and ${others} more failing)` : ""}`,
+        summary:
+            `Check ${first.name} ${ending(first)} for ${subject(spec, sha)}` +
+            (others > 0 ? ` (and ${others} more failing)` : ""),
         details: await failureDetails(slug, first, signal),
         links: links(judgement.failing),
         facts: checkFacts(judgement.relevant),
@@ -149,7 +151,7 @@ interface Poll {
     signal: AbortSignal;
 }
 
-/** The PR and the head commit a checks watch looks at. A pull request that moved on ends the watch. */
+/** The PR and the head commit a GitHub watch of checks looks at. A pull request that moved on ends the watch. */
 async function pullAndSha(poll: Poll): Promise<{ pull?: PullInfo; sha?: string; moved?: WatchResult }> {
     const { spec, slug, get } = poll;
     const pull = spec.pr === undefined ? undefined : (await get(`repos/${slug}/pulls/${spec.pr}`, compactPull)).value;
@@ -173,7 +175,9 @@ async function pullAndSha(poll: Poll): Promise<{ pull?: PullInfo; sha?: string; 
             sha,
             moved: {
                 outcome: "stopped",
-                summary: `Pull request ${spec.pr} moved on to ${pull.head.slice(0, 7)}; this watch followed ${spec.sha.slice(0, 7)}`,
+                summary:
+                    `Pull request ${spec.pr} moved on to ${pull.head.slice(0, 7)}; ` +
+                    `this watch followed ${spec.sha.slice(0, 7)}`,
             },
         };
     }
@@ -300,7 +304,8 @@ async function pollPull(poll: Poll, finish: Extract<Finish, { kind: "pr" }>): Pr
     if (reviews.approved.length > 0) {
         return {
             outcome: "passed",
-            summary: `Pull request ${spec.pr} was approved by ${reviews.approved.map((review) => review.login).join(", ")}`,
+            summary:
+                `Pull request ${spec.pr} was approved by ` + reviews.approved.map((review) => review.login).join(", "),
             links: [pull.url],
         };
     }

@@ -1,7 +1,7 @@
-// The one request function of the CI adapters that speak HTTP (GitLab and Jenkins). A request is described by the adapter,
-// and it travels one of two ways: straight to the CI server over HTTPS, or through a transport that a company plugin
-// registered. Everything above this file builds the same request and reads the same reply, so the adapters never know
-// which way it went, nor how the sign-in works.
+// The one request function of the CI adapters that speak HTTP (GitLab and Jenkins). A request is described by the
+// adapter, and it travels one of two ways: straight to the CI server over HTTPS, or through a transport that a company
+// plugin registered. Everything above this file builds the same request and reads the same reply, so the adapters never
+// know which way it went, nor how the sign-in works.
 //
 // Credentials are resolved when a request is made and live only in this file's local variables. No message made here
 // holds one: an error names what failed (a status, an error code) and never the headers or the body that were sent.
@@ -53,7 +53,7 @@ export interface SenderOptions {
 }
 
 /**
- * Why a request got no usable reply. `lost` means the server may have acted on it: the reply was cut off, or never came.
+ * Why a request got no usable reply. `lost` means the server may have acted on it: the reply was cut off or never came.
  * A write that ends this way is never sent again (see `lostReply` in the adapters).
  */
 export class RequestFailure extends Error {

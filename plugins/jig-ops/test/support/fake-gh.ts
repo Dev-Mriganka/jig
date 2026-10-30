@@ -1,10 +1,10 @@
 // A fake `gh`: an executable script first on PATH that answers from fixtures and logs every call. Nothing here reaches
 // GitHub. A fixture names the leading words of a call (`pr view`, `api`) and substrings that must appear among its
-// other arguments or its standard input (`commits/abc/check-runs`, `resolveReviewThread`; a leading `=` means an argument
-// that is exactly that), and gives one reply, or a list of replies that are used in turn (the last
-// one repeats). For `gh api -i` the script prints a status line and headers like the real gh does, and a request whose
-// `If-None-Match` header equals the fixture's `etag` gets the `304` answer the real gh gives: the headers, then
-// `gh: HTTP 304` on standard error and exit code 1.
+// other arguments or its standard input (`commits/abc/check-runs`, `resolveReviewThread`; a leading `=` means an
+// argument that is exactly that), and gives one reply, or a list of replies that are used in turn (the last one
+// repeats). For `gh api -i` the script prints a status line and headers like the real gh does, and a request whose
+// `If-None-Match` header equals the fixture's `etag` gets the `304` answer the real gh gives: the headers, then `gh:
+// HTTP 304` on standard error and exit code 1.
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";

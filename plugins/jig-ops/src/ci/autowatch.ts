@@ -1,7 +1,8 @@
-// The watch that starts by itself. jig-git announces a push and a new pull request on Pi's event bus as `jig-git:pushed`
-// ({ repo, branch, sha, pr? }), and this listens: when a service of the catalog has that repository and a CI entry, the CI
-// run of the pushed commit is watched, so nobody has to ask "is it done?". A newer push to the same branch replaces the
-// watch of the older commit: its result would only be about a commit that is no longer the head.
+// The watch that starts by itself. jig-git announces a push and a new pull request on Pi's event bus as
+// `jig-git:pushed` ({ repo, branch, sha, pr? }), and this listens: when a service of the catalog has that repository
+// and a CI entry, the CI run of the pushed commit is watched, so nobody has to ask "is it done?". A newer push to the
+// same branch replaces the watch of the older commit: its result would only be about a commit that is no longer the
+// head.
 //
 // jig-git cannot import this plugin, and this plugin never reads jig-git's files: the event is the whole contract. What
 // arrives on the bus is untrusted input, so the payload is checked before anything is done with it.
@@ -124,14 +125,14 @@ export function createAutoWatch(now: () => number = Date.now): AutoWatch {
     };
 }
 
-/** Listens for pushes on Pi's event bus. A payload or a catalog that cannot be used starts nothing, and breaks nothing. */
+/** Listens for pushes on Pi's event bus. A payload or catalog that cannot be used starts nothing and breaks nothing. */
 export function listenForPushes(pi: ExtensionAPI, auto: AutoWatch): void {
     pi.events.on(PUSHED_EVENT, (payload: unknown) => {
         try {
             auto.handle(payload);
         } catch {
-            // jig-core may not be loaded yet, or may refuse to start a watch outside a session. The push itself is done,
-            // and the agent can still start the watch with the ci tool.
+            // jig-core may not be loaded yet, or may refuse to start a watch outside a session. The push itself is
+            // done, and the agent can still start the watch with the ci tool.
         }
     });
 }

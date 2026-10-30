@@ -1,8 +1,8 @@
 // A fake CI server, in two forms that answer from the same responder:
 //   - a server on 127.0.0.1 for a catalog entry that signs in directly, so real requests cross a real socket;
 //   - a transport, registered on the fake jig-core, for an entry that names one.
-// Both record what they were sent. A responder decides each answer, and it can answer with a timeout, a stall or a reset
-// connection, as a server under load does.
+// Both record what they were sent. A responder decides each answer, and it can answer with a timeout, a stall or a
+// reset connection, as a server under load does.
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import type { Transport } from "../../../jig-core/src/contract.ts";

@@ -1,6 +1,6 @@
-// A harness with a fake CI server behind it, for the tests of the GitLab and Jenkins adapters: the plugin loaded into a fake Pi,
-// a catalog entry that names `https://ci.example.test`, and a real server on 127.0.0.1 that answers it (or a transport that
-// answers it). The server is closed when the test ends.
+// A harness with a fake CI server behind it, for the tests of the GitLab and Jenkins adapters: the plugin loaded into a
+// fake Pi, a catalog entry that names `https://ci.example.test`, and a real server on 127.0.0.1 that answers it (or a
+// transport that answers it). The server is closed when the test ends.
 import type { TestContext } from "node:test";
 import { setupHarness } from "./harness.ts";
 import type { Harness } from "./harness.ts";
