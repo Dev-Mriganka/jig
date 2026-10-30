@@ -183,6 +183,7 @@ Each removal is one line to the agent and a notice to you.
 | `jig().sandbox.register(provider)` | The sandbox says it is active and answers `canWrite(path)` |
 | `exec.run` checks `canWrite` | A program in a folder the sandbox lets bash write is refused, so a planted `git` never runs outside |
 | `/jig` and session start | Say whether bash is sandboxed, and in which network mode |
+| `bash` action `outside` | Classified as a local write that asks; allowed without asking only by a rule naming `bash`, action `outside` and a command pattern; refused with no screen; recorded |
 
 ## What the earlier sandbox and the spike taught
 
