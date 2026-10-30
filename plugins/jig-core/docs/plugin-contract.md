@@ -38,6 +38,7 @@ closed instead of running ungoverned.
 | `signIn`, `transports` | A company's sign-in service or transport, by name (see [Sign-in services and transports](sign-in-and-transports.md)) |
 | `mask.text`, `mask.value` | The masker, for a tool that masks its own results (see [Masking](masking.md)) |
 | `watches` | `registerKind`, `start`, `list` and `stop` (see [Watches](watches.md)) |
+| `environments` | `kindOf(name)`: the kind of an environment (`local`, `external`, `test` or `production`), built in, configured or added by a company plugin. A name nobody defined counts as production. A tool uses it to refuse an action by kind, such as never in production, whatever a company names its environments |
 | `config` | What a company plugin adds at start-up (`addEnvironments`, `addRules`, `addClassifyRules`, `addMaskFields`), and a plugin's own section (`registerSection`, `section`) |
 | `exec` | `run` and `git`, which start programs without a shell (see [Running programs](running-programs.md)) |
 

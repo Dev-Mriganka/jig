@@ -243,6 +243,18 @@ describe("the API that plugins get", () => {
         await second.fire("session_shutdown", { reason: "quit" }, fakeContext().ctx);
     });
 
+    test("environments.kindOf names the kind of any environment, and an unknown one counts as production", () => {
+        const { api } = load();
+        assert.equal(api.environments.kindOf("local"), "local");
+        assert.equal(api.environments.kindOf("external"), "external");
+        assert.equal(api.environments.kindOf("production"), "production");
+        assert.equal(api.environments.kindOf("nobody-defined-this"), "production");
+        api.config.addEnvironments({ staging: { kind: "test" }, prod: { kind: "production" } });
+        assert.equal(api.environments.kindOf("staging"), "test");
+        assert.equal(api.environments.kindOf("prod"), "production");
+        withdrawJig(api);
+    });
+
     test("declareTool checks what it is given, and declaring a tool again replaces it", () => {
         const { api } = load();
         assert.throws(() => api.declareTool({ tool: "", plugin: "p", classify: () => undefined }), TypeError);

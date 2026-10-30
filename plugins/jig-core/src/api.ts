@@ -41,6 +41,10 @@ export function buildApi(state: JigState): JigApi {
             resolve: (ref, signal) => state.secrets.resolve(ref, signal),
         },
 
+        environments: {
+            kindOf: (name) => state.policy().environments.kindOf(name),
+        },
+
         transports: {
             register: (name, transport) => state.transports.register(name, transport),
             request: (name, request, signal) => state.transports.request(name, request, signal),

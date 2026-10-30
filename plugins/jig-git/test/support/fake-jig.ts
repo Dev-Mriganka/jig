@@ -205,6 +205,9 @@ export function installFakeJig(): FakeJig {
             register: () => {},
             headers: async () => ({}),
         },
+        environments: {
+            kindOf: (name: string) => (name === "local" || name === "external" ? name : name === "production" || name === "prod" ? "production" : "test"),
+        },
         transports: {
             register: () => {},
             request: async () => {

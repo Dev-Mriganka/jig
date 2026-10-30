@@ -233,6 +233,14 @@ export interface JigApi {
 
     /** Transports a company plugin provides for its systems. A tool configured with a transport's name sends its HTTP
      *  requests through it instead of calling the network itself. */
+    /** What jig-core knows about environments, so a tool can refuse an action by kind, such as never in production,
+     *  whatever a company names its environments. */
+    readonly environments: {
+        /** The kind of an environment name: built in, configured or added by a company plugin. A name nobody defined
+         *  counts as production. */
+        kindOf(name: EnvironmentName): EnvironmentKind;
+    };
+
     readonly transports: {
         /** Registering the same name again replaces the transport. */
         register(name: string, transport: Transport): void;

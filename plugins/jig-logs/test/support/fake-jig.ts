@@ -90,6 +90,9 @@ export function installFakeJig(): FakeJig {
                 return value;
             },
         },
+        environments: {
+            kindOf: (name: string) => (name === "local" || name === "external" ? name : name === "production" || name === "prod" ? "production" : "test"),
+        },
         transports: {
             register: (name, transport) => void transports.set(name, transport),
             async request(name, request, signal): Promise<TransportResponse> {
