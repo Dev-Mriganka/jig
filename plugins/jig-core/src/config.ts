@@ -9,6 +9,9 @@
 // - The file is shared. Each other plugin keeps its settings in a section of its own (`git`, `lens`, ...) that it
 //   registers, together with a check. A top-level key that is neither jig-core's nor registered is an unknown field.
 //   A section that fails its check is lost on its own: the plugin uses its defaults, and jig-core's settings stay.
+// - A company plugin may give defaults for a plugin's section. The user's section is then checked laid over them, so a
+//   user writes only what they change; with no section of their own, the defaults must pass the check alone, and when
+//   they do not (a field only the user can give) the plugin is simply not configured and `/jig` says why.
 import { readFileSync } from "node:fs";
 import { errorMessage } from "./errors.ts";
 import { isObject } from "./kit/values.ts";
@@ -17,6 +20,7 @@ import type { Environments } from "./environments.ts";
 import type { ApprovalKind, ClassifyRule, Decision, Effect, EnvironmentConfig, Rule } from "./contract.ts";
 import { expandProtected, isListablePath, mergeProtected } from "./protected-paths.ts";
 import type { ProtectedPath, ProtectedSource } from "./protected-paths.ts";
+import { layered } from "./section-defaults.ts";
 
 /** The secret backends jig-core can resolve. `secrets.backends` chooses which of them are allowed. */
 export const SECRET_BACKENDS = ["pass", "env", "keychain", "op", "cmd", "file"] as const;
@@ -77,6 +81,18 @@ export const OWN_SECTIONS: readonly string[] = [
 /** A plugin's check of its own section: error messages that name the key, or an empty list when it is fine. */
 export type SectionCheck = (raw: unknown) => readonly string[];
 
+/** What a plugin's section is laid over, and where yours replaces instead of merging (see section-defaults.ts). */
+export interface SectionLayers {
+    /** The company's defaults, by section name. */
+    defaults: ReadonlyMap<string, unknown>;
+    /** The paths whose object of yours replaces the company's whole, by section name. */
+    replace: ReadonlyMap<string, readonly string[]>;
+    /** Per section, lists of paths that exclude each other; see `layered`. */
+    oneOf?: ReadonlyMap<string, readonly (readonly string[])[]>;
+}
+
+const NO_LAYERS: SectionLayers = { defaults: new Map(), replace: new Map() };
+
 const MAX_MESSAGE_CHARS = 300;
 
 // ---- reading the file --------------------------------------------------------------------------------------------
@@ -87,19 +103,28 @@ export interface LoadedConfig {
     found: boolean;
     config: JigConfig;
     problems: Problem[];
-    /** The plugin sections that were present and passed their checks, by name. */
+    /** The plugin sections that passed their checks, by name: yours, laid over the company's defaults when it gave some,
+     *  or the company's defaults alone when you have no section and they pass on their own. */
     sections: Map<string, unknown>;
+    /** Plugin sections that you have not written and whose company defaults are not valid alone, with the messages of
+     *  the check: the plugin is not configured until you add your part. Not a problem, only a fact for `/jig`. */
+    incomplete: Map<string, string[]>;
 }
 
 /** Reads and checks the file. Never throws: every failure becomes a problem, and the defaults apply. `checks` holds the
- *  sections plugins registered, by name. */
-export function loadConfigFile(file: string, checks: ReadonlyMap<string, SectionCheck> = new Map()): LoadedConfig {
+ *  sections plugins registered, by name, and `layers` what a company plugin gave them. */
+export function loadConfigFile(
+    file: string,
+    checks: ReadonlyMap<string, SectionCheck> = new Map(),
+    layers: SectionLayers = NO_LAYERS,
+): LoadedConfig {
     const failed = (problems: Problem[], found = true): LoadedConfig => ({
         file,
         found,
         config: defaultConfig(),
         problems,
-        sections: new Map(),
+        // A file that cannot be read still leaves the company's defaults.
+        ...companyOnly(checks, layers, new Set()),
     });
     let text: string;
     try {
@@ -117,7 +142,7 @@ export function loadConfigFile(file: string, checks: ReadonlyMap<string, Section
         // JSON.parse messages can quote the text, so say only that it is not valid.
         return failed([{ source: file, key: "(file)", message: "is not valid JSON" }]);
     }
-    return { file, found: true, ...parseConfig(value, file, checks) };
+    return { file, found: true, ...parseConfig(value, file, checks, layers) };
 }
 
 /**
@@ -128,7 +153,8 @@ export function parseConfig(
     value: unknown,
     source: string,
     checks: ReadonlyMap<string, SectionCheck> = new Map(),
-): { config: JigConfig; problems: Problem[]; sections: Map<string, unknown> } {
+    layers: SectionLayers = NO_LAYERS,
+): { config: JigConfig; problems: Problem[]; sections: Map<string, unknown>; incomplete: Map<string, string[]> } {
     const problems: Problem[] = [];
     const fail: Fail = (key, message) => problems.push({ source, key, message });
     const sectionProblems: Problem[] = [];
@@ -137,8 +163,9 @@ export function parseConfig(
 
     if (!isObject(value)) {
         fail("(file)", "must hold one JSON object");
-        return { config, problems, sections };
+        return { config, problems, ...companyOnly(checks, layers, new Set()) };
     }
+    const written = new Set<string>();
     for (const [key, raw] of Object.entries(value)) {
         if (OWN_SECTIONS.includes(key)) continue;
         const check = checks.get(key);
@@ -146,10 +173,13 @@ export function parseConfig(
             fail(printable(key), "is not a known field");
             continue;
         }
-        const messages = runSectionCheck(check, raw);
-        if (messages.length === 0) sections.set(key, raw);
-        else for (const message of messages) sectionProblems.push({ source, key: printable(key), message });
+        written.add(key);
+        const read = readSection(key, raw, check, layers);
+        if (read.use) sections.set(key, read.value);
+        for (const message of read.messages) sectionProblems.push({ source, key: printable(key), message });
     }
+    const company = companyOnly(checks, layers, written);
+    for (const [key, section] of company.sections) sections.set(key, section);
     if (value.environments !== undefined)
         config.environments = parseEnvironments(value.environments, "environments", fail);
     if (value.rules !== undefined) config.rules = parseRules(value.rules, "rules", fail);
@@ -164,7 +194,57 @@ export function parseConfig(
         config: problems.length === 0 ? config : defaultConfig(),
         problems: [...problems, ...sectionProblems],
         sections,
+        incomplete: company.incomplete,
     };
+}
+
+/** What a section of the file comes to: its value, whether the plugin gets it, and what is wrong with it. */
+interface SectionRead {
+    value: unknown;
+    use: boolean;
+    messages: string[];
+}
+
+/**
+ * Checks a section the user wrote. With company defaults it is checked laid over them, so the user writes only what
+ * they change; a section nobody gave defaults for is checked as it is. When the two do not fit and the section is
+ * complete without the defaults, it is used as written (the mismatch is still said); otherwise the plugin gets nothing.
+ */
+function readSection(name: string, raw: unknown, check: SectionCheck, layers: SectionLayers): SectionRead {
+    if (!layers.defaults.has(name)) {
+        const messages = runSectionCheck(check, raw);
+        return { value: raw, use: messages.length === 0, messages };
+    }
+    const merged = layered(layers.defaults.get(name), raw, layers.replace.get(name), layers.oneOf?.get(name));
+    const messages = runSectionCheck(check, merged);
+    if (messages.length === 0) return { value: merged, use: true, messages };
+    const said = `the company defaults for "${printable(name)}", with your settings laid over them, are not valid: `;
+    const alone = runSectionCheck(check, raw).length === 0;
+    const why = `${said}${messages.join("; ")}${alone ? " (your own section is used as you wrote it)" : ""}`;
+    return { value: raw, use: alone, messages: [why.slice(0, 2 * MAX_MESSAGE_CHARS)] };
+}
+
+/**
+ * The sections for which the user wrote nothing, and a company plugin gave defaults: the defaults alone, when they pass
+ * the plugin's check. When they do not (a field only the user can give), the plugin is not configured, and that is not
+ * an error: `incomplete` says so, for `/jig`. `written` names the sections the file has.
+ */
+function companyOnly(
+    checks: ReadonlyMap<string, SectionCheck>,
+    layers: SectionLayers,
+    written: ReadonlySet<string>,
+): { sections: Map<string, unknown>; incomplete: Map<string, string[]> } {
+    const sections = new Map<string, unknown>();
+    const incomplete = new Map<string, string[]>();
+    for (const [name, defaults] of layers.defaults) {
+        if (written.has(name)) continue;
+        const check = checks.get(name);
+        // Nobody registered the section, so there is nothing to check it by.
+        const messages = check === undefined ? [] : runSectionCheck(check, defaults);
+        if (messages.length === 0) sections.set(name, defaults);
+        else incomplete.set(name, messages);
+    }
+    return { sections, incomplete };
 }
 
 /** Runs a plugin's check. The check is code from another package: whatever it does, the result is a list of messages. */

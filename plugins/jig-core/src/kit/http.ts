@@ -246,6 +246,24 @@ function fromTransport(reply: TransportResponse, maxBytes: number): HttpResponse
     return responseOf(reply.status, headers, splitCookies(headers["set-cookie"]), bytes, truncated);
 }
 
+/** The headers a request carries before a credential is added: the caller's defaults, replaced by its own headers of the
+ *  same name (ignoring case). `defaults` names the ones (in lower case) that are still a default, which a credential's
+ *  header replaces without a clash. */
+function requestHeaders(request: HttpRequest): { headers: Record<string, string>; defaults: Set<string> } {
+    const headers: Record<string, string> = {};
+    const put = (name: string, value: string): void => {
+        for (const given of Object.keys(headers)) if (given.toLowerCase() === name.toLowerCase()) delete headers[given];
+        headers[name] = value;
+    };
+    for (const [name, value] of Object.entries(request.defaultHeaders ?? {})) put(name, value);
+    const defaults = new Set(Object.keys(headers).map((name) => name.toLowerCase()));
+    for (const [name, value] of Object.entries(request.headers ?? {})) {
+        put(name, value);
+        defaults.delete(name.toLowerCase());
+    }
+    return { headers, defaults };
+}
+
 /** Checks the shape of `auth` and returns its one kind. */
 function authKind(auth: HttpAuth): string {
     if (!isObject(auth)) throw invalid("auth must be an object with one credential source");
@@ -358,9 +376,17 @@ export function createHttp(deps: HttpDeps): JigApi["http"] {
                 if (!text(name)) throw invalid("auth.signIn must name a sign-in service");
                 try {
                     // Asked for every request: the service decides when its token has expired.
+                    // It signs the request as it will be sent: the method, the headers (without this credential)
+                    // and the body, and not only the address.
                     const headers = await deps.signIn.headers(
                         name,
-                        { system: request.system, url: request.url },
+                        {
+                            system: request.system,
+                            url: request.url,
+                            method: request.method,
+                            headers: requestHeaders(request).headers,
+                            ...(request.body === undefined ? {} : { body: request.body }),
+                        },
                         caller,
                     );
                     return { headers: { ...headers }, query: [], secrets: credentialsOf(headers) };
@@ -418,18 +444,7 @@ export function createHttp(deps: HttpDeps): JigApi["http"] {
             throw new HttpError("timeout", "the time ran out before it was sent", true);
         }
         // The defaults first, then the request's own, which replace a default of the same name (ignoring case).
-        const headers: Record<string, string> = {};
-        const put = (name: string, value: string): void => {
-            for (const given of Object.keys(headers))
-                if (given.toLowerCase() === name.toLowerCase()) delete headers[given];
-            headers[name] = value;
-        };
-        for (const [name, value] of Object.entries(request.defaultHeaders ?? {})) put(name, value);
-        const defaults = new Set(Object.keys(headers).map((name) => name.toLowerCase()));
-        for (const [name, value] of Object.entries(request.headers ?? {})) {
-            put(name, value);
-            defaults.delete(name.toLowerCase());
-        }
+        const { headers, defaults } = requestHeaders(request);
         if (credential !== undefined) {
             for (const [name, value] of Object.entries(credential.headers)) {
                 const lower = name.toLowerCase();
@@ -440,7 +455,8 @@ export function createHttp(deps: HttpDeps): JigApi["http"] {
                     throw invalid(`header ${name} is set by the sign-in, so the request cannot have it too`);
                 }
                 // The credential's header replaces the request's, and a default's, of the same name.
-                put(name, value);
+                for (const given of Object.keys(headers)) if (given.toLowerCase() === lower) delete headers[given];
+                headers[name] = value;
             }
         }
 

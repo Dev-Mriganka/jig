@@ -228,6 +228,13 @@ export function readOps(raw: unknown): { catalog?: Catalog; errors: string[] } {
     return errors.length > 0 ? { errors } : { errors, catalog: { services, watch, artifacts } };
 }
 
+/**
+ * Where an object of yours replaces a company's whole, when a company plugin gives defaults for the section: each of
+ * these is one choice among several (a CI sign-in of `{ token }` or `{ signIn }`; a deploy by `helm` or by
+ * `kubectl-image`), and merging two choices would give a mix that is neither.
+ */
+export const OPS_REPLACE: readonly string[] = ["services.*.ci.auth", "services.*.environments.*.deploy"];
+
 /** The error messages for a raw section, for `registerSection`. An empty list means the section is valid. */
 export function validateOps(raw: unknown): string[] {
     return readOps(raw).errors;

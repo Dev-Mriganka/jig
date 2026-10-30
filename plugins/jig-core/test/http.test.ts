@@ -1,7 +1,7 @@
 // `http.request`: the one request function that plugins call, with a credential that jig-core reads for them.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import type { HttpRequest, HttpResponse, TransportRequest, TransportResponse } from "../src/contract.ts";
+import type { HttpRequest, HttpResponse, SignInRequest, TransportRequest, TransportResponse } from "../src/contract.ts";
 import { createHttp, isHttpError } from "../src/kit/http.ts";
 import type { HttpError } from "../src/kit/http.ts";
 
@@ -22,6 +22,7 @@ function rig(options: { now?: () => number } = {}) {
     const asked: string[] = [];
     const redacted: string[] = [];
     const signedIn: Array<{ name: string; system: string; url: string }> = [];
+    const signedWith: SignInRequest[] = [];
     const services = new Map<string, Record<string, string>>();
     const transports = new Map<string, (request: TransportRequest) => Promise<TransportResponse> | TransportResponse>();
 
@@ -51,6 +52,7 @@ function rig(options: { now?: () => number } = {}) {
                 const headers = services.get(name);
                 if (headers === undefined) throw new Error(`no sign-in service is named "${name}"`);
                 signedIn.push({ name, system: request.system, url: request.url });
+                signedWith.push(request);
                 return headers;
             },
         },
@@ -70,7 +72,7 @@ function rig(options: { now?: () => number } = {}) {
     });
     const ok = (body = "{}", status = 200, headers: Record<string, string> = {}): Response =>
         new Response(body, { status, headers });
-    return { http, sent, replies, secrets, asked, redacted, signedIn, services, transports, ok };
+    return { http, sent, replies, secrets, asked, redacted, signedIn, signedWith, services, transports, ok };
 }
 
 const base: HttpRequest = { system: "orders", url: "https://api.staging.example.com/v1/orders?page=2", method: "GET" };
@@ -393,6 +395,52 @@ describe("signIn", () => {
             { name: "corp-sso", system: "orders", url: base.url },
             { name: "corp-sso", system: "orders", url: base.url },
         ]);
+    });
+
+    test("tells the service the method, the headers the request will carry without the credential, and the body", async () => {
+        const t = rig();
+        t.services.set("corp-sso", { Authorization: `Bearer ${TOKEN}` });
+        t.replies.push(t.ok(), t.ok(), t.ok());
+        await t.http.request({ ...base, auth: { signIn: "corp-sso" } });
+        await t.http.request({
+            ...base,
+            method: "POST",
+            defaultHeaders: { Accept: "text/plain", "User-Agent": "jig-test" },
+            headers: { accept: "application/json", "Content-Type": "application/json" },
+            body: '{"a":1}',
+            auth: { signIn: "corp-sso" },
+        });
+        const bytes = new Uint8Array([1, 2, 3]);
+        await t.http.request({ ...base, method: "PUT", body: bytes, auth: { signIn: "corp-sso" } });
+
+        const [get, post, put] = t.signedWith;
+        assert.deepEqual(get, { system: "orders", url: base.url, method: "GET", headers: {} });
+        assert.ok(!("body" in (get as object)), "a request with no body has no body key");
+        assert.equal(post?.method, "POST");
+        assert.deepEqual(
+            { ...post?.headers },
+            { "User-Agent": "jig-test", accept: "application/json", "Content-Type": "application/json" },
+            "the request's own header replaces a default of the same name, ignoring case; no credential",
+        );
+        assert.equal(post?.body, '{"a":1}');
+        assert.equal(put?.method, "PUT");
+        assert.equal(put?.body, bytes, "bytes are passed as they are");
+        // What the server received is what the service was told.
+        assert.equal(t.sent[1]?.init.body, post?.body);
+        assert.equal(t.sent[1]?.init.method, post?.method);
+    });
+
+    test("a header the credential replaces is still in the headers the service signs, and is replaced when sent", async () => {
+        const t = rig();
+        t.services.set("corp-sso", { Authorization: `Bearer ${TOKEN}` });
+        t.replies.push(t.ok());
+        await t.http.request({
+            ...base,
+            headers: { Authorization: "Bearer from-the-caller" },
+            auth: { signIn: "corp-sso" },
+        });
+        assert.equal(t.signedWith[0]?.headers.Authorization, "Bearer from-the-caller");
+        assert.equal(t.sent[0]?.headers.authorization, `Bearer ${TOKEN}`);
     });
 
     test("an unknown service stops the request with auth_failed", async () => {

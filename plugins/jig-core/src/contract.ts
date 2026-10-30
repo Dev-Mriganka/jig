@@ -175,13 +175,28 @@ export interface RunResult {
     timedOut: boolean;
 }
 
-/** One request a sign-in service authenticates. */
+/**
+ * One request a sign-in service authenticates: everything a service that signs the request itself (an HMAC scheme, AWS
+ * Signature Version 4) needs to sign it as it will be sent, so a POST is not signed as a GET.
+ */
 export interface SignInRequest {
     /** The system, as the tool calls it, such as `jira` or `logs`. */
     system: string;
+    /** The full URL, with its query, as it will be called. */
     url: string;
+    /** The method the request will use. */
+    method: HttpMethod;
+    /** The headers the request will carry: the caller's defaults, replaced by its own headers of the same name, and
+     *  never the credential this service is about to give. The network adds its own (`Host`, `Content-Length`, and a
+     *  `Content-Type` of `text/plain;charset=UTF-8` for a text body that has none), so a service that signs a
+     *  `Content-Type` returns it among its headers. Names keep the case the caller wrote. */
+    headers: Readonly<Record<string, string>>;
+    /** The body as it will be sent: text or bytes, and absent when the request has none. Do not change it. */
+    body?: string | Uint8Array;
 }
 
+/** Gives the headers that authenticate one request. It is asked for every request, and decides when a token has run
+ *  out. A service that signs the request reads `method`, `url`, `headers` and `body` of the `SignInRequest`. */
 export interface SignInService {
     headers(request: SignInRequest, signal?: AbortSignal): Promise<Readonly<Record<string, string>>>;
 }
@@ -203,14 +218,34 @@ export interface TransportResponse {
     body: string;
 }
 
+/** What a tunnel's port is: `forward` reaches one host and port, `socks` reaches any host the far side can. */
+export type TunnelKind = "forward" | "socks";
+
 /** A local port that reaches a host the machine cannot reach directly, such as a database behind a bastion. */
 export interface Tunnel {
+    /**
+     * What the port is. `forward` (the default, for a provider that does not say): the port on 127.0.0.1 reaches the one
+     * host and port that was asked for, and the tool connects to it as to that host (an SSH local forward, a cloud port
+     * forward). `socks`: the port on 127.0.0.1 is a SOCKS5 proxy that reaches any host the far side can, and the tool
+     * connects to its real hosts through it (a SOCKS proxy on a jump host, `ssh -D`). A tool that needs several hosts, such
+     * as the members of a replica set, needs `socks`.
+     */
+    kind?: TunnelKind;
     /** The port on 127.0.0.1 to connect to. */
     port: number;
     close(): void | Promise<void>;
 }
 
-/** Opens tunnels for a company, such as an SSH forward through its jump host or a cloud port forward. */
+/** A tunnel as `tunnels.open` returns it: its kind is always set. */
+export interface OpenedTunnel extends Tunnel {
+    kind: TunnelKind;
+}
+
+/**
+ * Opens tunnels for a company, such as an SSH forward through its jump host or a cloud port forward. `target` is where
+ * the tool is going. A `forward` tunnel reaches exactly that; a `socks` tunnel reaches whatever the tool asks it for, and
+ * the target only tells the provider which route to open (which jump host, which region).
+ */
 export interface TunnelProvider {
     open(target: { host: string; port: number }, signal?: AbortSignal): Promise<Tunnel>;
 }
@@ -354,8 +389,9 @@ export interface JigApi {
     readonly tunnels: {
         /** Registering the same name again replaces the provider. */
         register(name: string, provider: TunnelProvider): void;
-        /** Opens a tunnel through a registered provider. Throws when no provider has this name. */
-        open(name: string, target: { host: string; port: number }, signal?: AbortSignal): Promise<Tunnel>;
+        /** Opens a tunnel through a registered provider. Throws when no provider has this name, or when the tunnel it
+         *  gives is not valid. A tunnel whose provider did not say its kind is a `forward`. */
+        open(name: string, target: { host: string; port: number }, signal?: AbortSignal): Promise<OpenedTunnel>;
     };
 
     /** Transports a company plugin provides for its systems. A tool configured with a transport's name sends its HTTP
@@ -422,13 +458,33 @@ export interface JigApi {
         addMaskFields(fields: readonly string[]): void;
         /** A plugin's own section of jig.json, such as `git` or `lens`. jig-core reports a top-level key that
          *  neither jig-core nor a plugin registered as an unknown field. `validate` returns error messages that
-         *  name the key; with errors, `section()` returns undefined and the plugin uses its defaults. */
-        registerSection(name: string, validate: (raw: unknown) => readonly string[]): void;
+         *  name the key; with errors, `section()` returns undefined and the plugin uses its defaults.
+         *
+         *  When a company plugin gave defaults for the section (`addSectionDefaults`), `validate` is given the user's
+         *  section laid over them, so the user writes only what they change, and a field that only the user can give
+         *  may be missing from the defaults.
+         *
+         *  `replace` names keys whose object in the user's section replaces the company's whole instead of merging
+         *  into it. Use it where an object is one choice among several, such as an `auth` of `{ transport }` or of
+         *  `{ token }`: merged, the two would make a mix that is neither. A key is a path from the section's root,
+         *  with `*` for any one name: `auth`, `backend.auth`, `services.*.ci.auth`.
+         *
+         *  `oneOf` lists keys in one object that exclude each other, such as `["backend.auth", "backend.transport"]`:
+         *  when the user's section sets one of them, the company's value for the others is dropped. */
+        registerSection(
+            name: string,
+            validate: (raw: unknown) => readonly string[],
+            options?: { replace?: readonly string[]; oneOf?: readonly (readonly string[])[] },
+        ): void;
         /** A company plugin's defaults for a plugin's section, such as its log backend or its service catalog. Your own
-         *  section in jig.json is laid over them: objects merge key by key, and any other value of yours replaces
-         *  theirs. The merged section is checked by the plugin's own validation. */
+         *  section in jig.json is laid over them: objects merge key by key, any other value of yours replaces theirs,
+         *  and a key the plugin named in `registerSection`'s `replace` is replaced whole. The result is checked by the
+         *  plugin's own validation. With no section of your own, the defaults alone are checked: when they are not
+         *  valid (a field only the user can give is missing), the plugin is not configured, no problem is reported,
+         *  and `/jig` says the company defaults are incomplete. */
         addSectionDefaults(name: string, defaults: unknown): void;
-        /** The section as loaded at the last session start, after validation. Undefined when absent or invalid. */
+        /** The section as loaded at the last session start, after validation: the user's, laid over the company's
+         *  defaults when it gave some. Undefined when absent or invalid. */
         section(name: string): unknown;
     };
 

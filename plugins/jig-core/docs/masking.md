@@ -12,6 +12,7 @@ debuggable. The code is in `src/mask/`.
 |---|---|
 | Email addresses | `email#3fa9c1` |
 | Phone numbers: in a phone field, written with `+` and a country code, or in a North American format | `phone#3fa9c1-0132`. The last four digits stay, so a number can still be matched to a ticket |
+| SIP addresses (`sipUri`) and contact fields that hold a scalar (`primaryContact`) | `personal#3fa9c1` |
 | Names in name fields, usernames and logins | `name#3fa9c1`, `user#3fa9c1` |
 | Public IP addresses, IPv4 and IPv6 | `ip#3fa9c1` |
 | Card numbers: in a card field, or digit groups that pass the Luhn check | `card ****1111` |
@@ -28,6 +29,19 @@ How it decides:
 - **Field names are judged by their words.** `crmAccountId` is crm, account, id,
   never a substring such as `mac`. A last word that describes a value
   (`phoneType`, `emailVerified`) keeps the field out of the rules.
+- **Telephone numbers are found by their telecom names.** All are phone fields.
+  - **A number word with "number":** `faxNumber`, `smsNumber`, `mobileNumber`,
+    `cellNumber`, `didNumber`, `dialedNumber`, `dialableNumber`, `callerNumber`,
+    `contactNumber`, `destinationNumber`, `originatingNumber`, `portedNumber`.
+  - **The whole name, when it is short:** `tn`, `did`, `ani`, `dnis`, `cli`, `btn`,
+    `fax`, `mobile`, `cell`. Matched only as the whole name, so `client` is not
+    `cli` and `cellTower` is not a number.
+  - **The word `tn` anywhere:** `tnList`, `portingTn`.
+  - **`callerId`** is a number although it ends in `id`; `callerIdName` is a name.
+- **A contact field masks only a scalar.** `contact`, `billToContact` and any
+  name ending in `contact` become `personal#` tokens when they hold text or a
+  number. When they hold an object, its own fields decide, so a `billToContact`
+  record keeps its country and its ids.
 - **Text is scanned as well.** That covers JSON inside a log line, URL query
   strings, `key=value` pairs and free text, with percent-encoding decoded up to
   three layers. Names are found by field name only: a name written inside a

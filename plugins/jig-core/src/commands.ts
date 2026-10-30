@@ -102,10 +102,15 @@ export function statusLines(state: JigState): string[] {
     ];
     const sections = [...state.sectionChecks.keys()];
     if (sections.length > 0) {
-        const shown = sections.map(
-            (name) => `${name} (${state.personal.sections.has(name) ? "loaded" : "not set or invalid"})`,
-        );
+        const shown = sections.map((name) => `${name} (${sectionState(state, name)})`);
         lines.push(`Plugin sections in the file: ${shown.join(", ")}`);
+    }
+    // Not an error: a company gave defaults that lack something only you can give, so the plugin waits for it.
+    for (const [name, messages] of state.personal.incomplete) {
+        lines.push(
+            `Company defaults for "${name}" are incomplete without a section of yours, so the plugin is not configured: ` +
+                `${messages.slice(0, 3).join("; ")}${messages.length > 3 ? `; and ${messages.length - 3} more` : ""}`,
+        );
     }
     if (problems.length > 0)
         lines.push(`Configuration problems (${problems.length}):`, ...problems.map((problem) => `  ${problem}`));
@@ -113,6 +118,12 @@ export function statusLines(state: JigState): string[] {
     const watchProblem = state.watches.problem();
     if (watchProblem !== undefined) lines.push(`Watches: ${watchProblem}`);
     return lines;
+}
+
+/** What `/jig` says about one registered section. */
+function sectionState(state: JigState, name: string): string {
+    if (state.personal.sections.has(name)) return "loaded";
+    return state.personal.incomplete.has(name) ? "company defaults incomplete" : "not set or invalid";
 }
 
 /** `Open watches: 3 (1 paused, 1 waiting for its plugin)`: each watch not finished, and why some do not poll. */

@@ -3,7 +3,7 @@
 // a cluster or a CI server until a call is made.
 import type { ExtensionAPI, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { withJig } from "../../jig-core/src/client.ts";
-import { validateOps } from "./catalog.ts";
+import { OPS_REPLACE, validateOps } from "./catalog.ts";
 import { createAutoWatch, listenForPushes } from "./ci/autowatch.ts";
 import { createCiTool } from "./ci/tool.ts";
 import { registerCiWatch } from "./ci/watch.ts";
@@ -28,7 +28,7 @@ export function jigOps(options: OpsOptions = {}): ExtensionFactory {
         // jig-core may load after this plugin; withJig waits for it.
         // What the tools declare is how jig-core classifies them.
         withJig((api) => {
-            api.config.registerSection("ops", validateOps);
+            api.config.registerSection("ops", validateOps, { replace: OPS_REPLACE });
             api.declareTool({ tool: "runtime", plugin: "jig-ops", classify: runtime.classify });
             api.declareTool({ tool: "deploy", plugin: "jig-ops", classify: deploy.classify, preview: deploy.preview });
             api.declareTool({ tool: "ci", plugin: "jig-ops", classify: ci.classify, preview: ci.preview });

@@ -1,5 +1,6 @@
 // The SSH route: the argument list ssh gets, and the life of the key file, with a fake `ssh` on PATH that behaves as ssh does for a
-// local forward. The `tunnel` route, which waits for a company plugin, reports that no provider is registered.
+// local forward. The `tunnel` route is a company plugin's tunnel, a forward or a SOCKS proxy; without a provider it reports that
+// none is registered.
 import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -46,6 +47,7 @@ afterEach(() => {
 
 const deps = (extra: Partial<RouteDeps> = {}): RouteDeps => ({
     run: (file, args, options) => jig.api.exec.run(file, args, options),
+    openTunnel: (name, target, signal) => jig.api.tunnels.open(name, target, signal),
     resolveSecret: (reference, signal) => jig.api.secrets.resolve(reference, signal),
     freePort,
     probe,
@@ -55,6 +57,13 @@ const deps = (extra: Partial<RouteDeps> = {}): RouteDeps => ({
     lifetimeMs: 60_000,
     ...extra,
 });
+
+/**
+ * A probe that finds nothing listening, for the tests where the forward must NOT come up. `freePort` hands out a port that is free
+ * for a moment; in a full run other test files open servers on port 0 at the same time, and one of them can be given the same
+ * port. The real probe would then connect to it and call that a forward that works, and a call that has to fail would succeed.
+ */
+const nobodyListens: Partial<RouteDeps> = { probe: async () => false };
 
 const start = async (extra: Partial<RouteDeps> = {}, signal?: AbortSignal): Promise<Forward> => {
     const forward = await startForward(route, target, deps(extra), signal);
@@ -152,7 +161,7 @@ describe("the key file", () => {
     test("is deleted when ssh fails, whatever the failure", async () => {
         for (const mode of ["denied", "hostkey", "unreachable", "badkey"] as const) {
             ssh.mode(mode);
-            await assert.rejects(startForward(route, target, deps()), RouteError, mode);
+            await assert.rejects(startForward(route, target, deps(nobodyListens)), RouteError, mode);
             assert.deepEqual(leftBehind(), [], mode);
         }
     });
@@ -160,7 +169,7 @@ describe("the key file", () => {
     test("is deleted when the forward never comes up, and ssh is stopped", async () => {
         ssh.mode("silent");
         await assert.rejects(
-            startForward(route, target, deps({ readyTimeoutMs: 300 })),
+            startForward(route, target, deps({ ...nobodyListens, readyTimeoutMs: 300 })),
             /did not become ready in time/,
         );
         assert.deepEqual(leftBehind(), []);
@@ -170,7 +179,7 @@ describe("the key file", () => {
     test("is deleted when the call is cancelled while ssh starts", async () => {
         ssh.mode("silent");
         const controller = new AbortController();
-        const pending = startForward(route, target, deps(), controller.signal);
+        const pending = startForward(route, target, deps(nobodyListens), controller.signal);
         // Once ssh has been started: a fixed delay would be too short on a busy machine.
         await waitUntil(() => jig.started.length > 0, "ssh was started");
         controller.abort();
@@ -222,7 +231,7 @@ describe("the forward", () => {
         for (const [mode, pattern] of Object.entries(expected)) {
             ssh.mode(mode as "denied");
             await assert.rejects(
-                startForward(route, target, deps()),
+                startForward(route, target, deps(nobodyListens)),
                 (error: unknown) =>
                     error instanceof RouteError &&
                     pattern.test(error.message) &&
@@ -238,7 +247,7 @@ describe("the forward", () => {
         process.env.PATH = "";
         try {
             await assert.rejects(
-                startForward(route, target, deps()),
+                startForward(route, target, deps(nobodyListens)),
                 /could not start: ssh is not installed or not on PATH/,
             );
         } finally {
@@ -260,5 +269,79 @@ describe("the tunnel route", () => {
         assert.equal(jig.started.length, 0, "nothing was started");
         assert.equal(existsSync(path.join(scratch, "x")), false);
         assert.deepEqual(leftBehind(), []);
+    });
+});
+
+describe("a company's tunnel", () => {
+    const tunnel = { kind: "tunnel", name: "corp-net" } as const;
+
+    test("is opened by name for the database host, and gives its kind and its port", async () => {
+        const asked: HostPort[] = [];
+        for (const [kind, expected] of [
+            ["forward", "forward"],
+            ["socks", "socks"],
+            [undefined, "forward"],
+        ] as const) {
+            jig.api.tunnels.register("corp-net", {
+                open: async (host) => {
+                    asked.push(host);
+                    return { ...(kind === undefined ? {} : { kind }), port: 41_777, close: () => {} };
+                },
+            });
+            const forward = await startForward(tunnel, target, deps());
+            forwards.push(forward);
+            assert.deepEqual([forward.kind, forward.port, forward.alive()], [expected, 41_777, true]);
+        }
+        assert.deepEqual(asked, [target, target, target]);
+    });
+
+    test("stops once: it is not alive any more, and the provider's close is called once", async () => {
+        let closed = 0;
+        jig.api.tunnels.register("corp-net", {
+            open: async () => ({ kind: "socks", port: 41_778, close: () => void closed++ }),
+        });
+        const forward = await startForward(tunnel, target, deps());
+        forward.stop();
+        forward.stop();
+        await new Promise((resolve) => setImmediate(resolve));
+        assert.equal(forward.alive(), false);
+        assert.equal(closed, 1);
+    });
+
+    test("is reported without a provider as the route that needs a company plugin, and a failing provider in a line", async () => {
+        await assert.rejects(
+            startForward(tunnel, target, deps()),
+            (error: unknown) =>
+                error instanceof RouteError &&
+                error.message ===
+                    'no tunnel provider is registered: the route "corp-net" needs a company plugin that provides it',
+        );
+        jig.api.tunnels.register("corp-net", {
+            open: async () => {
+                throw new Error("the VPN is not connected");
+            },
+        });
+        await assert.rejects(
+            startForward(tunnel, target, deps()),
+            /the tunnel "corp-net" could not be opened: tunnel provider "corp-net" failed: the VPN is not connected/,
+        );
+        jig.api.tunnels.register("corp-net", {
+            open: async () => ({ kind: "udp", port: 41_779, close: () => {} }) as never,
+        });
+        await assert.rejects(startForward(tunnel, target, deps()), /whose kind is not forward or socks/);
+    });
+
+    test("a call that was cancelled before it started opens nothing", async () => {
+        let opened = 0;
+        jig.api.tunnels.register("corp-net", {
+            open: async () => {
+                opened++;
+                return { port: 41_780, close: () => {} };
+            },
+        });
+        const controller = new AbortController();
+        controller.abort();
+        await assert.rejects(startForward(tunnel, target, deps(), controller.signal), /cancelled/);
+        assert.equal(opened, 0);
     });
 });

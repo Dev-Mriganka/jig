@@ -25,6 +25,7 @@
         "hono": "4.13.11",
         "ignore": "7.0.10",
         "mongodb": "7.7.0",
+        "socks": "2.8.9",
         "yaml": "2.9.1"
     },
     "peerDependencies": {

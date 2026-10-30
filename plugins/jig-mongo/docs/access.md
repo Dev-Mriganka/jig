@@ -13,6 +13,25 @@ What the agent may see, and how that is enforced. Back to the [jig-mongo overvie
 A test environment may use an allow list too. A production environment may not use a deny list: that is an error when the section is
 checked, and again when a call is made, because `jig-core` decides which names are production.
 
+## Several connections
+
+An environment that has [several connections](connections.md#several-connections-in-one-environment) has its rules per connection:
+`access.<environment>` is a map by the connection's name, and each entry is a deny or an allow list as above.
+
+```json
+"access": {
+  "staging":    { "orders": { "deny": ["*.notes"] }, "billing": { "deny": ["cards.*"] } },
+  "production": { "orders": { "allow": { "orders.orders": ["_id", "status"] } } }
+}
+```
+
+- **A rule applies to its connection only.** The deny list of `orders` does not touch `billing`.
+- **A connection with no entry** has the default of its kind: nothing denied in a test environment, nothing readable in
+  production.
+- **Production needs an allow list for each connection,** and no JavaScript, as for one connection.
+- **One list for the whole environment is refused,** and so is a name that is no connection there: the message says which.
+- **An environment with one connection** keeps the shape it had: `access.<environment>` is the list itself.
+
 ## Patterns of a deny list
 
 | Pattern | Denies |

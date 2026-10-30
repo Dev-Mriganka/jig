@@ -506,9 +506,10 @@ describe("signing in", () => {
         const g = await start(t, world, { ci: gitlabCi({ auth: { signIn: "corp" } }) });
         g.h.jig.signInServices.set("corp", { headers: async () => ({ authorization: "Bearer sso-1" }) });
         assert.ok(ok(await g.call({ action: "runs" })));
-        assert.deepEqual(g.h.jig.signedIn, [
-            { system: "ci:gitlab", url: `https://ci.example.test${PROJECT}/pipelines?per_page=20` },
-        ]);
+        assert.deepEqual(
+            g.h.jig.signedIn.map(({ system, url, method }) => ({ system, url, method })),
+            [{ system: "ci:gitlab", url: `https://ci.example.test${PROJECT}/pipelines?per_page=20`, method: "GET" }],
+        );
         assert.equal(g.requests[0]?.headers["private-token"], undefined, "no token of ours was sent");
         assert.deepEqual(g.h.jig.resolved, [], "no secret was asked for");
     });

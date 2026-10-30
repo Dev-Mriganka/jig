@@ -12,7 +12,7 @@ import { startWorld } from "./support/session.ts";
 import type { World, WorldOptions } from "./support/session.ts";
 import { rawRecords, tempState } from "./support/state.ts";
 
-const REQUEST: SignInRequest = { system: "jira", url: "https://jira.example/rest/api" };
+const REQUEST: SignInRequest = { system: "jira", url: "https://jira.example/rest/api", method: "GET", headers: {} };
 
 function make() {
     const redactor = createRedactor();
@@ -232,6 +232,52 @@ describe("what the caller gives", () => {
         assert.throws(() => signIn.register(7 as unknown as string, service({})), TypeError);
         assert.throws(() => signIn.register("corp", {} as SignInService), /needs a headers function/);
         assert.throws(() => signIn.register("corp", undefined as unknown as SignInService), TypeError);
+    });
+
+    test("the service is told the method, the headers and the body, as a copy it cannot use to change the caller's", async () => {
+        const { signIn } = make();
+        const seen: Array<{ request: SignInRequest }> = [];
+        signIn.register("corp", service({}, seen));
+        const headers = { "Content-Type": "application/json" };
+        const bytes = new Uint8Array([7, 8, 9]);
+        await signIn.headers("corp", { ...REQUEST, method: "POST", headers, body: bytes });
+        await signIn.headers("corp", { ...REQUEST, method: "POST", headers, body: '{"a":1}' });
+        await signIn.headers("corp", REQUEST);
+        const [bytesAsked, textAsked, plainAsked] = seen.map((item) => item.request);
+        assert.equal(bytesAsked?.method, "POST");
+        assert.deepEqual({ ...bytesAsked?.headers }, headers);
+        assert.equal(bytesAsked?.body, bytes);
+        assert.equal(textAsked?.body, '{"a":1}');
+        assert.ok(!("body" in (plainAsked as object)));
+        assert.notEqual(bytesAsked?.headers, headers);
+        assert.throws(() => {
+            (bytesAsked?.headers as Record<string, string>)["X-Other"] = "changed";
+        }, TypeError);
+        assert.equal(Object.keys(headers).length, 1);
+    });
+
+    test("without a method or the headers a POST would be signed as a GET, so the request is refused", async () => {
+        const { signIn } = make();
+        const seen: Array<{ request: SignInRequest }> = [];
+        signIn.register("corp", service({}, seen));
+        const base = { system: "jira", url: "https://x" };
+        await assert.rejects(signIn.headers("corp", base as never), /the request needs a method/);
+        await assert.rejects(signIn.headers("corp", { ...base, method: "" } as never), /the request needs a method/);
+        for (const headers of [undefined, null, "a", ["a"]]) {
+            await assert.rejects(
+                signIn.headers("corp", { ...base, method: "GET", headers } as never),
+                /the request needs its headers/,
+                String(headers),
+            );
+        }
+        for (const body of [1, {}, ["a"], null]) {
+            await assert.rejects(
+                signIn.headers("corp", { ...base, method: "POST", headers: {}, body } as never),
+                /the body must be text or bytes/,
+                JSON.stringify(body),
+            );
+        }
+        assert.equal(seen.length, 0, "the service was never asked");
     });
 
     test("the request needs a system and a url", async () => {

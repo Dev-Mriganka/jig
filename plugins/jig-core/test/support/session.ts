@@ -120,6 +120,8 @@ export function fakePlugin(log: PluginLog): ExtensionFactory {
                     const headers = await jig().signIn.headers(params.signIn, {
                         system: "fake",
                         url: "https://fake.example/api",
+                        method: "GET",
+                        headers: {},
                     });
                     text += ` headers=${JSON.stringify(headers)}`;
                     details.headers = headers;

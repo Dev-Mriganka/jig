@@ -41,6 +41,31 @@ export function createSignIn(options: SignInOptions): SignIn {
         });
     }
 
+    /** The request as the service sees it: a copy, so a service cannot change what the next one is asked. */
+    function checkRequest(request: SignInRequest): SignInRequest {
+        const named = (text: unknown) => typeof text === "string" && text !== "";
+        if (!named(request?.system) || !named(request.url)) {
+            throw new TypeError("signIn.headers: the request needs a system and a url");
+        }
+        // Without the method and the headers a service would sign a POST as a GET, which the server turns down.
+        if (!named(request.method)) throw new TypeError("signIn.headers: the request needs a method");
+        const headers: unknown = request.headers;
+        if (typeof headers !== "object" || headers === null || Array.isArray(headers)) {
+            throw new TypeError("signIn.headers: the request needs its headers (an object, empty when it has none)");
+        }
+        const body: unknown = request.body;
+        if (body !== undefined && typeof body !== "string" && !(body instanceof Uint8Array)) {
+            throw new TypeError("signIn.headers: the body must be text or bytes");
+        }
+        return {
+            system: request.system,
+            url: request.url,
+            method: request.method,
+            headers: Object.freeze({ ...(headers as Record<string, string>) }),
+            ...(request.body === undefined ? {} : { body: request.body }),
+        };
+    }
+
     function hide(header: string, value: string): void {
         // An empty value protects nothing, and a blank one would blank every space in every result.
         if (value.trim() === "") return;
@@ -72,14 +97,11 @@ export function createSignIn(options: SignInOptions): SignIn {
                         `a company plugin registers one with signIn.register ${registered}`,
                 );
             }
-            const named = (text: unknown) => typeof text === "string" && text !== "";
-            if (!named(request?.system) || !named(request.url)) {
-                throw new TypeError("signIn.headers: the request needs a system and a url");
-            }
+            const given = checkRequest(request);
 
             let answer: unknown;
             try {
-                answer = await service.headers(request, signal);
+                answer = await service.headers(given, signal);
             } catch (error) {
                 throw new Error(`sign-in service "${printable(name)}" failed: ${errorMessage(error)}`);
             }

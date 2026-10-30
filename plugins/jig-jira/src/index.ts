@@ -13,7 +13,7 @@ export function jigJira(options: JiraOptions = {}): ExtensionFactory {
     return (pi: ExtensionAPI) => {
         const tool = createTool(options);
         withJig((api) => {
-            api.config.registerSection("jira", validateJira);
+            api.config.registerSection("jira", validateJira, { replace: ["auth"] });
             api.declareTool({ tool: "jira", plugin: "jig-jira", classify: tool.classify, preview: tool.preview });
         });
         pi.registerTool(tool.definition);

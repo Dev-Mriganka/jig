@@ -7,6 +7,10 @@ description: Using the mongo tool to look at MongoDB and, in a test environment,
 
 Use the `mongo` tool for every MongoDB question. It connects as the user configured, hides what the access lists hide, and asks the user before it writes. A read runs at once. A write to a test environment shows the user a preview first. A write to production is refused, always.
 
+## Environments with several connections
+
+Some environments have more than one cluster, such as `orders` and `billing` in `staging`. Then every call needs `cluster` next to `environment`. The tool says so when it is missing and names the choices; an environment with one connection refuses `cluster`. The rules are those of the environment (a write to production is refused whatever the cluster), and a result names the connection as `staging/orders`. Ask the user which cluster if the question does not say.
+
 ## Start by looking
 
 1. `databases`, then `collections` for a database, show what exists. Do not guess a name: a name that is denied or not allowed is refused with what is allowed.
@@ -53,4 +57,5 @@ The reason names what to change. The common ones:
 - `the filter is empty, so it would change every document`: say which documents.
 - `the filter matches more than 1000 documents`: narrow the filter, or raise `limit` if you mean it.
 - `runs JavaScript on the server`: `$where`, `$function` and `$accumulator` are not allowed. Use a filter or pipeline operators.
-- `no tunnel provider is registered`, `the bastion refused the SSH key`, `cannot reach the ... database`: the route is the user's to fix. Say so once, and do not retry blindly.
+- `no tunnel provider is registered`, `the tunnel ... could not be opened`, `the bastion refused the SSH key`, `cannot reach the ... database`: the route is the user's to fix. Say so once, and do not retry blindly.
+- `X has several connections: add cluster` or `X has one connection, so cluster is not used there`: use the names the message lists, or leave `cluster` out.

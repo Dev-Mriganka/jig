@@ -5,6 +5,8 @@ import path from "node:path";
 import { describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-agent";
+import { layered } from "../../jig-core/src/section-defaults.ts";
+import { API_REPLACE, validateApi } from "../src/config.ts";
 import plugin, { jigApi } from "../src/index.ts";
 import { METHODS } from "../src/engine/plan.ts";
 import { ACTION_NAMES, parameters } from "../src/params.ts";
@@ -94,6 +96,30 @@ describe("the extension", () => {
             assert.equal(declaration?.tool, "api");
             assert.equal(typeof declaration?.preview, "function");
             assert.equal(declaration?.masksOwnResults, undefined, "jig-core masks production results");
+        } finally {
+            jig.remove();
+        }
+    });
+
+    test("names the keys where your object replaces a company's default whole, so the two sign-ins are never both named", () => {
+        const jig = installFakeJig();
+        try {
+            load();
+            assert.deepEqual(jig.sectionReplace.get("api"), ["environments.*"]);
+            assert.deepEqual(jig.sectionReplace.get("api"), API_REPLACE);
+
+            // A company routes Staging through its transport; you would rather use a sign-in service of your own.
+            const company = {
+                collections: { orders: { http: "/work/orders/http" } },
+                environments: { Staging: { environment: "staging", transport: "corp-proxy" } },
+            };
+            const mine = { environments: { Staging: { environment: "staging", signIn: "corp-sso" } } };
+            assert.deepEqual(validateApi(layered(company, mine, API_REPLACE)), []);
+            assert.deepEqual(validateApi(layered(company, mine)), [
+                "api.environments.Staging: use signIn or transport, not both",
+            ]);
+            // A plain name still replaces the entry, as any value that is not an object does.
+            assert.deepEqual(validateApi(layered(company, { environments: { Staging: "staging" } }, API_REPLACE)), []);
         } finally {
             jig.remove();
         }

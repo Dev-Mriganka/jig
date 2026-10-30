@@ -243,7 +243,11 @@ test("direct, signIn: the service's other headers go along, and it is asked for 
         w.requests.every((r) => r.headers["x-tenant"] === "t-1" && r.headers.authorization === "Bearer sso-token-5566"),
     );
     assert.equal(w.jig.signedIn.length, 3, "the service decides when a token has run out");
-    assert.deepEqual(w.jig.signedIn[0], { system: "logs", url: "https://logs.test:9200/app-staging-*/_search" });
+    const first = w.jig.signedIn[0];
+    assert.deepEqual(
+        { system: first?.system, url: first?.url, method: first?.method },
+        { system: "logs", url: "https://logs.test:9200/app-staging-*/_search", method: "POST" },
+    );
     assert.deepEqual(w.jig.resolved, [], "no secret is read when the sign-in is a service");
 });
 

@@ -71,6 +71,11 @@ export class Pass implements Host {
     /** Masks a JSON-like value. `kind` and `parent` describe the field that holds it. */
     walk(value: unknown, kind: Kind, parent: string, depth: number): unknown {
         this.#limits.visit(depth);
+        // A contact field is personal data where it holds a scalar. Where it holds an object, its own fields say what is
+        // personal, so the object is walked as any other (a list of scalars keeps the kind: each item is a scalar).
+        if (kind === "contact" && typeof value === "object" && value !== null && !Array.isArray(value)) {
+            if (!isRawNumber(value)) kind = "other";
+        }
         if (typeof value === "string") {
             this.#limits.addBytes(byteLength(value));
             return this.scalar(value, kind, depth);
@@ -139,6 +144,8 @@ export class Pass implements Host {
             case "user":
             case "personal":
                 return this.tokens.mint(kind, text);
+            case "contact":
+                return this.tokens.mint("personal", text);
             case "ip":
                 return maskIpAddresses(text, this); // public addresses only; a hostname is left as it is
             case "phone":

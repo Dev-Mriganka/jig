@@ -2,7 +2,18 @@
 // deny list out of production.
 import assert from "node:assert/strict";
 import { after, afterEach, before, describe, test } from "node:test";
-import { accessFor, readMongo, settingsOf, validateMongo } from "../src/config.ts";
+import { SECRET_BACKENDS } from "../../jig-core/src/config.ts";
+import { layered } from "../../jig-core/src/section-defaults.ts";
+import {
+    accessFor,
+    connectionKey,
+    environmentsOf,
+    isReference,
+    MONGO_REPLACE,
+    readMongo,
+    settingsOf,
+    validateMongo,
+} from "../src/config.ts";
 import { InputError } from "../src/values.ts";
 import { defaultSection } from "./support/section.ts";
 import { installFakeJig } from "./support/fake-jig.ts";
@@ -365,5 +376,259 @@ describe("the access lists in the section", () => {
         const { settings, errors } = readMongo(section({ staging: connection({ user: "" }) }));
         assert.equal(settings, undefined);
         assert.ok(errors.length > 0);
+    });
+});
+
+describe("the user, as plain text or as a secret reference", () => {
+    test("is plain text unless it starts with the name of a secret backend and a colon", () => {
+        for (const user of ["agent", "svc:orders", "Pass:agent", "agent@example.com", "op", "passx:y", "pass:"]) {
+            assert.equal(isReference(user), false, user);
+        }
+        for (const user of ["pass:mongo/staging-user", "env:MONGO_USER", "cmd:mongo-user", "op://work/mongo/user"]) {
+            assert.equal(isReference(user), true, user);
+        }
+    });
+
+    test("the backends it knows are jig-core's", () => {
+        for (const backend of SECRET_BACKENDS) assert.equal(isReference(`${backend}:x`), true, backend);
+        assert.equal(isReference("other:x"), false);
+    });
+
+    test("a reference is accepted, and so is plain text", () => {
+        for (const user of ["pass:mongo/staging-user", "env:MONGO_USER", "agent", "svc:orders"]) {
+            assert.deepEqual(validateMongo(section({ staging: connection({ user }) })), [], user);
+            assert.equal(
+                settingsOf(section({ staging: connection({ user }) }))?.connections.get("staging")?.user,
+                user,
+            );
+        }
+    });
+
+    test("a reference with white space, a user with a control character, and a missing user are refused", () => {
+        for (const user of ["pass:two words", "env: x", "a\nb", "", 7, undefined]) {
+            assert.match(
+                errorsOf(section({ staging: connection({ user }) })),
+                /staging\.user: required, the database user \(plain text, or a secret reference/,
+                String(user),
+            );
+        }
+    });
+});
+
+describe("several connections in one environment", () => {
+    const named = (extra: Record<string, unknown> = {}) => ({
+        orders: connection({ uri: "mongodb://orders.staging.example.com:27017" }),
+        billing: connection({ uri: "mongodb://billing.staging.example.com:27017", user: "pass:mongo/billing-user" }),
+        ...extra,
+    });
+
+    test("an environment may name its connections: each is read as a connection of its own", () => {
+        const raw = section({ staging: named(), production: connection({ uri: "mongodb://db.example.com:27017" }) });
+        assert.deepEqual(validateMongo(raw), []);
+        const settings = settingsOf(raw);
+        assert.ok(settings);
+        assert.deepEqual([...settings.connections.keys()], ["staging/orders", "staging/billing", "production"]);
+        assert.deepEqual([...settings.clusters.entries()], [["staging", ["orders", "billing"]]]);
+        assert.deepEqual(environmentsOf(settings), ["staging", "production"]);
+        const billing = settings.connections.get(connectionKey("staging", "billing"));
+        assert.equal(billing?.environment, "staging");
+        assert.equal(billing?.cluster, "billing");
+        assert.equal(billing?.user, "pass:mongo/billing-user");
+        assert.equal(billing?.uri.hosts[0]?.host, "billing.staging.example.com");
+        assert.equal(settings.connections.get("production")?.cluster, undefined, "one connection has no name");
+        assert.equal(settings.clusters.has("production"), false);
+    });
+
+    test("one connection, written as before, is still one connection", () => {
+        const settings = settingsOf(section({ staging: connection() }));
+        assert.deepEqual([...(settings?.connections.keys() ?? [])], ["staging"]);
+        assert.equal(settings?.clusters.size, 0);
+    });
+
+    test("the key of a connection is its environment, or the environment and the name", () => {
+        assert.equal(connectionKey("staging"), "staging");
+        assert.equal(connectionKey("staging", "orders"), "staging/orders");
+    });
+
+    test("a name that cannot be one, and a value that is not a connection, are errors that name the key", () => {
+        const bad = errorsOf(section({ staging: named({ "has space": connection(), deny: connection() }) }));
+        assert.match(bad, /mongo\.connections\.staging: "has space" is not a usable name for a connection/);
+        assert.match(bad, /mongo\.connections\.staging: "deny" is not a usable name for a connection/);
+        assert.match(
+            errorsOf(section({ staging: named({ extra: "mongodb://x.example.com" }) })),
+            /mongo\.connections\.staging\.extra: must be an object with uri, user and password \(a connection of staging\)/,
+        );
+        // Every key a typo, so none is a field of a connection: read as names, and each is said to be no connection.
+        assert.match(
+            errorsOf(section({ staging: { urii: "mongodb://x.example.com", usr: "agent" } })),
+            /mongo\.connections\.staging\.urii: must be an object/,
+        );
+    });
+
+    test("each connection is checked on its own, with its own key in the message", () => {
+        const errors = errorsOf(
+            section({
+                staging: named({
+                    billing: connection({ uri: "mongodb://u:p@billing.example.com", password: "plain-text" }),
+                }),
+            }),
+        );
+        assert.match(errors, /mongo\.connections\.staging\.billing\.uri: must not hold a user or a password/);
+        assert.match(errors, /mongo\.connections\.staging\.billing\.password: must be a secret reference/);
+        assert.ok(!errors.includes("plain-text") && !errors.includes("u:p@"));
+        assert.doesNotMatch(errors, /staging\.orders/);
+    });
+
+    test("an environment holds at most ten, and local and external still hold none", () => {
+        const many = Object.fromEntries(Array.from({ length: 11 }, (_, index) => [`c${index}`, connection()]));
+        assert.match(errorsOf(section({ staging: many })), /staging: at most 10 connections by name/);
+        assert.match(errorsOf(section({ local: named() })), /a database is a test or production environment/);
+    });
+
+    test("an ssh route needs one host, per connection", () => {
+        const via = { ssh: { host: "bastion.example.com", user: "agent", key: "pass:ssh/bastion" } };
+        const errors = errorsOf(
+            section({
+                staging: named({ billing: connection({ uri: "mongodb+srv://billing.example.com", via }) }),
+            }),
+        );
+        assert.match(errors, /mongo\.connections\.staging\.billing\.via\.ssh: needs a uri with exactly one host/);
+    });
+
+    test("a company's connections and your credentials lay together, and a route of yours replaces the company's", () => {
+        const company = {
+            connections: {
+                staging: {
+                    orders: { uri: "mongodb://orders.staging.example.com:27017", via: { tunnel: "corp-net" } },
+                    billing: { uri: "mongodb://billing.staging.example.com:27017", via: { tunnel: "corp-net" } },
+                },
+                production: { uri: "mongodb://db.example.com:27017", via: { tunnel: "corp-net" } },
+            },
+            access: { production: { allow: { "orders.orders": ["_id"] } } },
+        };
+        const mine = {
+            connections: {
+                staging: {
+                    orders: { user: "pass:mongo/orders-user", password: "pass:mongo/orders" },
+                    billing: {
+                        user: "agent",
+                        password: "pass:mongo/billing",
+                        via: { ssh: { host: "bastion.example.com", user: "agent", key: "pass:ssh/bastion" } },
+                    },
+                },
+                production: { user: "agent-readonly", password: "pass:mongo/production" },
+            },
+        };
+        assert.deepEqual(validateMongo(layered(company, mine, MONGO_REPLACE)), []);
+        assert.match(validateMongo(layered(company, mine)).join("\n"), /use ssh or tunnel, not both/);
+    });
+});
+
+describe("the access lists of an environment with several connections", () => {
+    const environment = (extra: Record<string, unknown> = {}) => ({
+        orders: connection({ uri: "mongodb://orders.staging.example.com:27017" }),
+        billing: connection({ uri: "mongodb://billing.staging.example.com:27017" }),
+        ...extra,
+    });
+    const production = () => ({
+        orders: connection({ uri: "mongodb://orders.example.com:27017" }),
+        billing: connection({ uri: "mongodb://billing.example.com:27017" }),
+    });
+
+    test("are given per connection, and each applies to its connection only", () => {
+        const raw = section(
+            { staging: environment() },
+            { staging: { orders: { deny: ["*.notes"] }, billing: { deny: ["cards.*"] } } },
+        );
+        assert.deepEqual(validateMongo(raw), []);
+        const settings = settingsOf(raw);
+        assert.ok(settings);
+        jig.kinds.set("staging", "test");
+        assert.deepEqual([...settings.access.keys()], ["staging/orders", "staging/billing"]);
+        const orders = accessFor(settings, "staging", "orders");
+        const billing = accessFor(settings, "staging", "billing");
+        assert.throws(() => billing.namespace("cards", "visa"), /denied/);
+        billing.namespace("orders", "orders");
+        orders.namespace("cards", "visa");
+        assert.equal(orders.mode, "deny");
+    });
+
+    test("a connection with no rules has the default of its kind, and the other connection's rules do not leak into it", () => {
+        const raw = section({ staging: environment() }, { staging: { orders: { deny: ["orders.secret"] } } });
+        const settings = settingsOf(raw);
+        assert.ok(settings);
+        jig.kinds.set("staging", "test");
+        assert.throws(() => accessFor(settings, "staging", "orders").namespace("orders", "secret"), /denied/);
+        accessFor(settings, "staging", "billing").namespace("orders", "secret");
+    });
+
+    test("one set of rules for the whole environment is refused, and says to give them by name", () => {
+        const errors = errorsOf(section({ staging: environment() }, { staging: { deny: ["*.notes"] } }));
+        assert.match(errors, /mongo\.access\.staging\.deny: staging has several connections \(orders, billing\)/);
+        assert.match(errors, /so give the rules for each by name/);
+        assert.match(
+            errorsOf(section({ staging: environment() }, { staging: "deny" })),
+            /must be an object by connection name/,
+        );
+    });
+
+    test("rules for a connection that is not there are refused", () => {
+        assert.match(
+            errorsOf(section({ staging: environment() }, { staging: { invoices: { deny: ["*.notes"] } } })),
+            /mongo\.access\.staging\."invoices": there is no connection with this name in staging/,
+        );
+    });
+
+    test("each is checked as the rules of an environment are, with the connection in the key", () => {
+        assert.match(
+            errorsOf(section({ staging: environment() }, { staging: { orders: { deny: ["notes"] } } })),
+            /mongo\.access\.staging\.orders\.deny: "notes" is not/,
+        );
+        // Production: each connection needs an allow list, and may not run JavaScript.
+        jig.kinds.set("production", "production");
+        assert.match(
+            errorsOf(section({ production: production() }, { production: { orders: { deny: ["*.notes"] } } })),
+            /mongo\.access\.production\.orders: production needs an allow list/,
+        );
+        assert.match(
+            errorsOf(
+                section(
+                    { production: production() },
+                    { production: { orders: { allow: { "orders.orders": ["_id"] }, javascript: true } } },
+                ),
+            ),
+            /mongo\.access\.production\.orders\.javascript: server-side JavaScript is never allowed in production/,
+        );
+        assert.deepEqual(
+            validateMongo(
+                section(
+                    { production: production() },
+                    {
+                        production: {
+                            orders: { allow: { "orders.orders": ["_id"] } },
+                            billing: { allow: { "billing.invoices": ["_id", "total"] } },
+                        },
+                    },
+                ),
+            ),
+            [],
+        );
+    });
+
+    test("production reads nothing from a connection that has no allow list, and a deny list is refused again at a call", () => {
+        const raw = section({ production: production() });
+        const settings = settingsOf(raw);
+        assert.ok(settings);
+        jig.kinds.set("production", "production");
+        assert.throws(
+            () => accessFor(settings, "production", "billing").namespace("orders", "orders"),
+            /nothing is allowed yet/,
+        );
+    });
+
+    test("an environment with one connection keeps the shape it had", () => {
+        const raw = section({ staging: connection() }, { staging: { deny: ["*.notes"] } });
+        assert.deepEqual(validateMongo(raw), []);
+        assert.deepEqual([...(settingsOf(raw)?.access.keys() ?? [])], ["staging"]);
     });
 });

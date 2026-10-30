@@ -22,6 +22,8 @@ export interface FakeJig {
     declared: Map<string, ToolDeclaration>;
     /** The check each plugin registered for its section of jig.json. */
     sections: Map<string, (raw: unknown) => readonly string[]>;
+    /** The keys each plugin named that replace a company's defaults instead of merging into them. */
+    sectionReplace: Map<string, readonly string[] | undefined>;
     /** The preview the user approved for a call that asked, by tool call id. */
     approved: Map<string, Preview>;
     facts: Map<string, Facts[]>;
@@ -57,6 +59,7 @@ function checked(value: TransportResponse): TransportResponse {
 export function installFakeJig(): FakeJig {
     const declared = new Map<string, ToolDeclaration>();
     const sections = new Map<string, (raw: unknown) => readonly string[]>();
+    const sectionReplace = new Map<string, readonly string[] | undefined>();
     const values = new Map<string, unknown>();
     const approved = new Map<string, Preview>();
     const facts = new Map<string, Facts[]>();
@@ -155,7 +158,10 @@ export function installFakeJig(): FakeJig {
             addSecretCommands: () => {},
             addMaskFields: () => {},
             addSectionDefaults: () => {},
-            registerSection: (name, validate) => void sections.set(name, validate),
+            registerSection: (name, validate, options) => {
+                sections.set(name, validate);
+                sectionReplace.set(name, options?.replace);
+            },
             section: (name) => {
                 const value = values.get(name);
                 const validate = sections.get(name);
@@ -190,6 +196,7 @@ export function installFakeJig(): FakeJig {
         api,
         declared,
         sections,
+        sectionReplace,
         approved,
         facts,
         secrets,

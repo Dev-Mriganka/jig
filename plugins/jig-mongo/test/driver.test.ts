@@ -288,7 +288,36 @@ describe("the options of a connection", () => {
         const { directConnection: _d, tls: _t, serverName: _s, authSource: _a, ...plain } = target;
         const options = clientOptions({ ...plain, production: true });
         assert.equal(options.readPreference, "secondaryPreferred");
-        for (const absent of ["directConnection", "tls", "servername", "authSource"])
+        for (const absent of ["directConnection", "tls", "servername", "authSource", "proxyHost", "proxyPort"])
             assert.ok(!(absent in options), absent);
+    });
+
+    test("a SOCKS5 proxy goes to the driver as proxyHost and proxyPort, which it accepts, with the real address and no direct connection", async () => {
+        const proxied: ConnectTarget = {
+            environment: "staging",
+            uri: "mongodb://a.example.com:27017,b.example.com:27017/orders?replicaSet=rs0",
+            user: "agent",
+            password: "db-pass-1",
+            production: false,
+            proxyHost: "127.0.0.1",
+            proxyPort: 41_555,
+        };
+        const options = clientOptions(proxied);
+        assert.equal(options.proxyHost, "127.0.0.1");
+        assert.equal(options.proxyPort, 41_555);
+        assert.ok(!("directConnection" in options));
+        assert.ok(!("servername" in options));
+        const client = new driver.MongoClient(proxied.uri, options as never);
+        try {
+            assert.equal(client.options.proxyHost, "127.0.0.1");
+            assert.equal(client.options.proxyPort, 41_555);
+            assert.deepEqual(
+                client.options.hosts.map((host) => host.toString()),
+                ["a.example.com:27017", "b.example.com:27017"],
+            );
+            assert.equal(client.options.replicaSet, "rs0");
+        } finally {
+            await client.close();
+        }
     });
 });

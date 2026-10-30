@@ -4,6 +4,7 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 
 ## Contents
 
+- [2026-10-31: gaps a company plugin found in jig-core, closed](#2026-10-31-gaps-a-company-plugin-found-in-jig-core-closed)
 - [2026-10-31: filter lists, Jira links and a pull request title rule](#2026-10-31-filter-lists-jira-links-and-a-pull-request-title-rule)
 - [2026-10-30: Jig never signs in; it reads a credential and keeps it from the agent](#2026-10-30-jig-never-signs-in-it-reads-a-credential-and-keeps-it-from-the-agent)
 - [2026-10-30: checks run on every push](#2026-10-30-checks-run-on-every-push)
@@ -28,6 +29,83 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 - [2026-10-30: jig-git's tools, and a watch that knows when it is done](#2026-10-30-jig-gits-tools-and-a-watch-that-knows-when-it-is-done)
 - [2026-10-30: built clean, beside the existing harness](#2026-10-30-built-clean-beside-the-existing-harness)
 - [Earlier decisions that still hold (2026-10-29)](#earlier-decisions-that-still-hold-2026-10-29)
+
+## 2026-10-31: gaps a company plugin found in jig-core, closed
+
+A company plugin that configured Jig for its own systems found these. Each is
+generic: no company is named.
+
+- **A sign-in service sees the whole request.** `SignInRequest` now carries the
+  `method`, the `headers` the request will carry (without the credential) and
+  the `body`, as well as `system` and `url`.
+  - **Why:** a service that signs requests (an HMAC scheme, AWS Signature
+    Version 4) signed a POST as a GET, and the server answered 401.
+  - **Required, not optional:** a service that cannot rely on the method would
+    sign a guess. `jig-core` refuses a request without a method or headers
+    before the service is asked.
+- **A section is checked laid over the company's defaults.** `loadPersonalConfig`
+  used to check your section alone and drop it on error, so a user who wrote
+  only what they change (`{ "jira": { "site": "…" } }`) got an error.
+  - **With defaults,** your section is validated after it is laid over them. A
+    section with none is validated as before.
+  - **Defaults that need you:** with no section of yours and defaults that are
+    not valid alone, the plugin is not configured. No start-up problem is
+    reported; `/jig` says the company defaults are incomplete.
+  - **`registerSection(name, validate, { replace })`** names keys that replace
+    the company's whole instead of merging, so `auth: { token }` never merges into
+    `auth: { transport }`. A key is a path from the section's root, with `*` for
+    any one name. Declared by `jig-ops` (CI `auth`, `deploy`), `jig-api`
+    (`environments.*`) and `jig-mongo` (`via`).
+- **A tunnel says what it is, and `jig-mongo` uses both kinds.** A `Tunnel` has a
+  `kind`: `forward` (the default: a local port that reaches one host and port)
+  or `socks` (a local SOCKS5 proxy that reaches any host the far side can).
+  - **Why:** a `mongodb+srv` address or a replica set needs every member
+    reached, which a forward cannot do. With a SOCKS tunnel `jig-mongo` gives the
+    driver `proxyHost` and `proxyPort`, and keeps the real address.
+  - **`jig-mongo` now opens a company tunnel through `jig-core`.** Until now a
+    `via: { tunnel }` route always failed with "no tunnel provider is registered",
+    although `jig-core` had a registry. A forward is used as an SSH forward is.
+  - **A new dependency, `socks` 2.8.9, pinned exactly (MIT).** The driver needs it
+    to go through a proxy and does not install it. Its own dependencies are
+    `ip-address` and `smart-buffer`.
+  - **A `mongodb+srv` address is still looked up in this machine's DNS:** the
+    driver cannot send a lookup through a proxy.
+- **An environment may have several MongoDB connections.**
+  `connections.<environment>` is one connection, as before, or a map of named
+  ones (`orders` and `billing` in `staging`).
+  - **The tool takes `cluster`,** required where an environment is a map and
+    refused where it has one connection. The environment still decides the
+    rules, so classification is unchanged.
+  - **Access lists are per connection** for such an environment, and keep their
+    shape for one connection.
+  - **The user can be a secret reference,** like the password; plain text still
+    works. A value that starts with the name of a secret backend and a colon is
+    read as a reference.
+- **More personal-data field names are masked by default.** Telecom names that
+  were found unmasked: `ani`, `dnis`, `cli`, `btn`, `fax`, `mobile`, `cell` and
+  the `...Number` forms (`faxNumber`, `callerNumber`, `destinationNumber`),
+  `tnList`, `portingTn` and `callerId` are phone fields; `sipUri` and the contact
+  fields (`contact`, `billToContact`, ...) are `personal` tokens.
+  - **In the word-based rules, not a flat list.** The short names match as the
+    whole name only, so `client` is not `cli`. A descriptor still keeps a field
+    out (`mobileType`).
+  - **A contact masks only a scalar,** through a new `contact` kind: an object
+    under it is read field by field, so a `billToContact` record keeps its ids.
+  - **The corpus said `contact` was kept;** it is masked now, on purpose.
+- **A flaky `jig-mongo` route test is deterministic.** The tests where the SSH
+  forward must not come up used the real probe, which connects to the port
+  `freePort` handed out.
+  - **The assumption:** that port stays free. In a full run other test files open
+    servers on port 0 at the same moment, one can be given the same port, and the
+    probe then calls that server a forward that works: a call that has to fail
+    succeeds.
+  - **Fix:** those tests inject a probe that finds nothing listening. The tests
+    that need a working forward still use a real port.
+  - **Not fixed, and not a test matter:** `jig-mongo` cannot tell its own `ssh` from
+    another listener on that port. Letting `ssh` report when it is ready would.
+- **A connection failure is no longer described twice.** The line for a database
+  that could not be reached was turned into "the database driver failed" by a
+  second pass, so `jig-mongo` now says "cannot reach the staging/orders database".
 
 ## 2026-10-31: filter lists, Jira links and a pull request title rule
 
@@ -81,6 +159,7 @@ generic fix, in its own commit.
     sent. The message shows the pattern.
   - **An `edit` that does not set a title is not checked:** the rule is about
     what is written now, not about a title that was there before.
+
 
 ## 2026-10-30: Jig never signs in; it reads a credential and keeps it from the agent
 

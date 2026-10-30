@@ -5,7 +5,9 @@ import { MaskError } from "./error.ts";
 /**
  * What a field holds, which decides how its value is masked. `email`, `phone`, `name`, `user`, `personal` and `ip`
  * become tokens, `card` shows its last four digits, and the kinds in REMOVED are dropped. `identifier` and `safe` are
- * kept, but still checked for credential shapes. `other` is scanned as text.
+ * kept, but still checked for credential shapes. `other` is scanned as text. `contact` is a `personal` value only where
+ * the field holds a scalar (`primaryContact: "Casey Sample"`); where it holds an object the object's own fields decide,
+ * so a `billToContact` record keeps its country and its ids.
  */
 export type Kind =
     | "email"
@@ -13,6 +15,7 @@ export type Kind =
     | "name"
     | "user"
     | "personal"
+    | "contact"
     | "card"
     | "cardSecret"
     | "ip"
@@ -36,6 +39,7 @@ const LABELS: Readonly<Record<Kind, string>> = {
     name: "name",
     user: "user",
     personal: "personal",
+    contact: "personal",
     card: "card",
     cardSecret: "card",
     ip: "ip",
@@ -77,7 +81,7 @@ export function removed(kind: Kind): string {
 }
 
 /** Kinds whose non-string scalars (numbers, booleans) are replaced by a token or display form. */
-const TOKENISED: ReadonlySet<Kind> = new Set<Kind>(["email", "phone", "name", "user", "personal", "card"]);
+const TOKENISED: ReadonlySet<Kind> = new Set<Kind>(["email", "phone", "name", "user", "personal", "contact", "card"]);
 
 export function isTokenised(kind: Kind): boolean {
     return TOKENISED.has(kind);
@@ -162,6 +166,22 @@ const COMPOUND_PIECES: ReadonlySet<string> = new Set([
     "service",
     "customer",
     "primary",
+    "caller",
+    "fax",
+    "sms",
+    "mobile",
+    "cell",
+    "did",
+    "dialed",
+    "dialable",
+    "destination",
+    "originating",
+    "ported",
+    "porting",
+    "sip",
+    "uri",
+    "admin",
+    "technical",
 ]);
 
 /** Splits a lowercase run such as `ipaddress` into known words; anything else stays whole. */
@@ -215,6 +235,43 @@ const SAFE_FIELDS: ReadonlySet<string> = new Set([
     "durationseconds",
     "totaldurationseconds",
     "totalcalls",
+]);
+
+// Telephony names for a number. These are matched as the whole field name, because each is too short, or too common as a
+// word, to be matched inside a longer name (`cell` alone is a number, `cellTower` is not; `client` is not `cli`).
+const NUMBER_NAMES: ReadonlySet<string> = new Set([
+    "tn",
+    "did",
+    "called",
+    "ani",
+    "dnis",
+    "cli",
+    "btn",
+    "fax",
+    "mobile",
+    "cell",
+]);
+// A word that makes `...Number` a telephone number: `faxNumber`, `callerNumber`, `destinationNumber`, `contactNumber`.
+const NUMBER_QUALIFIERS: ReadonlySet<string> = new Set([
+    "calling",
+    "called",
+    "caller",
+    "fax",
+    "sms",
+    "mobile",
+    "cell",
+    "did",
+    "dialed",
+    "dialable",
+    "contact",
+    "destination",
+    "originating",
+    "ported",
+    "porting",
+    "ani",
+    "dnis",
+    "cli",
+    "btn",
 ]);
 
 // Identifiers are kept readable so tickets stay debuggable, but are still checked for credential shapes.
@@ -440,18 +497,25 @@ function classify(key: string, parent: string): Kind {
     if (has(...DEVICE_WORDS) || sequence("device", "id")) return "identifier";
 
     if (value && (has("email", "emails") || sequence("e", "mail") || last === "mail")) return "email";
+    // `faxNumber`, `callerNumber`: a telephony word, then "number". `tnList` and `portingTn` hold telephone numbers too.
+    const numbered = w.some(
+        (word, i) => (word === "number" || word === "num") && NUMBER_QUALIFIERS.has(w[i - 1] ?? ""),
+    );
+    // `callerId` is a number although it ends in `id`; `callerIdName` is a name, and the name rule below has it.
+    const callerId = sequence("caller", "id") && (last === "id" || last === "number" || last === "num");
     if (
         value &&
-        (has("phone", "phones", "telephone", "msisdn") ||
-            // Telephony names for a number, too short to be matched inside a longer name.
-            joined === "tn" ||
-            joined === "did" ||
-            joined === "called" ||
-            sequence("calling", "number") ||
-            sequence("called", "number") ||
+        (has("phone", "phones", "telephone", "msisdn", "tn", "tns") ||
+            NUMBER_NAMES.has(joined) ||
+            numbered ||
+            callerId ||
             (callRecord && (joined === "from" || joined === "to")))
     )
         return "phone";
+    // A SIP address names a person or a line; it is not a bare number, so it is a token and not a phone.
+    if (value && sequence("sip", "uri")) return "personal";
+    // `contact`, `billToContact`: a person or a line, when the field holds a scalar (see Kind).
+    if (value && last === "contact") return "contact";
     if (value && (has("username", "login", "logins") || sequence("user", "name"))) return "user";
     if (value && (sequence("tax", "id") || sequence("government", "id"))) return "government";
     if (IDENTIFIER_SUFFIXES.has(last)) return "identifier";

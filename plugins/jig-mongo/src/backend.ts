@@ -88,6 +88,8 @@ export interface Backend {
 /** What it takes to open a connection. Credentials are here and in the driver's memory, and nowhere else. */
 export interface ConnectTarget {
     environment: string;
+    /** Which of the environment's connections, when it has several. */
+    cluster?: string;
     /** No credentials in it. */
     uri: string;
     user: string;
@@ -97,6 +99,9 @@ export interface ConnectTarget {
     /** Behind a forward the address is local, and the certificate is still the database host's. */
     serverName?: string;
     directConnection?: boolean;
+    /** Behind a SOCKS5 proxy the address is the real one, and the driver reaches every host of it through the proxy. */
+    proxyHost?: string;
+    proxyPort?: number;
     /** Production reads come from a secondary when there is one. */
     production: boolean;
 }

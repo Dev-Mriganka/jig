@@ -2,7 +2,7 @@
 // tool goes to Pi. Nothing is read from a database, a secret store or a bastion host until a call is made.
 import type { ExtensionAPI, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { withJig } from "../../jig-core/src/client.ts";
-import { validateMongo } from "./config.ts";
+import { MONGO_REPLACE, validateMongo } from "./config.ts";
 import { createTool } from "./tool.ts";
 import type { MongoOptions } from "./tool.ts";
 
@@ -14,7 +14,7 @@ export function jigMongo(options: MongoOptions = {}): ExtensionFactory {
         const tool = createTool(options);
         // jig-core may load after this plugin; withJig waits for it.
         withJig((api) => {
-            api.config.registerSection("mongo", validateMongo);
+            api.config.registerSection("mongo", validateMongo, { replace: MONGO_REPLACE });
             api.declareTool({ tool: "mongo", plugin: "jig-mongo", classify: tool.classify, preview: tool.preview });
         });
         pi.registerTool(tool.definition);

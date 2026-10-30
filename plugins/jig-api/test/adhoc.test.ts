@@ -267,7 +267,15 @@ describe("how a call signs in", () => {
         assert.equal(h.api.requests[0]?.headers["x-sso-session"], "sess-4711-abcdef");
         assert.equal(h.api.requests[0]?.headers.authorization, undefined);
         assert.deepEqual(h.jig.signInCalls, [
-            { name: "company-sso", request: { system: "api:acme", url: `${h.api.origin}/v1/orders/1` } },
+            {
+                name: "company-sso",
+                request: {
+                    system: "api:acme",
+                    url: `${h.api.origin}/v1/orders/1`,
+                    method: "GET",
+                    headers: { "User-Agent": "jig-api", Accept: "application/json, text/plain, */*" },
+                },
+            },
         ]);
         assert.deepEqual(h.jig.secretCalls, []);
     });

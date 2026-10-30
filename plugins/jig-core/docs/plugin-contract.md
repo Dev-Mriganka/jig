@@ -53,6 +53,9 @@ closed instead of running ungoverned.
     [Credential sources](sign-in-and-transports.md)).
 - **`signIn`, `transports`** give a company's sign-in service or transport, by
   name (see [Credential sources](sign-in-and-transports.md)).
+  - A sign-in service is given the whole request: its `method`, `url`,
+    `headers` (without the credential) and `body`, so it can sign a POST as a
+    POST.
 - **`mask.text`, `mask.value`** are the masker, for a tool that masks its own
   results (see [Masking](masking.md)).
 - **`watches`** has `registerKind`, `start`, `list` and `stop` (see
@@ -67,6 +70,20 @@ closed instead of running ungoverned.
   A company plugin gives a tool a network route of its own, such as a database
   behind a jump host or a cloud port forward. The tool connects to `127.0.0.1`
   on the port it gets, and closes the tunnel when done.
+  - **A tunnel says what its port is** with `kind`:
+
+    | `kind` | The port on `127.0.0.1` is | The tool connects |
+    |---|---|---|
+    | `forward` (the default) | A local port that reaches the one host and port asked for | To `127.0.0.1`, as if it were that host |
+    | `socks` | A SOCKS5 proxy that reaches any host the far side can | To its real hosts, through the proxy |
+
+  - **A provider that does not say** gives a `forward`, as every provider did
+    before kinds. `open` always returns the kind, and refuses any other word.
+  - **The target** is where the tool is going. A `forward` reaches exactly that.
+    A `socks` tunnel reaches whatever the tool asks it for, so the target only
+    tells the provider which route to open.
+  - **Why `socks`:** a tool that needs several hosts, such as the members of a
+    replica set, cannot use a forward, which reaches one.
 - **`config`** is what a company plugin adds at start-up, and what a plugin
   keeps for itself.
   - A company adds `addEnvironments`, `addRules`, `addClassifyRules`,
@@ -75,8 +92,13 @@ closed instead of running ungoverned.
     with `section`.
   - A company can give defaults for any plugin's section with
     `addSectionDefaults`. Your own section is laid over them: objects merge key
-    by key, anything else of yours replaces theirs, and the plugin's check still
-    applies.
+    by key, anything else of yours replaces theirs, and the plugin's check sees
+    the result, so a user writes only what they change.
+  - `registerSection(name, validate, { replace })` names the keys where an
+    object of the user's replaces the company's whole, such as `auth`,
+    `backend.auth` or `services.*.ci.auth`.
+  - Defaults that are not valid alone, with no section of the user's, leave the
+    plugin unconfigured and are shown by `/jig`, not reported as a problem.
 - **`exec`** has `run` and `git`, which start programs without a shell (see
   [Running programs](running-programs.md)).
 

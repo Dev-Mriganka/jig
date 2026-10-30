@@ -6,7 +6,7 @@ import path from "node:path";
 import { describe, test } from "node:test";
 import type { ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Check } from "typebox/value";
-import { validateOps } from "../src/catalog.ts";
+import { OPS_REPLACE, validateOps } from "../src/catalog.ts";
 import { CI_ACTIONS, FINISHES } from "../src/ci/adapter.ts";
 import { SYSTEMS } from "../src/ci/adapters.ts";
 import {
@@ -21,6 +21,7 @@ import {
     MAX_WATCH_MINUTES,
     usage as deployUsage,
 } from "../src/deploy/params.ts";
+import { layered } from "../../jig-core/src/section-defaults.ts";
 import plugin, { jigOps } from "../src/index.ts";
 import {
     ACTIONS,
@@ -89,6 +90,67 @@ describe("the extension", () => {
             assert.deepEqual([...jig.kinds.keys()], ["ops-rollout", "ops-ci"]);
             assert.equal(jig.kinds.get("ops-rollout")?.plugin, "jig-ops");
             assert.equal(jig.kinds.get("ops-ci")?.plugin, "jig-ops");
+        } finally {
+            jig.remove();
+        }
+    });
+
+    test("names the keys where your object replaces a company's default whole, and they make a company's defaults usable", () => {
+        const jig = installFakeJig();
+        try {
+            jigOps()(fakePi().pi);
+            assert.deepEqual(jig.sectionReplace.get("ops"), ["services.*.ci.auth", "services.*.environments.*.deploy"]);
+            assert.deepEqual(jig.sectionReplace.get("ops"), OPS_REPLACE);
+
+            // A company gives where the CI server is and how it signs in; you give your own token, and a deploy method.
+            const company = {
+                services: {
+                    "orders-api": {
+                        ci: {
+                            system: "gitlab",
+                            url: "https://ci.example.com",
+                            project: "acme/orders-api",
+                            auth: { signIn: "corp-sso" },
+                        },
+                        environments: {
+                            staging: {
+                                deploy: { method: "helm", release: "orders-api", chart: "deploy/chart" },
+                                runtime: {
+                                    kubernetes: {
+                                        context: "test-cluster",
+                                        namespace: "orders-staging",
+                                        selector: "app=orders-api",
+                                    },
+                                },
+                                health: "https://api.staging.example.com/orders/health",
+                            },
+                        },
+                    },
+                },
+            };
+            const mine = {
+                services: {
+                    "orders-api": {
+                        ci: { auth: { token: "pass:ci/gitlab" } },
+                        environments: {
+                            staging: {
+                                deploy: { method: "kubectl-image", workload: "deployment/orders", container: "orders" },
+                            },
+                        },
+                    },
+                },
+            };
+            assert.deepEqual(validateOps(layered(company, mine, OPS_REPLACE)), []);
+            // Merged key by key, the two sign-ins and the two deploy methods would make mixes that are neither.
+            const mixed = validateOps(layered(company, mine));
+            assert.ok(
+                mixed.some((error) => error.includes("services.orders-api.ci.auth")),
+                mixed.join("\n"),
+            );
+            assert.ok(
+                mixed.some((error) => error.includes("deploy")),
+                mixed.join("\n"),
+            );
         } finally {
             jig.remove();
         }
@@ -357,6 +419,7 @@ describe("the package", () => {
             "hono",
             "ignore",
             "mongodb",
+            "socks",
             "yaml",
         ]);
     });

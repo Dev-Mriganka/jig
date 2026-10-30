@@ -12,6 +12,9 @@ export default function (pi: ExtensionAPI) {
     // jig-core may load after this plugin; withJig waits for it. What the tool declares is how jig-core classifies it.
     withJig((api) => {
         api.declareTool(tool.declaration);
-        api.config.registerSection("logs", validateLogsSection);
+        api.config.registerSection("logs", validateLogsSection, {
+            replace: ["backend.auth"],
+            oneOf: [["backend.auth", "backend.transport"]],
+        });
     });
 }

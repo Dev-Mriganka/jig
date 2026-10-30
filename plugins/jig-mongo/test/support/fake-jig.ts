@@ -1,10 +1,12 @@
 // A stand-in for jig-core's run-time API, published on the same process-wide slot, so the plugin runs as it would under jig-core.
 // Only what jig-mongo uses is real: the section of jig.json, secrets, the kind of an environment, the approved preview, the
-// facts, and `exec.run`, which starts real programs from an argument list with a short environment, as jig-core does. The programs
-// are a fake `ssh`, found through a PATH that starts with its folder.
+// facts, `tunnels` (jig-core's own registry, so what a provider gives is checked as jig-core checks it), and `exec.run`, which
+// starts real programs from an argument list with a short environment, as jig-core does. The programs are a fake `ssh`, found
+// through a PATH that starts with its folder.
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { publishJig, withdrawJig } from "../../../jig-core/src/client.ts";
+import { createTunnels } from "../../../jig-core/src/tunnels.ts";
 import type {
     EnvironmentKind,
     Facts,
@@ -27,6 +29,8 @@ export interface FakeJig {
     declared: Map<string, ToolDeclaration>;
     /** The check each plugin registered for its section of jig.json. */
     sections: Map<string, (raw: unknown) => readonly string[]>;
+    /** The keys each plugin named that replace a company's defaults instead of merging into them. */
+    sectionReplace: Map<string, readonly string[] | undefined>;
     approved: Map<string, Preview>;
     facts: Map<string, Facts[]>;
     /** Secret values by reference, and every reference resolved, in order. */
@@ -61,6 +65,7 @@ const defaultKinds = (): Array<[string, EnvironmentKind]> => [
 export function installFakeJig(): FakeJig {
     const declared = new Map<string, ToolDeclaration>();
     const sections = new Map<string, (raw: unknown) => readonly string[]>();
+    const sectionReplace = new Map<string, readonly string[] | undefined>();
     const values = new Map<string, unknown>();
     const approved = new Map<string, Preview>();
     const facts = new Map<string, Facts[]>();
@@ -69,6 +74,7 @@ export function installFakeJig(): FakeJig {
     const kinds = new Map<string, EnvironmentKind>(defaultKinds());
     const started: Started[] = [];
     const programs = { bin: "" };
+    let tunnels = createTunnels();
 
     function spawnProgram(file: string, args: readonly string[], options: RunOptions): Promise<RunResult> {
         return new Promise((resolve, reject) => {
@@ -143,10 +149,8 @@ export function installFakeJig(): FakeJig {
         },
         environments: { kindOf: (name) => kinds.get(name) ?? "production" },
         tunnels: {
-            register: () => {},
-            open: async () => {
-                throw new Error("no tunnels in tests");
-            },
+            register: (name, provider) => tunnels.register(name, provider),
+            open: (name, target, signal) => tunnels.open(name, target, signal),
         },
         transports: {
             register: () => {},
@@ -182,7 +186,10 @@ export function installFakeJig(): FakeJig {
             addProtectedPaths: () => {},
             addSecretCommands: () => {},
             addMaskFields: () => {},
-            registerSection: (name, validate) => void sections.set(name, validate),
+            registerSection: (name, validate, options) => {
+                sections.set(name, validate);
+                sectionReplace.set(name, options?.replace);
+            },
             addSectionDefaults: () => {},
             section: (name) => {
                 const value = values.get(name);
@@ -209,6 +216,7 @@ export function installFakeJig(): FakeJig {
         api,
         declared,
         sections,
+        sectionReplace,
         approved,
         facts,
         secrets,
@@ -226,6 +234,7 @@ export function installFakeJig(): FakeJig {
             started.length = 0;
             kinds.clear();
             for (const [name, kind] of defaultKinds()) kinds.set(name, kind);
+            tunnels = createTunnels();
         },
         remove: () => withdrawJig(api),
     };
