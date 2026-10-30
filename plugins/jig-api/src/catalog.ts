@@ -7,8 +7,7 @@ import { pathOf } from "./model.ts";
 import type { Collection, Environment, SavedRequest } from "./model.ts";
 
 export interface Catalog {
-    /** Every configured collection, in the order of the configuration. */
-    collections: readonly Collection[];
+    /** One configured collection, read now. Collections are read when something asks for them, and once per catalog. */
     collection(name: string): Collection;
     /** The collections a call may mean: the named one, or all. */
     selected(name: string | undefined): readonly Collection[];
@@ -31,21 +30,23 @@ function inFolder(request: SavedRequest, folder: string): boolean {
 const trimmed = (value: string): string => value.replace(/^\/+|\/+$/g, "");
 
 export function loadCatalog(settings: ApiSettings): Catalog {
-    const collections = [...settings.collections.values()].map((configured) => configured.load());
-    const byName = new Map(collections.map((collection) => [collection.name, collection]));
-
-    const known = (): string => shortList(collections.map((collection) => collection.name), ", ", 80);
+    const read = new Map<string, Collection>();
+    const known = (): string => shortList([...settings.collections.keys()], ", ", 80);
 
     const catalog: Catalog = {
-        collections,
-
         collection(name) {
-            const found = byName.get(name);
-            if (found === undefined) throw new InputError(`no collection named ${shown(name, 30)}. Known collections: ${known()}`);
-            return found;
+            const configured = settings.collections.get(name);
+            if (configured === undefined) throw new InputError(`no collection named ${shown(name, 30)}. Known collections: ${known()}`);
+            let collection = read.get(name);
+            if (collection === undefined) {
+                collection = configured.load();
+                read.set(name, collection);
+            }
+            return collection;
         },
 
-        selected: (name) => (name === undefined ? collections : [catalog.collection(name)]),
+        selected: (name) =>
+            (name === undefined ? [...settings.collections.keys()].map((each) => catalog.collection(each)) : [catalog.collection(name)]),
 
         request(name, collection, folder) {
             if (typeof name !== "string" || name.trim() === "") throw new InputError("api needs request, the name of a saved request");
