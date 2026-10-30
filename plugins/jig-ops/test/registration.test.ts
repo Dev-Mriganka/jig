@@ -239,7 +239,11 @@ describe("the package", () => {
         const core = manifest.pi.extensions.indexOf("./plugins/jig-core/src/index.ts");
         const ops = manifest.pi.extensions.indexOf("./plugins/jig-ops/src/index.ts");
         assert.ok(core === 0 && ops > core, "jig-ops comes after jig-core");
-        assert.equal(manifest.pi.extensions.slice(ops).join(","), "./plugins/jig-ops/src/index.ts,./plugins/jig-review/src/index.ts", "only jig-review comes after it");
+        assert.equal(
+            manifest.pi.extensions.slice(ops).join(","),
+            "./plugins/jig-ops/src/index.ts,./plugins/jig-review/src/index.ts,./plugins/jig-theme/src/index.ts",
+            "only jig-review and jig-theme come after it",
+        );
         assert.equal(manifest.pi.extensions.some((entry) => entry.includes("jig-k8s")), false, "jig-k8s is not a plugin of its own");
         assert.deepEqual(manifest.pi.skills, ["./plugins/*/skills"]);
         assert.ok(fs.existsSync(path.join(ROOT, manifest.pi.extensions[ops] as string)));

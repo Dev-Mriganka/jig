@@ -55,6 +55,18 @@ export function build(palette: Palette, name: string): PiTheme {
     };
 }
 
+/** A palette with some of its colours and roles changed: what you list replaces the base's, and nothing else changes. */
+export function derive(
+    base: Palette,
+    changes: { vars?: Readonly<Record<string, ColorValue>>; colors?: Readonly<Record<string, ColorValue>> },
+): Palette {
+    return {
+        appearance: base.appearance,
+        vars: { ...base.vars, ...changes.vars } as Palette["vars"],
+        colors: { ...base.colors, ...changes.colors } as Palette["colors"],
+    };
+}
+
 /** The text of a theme file. */
 export const themeText = (theme: PiTheme): string => `${JSON.stringify(theme, null, 2)}\n`;
 
