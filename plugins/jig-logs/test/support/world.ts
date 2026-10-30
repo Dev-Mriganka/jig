@@ -77,7 +77,6 @@ export async function world(t: TestContext, options: WorldOptions = {}): Promise
     const responder = options.responder ?? fixtureResponder(options.docs ?? []);
     let requests: Recorded[];
     let transport: FakeTransport | undefined;
-    let fetchOption: typeof fetch | undefined;
     if (options.backend === "transport") {
         transport = fakeTransport(responder, { ignoreSignal: options.ignoreSignal === true });
         jig.transports.set("corp", transport);
@@ -85,12 +84,12 @@ export async function world(t: TestContext, options: WorldOptions = {}): Promise
     } else {
         const server = await startServer(responder);
         t.after(() => server.close());
-        fetchOption = routeTo(server);
+        jig.setFetch(routeTo(server));
         requests = server.requests;
     }
 
     // What the plugin's factory does with jig-core, with the parts a test replaces.
-    const tool = createLogsTool({ now: () => NOW, fetch: fetchOption, timeoutMs: options.timeoutMs ?? 20_000 });
+    const tool = createLogsTool({ now: () => NOW, timeoutMs: options.timeoutMs ?? 20_000 });
     jig.api.declareTool(tool.declaration);
     jig.api.config.registerSection("logs", validateLogsSection);
     jig.setSection("logs", options.section ?? logsSection(options));

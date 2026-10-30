@@ -7,6 +7,7 @@
 // Every credential the fake hands out is remembered in `issued`, so a test can check that none of them reaches an error
 // or a result.
 import { publishJig, withdrawJig } from "../../../jig-core/src/client.ts";
+import { createHttp } from "../../../jig-core/src/kit/http.ts";
 import type {
     Facts,
     JigApi,
@@ -39,6 +40,8 @@ export interface FakeJig {
     /** The transports plugins registered, and the requests sent through them. */
     transports: Map<string, Transport>;
     sent: TransportRequest[];
+    /** The network that `http.request` uses for a direct request. Default: the global `fetch`. */
+    setFetch(fetchImpl: typeof fetch | undefined): void;
     facts: Map<string, Facts[]>;
     /** Every text or value the plugin asked jig-core to mask. jig-core masks results itself, so this stays empty. */
     masked: unknown[];
@@ -59,6 +62,7 @@ export function installFakeJig(): FakeJig {
     const facts = new Map<string, Facts[]>();
     const masked: unknown[] = [];
     const state = { secretDelayMs: 0 };
+    let fetchImpl: typeof fetch | undefined;
 
     const wait = (ms: number, signal: AbortSignal | undefined) =>
         new Promise<void>((resolve, reject) => {
@@ -131,11 +135,8 @@ export function installFakeJig(): FakeJig {
                 return headers;
             },
         },
-        http: {
-            request: async () => {
-                throw new Error("this fake has no http");
-            },
-        },
+        // The real request logic over this fake's secrets, sign-in services, transports and network.
+        http: { request: (request, signal) => http.request(request, signal) },
 
         mask: {
             text: (input) => (masked.push(input), input),
@@ -174,6 +175,13 @@ export function installFakeJig(): FakeJig {
         },
     };
 
+    const http = createHttp({
+        fetch: (input, init) => (fetchImpl ?? fetch)(input, init),
+        secrets: { resolve: (reference, signal) => api.secrets.resolve(reference, signal) },
+        signIn: { headers: (name, request, signal) => api.signIn.headers(name, request, signal) },
+        transports: { request: (name, request, signal) => api.transports.request(name, request, signal) },
+    });
+
     publishJig(api);
     return {
         api,
@@ -193,6 +201,9 @@ export function installFakeJig(): FakeJig {
         issued,
         transports,
         sent,
+        setFetch: (replacement) => {
+            fetchImpl = replacement;
+        },
         facts,
         masked,
         remove: () => withdrawJig(api),

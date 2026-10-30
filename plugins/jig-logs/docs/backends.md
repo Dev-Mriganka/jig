@@ -30,7 +30,7 @@ adapter says how to ask, and how to read the answer.
 |---|---|
 | The checks on a call, windows, buckets, halving and retrying, the budgets | The settings an environment needs, and their checks |
 | Paging, excerpts around a term, clipping, hit lines | The request for one bucket, and the check for data |
-| The sender: sign-in, secrets, transports, timeouts, the size of a reply | How a request travels: method, path, body, headers |
+| The sender: where the credential comes from, timeouts, the size of a reply, and what each failure means (`jig-core` sends the request and reads the secret) | How a request travels: method, path, body, headers |
 | The words of a failure, and the facts a call records | Reading a reply into hits |
 | | What an error reply means |
 | | The limits of the store |
