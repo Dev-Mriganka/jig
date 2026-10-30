@@ -56,8 +56,7 @@ This tool lists and stops the watches of every plugin.
 
 `jig.json` in Pi's agent folder: `~/.pi/agent/jig.json`, unless
 `PI_CODING_AGENT_DIR` points elsewhere. A separate Pi profile has its own file.
-All fields are optional. Company plugins add environments, classification rules
-and masking field names at start-up, and register sign-in services.
+All fields are optional.
 
 | Field | Default | Meaning |
 |---|---|---|
@@ -97,6 +96,14 @@ starts with the defaults rather than guessing. So is a wrong type or value.
 - **Hiding a tool that the rules deny completely** from the model.
 - **The form screen.** The form kind uses the selector for now.
 
+## Company part (in the company plugin)
+
+At start-up, it adds to what `jig-core` knows:
+- environments, and which of its targets count as production;
+- rules and classification rules for its own tools;
+- field names that hold personal data in its systems, for masking;
+- sign-in services and transports for its systems.
+
 ## Origin
 
 `jig-core` is its own code. It borrows patterns from
@@ -123,16 +130,12 @@ jig-core/
 
 ## More detail
 
-- [Watches](docs/watches.md): polling, finish lines, saving, and the messages
-- [Sign-in services and transports](docs/sign-in-and-transports.md): how a
-  company plugin signs requests in or carries them
-- [What asks, what is blocked](docs/approval-screens.md): the order of a
-  decision, and the dialog, review screen and form
-- [What happens to a result](docs/results.md): redact, mask and cap
+- [Watches](docs/watches.md): kinds, polling, finish lines, messages, saving
+- [Sign-in and transports](docs/sign-in-and-transports.md): how a company signs in
+- [What asks](docs/approval-screens.md): the order of a decision, and the screens
+- [Results](docs/results.md): what happens to a result: redact, mask and cap
 - [Masking](docs/masking.md): what counts as personal data, and the tokens
 - [Records](docs/records.md): the line per call and per turn, facts, error kinds
-- [Configuration reference](docs/configuration.md): rule matching, secret
-  references, sections of other plugins, environment variables
+- [Configuration](docs/configuration.md): rule matching, secrets, sections, variables
 - [Running programs](docs/running-programs.md): no shell, and the checks on git
-- [The contract for plugins](docs/plugin-contract.md): what a plugin gets from
-  `jig-core`, and the events
+- [Plugin contract](docs/plugin-contract.md): what a plugin gets from `jig-core`

@@ -104,11 +104,6 @@ are read as an HTTP answer is.
 - default fields: friendly names, the fields `update` may set, private names;
 - the environment name, when it is not `external`.
 
-## Later
-
-- **A first run against a real Jira,** in both editions and with a real
-  sign-in (see [Not verified yet](docs/not-verified.md)).
-
 ## Layout
 
 ```text

@@ -2,7 +2,8 @@
 
 Checked on 2026-10-30. About 2,200 of the 13,000 Pi packages on npm were
 sampled, and the strongest were read in source or README. Nothing has been
-installed or run yet.
+installed or run yet, apart from AI Observer (in a sandbox with no network) and
+Grafana (for `jig-lens`).
 
 Each package gets one of four verdicts:
 - **use as is;**
@@ -149,7 +150,8 @@ Credentials stay out of `bash` (see [Permissions](permissions.md)).
 
 ## Not verified
 
-- **Behaviour comes from source, docs and READMEs only.** Nothing has been run.
+- **Behaviour comes from source, docs and READMEs only.** Nothing has been run,
+  apart from the two named at the top.
 - **`pi-ask-questions`:** whether other packages can open it, and how it
   behaves on Pi 1.4.
 - **WSL2:** the Linux Secret Service has not been tried there.

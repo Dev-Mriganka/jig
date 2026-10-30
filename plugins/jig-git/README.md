@@ -74,7 +74,8 @@ them. `checks` covers GitHub only; other CI systems belong in a company plugin
 
 ## Rules
 
-- **Reads and local writes run; writes to GitHub ask you.** A rule in your
+- **Reads and local writes run; writes to GitHub ask you.** Every tool declares
+  the environment and effect of each action to `jig-core`, and a rule in your
   configuration can change any default, within the floor.
 - **Which repository.** Every action takes an optional `repo`: a folder name in
   the workspace, or an absolute path inside a work tree. The workspace is the
@@ -130,11 +131,6 @@ invalid field, and the defaults apply instead.
   `staging`, within the policy for automatic deploys;
 - other CI systems and deploy tools.
 
-## Later
-
-- **A first run against GitHub itself:** rate limits, `X-Poll-Interval`, branch
-  protection and the GraphQL queries (see [Not verified yet](docs/not-verified.md)).
-
 ## Layout
 
 ```text
@@ -156,8 +152,10 @@ jig-git/
 ## More detail
 
 - [Watching CI](docs/watching-ci.md): the watch, its finish lines, polling, events
-- [Artifacts and deploys](docs/artifacts-and-deploys.md): "artifact ready", and why `jig-git` never deploys
+- [Artifacts and deploys](docs/artifacts-and-deploys.md): "artifact ready", and
+  why `jig-git` never deploys
 - [Writes](docs/writes.md): what you see before a write asks, and lost replies
 - [Scope](docs/scope.md): what is left out on purpose, and what belongs elsewhere
-- [Background](docs/background.md): the sessions the tool list comes from, and what was ported
+- [Background](docs/background.md): the sessions the tool list comes from, and
+  what was ported
 - [Not verified yet](docs/not-verified.md): what the tests do not cover
