@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, test } from "node:test";
 import { readHttp } from "../src/config.ts";
-import { planOf } from "../src/plan.ts";
+import { planOf } from "../src/engine/plan.ts";
 import { ok, SECRET_REFERENCE, setupHarness } from "./support/harness.ts";
 import type { Harness } from "./support/harness.ts";
 

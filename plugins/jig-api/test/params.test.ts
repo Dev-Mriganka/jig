@@ -5,7 +5,7 @@ import { describe, test } from "node:test";
 import { readHttp } from "../src/config.ts";
 import type { HttpSettings } from "../src/config.ts";
 import { findTarget, isMethod, MAX_BODY_BYTES, METHODS, parseCall, USAGE } from "../src/params.ts";
-import { InputError } from "../src/values.ts";
+import { InputError } from "../src/engine/values.ts";
 
 function settingsOf(section: Record<string, unknown>): HttpSettings {
     const read = readHttp(section);

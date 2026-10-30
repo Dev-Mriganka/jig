@@ -6,15 +6,15 @@ import { jig } from "../../jig-core/src/client.ts";
 import type { CallClass, Preview } from "../../jig-core/src/contract.ts";
 import { settingsOf } from "./config.ts";
 import type { HttpSettings } from "./config.ts";
-import { createHttp } from "./http.ts";
-import type { HttpOptions, Sent } from "./http.ts";
+import { createHttp } from "./engine/http.ts";
+import type { HttpOptions, Sent } from "./engine/http.ts";
 import { findTarget, parameters, parseCall } from "./params.ts";
-import { planOf } from "./plan.ts";
-import type { Plan } from "./plan.ts";
-import { previewOf } from "./preview.ts";
-import { renderResult } from "./render.ts";
-import { InputError } from "./values.ts";
-import { LostReplyError, NotSentError } from "./wire.ts";
+import { planOf } from "./engine/plan.ts";
+import type { Plan } from "./engine/plan.ts";
+import { previewOf } from "./engine/preview.ts";
+import { renderResult } from "./engine/render.ts";
+import { InputError } from "./engine/values.ts";
+import { LostReplyError, NotSentError } from "./engine/wire.ts";
 
 const DESCRIPTION =
     "Call a named HTTP API with a method, path, JSON body and headers. GET reads; other methods write. " +

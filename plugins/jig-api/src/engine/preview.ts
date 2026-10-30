@@ -1,6 +1,6 @@
 // What the person reads before a call that asks: the target, the method, the full address, the headers the model gave
 // and the body. The sign-in is named but never shown: the tool adds it, and a header or a token is not in the plan.
-import type { Preview } from "../../jig-core/src/contract.ts";
+import type { Preview } from "../../../jig-core/src/contract.ts";
 import { prettyJson } from "./json.ts";
 import { describeAuth } from "./plan.ts";
 import type { Plan } from "./plan.ts";

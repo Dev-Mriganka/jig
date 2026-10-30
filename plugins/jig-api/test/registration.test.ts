@@ -51,7 +51,7 @@ describe("the extension", () => {
         }
     });
 
-    test("tells jig-core its section and its tool, which is declared as a jig-http tool", () => {
+    test("tells jig-core its section and its tool, which is declared as a jig-api tool", () => {
         const jig = installFakeJig();
         try {
             load();
@@ -61,7 +61,7 @@ describe("the extension", () => {
             assert.deepEqual(check({ targets: { api: target } }), []);
             assert.equal(check({ targets: { api: { ...target, baseUrl: "http://api.example.test" } } }).length, 1);
             const declaration = jig.declared.get("http");
-            assert.equal(declaration?.plugin, "jig-http");
+            assert.equal(declaration?.plugin, "jig-api");
             assert.equal(declaration?.tool, "http");
             assert.equal(typeof declaration?.preview, "function");
             assert.equal(declaration?.masksOwnResults, undefined, "jig-core masks production results");
@@ -77,7 +77,7 @@ describe("the extension", () => {
         assert.equal(first.declared.has("http"), false, "nothing was declared into the jig-core that went away");
         const jig = installFakeJig();
         try {
-            assert.equal(jig.declared.get("http")?.plugin, "jig-http");
+            assert.equal(jig.declared.get("http")?.plugin, "jig-api");
             assert.ok(jig.sections.has("http"));
         } finally {
             jig.remove();
@@ -107,13 +107,13 @@ describe("the package", () => {
     const manifest = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")) as { pi: { extensions: string[]; skills: string[] } };
 
     test("Pi loads the extension and finds the skill", () => {
-        assert.ok(manifest.pi.extensions.includes("./plugins/jig-http/src/index.ts"));
+        assert.ok(manifest.pi.extensions.includes("./plugins/jig-api/src/index.ts"));
         assert.ok(manifest.pi.skills.includes("./plugins/*/skills"));
-        assert.ok(fs.existsSync(path.join(root, "plugins", "jig-http", "src", "index.ts")));
+        assert.ok(fs.existsSync(path.join(root, "plugins", "jig-api", "src", "index.ts")));
     });
 
     test("the skill has the frontmatter Pi needs: a name that is its folder, and a description that says when to use it", () => {
-        const text = fs.readFileSync(path.join(root, "plugins", "jig-http", "skills", "http", "SKILL.md"), "utf8");
+        const text = fs.readFileSync(path.join(root, "plugins", "jig-api", "skills", "http", "SKILL.md"), "utf8");
         const [, head = ""] = /^---\n([\s\S]*?)\n---\n/.exec(text) ?? [];
         assert.match(head, /^name: http$/m);
         const description = /^description: (.*)$/m.exec(head)?.[1] ?? "";

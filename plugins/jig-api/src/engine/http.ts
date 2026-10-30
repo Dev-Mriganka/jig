@@ -5,8 +5,8 @@
 // unknown, and the caller says so (see tool.ts). The one exception is a 401 for an OAuth token that came from the cache.
 // That is the server turning the request down because the token has expired, before it acted on it, so sending it again with
 // a new token cannot repeat a write.
-import { jig } from "../../jig-core/src/client.ts";
-import type { Call } from "./params.ts";
+import { jig } from "../../../jig-core/src/client.ts";
+import type { Call } from "../params.ts";
 import { createTokens } from "./oauth.ts";
 import type { Plan } from "./plan.ts";
 import { credentialsOf, scrubbed } from "./scrub.ts";
@@ -34,7 +34,7 @@ export interface Http {
 
 const OWN_HEADERS: ReadonlyArray<readonly [string, string]> = [
     ["Accept", "application/json, text/plain, */*"],
-    ["User-Agent", "jig-http"],
+    ["User-Agent", "jig-api"],
 ];
 
 /** The tool's headers, then the caller's, which replace the tool's of the same name, then the sign-in's, which replace

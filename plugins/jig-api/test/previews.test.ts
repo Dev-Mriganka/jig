@@ -2,7 +2,7 @@
 // tool would send now differs from what was approved, nothing is sent: "changed since the preview".
 import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, test } from "node:test";
-import { SHOWN_LINES } from "../src/values.ts";
+import { SHOWN_LINES } from "../src/engine/values.ts";
 import { ok, SECRET, SECRET_REFERENCE, setupHarness } from "./support/harness.ts";
 import type { Harness } from "./support/harness.ts";
 

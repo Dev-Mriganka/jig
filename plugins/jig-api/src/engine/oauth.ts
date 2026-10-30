@@ -4,8 +4,8 @@
 // The token is never written anywhere, never logged and never put in a result or an error. jig-core cannot hide it, because
 // it did not resolve it, so http.ts removes it from every answer (see scrub.ts). Every failure here is a NotSentError:
 // whether or not the token endpoint got the request, nothing has gone to the API yet.
-import { jig } from "../../jig-core/src/client.ts";
-import type { OAuthPassword, Target } from "./config.ts";
+import { jig } from "../../../jig-core/src/client.ts";
+import type { OAuthPassword, Target } from "../config.ts";
 import { errorMessage, isObject } from "./values.ts";
 import { exchange, LostReplyError, NotSentError } from "./wire.ts";
 import type { Answer, Stops, Wire } from "./wire.ts";
@@ -86,7 +86,7 @@ function tokenRequest(target: Target, oauth: OAuthPassword, account: Account): W
     const headers: Record<string, string> = {
         Accept: "application/json",
         "Content-Type": "application/x-www-form-urlencoded",
-        "User-Agent": "jig-http",
+        "User-Agent": "jig-api",
     };
     if (account.clientSecret !== undefined) {
         // RFC 6749, section 2.3.1: the client's id and secret are form-encoded before they are joined.

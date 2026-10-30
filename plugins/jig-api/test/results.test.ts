@@ -3,10 +3,10 @@
 import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, test } from "node:test";
 import { gzipSync } from "node:zlib";
-import { prettyJson } from "../src/json.ts";
-import { shownHeaders } from "../src/render.ts";
-import { SHOWN_LINES } from "../src/values.ts";
-import { MAX_ANSWER_BYTES } from "../src/wire.ts";
+import { prettyJson } from "../src/engine/json.ts";
+import { shownHeaders } from "../src/engine/render.ts";
+import { SHOWN_LINES } from "../src/engine/values.ts";
+import { MAX_ANSWER_BYTES } from "../src/engine/wire.ts";
 import { ok, setupHarness } from "./support/harness.ts";
 import type { Harness } from "./support/harness.ts";
 

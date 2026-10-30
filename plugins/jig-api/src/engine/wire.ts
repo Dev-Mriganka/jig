@@ -7,10 +7,10 @@
 //                      For a write, whether it happened is unknown, so it is never sent again.
 //
 // A redirect is never followed, so that a token or a signature cannot be sent to another host or in the clear.
-import { jig } from "../../jig-core/src/client.ts";
-import type { TransportRequest, TransportResponse } from "../../jig-core/src/contract.ts";
-import { addressProblem } from "./config.ts";
-import type { Method } from "./params.ts";
+import { jig } from "../../../jig-core/src/client.ts";
+import type { TransportRequest, TransportResponse } from "../../../jig-core/src/contract.ts";
+import { addressProblem } from "../config.ts";
+import type { Method } from "../params.ts";
 import { errorMessage, isObject, oneLine } from "./values.ts";
 
 /** A longer answer is cut here. The model reads far less, and jig-core caps what it shows. */

@@ -4,8 +4,8 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import type { TestContext } from "node:test";
-import { exchange, LostReplyError, MAX_ANSWER_BYTES, NotSentError } from "../src/wire.ts";
-import type { Wire } from "../src/wire.ts";
+import { exchange, LostReplyError, MAX_ANSWER_BYTES, NotSentError } from "../src/engine/wire.ts";
+import type { Wire } from "../src/engine/wire.ts";
 
 const wire = (extra: Partial<Wire> = {}): Wire => ({
     system: "http:api",

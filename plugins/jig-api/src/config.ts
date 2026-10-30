@@ -1,6 +1,6 @@
 // The `http` section of jig.json: the named targets a call can reach, and how each one signs in. jig-core checks the
 // section with validateHttp when a session starts, so the rest of the plugin reads settings that are valid.
-import { isObject, shown } from "./values.ts";
+import { isObject, shown } from "./engine/values.ts";
 
 /** What the `oauthPassword` sign-in needs: the OAuth 2.0 password grant (RFC 6749, section 4.3). */
 export interface OAuthPassword {

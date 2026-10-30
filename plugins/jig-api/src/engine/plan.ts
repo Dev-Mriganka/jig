@@ -3,8 +3,8 @@
 // fingerprint ties them together: if the plan at execution differs from the one that was approved, nothing is sent
 // (see tool.ts).
 import { createHash } from "node:crypto";
-import type { Auth } from "./config.ts";
-import type { Call } from "./params.ts";
+import type { Auth } from "../config.ts";
+import type { Call } from "../params.ts";
 import { InputError } from "./values.ts";
 
 export interface Plan {

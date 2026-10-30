@@ -3,7 +3,7 @@
 import type { ExtensionAPI, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { withJig } from "../../jig-core/src/client.ts";
 import { validateHttp } from "./config.ts";
-import type { HttpOptions } from "./http.ts";
+import type { HttpOptions } from "./engine/http.ts";
 import { createTool } from "./tool.ts";
 
 export type { HttpOptions };
@@ -14,7 +14,7 @@ export function jigHttp(options: HttpOptions = {}): ExtensionFactory {
         const tool = createTool(options);
         withJig((api) => {
             api.config.registerSection("http", validateHttp);
-            api.declareTool({ tool: "http", plugin: "jig-http", classify: tool.classify, preview: tool.preview });
+            api.declareTool({ tool: "http", plugin: "jig-api", classify: tool.classify, preview: tool.preview });
         });
         pi.registerTool(tool.definition);
     };

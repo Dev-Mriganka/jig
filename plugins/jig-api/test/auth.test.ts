@@ -55,7 +55,7 @@ describe("no sign-in", () => {
         assert.equal(request.headers.authorization, undefined);
         assert.equal(request.headers.cookie, undefined);
         assert.equal(request.headers.accept, "application/json, text/plain, */*");
-        assert.equal(request.headers["user-agent"], "jig-http");
+        assert.equal(request.headers["user-agent"], "jig-api");
         assert.equal(request.headers["content-type"], undefined, "no body, no content type");
         assert.deepEqual([h.jig.secretCalls, h.jig.signInCalls, h.jig.transportCalls], [[], [], []]);
     });
@@ -211,7 +211,7 @@ describe("a company transport", () => {
             system: "http:api",
             method: "POST",
             url: `${h.api.origin}/v1/items?x=1`,
-            headers: { Accept: "application/json, text/plain, */*", "User-Agent": "jig-http", "Content-Type": "application/json", "X-Trace": "t" },
+            headers: { Accept: "application/json, text/plain, */*", "User-Agent": "jig-api", "Content-Type": "application/json", "X-Trace": "t" },
             body: '{"name":"Zed"}',
         });
         // What the proxy forwarded is what the API saw: only what the proxy adds identifies the session.
