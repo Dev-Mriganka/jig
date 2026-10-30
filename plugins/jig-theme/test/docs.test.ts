@@ -226,3 +226,14 @@ test("the picture is an image with a description, and its swatches are jig-signa
     const readme = read(README);
     assert.ok(readme.includes("(../../docs/img/theme-palettes.svg)"));
 });
+
+test("the root documents list the plugin", () => {
+    assert.match(read(path.join(ROOT, "docs/plugins.md")), /\[`jig-theme`\]\(\.\.\/plugins\/jig-theme\/README\.md\) \| built \|/);
+    assert.match(read(path.join(ROOT, "README.md")), /\[`jig-theme`\]\(plugins\/jig-theme\/README\.md\) \| built \|/);
+    assert.match(read(path.join(ROOT, "AGENTS.md")), /`jig-theme` is built/);
+    assert.match(read(path.join(ROOT, "README.md")), /ten of the thirteen plugins are built/);
+    assert.match(read(path.join(ROOT, "docs/architecture.md")), /jig-theme {2}the look/);
+    const glossary = read(path.join(ROOT, "docs/glossary.md"));
+    assert.match(glossary, /\| \*\*Palette\*\* \|/);
+    assert.match(glossary, /\| \*\*Footer part\*\* \|/);
+});

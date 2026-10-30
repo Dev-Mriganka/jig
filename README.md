@@ -4,7 +4,7 @@ Jig is a set of plugins for the [Pi](https://pi.dev) coding agent. They decide
 what the agent may do, ask you when it matters, keep secrets out of its reach,
 and record what happened so you can see it later.
 
-**Status:** nine of the twelve plugins are built. Each plugin's README is the
+**Status:** ten of the thirteen plugins are built. Each plugin's README is the
 specification that its code follows.
 
 ## What works today
@@ -18,7 +18,7 @@ for you. `jig-jira` reads and changes Jira issues, with rendered previews.
 team's saved API requests by name, with sign-in added by the tool. `jig-ops`
 looks at CI on GitHub Actions, GitLab CI or Jenkins and watches it until it
 finishes, deploys a version to a test environment and reads what runs, all from
-one service catalog. `jig-review` opens a private code review of the agent's changes in the browser, with comments the agent answers round by round, and you approve it with a passkey. The other plugins are designs.
+one service catalog. `jig-review` opens a private code review of the agent's changes in the browser, with comments the agent answers round by round, and you approve it with a passkey. `jig-theme` gives Pi six palettes as themes, palettes of your own from `jig.json`, a one-line footer of model, context, cache time and cost, and answers in the theme's text colour. The other plugins are designs.
 
 ## Where Jig sits
 
@@ -47,6 +47,7 @@ one service catalog. `jig-review` opens a private code review of the agent's cha
 | [`jig-api`](plugins/jig-api/README.md) | built | Your team's saved API requests (Postman, `.http` files, Bruno, OpenAPI), run by name with only their variables filled, and sign-in added by the tool |
 | [`jig-ops`](plugins/jig-ops/README.md) | built | CI on GitHub Actions, GitLab CI or Jenkins and watching it until it finishes, deploy and run on a platform, from one service catalog |
 | [`jig-review`](plugins/jig-review/README.md) | built | Code review in the browser: line comments the agent answers round by round, and approval with a passkey |
+| [`jig-theme`](plugins/jig-theme/README.md) | built | Six palettes as Pi themes, your own in `jig.json`, a one-line footer of model, context, cache time and cost, and answers in the theme's text colour |
 | [`jig-agents`](plugins/jig-agents/README.md) | design | Subagents in terminal panes |
 
 Every plugin needs `jig-core`; otherwise they work on their own.
