@@ -4,6 +4,7 @@
 // the defaults, so a typo never leaves a tool half configured. `watch` and `artifacts` were here while jig-git ran the CI
 // watch; they are `ops.watch` and `ops.artifacts` now, and the error for them says so.
 import { jig } from "../../jig-core/src/client.ts";
+import { isObject } from "../../jig-core/src/kit/values.ts";
 import { checkBranch } from "./names.ts";
 
 export interface GitSettings {
@@ -22,10 +23,6 @@ const TOP = new Set(["base", "protected", "commitMessage", "branchName", "prTemp
 const MOVED: Readonly<Record<string, string>> = { watch: "ops.watch", artifacts: "ops.artifacts" };
 const BRANCH_PATTERN = /^[A-Za-z0-9._/*-]+$/;
 const HOST = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
-
-function isObject(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function checkRegExp(value: unknown, key: string, errors: string[]): void {
     if (typeof value !== "string" || value === "") {

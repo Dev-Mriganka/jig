@@ -5,6 +5,7 @@
 // package, so what it gives back is checked here, where its mistake would otherwise show up as a confusing failure.
 import type { Tunnel, TunnelProvider } from "./contract.ts";
 import { errorMessage } from "./errors.ts";
+import { printable } from "./kit/text.ts";
 
 export interface Tunnels {
     register(name: string, provider: TunnelProvider): void;
@@ -12,11 +13,6 @@ export interface Tunnels {
 }
 
 const MAX_NAMES_SHOWN = 10;
-
-function printable(text: string): string {
-    const clean = text.replace(/[\u0000-\u001f\u007f]/g, "?");
-    return clean.length > 60 ? `${clean.slice(0, 60)}...` : clean;
-}
 
 function validPort(port: unknown): port is number {
     return typeof port === "number" && Number.isInteger(port) && port >= 1 && port <= 65535;

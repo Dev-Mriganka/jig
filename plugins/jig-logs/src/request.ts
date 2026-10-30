@@ -5,6 +5,7 @@
 //
 // Credentials are resolved when a request is made and live only in this file's local variables. No message made here
 // holds one: an error names what failed (a status, an error code) and never the headers or the body that were sent.
+import { untilAborted } from "../../jig-core/src/kit/abort.ts";
 import { jig } from "../../jig-core/src/client.ts";
 import type { Wire } from "./backends/backend.ts";
 import type { Auth, Backend } from "./config.ts";
@@ -154,16 +155,6 @@ async function viaTransport(name: string, url: string, wire: Wire, signal: Abort
     const reply = await untilAborted(jig().transports.request(name, request, signal), signal);
     if (Buffer.byteLength(reply.body) > MAX_REPLY_BYTES) throw new RequestError("response_too_large");
     return { status: reply.status, body: reply.body };
-}
-
-/** A transport is another package's code and may ignore its signal. This stops waiting for it when the signal fires. */
-function untilAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
-        const stop = () => reject(signal.reason);
-        work.then(resolve, reject).finally(() => signal.removeEventListener("abort", stop));
-        if (signal.aborted) stop();
-        else signal.addEventListener("abort", stop, { once: true });
-    });
 }
 
 type SignIn = (url: string, signal: AbortSignal | undefined) => Promise<Readonly<Record<string, string>>>;

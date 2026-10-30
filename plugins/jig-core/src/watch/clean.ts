@@ -7,6 +7,7 @@
 // The order is the one for a tool result: redact secrets, mask personal data, cut to size. Terminal escape codes go
 // first, because a code in the middle of a secret would stop the redactor from finding it.
 import type { WatchResult } from "../contract.ts";
+import { isObject } from "../kit/values.ts";
 import { cleanFacts } from "../records.ts";
 
 /** What the engine cleans with. `mask` throws when it cannot mask; the caller then withholds the text. */
@@ -24,10 +25,6 @@ export const MAX_LINK_CHARS = 500;
 export const WITHHELD = "withheld: it could not be masked";
 
 const OUTCOMES: readonly string[] = ["passed", "failed", "timed-out", "stopped", "error"];
-
-function isObject(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 /** Whether a plugin's answer has the shape of a result. A poll that ends with anything else is a failed poll. */
 export function isWatchResult(value: unknown): value is WatchResult {

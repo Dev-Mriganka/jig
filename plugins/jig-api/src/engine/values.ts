@@ -1,20 +1,10 @@
 // Small helpers the modules share: the error that means "invalid input", and ways to put a value into a message.
+import { stringOf } from "../../../jig-core/src/kit/text.ts";
+import { InputError, isObject } from "../../../jig-core/src/kit/values.ts";
 
-/**
- * A mistake in a call's input, or in the configuration it names. jig-core takes a `TypeError` from a preview to mean
- * "invalid input" and blocks the call without asking, so every such finding is an InputError, which is a TypeError. A
- * TypeError from a bug in this plugin is not an InputError, and tool.ts keeps it from being mistaken for one.
- */
-export class InputError extends TypeError {
-    constructor(message: string) {
-        super(message);
-        this.name = "InputError";
-    }
-}
-
-export function isObject(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+/** Shared with the other plugins (jig-core's `kit/values.ts`). A mistake in a call's input is an InputError, a
+ *  TypeError that jig-core reads as "invalid input"; tool.ts keeps a TypeError from a bug here from being mistaken for one. */
+export { InputError, isObject };
 
 /** Lines of a body that a person or the model is shown: a preview cuts a long body to this, and a result a long text. */
 export const SHOWN_LINES = 200;
@@ -24,21 +14,13 @@ export function errorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
 }
 
-function printable(value: unknown): string {
-    try {
-        return String(value);
-    } catch {
-        return "(cannot be shown)";
-    }
-}
-
 /** A value as it can appear in a message: JSON on one line, cut. Control characters come out escaped. */
 export function shown(value: unknown, max = 40): string {
     let text: string;
     try {
-        text = JSON.stringify(value) ?? printable(value);
+        text = JSON.stringify(value) ?? stringOf(value);
     } catch {
-        text = printable(value);
+        text = stringOf(value);
     }
     return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }

@@ -117,6 +117,7 @@ jig-core/
     secrets.ts, signin.ts, transports.ts, redact.ts,
     cap.ts, records.ts                                   secrets, sign-in, and what happens to data
     exec.ts, git-config-guard.ts, commands.ts            running programs and git safely; /jig
+    kit/                                                 stateless helpers that plugins import (see the contract)
     mask/                                                the masker, written separately
     watch/                                               the watch engine and the `watch` tool
   test/                                                  unit tests, and tests inside a real Pi session

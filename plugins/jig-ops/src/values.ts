@@ -2,19 +2,13 @@
 // kubectl's JSON, and ways to put a value or a piece of cluster text into a message.
 import { createHash } from "node:crypto";
 import type { Facts } from "../../jig-core/src/contract.ts";
+import { stringOf } from "../../jig-core/src/kit/text.ts";
+import { InputError, isObject } from "../../jig-core/src/kit/values.ts";
 
-/**
- * A mistake in a call's input, or in the configuration it names. jig-core takes a `TypeError` from a tool's classify to
- * mean "invalid input" and blocks the call without asking. Every such finding is an InputError, which is a TypeError.
- * A TypeError from a bug in this plugin is not one, and `classifying` keeps the two apart, so a bug is never reported
- * as the model's mistake.
- */
-export class InputError extends TypeError {
-    constructor(message: string) {
-        super(message);
-        this.name = "InputError";
-    }
-}
+/** Shared with the other plugins (jig-core's `kit/values.ts`). A mistake in a call's input is an InputError, a
+ *  TypeError that jig-core reads as "invalid input"; `classifying` keeps a TypeError from a bug here from being reported
+ *  as the model's mistake. */
+export { InputError, isObject };
 
 /**
  * What leaves a tool's classify or preview: an InputError as it is, so jig-core blocks the call without asking, and any
@@ -43,10 +37,6 @@ export async function previewing<T>(work: () => Promise<T>): Promise<T> {
     } catch (error) {
         throw reported(error);
     }
-}
-
-export function isObject(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /**
@@ -85,21 +75,13 @@ export function str(value: unknown): string | undefined {
     return typeof value === "string" && value !== "" ? value : undefined;
 }
 
-function printable(value: unknown): string {
-    try {
-        return String(value);
-    } catch {
-        return "(cannot be shown)";
-    }
-}
-
 /** A value as it can appear in a message: JSON on one line, cut. Control characters come out escaped. */
 export function shown(value: unknown, max = 40): string {
     let text: string;
     try {
-        text = JSON.stringify(value) ?? printable(value);
+        text = JSON.stringify(value) ?? stringOf(value);
     } catch {
-        text = printable(value);
+        text = stringOf(value);
     }
     return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }

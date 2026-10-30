@@ -6,6 +6,7 @@
 // result hook: redacted, masked where needed and capped, like any other result.
 import type { Transport, TransportRequest, TransportResponse } from "./contract.ts";
 import { errorMessage } from "./errors.ts";
+import { printable } from "./kit/text.ts";
 
 export interface Transports {
     register(name: string, transport: Transport): void;
@@ -14,12 +15,6 @@ export interface Transports {
 
 /** The most registered names an error lists. */
 const MAX_NAMES_SHOWN = 10;
-
-/** A name from another package, safe to put in a message: no control characters, and short. */
-function printable(text: string): string {
-    const clean = text.replace(/[\u0000-\u001f\u007f]/g, "?");
-    return clean.length > 60 ? `${clean.slice(0, 60)}...` : clean;
-}
 
 /** The response as a plain copy, checked where another package's mistake would otherwise surface as a confusing
  *  failure deep inside a tool. */

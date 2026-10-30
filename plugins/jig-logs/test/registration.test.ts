@@ -159,7 +159,7 @@ const sources = fs
     .filter((file) => file.endsWith(".ts"))
     .map((file) => ({ file, text: fs.readFileSync(path.join(SRC, file), "utf8") }));
 
-test("the plugin reaches jig-core only through its contract and its client", () => {
+test("the plugin reaches jig-core only through its contract, its client and its kit of stateless helpers", () => {
     assert.ok(sources.length >= 10);
     for (const { file, text } of sources) {
         for (const match of text.matchAll(
@@ -169,7 +169,7 @@ test("the plugin reaches jig-core only through its contract and its client", () 
             if (specifier.includes("jig-core")) {
                 assert.match(
                     specifier,
-                    /^\.\.\/\.\.\/jig-core\/src\/(?:contract|client)\.ts$/,
+                    /^\.\.\/\.\.\/jig-core\/src\/(?:contract|client|kit\/[a-z-]+)\.ts$/,
                     `${file}: ${specifier}`,
                 );
             }

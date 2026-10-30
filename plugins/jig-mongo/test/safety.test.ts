@@ -36,11 +36,11 @@ describe("the driver and the processes", () => {
         assert.deepEqual(where(/\bshell\s*:|\beval\(|new Function\(/), []);
     });
 
-    test("jig-core is reached through its client and its contract only", () => {
+    test("jig-core is reached through its client, its contract and its kit only", () => {
         const imports = sources.flatMap(({ file, text }) =>
             [...text.matchAll(/from "(\.\.\/\.\.\/jig-core\/[^"]+)"/g)].map((match) => `${file}: ${match[1]}`),
         );
-        for (const line of imports) assert.match(line, /jig-core\/src\/(?:client|contract)\.ts$/, line);
+        for (const line of imports) assert.match(line, /jig-core\/src\/(?:client|contract|kit\/[a-z-]+)\.ts$/, line);
     });
 
     test("a secret is resolved in one file, and a password is handed to the driver and to nothing else", () => {

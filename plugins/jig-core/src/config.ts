@@ -11,6 +11,7 @@
 //   A section that fails its check is lost on its own: the plugin uses its defaults, and jig-core's settings stay.
 import { readFileSync } from "node:fs";
 import { errorMessage } from "./errors.ts";
+import { isObject } from "./kit/values.ts";
 import { buildEnvironments } from "./environments.ts";
 import type { Environments } from "./environments.ts";
 import type { ApprovalKind, ClassifyRule, Decision, Effect, EnvironmentConfig, Rule } from "./contract.ts";
@@ -184,10 +185,6 @@ function runSectionCheck(check: SectionCheck, raw: unknown): string[] {
 // ---- checking one section ----------------------------------------------------------------------------------------
 
 type Fail = (key: string, message: string) => void;
-
-function isObject(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 /** A key name is shown, never its value: strip control characters and cap the length. */
 function printable(name: string): string {

@@ -33,15 +33,15 @@ test("no enum, namespace, import =, or parameter properties: types are erased, n
     }
 });
 
-test("runtime imports are node: builtins, Pi's host packages, or relative .ts modules; jig-core is reached by its contract and client only", () => {
+test("runtime imports are node: builtins, Pi's host packages, or relative .ts modules; jig-core is reached by its contract, client and kit only", () => {
     for (const { file, text } of sources()) {
         for (const match of text.matchAll(/^import\s+(type\s+)?([^;]*?)\s+from\s+"([^"]+)";/gm)) {
             const [, typeOnly, , specifier = ""] = match;
             if (specifier.includes("jig-core")) {
                 assert.match(
                     specifier,
-                    /\/jig-core\/src\/(contract|client)\.ts$/,
-                    `${file}: ${specifier} is not the contract or the client`,
+                    /\/jig-core\/src\/(contract|client|kit\/[a-z-]+)\.ts$/,
+                    `${file}: ${specifier} is not the contract, the client or the kit`,
                 );
                 if (specifier.endsWith("contract.ts"))
                     assert.ok(typeOnly, `${file}: the contract is imported with import type`);

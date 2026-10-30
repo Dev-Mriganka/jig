@@ -43,6 +43,18 @@ closed instead of running ungoverned.
 | `config` | What a company plugin adds at start-up (`addEnvironments`, `addRules`, `addClassifyRules`, `addProtectedPaths`, `addMaskFields`), a plugin's own section (`registerSection`, `section`), and a company's defaults for any plugin's section (`addSectionDefaults`), which your own section is laid over: objects merge key by key, anything else of yours replaces theirs, and the plugin's check still applies |
 | `exec` | `run` and `git`, which start programs without a shell (see [Running programs](running-programs.md)) |
 
+## The kit: stateless helpers
+
+`plugins/jig-core/src/kit/` holds small helpers that plugins import directly, as
+they do `client.ts`, so that copies stop drifting. Nothing in it holds state or
+talks to Pi.
+
+| File | What it gives |
+|---|---|
+| `kit/values.ts` | `isObject(value)`, and `InputError`: a `TypeError` named `InputError`, which `jig-core` reads as "invalid input" when a tool's classify or preview throws it |
+| `kit/text.ts` | `printable(text)`: a name or header from outside, safe in a message (control characters become `?`, cut at 60 characters); `stringOf(value)`: `String(value)`, or a stand-in when the value's own `toString` throws |
+| `kit/abort.ts` | `untilAborted(work, signal)`: rejects with the signal's reason when it fires, even if `work` ignores its signal, and always observes `work` so a late failure is never an unhandled rejection |
+
 ## Protected paths
 
 `config.addProtectedPaths({ secret?, guarded? })` adds paths that Pi's own file

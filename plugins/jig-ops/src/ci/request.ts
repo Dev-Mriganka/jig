@@ -6,6 +6,7 @@
 // Credentials are resolved when a request is made and live only in this file's local variables. No message made here
 // holds one: an error names what failed (a status, an error code) and never the headers or the body that were sent.
 // A redirect is never followed, because it would carry the credential to an address the catalog never named.
+import { untilAborted } from "../../../jig-core/src/kit/abort.ts";
 import { jig } from "../../../jig-core/src/client.ts";
 import type { CiAuth, CiSystem } from "./config.ts";
 
@@ -215,16 +216,6 @@ async function viaTransport(name: string, http: CiHttp, request: Request, signal
     if (Buffer.byteLength(reply.body) > maxBytes) throw tooLarge(maxBytes);
     const headers = lowerCased(reply.headers ?? {});
     return { status: reply.status, headers, cookies: splitCookies(headers["set-cookie"]), body: reply.body };
-}
-
-/** A transport is another package's code and may ignore its signal. This stops waiting for it when the signal fires. */
-function untilAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
-        const stop = () => reject(signal.reason);
-        work.then(resolve, reject).finally(() => signal.removeEventListener("abort", stop));
-        if (signal.aborted) stop();
-        else signal.addEventListener("abort", stop, { once: true });
-    });
 }
 
 type SignIn = (url: string, signal: AbortSignal | undefined) => Promise<Readonly<Record<string, string>>>;
