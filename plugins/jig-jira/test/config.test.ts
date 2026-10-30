@@ -54,6 +54,7 @@ describe("a valid section", () => {
         assert.deepEqual(found.updateFields, DEFAULT_UPDATE_FIELDS);
         assert.deepEqual(DEFAULT_UPDATE_FIELDS, ["summary", "description", "labels", "priority", "assignee"]);
         assert.deepEqual(found.fields, {});
+        assert.deepEqual(found.createDefaults, {});
         assert.deepEqual(found.privateNames, []);
         assert.equal(found.environment, DEFAULT_ENVIRONMENT);
         assert.equal(DEFAULT_ENVIRONMENT, "external");
@@ -64,9 +65,11 @@ describe("a valid section", () => {
             ...cloud,
             updateFields: ["summary", "Story Points", "customfield_10500"],
             fields: { "Story Points": "customfield_10016", Epic: "customfield_10014" },
+            createDefaults: { Priority: "Medium", " Components ": ["Web"], "Story Points": 1 },
             privateNames: [" payroll ", "corp.example.net"],
             environment: "staging",
         });
+        assert.deepEqual(found.createDefaults, { Priority: "Medium", Components: ["Web"], "Story Points": 1 });
         assert.deepEqual(found.updateFields, ["summary", "Story Points", "customfield_10500"]);
         assert.deepEqual(found.fields, { "Story Points": "customfield_10016", Epic: "customfield_10014" });
         assert.deepEqual(found.privateNames, ["payroll", "corp.example.net"]);
@@ -288,6 +291,34 @@ describe("the other fields", () => {
             validateJira({ ...cloud, fields: ["customfield_1"] })[0] ?? "",
             /^jira\.fields: must be an object/,
         );
+    });
+
+    test("createDefaults maps field names to the values create gives them", () => {
+        const errors = (value: unknown) => validateJira({ ...cloud, createDefaults: value });
+        assert.deepEqual(errors({}), []);
+        assert.deepEqual(errors({ priority: "High", Labels: ["a"], "Fix Version/s": [{ name: "1.0" }], x: null }), []);
+        for (const bad of [[], "priority", 3, null]) {
+            assert.deepEqual(errors(bad), [
+                "jira.createDefaults: must be an object of field names and the values to give them",
+            ]);
+        }
+        assert.deepEqual(errors({ "": "x" }), [
+            'jira.createDefaults: "" is not a usable field name (1 to 60 characters, no control characters)',
+        ]);
+        assert.deepEqual(errors({ ["x".repeat(61)]: "x" }).length, 1);
+        for (const name of ["project", "Project", "issuetype", "Issue Type", "summary", " Summary "]) {
+            assert.deepEqual(errors({ [name]: "x" }), [
+                `jira.createDefaults.${name}: the call sets this (project, type and summary are parameters)`,
+            ]);
+        }
+        assert.deepEqual(errors({ Priority: "High", priority: "Low" }), [
+            "jira.createDefaults.priority: is the same name as another entry, apart from case",
+        ]);
+        assert.deepEqual(errors({ labels: { a: { b: { c: { d: { e: { f: { g: 1 } } } } } } } }), [
+            "jira.createDefaults.labels: the value is too large or nested too deeply",
+        ]);
+        const many = Object.fromEntries(Array.from({ length: 31 }, (_, i) => [`field${i}`, i]));
+        assert.deepEqual(errors(many), ["jira.createDefaults: at most 30 fields"]);
     });
 
     test("privateNames is a list of names", () => {

@@ -23,7 +23,13 @@ const SHARED: Target = {
     index: "logs-*,-logs-debug-*",
     timeField: "timestamp",
     messageField: "log.message",
-    filter: { "env.keyword": "prod", "tier.keyword": "web", region_code: 7, canary: false },
+    filter: {
+        "env.keyword": "prod",
+        "tier.keyword": "web",
+        region_code: 7,
+        canary: false,
+        "namespace.keyword": ["orders", "billing"],
+    },
     jigEnvironment: "production",
 };
 
@@ -82,15 +88,28 @@ test("a phrase is a match_phrase on the message field; a query is a query_string
     ]);
 });
 
-test("each filter entry is an exact term after the range, in the configured order", () => {
+test("each filter entry is a term, or a terms for a list, after the range, in the configured order", () => {
     const body = searchBody(query({ target: SHARED }), range, 5) as any;
     assert.deepEqual(body.query.bool.filter.slice(1), [
         { term: { "env.keyword": "prod" } },
         { term: { "tier.keyword": "web" } },
         { term: { region_code: 7 } },
         { term: { canary: false } },
+        { terms: { "namespace.keyword": ["orders", "billing"] } },
     ]);
     assert.equal((searchBody(query(), range, 5) as any).query.bool.filter.length, 1, "no filter, no term");
+});
+
+test("a list of one value is still a terms, and a list may mix text, numbers and flags", () => {
+    const target: Target = { ...PLAIN, filter: { a: ["only"], b: ["x", 2, true] } };
+    const body = searchBody(query({ target }), range, 5) as any;
+    assert.deepEqual(body.query.bool.filter.slice(1), [{ terms: { a: ["only"] } }, { terms: { b: ["x", 2, true] } }]);
+    assert.deepEqual(problemsWith(body, { timeField: "@timestamp", messageField: "message" }), []);
+});
+
+test("the check for data keeps the lists of the environment's filter too", () => {
+    const body = probeBody(query({ target: SHARED }), range) as any;
+    assert.deepEqual(body.query.bool.filter[5], { terms: { "namespace.keyword": ["orders", "billing"] } });
 });
 
 test("a search asks for exact totals, a timeout shorter than the request's, and only the two fields it shows", () => {
@@ -210,6 +229,10 @@ test("the grammar helper is not vacuous: it refuses what the builder must never 
         ["should clauses", mutate((b) => void (b.query.bool.should = [{ term: { x: "y" } }]))],
         ["a term with two fields", mutate((b) => void b.query.bool.filter.push({ term: { a: "1", b: "2" } }))],
         ["a wildcard filter", mutate((b) => void b.query.bool.filter.push({ wildcard: { a: "*" } }))],
+        ["an empty terms", mutate((b) => void b.query.bool.filter.push({ terms: { a: [] } }))],
+        ["a terms of 51", mutate((b) => void b.query.bool.filter.push({ terms: { a: Array(51).fill("x") } }))],
+        ["a terms of objects", mutate((b) => void b.query.bool.filter.push({ terms: { a: [{ x: 1 }] } }))],
+        ["a terms with a scalar", mutate((b) => void b.query.bool.filter.push({ terms: { a: "x" } }))],
     ];
     for (const [name, body] of bad) assert.notDeepEqual(problemsWith(body, PLAIN), [], `must refuse: ${name}`);
     const count = searchBody(query(), range, 0) as any;

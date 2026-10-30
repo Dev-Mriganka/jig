@@ -373,6 +373,32 @@ test("the check for data keeps to the environment's filter, so another environme
     assert.deepEqual(w.requests[1]?.body.query.bool.filter[1], { term: { "env.keyword": "prod" } });
 });
 
+test("a filter with a list keeps the documents whose field is any of the values, and the check for data does too", async (t) => {
+    const named = (namespace: string, n: number) => ({
+        "@timestamp": new Date(NOW - 20 * 60_000 + n * 30_000).toISOString(),
+        message: `${namespace} message`,
+        env: "prod",
+        namespace,
+    });
+    const found = [named("orders", 0), named("billing", 1), named("search", 2)];
+    const environments = {
+        prod: { index: "app-*", filter: { "env.keyword": "prod", "namespace.keyword": ["orders", "billing"] } },
+    };
+    const w = await world(t, { docs: found, environments });
+    const text = ok(await w.call({ phrase: "message", environment: "prod", window: "30m" }));
+    assert.match(text, /complete, 2 hits/);
+    assert.ok(text.includes("orders message") && text.includes("billing message") && !text.includes("search message"));
+    assert.deepEqual(w.requests[0]?.body.query.bool.filter[2], {
+        terms: { "namespace.keyword": ["orders", "billing"] },
+    });
+    const none = await world(t, { docs: [named("search", 0)], environments });
+    const empty = ok(await none.call({ phrase: "message", environment: "prod", window: "30m" }));
+    assert.match(empty, /no documents at all in this environment and window/);
+    assert.deepEqual(none.requests[1]?.body.query.bool.filter[2], {
+        terms: { "namespace.keyword": ["orders", "billing"] },
+    });
+});
+
 test("the result is one block of plain text, with a few counts in its details and in the record's facts", async (t) => {
     const w = await world(t, { docs: docs(6) });
     const result = await w.call(ask);

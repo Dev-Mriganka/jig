@@ -30,12 +30,15 @@ const EXPECTED: Row[] = [
     ["attachments", "read"],
     ["assignable", "read"],
     ["find_field", "read"],
+    ["link_types", "read"],
     ["create", "write", "review"],
     ["comment", "write", "review"],
     ["edit_comment", "write", "review"],
     ["delete_comment", "write", "dialog"],
     ["transition", "write", "dialog"],
     ["update", "write", "dialog"],
+    ["link", "write", "dialog"],
+    ["unlink", "write", "dialog"],
 ];
 
 describe("classification", () => {
@@ -60,7 +63,7 @@ describe("classification", () => {
 
     test("an action nobody declared is unknown, so jig-core asks", () => {
         for (const input of [
-            { action: "link" },
+            { action: "relink" },
             { action: "" },
             { action: "__proto__" },
             { action: "constructor" },
@@ -198,7 +201,15 @@ describe("the README", () => {
 
     test("its configuration table names exactly the fields the section accepts", () => {
         const documented = table("| Field | Default |").map((row) => names(row[0])[0]);
-        assert.deepEqual(documented, ["site", "auth", "updateFields", "fields", "privateNames", "environment"]);
+        assert.deepEqual(documented, [
+            "site",
+            "auth",
+            "updateFields",
+            "fields",
+            "createDefaults",
+            "privateNames",
+            "environment",
+        ]);
         const valid = { site: "https://example.test", auth: { token: "pass:x/y" } };
         for (const field of documented) {
             assert.ok(

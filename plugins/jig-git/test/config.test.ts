@@ -11,6 +11,7 @@ test("an empty section is valid and gives the defaults", () => {
         protected: undefined,
         commitMessage: undefined,
         branchName: undefined,
+        prTitle: undefined,
         prTemplate: undefined,
         cloneHost: "github.com",
     });
@@ -23,6 +24,7 @@ test("every documented field is accepted", () => {
         protected: ["main", "release/*"],
         commitMessage: "^[A-Z]+-\\d+ ",
         branchName: "^feature/",
+        prTitle: "^[A-Z]+-\\d+: ",
         prTemplate: "docs/pr.md",
         cloneHost: "gh-work",
     };
@@ -31,6 +33,7 @@ test("every documented field is accepted", () => {
     assert.equal(settings.base, "develop");
     assert.deepEqual(settings.protected, ["main", "release/*"]);
     assert.equal(settings.cloneHost, "gh-work");
+    assert.equal(settings.prTitle, "^[A-Z]+-\\d+: ");
 });
 
 test("a field nobody defined is an error that names it, at any depth", () => {
@@ -62,6 +65,9 @@ test("values of the wrong type or range are errors that name the key", () => {
     assert.match(errors({ commitMessage: "(" })[0] ?? "", /^git\.commitMessage is not a valid regular expression: /);
     assert.match(errors({ branchName: "[" })[0] ?? "", /^git\.branchName is not a valid regular expression: /);
     assert.deepEqual(errors({ branchName: "" }), ["git.branchName must be a non-empty regular expression"]);
+    assert.match(errors({ prTitle: "(" })[0] ?? "", /^git\.prTitle is not a valid regular expression: /);
+    assert.deepEqual(errors({ prTitle: "" }), ["git.prTitle must be a non-empty regular expression"]);
+    assert.deepEqual(errors({ prTitle: 7 }), ["git.prTitle must be a non-empty regular expression"]);
     assert.deepEqual(errors({ prTemplate: "" }), ["git.prTemplate must be the path of a Markdown file"]);
     assert.deepEqual(errors({ cloneHost: "a b" }), [
         "git.cloneHost must be a host name or an ssh alias such as github.com",

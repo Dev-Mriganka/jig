@@ -18,7 +18,7 @@ list of parts:
 | `size` | How many hits this request still wants |
 | `timeout` | `25s`: the backend gives up on a shard search after this |
 | `track_total_hits` | `true`, so totals are exact |
-| `filter` | The time range, then one `term` per entry of the environment's `filter` |
+| `filter` | The time range, then one `term` or `terms` per entry of the environment's `filter` |
 | `must` | One clause: a `match_phrase` for a `phrase`, or a `query_string` for a `query` |
 | `sort` | The time field, in the call's `order`, with `unmapped_type: date` |
 | `_source` | The time field and the message field, and nothing else |
@@ -30,6 +30,11 @@ list of parts:
   before the tool's own timeout cuts the connection.
 - **`track_total_hits`:** a backend that counts only up to a limit reports a lower
   bound, and the result says "at least".
+
+- **`filter`:** an entry with one value is a `term`. An entry with a list is a
+  `terms`, which a document matches when its field equals any of the values, so
+  `"namespace.keyword": ["orders", "billing"]` finds the documents of either. A list
+  holds 1 to 50 values.
 
 `sort` and `_source` are left out when `size` is 0. The time range is a `range`
 on the environment's `timeField`, from `gte` the start to `lt` the end, with
@@ -75,7 +80,7 @@ The text of a call lands in one value only: the phrase of a `match_phrase`, or
 the string of a `query_string`. It never becomes a key, a field name or a clause
 of its own. So a call cannot add a script, an aggregation, a field, another index
 or paging by `from`. Field names, the index and the environment's filter come
-from configuration.
+from configuration, a list of values included.
 
 `test/golden/` holds the exact bodies for a phrase search, a query on a shared
 index, a bucket that only counts, and the check for data. A test builds every
@@ -84,7 +89,7 @@ combination the builder can make and checks that each stays inside this grammar.
 ## The check for data
 
 The body of the check for data (see [Windows and buckets](windows-and-buckets.md#when-nothing-is-found))
-has `size: 0`, the time range and the environment's filter. It has no `must`, no
+has `size: 0`, the time range and the environment's filter, lists included. It has no `must`, no
 `sort` and no `_source`, so it never carries the phrase or the query:
 
 ```json

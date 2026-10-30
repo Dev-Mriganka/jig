@@ -19,12 +19,15 @@ comment needs text. Usage: jira comment {key, text}`.
 | `attachments` | `key` | |
 | `assignable` | `key` | `query`, `limit` |
 | `find_field` | `query` | |
+| `link_types` | | |
 | `create` | `project`, `type`, `summary` | `description`, `fields` |
 | `comment` | `key`, `text` | |
 | `edit_comment` | `key`, `commentId`, `text` | |
 | `delete_comment` | `key`, `commentId` | |
 | `transition` | `key`, `transition` | |
 | `update` | `key`, `fields` | |
+| `link` | `key`, `to`, `linkType` | |
+| `unlink` | `key`, `to` | `linkType` |
 
 | Parameter | Meaning |
 |---|---|
@@ -38,12 +41,29 @@ comment needs text. Usage: jira comment {key, text}`.
 | `transition` | A name from `transitions` (or its id) |
 | `type`, `summary`, `description` | The issue type name; a one-line title of at most 255 characters; the description, in wiki markup |
 | `fields` | The fields to set, by name or id (see below) |
+| `to`, `linkType` | The other issue's key; a link type from `link_types`, by name or by a phrase (see below) |
 
 - **`limit`:** `search` and `assignable` return 20 by default, up to 50.
   `comments` returns 20, up to 100. `changelog` returns 30, up to 100.
 - **`fields`:** an example is
   `{"labels": ["a"], "priority": "High", "assignee": "<id from assignable>"}`. A
   person is given by the id `assignable` shows, or `null` to unassign.
+
+## Links
+
+A call reads "`key` <phrase> `to`": `link` with `key: "PROJ-1"`, `to: "PROJ-2"` and
+`linkType: "blocks"` makes PROJ-1 block PROJ-2, which PROJ-2 lists as "is blocked
+by PROJ-1".
+- **`linkType`:** a name (`Blocks`), an id, or one of the type's two phrases,
+  without regard to case. A name or the outward phrase (`blocks`) makes `key` the
+  outward end. The inward phrase (`is blocked by`) turns the link round. `link_types`
+  lists the names and phrases.
+- **`unlink`:** finds the link between `key` and `to` in `key`'s own links. With
+  several links between the two, `linkType` says which; without it the call is
+  refused and lists them.
+- **Refused before anyone is asked:** the same issue twice, an issue that does not
+  exist, a type that matches nothing (the message lists the types), and a link that
+  is already there.
 
 ## Fields
 

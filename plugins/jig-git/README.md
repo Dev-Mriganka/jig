@@ -92,7 +92,7 @@ invalid field, and the defaults apply instead.
 |---|---|---|
 | `base` | the repository's default branch | The branch new work starts from and pull requests target |
 | `protected` | the repository's default branch | Branches that refuse direct changes by these tools |
-| `commitMessage`, `branchName` | none | Regular expressions that commit messages and new branch names must match |
+| `commitMessage`, `branchName`, `prTitle` | none | Regular expressions that commit messages, new branch names and pull request titles must match |
 | `prTemplate` | the repository's own template | The path of a Markdown file with the pull request body template |
 | `cloneHost` | `github.com` | The ssh host `clone` connects to: `github.com` or a `Host` alias |
 
@@ -104,15 +104,17 @@ The fields in detail are in [Configuration](docs/configuration.md).
     "base": "main",
     "protected": ["main", "release/*"],
     "branchName": "^(feature|fix)/PROJ-\\d+",
-    "commitMessage": "^PROJ-\\d+: "
+    "commitMessage": "^PROJ-\\d+: ",
+    "prTitle": "^PROJ-\\d+: "
   }
 }
 ```
 
 ## Company part (in the company plugin)
 
-- the `git` settings for its repositories: base and protected branches, branch
-  and commit message patterns, the pull request template, the clone host;
+- the `git` settings for its repositories: base and protected branches, branch,
+  commit message and pull request title patterns, the pull request template, the
+  clone host;
 - later, the sign-in for a git host that is not `github.com`.
 
 ## Events

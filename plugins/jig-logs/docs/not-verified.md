@@ -38,7 +38,8 @@ and a fake transport. Nothing has been tried against a real backend.
   - `analyze_wildcard` on a Lucene query;
   - the 25 second search timeout;
   - the check for data as a `size: 0` search (the earlier harness used a count);
-  - fields named in the configuration, and the `term` filter.
+  - fields named in the configuration, the `term` filter, and the `terms` filter
+    that a list of values becomes.
 
 ## Loki
 
@@ -96,6 +97,10 @@ What was not found in the documentation, so it is assumed:
   from it, whether or not Loki has comments.
 - **`limit` counts lines across streams,** and the lines of different streams are
   merged by time by the adapter, since Loki sorts inside a stream only.
+- **A `=~` label matcher is anchored.** The filter of an environment writes a list as
+  `namespace=~"orders|billing"` and relies on that to match a whole label value, not
+  a part of it. Loki follows Prometheus in this, but the pages read do not say so, and
+  the fake Loki anchors by construction.
 - **A third part of a line,** structured metadata, may follow the time and the
   line in newer versions. It is not read.
 - **The wording of errors differs between versions.** They are matched loosely on

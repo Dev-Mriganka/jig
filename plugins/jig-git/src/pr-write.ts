@@ -11,6 +11,7 @@ import type { GhOptions } from "./github.ts";
 import { checkBody, checkBranch, checkNumber, checkTitle, checkWords } from "./names.ts";
 import { checksOfPr, viewPr } from "./pr-read.ts";
 import type { PrDetail } from "./pr-read.ts";
+import type { GitSettings } from "./config.ts";
 import type { Call, Planned } from "./previews.ts";
 import { digest, reviewPreview } from "./previews.ts";
 import { baseBranch, githubRepo, resolveRepo } from "./repo.ts";
@@ -46,6 +47,19 @@ function readTemplate(repo: Repo, prTemplate: string | undefined): string | unde
 }
 
 // ---- helpers ------------------------------------------------------------------------------------------------------
+
+/**
+ * A title that is one line, and that matches `git.prTitle` when the configuration sets one, as a commit message must
+ * match `git.commitMessage`. The pattern is in the message, so the model sees what to write. This runs while the plan is
+ * made, before anyone is asked and before anything is sent.
+ */
+function ruledTitle(value: unknown, settings: GitSettings): string {
+    const title = checkTitle(value);
+    const pattern = settings.prTitle;
+    if (pattern !== undefined && !new RegExp(pattern).test(title))
+        throw new Error(`the pull request title does not match git.prTitle (${pattern})`);
+    return title;
+}
 
 interface OpenPr {
     number: number;
@@ -103,7 +117,7 @@ interface CreateParams {
 export async function planCreate(params: CreateParams, call: Call): Promise<Planned> {
     const repo = await resolveRepo(params.repo, call.signal);
     const { signal, settings } = call;
-    const title = checkTitle(params.title);
+    const title = ruledTitle(params.title, settings);
     if (params.body === undefined || params.body.trim() === "") {
         const template = readTemplate(repo, settings.prTemplate);
         throw new Error(
@@ -219,7 +233,7 @@ interface EditParams {
 export async function planEdit(params: EditParams, call: Call): Promise<Planned> {
     const number = checkNumber(params.number);
     const edit = {
-        title: params.title === undefined ? undefined : checkTitle(params.title),
+        title: params.title === undefined ? undefined : ruledTitle(params.title, call.settings),
         body: params.body === undefined ? undefined : checkBody(params.body),
         base: params.base === undefined ? undefined : checkBranch(params.base, "base"),
         labels: params.labels === undefined ? undefined : checkWords(params.labels, "labels"),

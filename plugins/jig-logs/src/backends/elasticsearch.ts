@@ -7,14 +7,15 @@
 // The model's text only ever lands in one value: the phrase of a `match_phrase`, or the string of a `query_string`. It
 // never becomes a key, a field name or a clause of its own, so a call cannot ask the backend for anything else: no
 // scripts, aggregations or other indexes. Field names, the index and the environment filter come from configuration.
-import type { ElasticTarget, FilterValue, Target } from "../config.ts";
+import type { ElasticTarget, FilterSetting, Target } from "../config.ts";
 import { final } from "../failure.ts";
+import { checkFilter, isList } from "../filter.ts";
 import type { LogQuery } from "../query.ts";
 import { parseBody } from "../response.ts";
 import type { SearchPage, Source } from "../response.ts";
 import { iso } from "../time.ts";
 import type { Range } from "../time.ts";
-import { CONTROL, isObject, printable, shown } from "../values.ts";
+import { isObject } from "../values.ts";
 import type { LogBackend } from "./backend.ts";
 
 export const DEFAULT_TIME_FIELD = "@timestamp";
@@ -42,7 +43,10 @@ function scope(query: LogQuery, range: Range): Clause[] {
     return [
         // `format` makes the bounds mean ISO instants whatever date format the field was mapped with.
         { range: { [timeField]: { gte: iso(range.from), lt: iso(range.to), format: "strict_date_optional_time" } } },
-        ...Object.entries(filter).map(([field, value]): Clause => ({ term: { [field]: value } })),
+        // One value is a `term`; a list is a `terms`, which a document matches when its field equals any of them.
+        ...Object.entries(filter).map(
+            ([field, value]): Clause => (isList(value) ? { terms: { [field]: value } } : { term: { [field]: value } }),
+        ),
     ];
 }
 
@@ -131,25 +135,9 @@ function errorType(text: string): string | undefined {
 
 // ---- the settings of an environment ------------------------------------------------------------------------------
 
-const MAX_FILTERS = 8;
 /** An index name or pattern: letters, digits and `_ . * : , -`, so it can be put in a request path as it is. */
 const INDEX = /^[A-Za-z0-9_.*:,-]{1,255}$/;
 const FIELD = /^[A-Za-z0-9_.@-]{1,128}$/;
-
-function checkFilter(raw: unknown, key: string, errors: string[]): void {
-    if (!isObject(raw) || Object.keys(raw).length === 0 || Object.keys(raw).length > MAX_FILTERS) {
-        errors.push(`${key} must map 1 to ${MAX_FILTERS} field names to the value each must equal`);
-        return;
-    }
-    for (const [field, value] of Object.entries(raw)) {
-        if (!FIELD.test(field)) errors.push(`${key}: ${shown(field)} is not a field name`);
-        const text = typeof value === "string" && value !== "" && value.length <= 200 && !CONTROL.test(value);
-        const number = typeof value === "number" && Number.isFinite(value);
-        if (!text && !number && typeof value !== "boolean") {
-            errors.push(`${key}.${printable(field)} must be text, a number, true or false`);
-        }
-    }
-}
 
 export const elasticsearch: LogBackend = {
     type: "elasticsearch",
@@ -177,7 +165,8 @@ export const elasticsearch: LogBackend = {
                 errors.push(`${key}.${field} must be a field name`);
             }
         }
-        if (raw.filter !== undefined) checkFilter(raw.filter, `${key}.filter`, errors);
+        if (raw.filter !== undefined)
+            checkFilter(raw.filter, `${key}.filter`, { pattern: FIELD, noun: "field" }, errors);
     },
 
     environment(name, raw) {
@@ -185,7 +174,7 @@ export const elasticsearch: LogBackend = {
             index: raw.index as string,
             timeField: (raw.timeField as string | undefined) ?? DEFAULT_TIME_FIELD,
             messageField: (raw.messageField as string | undefined) ?? DEFAULT_MESSAGE_FIELD,
-            filter: (raw.filter as Record<string, FilterValue> | undefined) ?? {},
+            filter: (raw.filter as Record<string, FilterSetting> | undefined) ?? {},
             jigEnvironment: (raw.jigEnvironment as string | undefined) ?? name,
         };
     },

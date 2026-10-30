@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { loki } from "../src/backends/loki.ts";
-import { checkPipeline, literalPattern, quote, selectorProblem } from "../src/backends/logql.ts";
+import { checkPipeline, literalPattern, matcherFor, quote, selectorProblem } from "../src/backends/logql.ts";
 import type { Backend, LokiTarget, Target } from "../src/config.ts";
 import { failureFromStatus } from "../src/failure.ts";
 import { resolveQuery } from "../src/params.ts";
@@ -67,6 +67,66 @@ test("golden: the check for data has the selector and the range, and nothing the
         "loki-probe",
         loki.probe(query({ text: "never-sent", match: ["never-sent"], exclude: ["never-sent"] }), range),
     );
+});
+
+// ---- the filter ------------------------------------------------------------------------------------------------------
+
+const FILTERED = loki.environment("staging", {
+    selector: SELECTOR,
+    filter: { namespace: ["orders", "billing"], region: "eu.west", shard: 3 },
+}) as LokiTarget;
+
+test("golden: a filter adds a matcher to the selector: = for one value, =~ for a list", () => {
+    matchesGolden("loki-filter", search({ target: FILTERED, match: ["timeout"] }));
+});
+
+test("the matchers go inside the selector's braces, after its own, and the check for data has them too", () => {
+    const parsed = parseLogql(search({ target: FILTERED }).query as string);
+    assert.deepEqual(parsed?.matchers, [
+        { label: "app", op: "=", value: "orders-api" },
+        { label: "env", op: "=", value: "staging" },
+        { label: "namespace", op: "=~", value: "orders|billing" },
+        { label: "region", op: "=", value: "eu.west" },
+        { label: "shard", op: "=", value: "3" },
+    ]);
+    assert.equal(parsed?.rest, "", "no line filter follows but the phrase");
+    const probe = parseLogql((loki.probe(query({ target: FILTERED }), range) as Params).query as string);
+    assert.deepEqual(probe?.matchers, parsed?.matchers);
+    assert.equal(probe?.filters.length, 0, "and nothing the model wrote");
+});
+
+test("a selector with spaces before its brace, or in its matchers, is extended without a stray comma", () => {
+    for (const selector of ['{app="orders-api" }', '{ app = "orders-api" , env != "dev" }', '{app="a,b}"}']) {
+        const target = loki.environment("staging", { selector, filter: { namespace: ["a", "b"] } }) as LokiTarget;
+        const text = (loki.probe(query({ target }), range) as Params).query as string;
+        const parsed = parseLogql(text);
+        assert.ok(parsed, text);
+        assert.equal(parsed.rest, "");
+        assert.deepEqual(parsed.matchers.at(-1), { label: "namespace", op: "=~", value: "a|b" });
+        assert.equal(parsed.matchers.length, (parseLogql(selector)?.matchers.length ?? 0) + 1);
+        assert.equal(selectorProblem(text), undefined, "the result is a selector too");
+    }
+});
+
+test("a list becomes one regular expression of its values, each matched literally", () => {
+    assert.equal(matcherFor("ns", ["a", "b"]), 'ns=~"a|b"');
+    assert.equal(matcherFor("ns", ["only"]), 'ns=~"only"');
+    assert.equal(matcherFor("ns", "one"), 'ns="one"');
+    assert.equal(matcherFor("n", [1, 2.5, true]), String.raw`n=~"1|2\\.5|true"`);
+    for (const values of [
+        ["a.b", "c|d"],
+        ["(x)", "[id]", "a+b*c?"],
+        ['say "hi"', "back\\slash"],
+        ["^s$", "{1}"],
+    ]) {
+        const read = readString(matcherFor("ns", values).slice("ns=~".length), 0);
+        assert.ok(read, JSON.stringify(values));
+        const pattern = new RegExp(`^(?:${read.value})$`);
+        for (const value of values) assert.ok(pattern.test(value), `${value} is one of the alternatives`);
+        assert.ok(!pattern.test(values.join("|")), "and the bar inside a value does not split it");
+        assert.ok(!pattern.test("zzz"));
+    }
+    assert.ok(!new RegExp(`^(?:${literalPattern("a.b")}|c)$`).test("axb"), "a dot is a dot");
 });
 
 // ---- time, order and limit -----------------------------------------------------------------------------------------
@@ -188,6 +248,20 @@ test("a phrase, a match and an exclude are each the value of one line filter, ho
         const url: URL = new URL(loki.wire(TARGET, direct)(request).path, "https://logs.example.com");
         assert.deepEqual(Object.fromEntries(url.searchParams), request);
         assert.deepEqual([...url.searchParams.keys()], ["query", "start", "end", "limit", "direction"]);
+    }
+});
+
+test("a value cannot leave its string or its matcher, however hostile", () => {
+    for (const text of HOSTILE) {
+        for (const setting of [text, [text, "x"]]) {
+            const target = loki.environment("staging", { selector: SELECTOR, filter: { namespace: setting } });
+            const request = loki.search(query({ target: target as LokiTarget }), range, 5) as Params;
+            const parsed = parseLogql(request.query as string);
+            assert.ok(parsed, JSON.stringify(text));
+            assert.equal(parsed.matchers.length, 3, "the two of the selector and the one of the filter");
+            assert.equal(parsed.rest, "", "nothing else follows");
+            assert.deepEqual(bracesOutsideStrings(request.query as string), [0]);
+        }
     }
 });
 

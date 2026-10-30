@@ -4,6 +4,7 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 
 ## Contents
 
+- [2026-10-31: filter lists, Jira links and a pull request title rule](#2026-10-31-filter-lists-jira-links-and-a-pull-request-title-rule)
 - [2026-10-30: Jig never signs in; it reads a credential and keeps it from the agent](#2026-10-30-jig-never-signs-in-it-reads-a-credential-and-keeps-it-from-the-agent)
 - [2026-10-30: checks run on every push](#2026-10-30-checks-run-on-every-push)
 - [2026-10-30: jig-theme, the look, built on Pi's own themes](#2026-10-30-jig-theme-the-look-built-on-pis-own-themes)
@@ -27,6 +28,59 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 - [2026-10-30: jig-git's tools, and a watch that knows when it is done](#2026-10-30-jig-gits-tools-and-a-watch-that-knows-when-it-is-done)
 - [2026-10-30: built clean, beside the existing harness](#2026-10-30-built-clean-beside-the-existing-harness)
 - [Earlier decisions that still hold (2026-10-29)](#earlier-decisions-that-still-hold-2026-10-29)
+
+## 2026-10-31: filter lists, Jira links and a pull request title rule
+
+A company plugin found three gaps while configuring these plugins. Each is a
+generic fix, in its own commit.
+
+- **jig-logs: a filter value can be a list.** "The namespace is one of these"
+  could not be written, because a `filter` entry was one exact value.
+  - **Elasticsearch:** a list is a `terms` clause in `bool.filter`, next to the
+    `term` of a single value.
+  - **Loki gets a `filter` too,** which the docs had said it did not have. Each
+    entry is a matcher added to the selector: `label="value"`, or
+    `label=~"a|b"` for a list, with each value escaped as a line filter's text is.
+  - **A list holds 1 to 50 values;** an empty one is refused when the
+    configuration is checked.
+  - **Not a tool parameter:** the tool has no field filter, because the text of
+    a call never becomes a field name. Lists are configuration only.
+- **jig-jira: a comment works without `/myself`.** Some sites reach Jira only
+  through a sign-in proxy that has no "who am I".
+  - **What `me` was for:** the "as <name>" in the preview, the account in the
+    fingerprint, and telling your comment from another one after a lost reply.
+  - **When `/myself` answers 403 or 404, or the transport refuses it:** the
+    comment still goes. The preview drops the name and says why, and the read
+    after a lost reply goes by the text alone, so it can say "did not happen"
+    but only "could not settle it" when a comment has the text.
+  - **Any other failure still stops the comment.**
+- **jig-jira: `link`, `unlink` and `link_types`.**
+  - **A call reads "key <phrase> to":** `blocks` makes `key` the outward end, and
+    the inward phrase (`is blocked by`) turns it round. A name or an id means the
+    outward reading.
+  - **`unlink` finds the link by its two issues** in `key`'s own links, so the
+    model never handles a link id. `linkType` says which when there are several.
+  - **Both are external writes on a dialog:** no text, so no review screen. The
+    preview names both issues and the type, and says which issue Jira gets as
+    `outwardIssue`.
+  - **Unverified:** that `outwardIssue` is the issue that reads "blocks". It is
+    listed in the not-verified page, with where to swap it.
+- **jig-jira: `createDefaults`.** A map of field name to value that `create`
+  applies when the call does not set that field.
+  - **Names resolve like the call's own `fields`,** so a default and a field in a
+    call mean the same thing by the same name.
+  - **Shown as "from your defaults"** and part of the request, so the person
+    approves them and a change while they read voids the approval.
+  - **A default that does not fit** (not on this issue type's screen) is left
+    out with a note, because it was meant for every create. A value the screen
+    refuses stops the call and says where it came from.
+- **jig-git: a pull request title rule, `git.prTitle`.** An optional regular
+  expression that the title of `pr create` and of `pr edit` must match, as
+  `git.commitMessage` does for a commit.
+  - **Refused while the preview is built,** so nobody is asked and nothing is
+    sent. The message shows the pattern.
+  - **An `edit` that does not set a title is not checked:** the rule is about
+    what is written now, not about a title that was there before.
 
 ## 2026-10-30: Jig never signs in; it reads a credential and keeps it from the agent
 

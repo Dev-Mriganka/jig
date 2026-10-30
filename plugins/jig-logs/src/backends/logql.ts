@@ -1,5 +1,7 @@
 // The parts of LogQL that Loki's adapter has to get exactly right: writing a string, reading a stream selector, and
 // keeping the model's pipeline from reaching past the selector the configuration chose.
+import type { FilterSetting } from "../config.ts";
+import { isList } from "../filter.ts";
 import { CONTROL, refuse } from "../values.ts";
 
 /**
@@ -26,6 +28,20 @@ export function literalPattern(text: string): string {
 }
 
 // ---- the stream selector, which comes from configuration ----------------------------------------------------------
+
+/** A label name, as the selector reads it. */
+export const LABEL_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/**
+ * The matcher for one `filter` entry: `label="value"` for one value, and for a list `label=~"a|b"`, which Loki reads as
+ * the whole value being a or b (a matcher is anchored). Each value is matched literally, escaped the way a line filter's
+ * text is, so a value with a `|` or a `.` in it is one alternative and not a pattern. Label values are text, so a
+ * number or a flag is written as its text. Label values are matched with their case.
+ */
+export function matcherFor(label: string, setting: FilterSetting): string {
+    if (!isList(setting)) return `${label}=${quote(String(setting))}`;
+    return `${label}=~${quote(setting.map((value) => literalPattern(String(value))).join("|"))}`;
+}
 
 const LABEL = "[A-Za-z_][A-Za-z0-9_]*";
 const OPERATOR = "=~|!~|!=|=";

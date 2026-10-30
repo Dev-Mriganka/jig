@@ -1,7 +1,8 @@
 // The `jira` section of jig.json: where the Jira is, how to sign in, and which fields `update` may set. jig-core checks
 // the section with validateJira when a session starts, so the rest of the plugin reads settings that are valid.
 import { isObject } from "../../jig-core/src/kit/values.ts";
-import { builtInField, isFieldId, isFieldReference } from "./fields.ts";
+import { builtInField, checkJson, isFieldId, isFieldReference } from "./fields.ts";
+import { InputError } from "./values.ts";
 
 /** How requests are signed in. Exactly one of four, as the section's `auth` object says. */
 export type Auth =
@@ -23,6 +24,8 @@ export interface JiraSettings {
     updateFields: readonly string[];
     /** Friendly names for field ids, such as `Story Points` for `customfield_10016`. */
     fields: Readonly<Record<string, string>>;
+    /** Values `create` gives a field when the call does not set it, by field name or id. */
+    createDefaults: Readonly<Record<string, unknown>>;
     /** Folder or host names that must not appear in text sent to Jira. They are flagged in the preview. */
     privateNames: readonly string[];
     /** The environment name that jig-core's rules know this Jira by. */
@@ -37,6 +40,7 @@ const SECTION_FIELDS: ReadonlySet<string> = new Set([
     "auth",
     "updateFields",
     "fields",
+    "createDefaults",
     "privateNames",
     "environment",
 ]);
@@ -47,6 +51,9 @@ const AUTH_FIELDS: ReadonlySet<string> = new Set(["email", "token", "signIn", "t
 const SECRET_REFERENCE = /^[a-z][a-z0-9+.-]*:\S+$/;
 const ENVIRONMENT_NAME = /^[A-Za-z][A-Za-z0-9_-]{0,39}$/;
 const MAX_LIST = 100;
+const MAX_DEFAULTS = 30;
+/** What the project and type parameters set, so a default cannot. `summary` is a parameter that `create` requires. */
+const NOT_DEFAULTABLE = new Set(["project", "issuetype", "issue type", "summary"]);
 
 /** The address as a URL when it is an https one, else undefined. Plain http is refused everywhere: a token must not
  *  cross the network in the clear. */
@@ -176,6 +183,40 @@ function checkFields(value: unknown, errors: string[]): Record<string, string> |
     return fields;
 }
 
+function checkCreateDefaults(value: unknown, errors: string[]): Record<string, unknown> | undefined {
+    if (value === undefined) return undefined;
+    if (!isObject(value)) {
+        errors.push("jira.createDefaults: must be an object of field names and the values to give them");
+        return undefined;
+    }
+    const entries = Object.entries(value);
+    if (entries.length > MAX_DEFAULTS) errors.push(`jira.createDefaults: at most ${MAX_DEFAULTS} fields`);
+    const defaults: Record<string, unknown> = {};
+    const seen = new Set<string>();
+    for (const [name, given] of entries.slice(0, MAX_DEFAULTS)) {
+        const lower = name.trim().toLowerCase();
+        if (name.trim() === "" || name.length > 60 || /[\u0000-\u001f]/.test(name)) {
+            errors.push(
+                `jira.createDefaults: "${name.slice(0, 30)}" is not a usable field name (1 to 60 characters, no control characters)`,
+            );
+        } else if (NOT_DEFAULTABLE.has(lower)) {
+            errors.push(`jira.createDefaults.${name}: the call sets this (project, type and summary are parameters)`);
+        } else if (seen.has(lower)) {
+            errors.push(`jira.createDefaults.${name}: is the same name as another entry, apart from case`);
+        } else {
+            try {
+                checkJson("x", given);
+                seen.add(lower);
+                defaults[name.trim()] = given;
+            } catch (error) {
+                const why = error instanceof InputError ? error.message.replace(/^x: /, "") : "not a usable value";
+                errors.push(`jira.createDefaults.${name}: ${why}`);
+            }
+        }
+    }
+    return defaults;
+}
+
 /**
  * Checks a raw `jira` section and reads it. `errors` name their key; with any error there are no settings. A misspelt
  * field is an error and not a silent default: `updateField` would otherwise leave `update` on its default list.
@@ -197,6 +238,7 @@ export function readJira(raw: unknown): { settings?: JiraSettings; errors: strin
             );
         }
     }
+    const createDefaults = checkCreateDefaults(raw.createDefaults, errors) ?? {};
     const privateNames = checkList(raw.privateNames, "privateNames", errors, 100);
     const environment = raw.environment ?? DEFAULT_ENVIRONMENT;
     if (typeof environment !== "string" || !ENVIRONMENT_NAME.test(environment)) {
@@ -211,6 +253,7 @@ export function readJira(raw: unknown): { settings?: JiraSettings; errors: strin
             auth,
             updateFields: updateFields ?? DEFAULT_UPDATE_FIELDS,
             fields,
+            createDefaults,
             privateNames: privateNames ?? [],
             environment: String(environment),
         },

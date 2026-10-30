@@ -186,6 +186,28 @@ test("text with quotes, braces and backslashes finds exactly the line that holds
     assert.equal(w.requests.length, 1);
 });
 
+test("a filter with a list keeps the streams whose label is any of the values, and the check for data keeps to it", async (t) => {
+    const named = (namespace: string, region: string) =>
+        stream({ app: "orders-api", env: "staging", namespace, region }, 2, {
+            text: (n) => `${namespace}/${region} ${n}`,
+        });
+    const streams = [named("orders", "eu"), named("billing", "eu"), named("search", "eu"), named("orders", "us")];
+    const environments = {
+        staging: { selector: SELECTOR, filter: { namespace: ["orders", "billing"], region: "eu" } },
+    };
+    const w = await lokiWorld(t, streams, { section: lokiSection({ environments }) });
+    const text = ok(await w.call({ ...ask, phrase: "/" }));
+    const sent = paramsOf(w.requests[0] as Recorded).query as string;
+    assert.equal(sent, `{app="orders-api", env="staging", namespace=~"orders|billing", region="eu"} |~ "(?i)/"`);
+    assert.deepEqual(messages(text).sort(), ["billing/eu 0", "billing/eu 1", "orders/eu 0", "orders/eu 1"]);
+    const none = ok(await w.call({ ...ask, phrase: "needle-not-there" }));
+    assert.match(none, /^Availability: the window holds documents/m);
+    assert.equal(
+        paramsOf(w.requests[2] as Recorded).query,
+        '{app="orders-api", env="staging", namespace=~"orders|billing", region="eu"}',
+    );
+});
+
 // ---- when nothing is found -----------------------------------------------------------------------------------------
 
 test("no hits: a second request asks the selector alone whether the window holds any lines", async (t) => {

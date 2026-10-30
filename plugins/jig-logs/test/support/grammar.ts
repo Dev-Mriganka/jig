@@ -131,11 +131,18 @@ export function problemsWith(body: unknown, fields: Fields): string[] {
     if (filter.length === 0) problems.push("the query needs a filter");
     checkRange(filter[0], fields, problems);
     for (const clause of filter.slice(1)) {
-        const term = isObject(clause) && Object.keys(clause).join() === "term" ? clause.term : undefined;
-        const entries = isObject(term) ? Object.entries(term) : [];
-        const scalar = ["string", "number", "boolean"].includes(typeof entries[0]?.[1]);
-        if (entries.length !== 1 || !scalar)
-            problems.push("every filter after the range is a term with one scalar value");
+        const kind = isObject(clause) ? Object.keys(clause).join() : "";
+        const body = isObject(clause) && (kind === "term" || kind === "terms") ? clause[kind] : undefined;
+        const entries = isObject(body) ? Object.entries(body) : [];
+        const scalar = (value: unknown) => ["string", "number", "boolean"].includes(typeof value);
+        const value = entries[0]?.[1];
+        const fine =
+            kind === "term"
+                ? scalar(value)
+                : Array.isArray(value) && value.length >= 1 && value.length <= 50 && value.every(scalar);
+        if (entries.length !== 1 || !fine) {
+            problems.push("every filter after the range is a term with one scalar value, or a terms with 1 to 50");
+        }
     }
     if (size !== 0 || bool.must !== undefined) {
         const must = Array.isArray(bool.must) ? bool.must : [];

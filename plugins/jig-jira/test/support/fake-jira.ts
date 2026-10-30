@@ -78,8 +78,12 @@ export interface FakeJira {
     inlineComments: number;
     /** Whether the create screen can be read. Default true. */
     createScreen: boolean;
+    /** The link types `GET /issueLinkType` lists. */
+    linkTypes: Array<{ id: string; name: string; inward: string; outward: string }>;
     /** A header every request must carry, else it is answered 401. */
     requireHeader?: { name: string; value: string };
+    /** Answer `GET /myself` with this status and no user, as a sign-in proxy that has no "who am I" does. */
+    myselfStatus?: number;
     misbehave(rule: Misbehaviour): void;
     /** Requests of a kind, e.g. `fake.sent("POST", "/issue/PROJ-1/comment")`. */
     sent(method: string, path: string | RegExp): Recorded[];
@@ -224,6 +228,12 @@ function fixtures(flavor: Flavor, users: FakeUser[]): Map<string, FakeIssue> {
     return issues;
 }
 
+const LINK_TYPES = [
+    { id: "10000", name: "Blocks", inward: "is blocked by", outward: "blocks" },
+    { id: "10001", name: "Relates", inward: "relates to", outward: "relates to" },
+    { id: "10002", name: "Duplicate", inward: "is duplicated by", outward: "duplicates" },
+];
+
 const FIELDS = [
     { id: "summary", name: "Summary", custom: false },
     { id: "description", name: "Description", custom: false },
@@ -324,6 +334,7 @@ export async function startFakeJira(flavor: Flavor = "cloud"): Promise<FakeJira>
     const users = (): FakeUser[] => structuredClone(flavor === "cloud" ? CLOUD_USERS : DATACENTER_USERS);
     let nextIssue = 100;
     let nextComment = 10100;
+    let nextLink = 10200;
     let rules: Misbehaviour[] = [];
 
     const fake: FakeJira = {
@@ -338,6 +349,7 @@ export async function startFakeJira(flavor: Flavor = "cloud"): Promise<FakeJira>
         unknownFields: [],
         inlineComments: Number.POSITIVE_INFINITY,
         createScreen: true,
+        linkTypes: [],
         misbehave: (rule) => void rules.push(rule),
         sent: (method, path) =>
             fake.requests.filter(
@@ -355,10 +367,13 @@ export async function startFakeJira(flavor: Flavor = "cloud"): Promise<FakeJira>
             fake.unknownFields = [];
             fake.inlineComments = Number.POSITIVE_INFINITY;
             fake.createScreen = true;
+            fake.linkTypes = structuredClone(LINK_TYPES);
             delete fake.requireHeader;
+            delete fake.myselfStatus;
             rules = [];
             nextIssue = 100;
             nextComment = 10100;
+            nextLink = 10200;
         },
         close: () =>
             new Promise((resolve) => {
@@ -419,8 +434,46 @@ export async function startFakeJira(flavor: Flavor = "cloud"): Promise<FakeJira>
         if (fake.requireHeader !== undefined && request.headers[fake.requireHeader.name] !== fake.requireHeader.value) {
             return { status: 401, body: { message: "Unauthorized" } };
         }
-        if (method === "GET" && path === "/myself") return { status: 200, body: userJson(fake.me) };
+        if (method === "GET" && path === "/myself") {
+            return fake.myselfStatus === undefined
+                ? { status: 200, body: userJson(fake.me) }
+                : { status: fake.myselfStatus, body: { errorMessages: ["No who-am-I here"], errors: {} } };
+        }
         if (method === "GET" && path === "/field") return { status: 200, body: fake.fields };
+        if (method === "GET" && path === "/issueLinkType")
+            return { status: 200, body: { issueLinkTypes: fake.linkTypes } };
+
+        // `outwardIssue` is the issue that reads the type's outward phrase ("blocks"); it lists the other as its
+        // `outwardIssue`, and the other lists it as its `inwardIssue`.
+        if (method === "POST" && path === "/issueLink") {
+            const type = fake.linkTypes.find((candidate) => candidate.name === body?.type?.name);
+            if (type === undefined) return notFound(`No issue link type with name '${body?.type?.name}' found.`);
+            const outwardIssue = fake.issues.get(String(body?.outwardIssue?.key));
+            const inwardIssue = fake.issues.get(String(body?.inwardIssue?.key));
+            if (outwardIssue === undefined || inwardIssue === undefined) {
+                return notFound("Issue does not exist or you do not have permission to see it.");
+            }
+            const id = String(nextLink++);
+            const ref = (issue: FakeIssue) => ({
+                key: issue.key,
+                fields: { summary: issue.fields.summary, status: issue.fields.status },
+            });
+            const list = (issue: FakeIssue): unknown[] => (issue.fields.issuelinks ??= []) as unknown[];
+            list(outwardIssue).push({ id, type, outwardIssue: ref(inwardIssue) });
+            list(inwardIssue).push({ id, type, inwardIssue: ref(outwardIssue) });
+            return { status: 201 };
+        }
+        if (method === "DELETE" && (match = /^\/issueLink\/(\d+)$/.exec(path))) {
+            const id = match[1];
+            let found = false;
+            for (const issue of fake.issues.values()) {
+                const links = (issue.fields.issuelinks ?? []) as Array<{ id: string }>;
+                const kept = links.filter((link) => link.id !== id);
+                found ||= kept.length !== links.length;
+                issue.fields.issuelinks = kept;
+            }
+            return found ? { status: 204 } : notFound(`No issue link with id '${id}' exists.`);
+        }
 
         if (method === "GET" && (match = /^\/project\/([A-Z]+)$/.exec(path))) {
             return match[1] === "PROJ"

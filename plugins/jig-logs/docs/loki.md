@@ -32,6 +32,7 @@ in Loki's own documentation, and what was not, is in
 | `backend.auth` | Any of the four kinds (see [Connecting](connecting.md)) |
 | `backend.tenant` | Optional. Sent as the header `X-Scope-OrgID` on every request |
 | `environments.<name>.selector` | Required. A LogQL stream selector with at least one `=` or `=~` matcher that has a value |
+| `environments.<name>.filter` | Optional. Labels that must equal a value, or one of a list: matchers added to the selector |
 
 - **`backend.auth`:** for Grafana Cloud use `username` and `password`: the user
   shown in the Loki details of the stack, and an API token as a secret reference.
@@ -42,7 +43,12 @@ in Loki's own documentation, and what was not, is in
   names two tenants.
 - **`selector`:** it names the streams of the environment, and it comes from here
   and never from the model.
-An environment has no `index`, `timeField`, `messageField` or `filter`: they are
+- **`filter`:** up to 8 labels, each with one value or a list of 1 to 50, such as
+  `{ "namespace": ["orders-api", "billing-api"], "region": "eu" }`. A value is text, a
+  number, `true` or `false`, and a label is a name the selector can read (letters,
+  digits and `_`, so no dots). It comes from here and never from the model.
+
+An environment has no `index`, `timeField` or `messageField`: they are
 Elasticsearch's, and Loki has a time and a line and nothing to choose. A field of
 the other type is reported by name.
 
@@ -60,15 +66,15 @@ One request for each bucket:
 
 | In the call | In the query |
 |---|---|
-| (the environment) | its `selector` |
+| (the environment) | its `selector`, with the matchers of its `filter` added |
 | `phrase` | `\|~ "(?i)<phrase>"` |
 | `match` | one `\|~ "(?i)<text>"` for each text |
 | `exclude` | one `!~ "(?i)<text>"` for each text |
+| `query` | the text itself, last |
 
 The text is matched literally: every regular-expression character in it is
 escaped. `(?i)` makes the filter ignore case, as the tool does on every
 backend; Loki's own `|=` and `!=` would not.
-| `query` | the text itself, last |
 
 This is a search for the phrase `req-7f3a9c`, with `match: ["timeout"]` and
 `exclude: ["Heartbeat"]`, in `staging`:
@@ -90,6 +96,21 @@ lines before it parses them.
 The parameters are in the address, as Loki's documentation shows them. So a
 sign-in service, a transport and a gateway in front of Loki see the query, as they
 would from any other Loki client; with Elasticsearch it is in the body.
+
+## What a filter becomes
+
+Each entry of an environment's `filter` is a matcher put inside the selector's
+braces, after its own matchers. One value is `label="value"`. A list is one regular
+expression with each value escaped as a line filter's text is: `namespace=~"orders|billing"`.
+A label matcher has to match the whole value, so that finds a stream whose
+`namespace` is exactly `orders` or `billing`, and no other.
+
+```text
+{app="orders-api", env="staging", namespace=~"orders|billing", region="eu"} |~ "(?i)req-7f3a9c"
+```
+
+A number or a flag is written as its text, and case counts, as for any label.
+The check for data asks the same streams.
 
 ## What the model's `query` may be
 
@@ -129,9 +150,9 @@ Loki answers a log query with lines and no count. So:
 - **A bucket after the hits are collected asks for one line.** For Elasticsearch it
   asks for the count; Loki has none to give, and one line tells that the bucket
   holds something. The total then reads "at least".
-- **The check for data** asks the selector alone, over the whole window, for one
-  line. The availability line then says that the window holds documents, without a
-  number.
+- **The check for data** asks the selector and its filter, and nothing the model
+  wrote, over the whole window, for one line. The availability line then says that
+  the window holds documents, without a number.
 
 `match` and `exclude` are sent to Loki and applied again to the hits that come
 back, ignoring case both times, so `match: ["timeout"]` also finds a line that

@@ -5,6 +5,7 @@ import {
     commentPage,
     fieldList,
     getIssue,
+    linkTypes,
     newestComments,
     search,
     transitionsOf,
@@ -18,6 +19,7 @@ import {
     formatComments,
     formatFields,
     formatIssue,
+    formatLinkTypes,
     formatSearch,
     formatTransitions,
     formatUsers,
@@ -117,6 +119,8 @@ export async function runRead(env: Env, call: Call): Promise<string> {
             );
             return formatFields(call.query, fields.slice(0, MAX_FIELD_MATCHES), aliases);
         }
+        case "link_types":
+            return formatLinkTypes(await linkTypes(env));
         default:
             throw new InputError(`jira ${call.action} is a write, not a read`);
     }

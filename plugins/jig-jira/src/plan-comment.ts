@@ -1,5 +1,5 @@
 // The plans for the three writes on a comment: add, replace and delete.
-import { getComment, issueHead, myself, newestComments, notFoundAsInvalid } from "./api.ts";
+import { getComment, issueHead, newestComments, notFoundAsInvalid, whoAmI } from "./api.ts";
 import type { Comment, Env } from "./api.ts";
 import { JiraError } from "./http.ts";
 import { about } from "./plan.ts";
@@ -10,25 +10,57 @@ import { minute, obj, sameUser, str, userId } from "./values.ts";
 /** How many of the newest comments the re-read after a lost reply looks through. */
 const RECHECK_COMMENTS = 50;
 
+/**
+ * What a comment needs to know about who is signed in (`GET /myself`) is three things: the preview says who posts, the
+ * fingerprint holds the account so that a changed sign-in voids the approval, and the check after a lost reply tells
+ * the comment from someone else's with the same text. A site whose proxy has no "who am I" has none of them: the preview
+ * says so, the fingerprint holds nothing of the account, and the check goes by the text alone (see `check` below).
+ */
 export async function planComment(env: Env, call: CallOf<"comment">): Promise<Plan> {
     // Who is signed in is read before the write, because after a lost reply it may no longer be possible to ask.
-    const [head, me] = await Promise.all([issueHead(env, call.key), myself(env)]);
+    const [head, who] = await Promise.all([issueHead(env, call.key), whoAmI(env)]);
+    const me = who.user;
+    const asked = `${about(head)} (${head.status})`;
     return {
         key: call.key,
         shown: {
-            summary: `Add a comment to ${about(head)} (${head.status}), as ${me.displayName}`,
+            summary: me === undefined ? `Add a comment to ${asked}` : `Add a comment to ${asked}, as ${me.displayName}`,
             flags: pointersIn([call.text], env.settings.privateNames),
             rows: [],
-            notes: [],
+            notes:
+                me === undefined
+                    ? [
+                          `This Jira does not say who you are signed in as (${who.why}), so the preview cannot show who posts. ` +
+                              "If the reply to the comment is lost, the check afterwards finds a comment by its text only.",
+                      ]
+                    : [],
             texts: [{ label: "Comment", source: call.text }],
         },
         send: { method: "POST", path: `/issue/${call.key}/comment`, body: { body: call.text } },
-        basis: { as: userId(me) },
+        basis: { as: me === undefined ? null : userId(me) },
         async check() {
             const { comments } = await newestComments(env, call.key, RECHECK_COMMENTS);
-            const mine = comments.filter(
-                (comment) => sameUser(comment.author, me) && comment.body.trim() === call.text.trim(),
-            );
+            const sameText = comments.filter((comment) => comment.body.trim() === call.text.trim());
+            if (me === undefined) {
+                // Without knowing who is signed in, a comment with this text may be anyone's: only "no such comment"
+                // settles it.
+                const [newest] = sameText.slice(-1);
+                if (newest === undefined) {
+                    return {
+                        happened: false,
+                        text: `the newest ${RECHECK_COMMENTS} comments on ${call.key} hold none with this text`,
+                    };
+                }
+                return {
+                    happened: undefined,
+                    text:
+                        `${sameText.length === 1 ? "a comment" : `${sameText.length} comments`} with this text ` +
+                        `(newest ${newest.id}, created ${minute(newest.created)}) ` +
+                        `${sameText.length === 1 ? "is" : "are"} on ${call.key}, but who wrote ` +
+                        `${sameText.length === 1 ? "it" : "them"} cannot be told, as Jira does not say who you are`,
+                };
+            }
+            const mine = sameText.filter((comment) => sameUser(comment.author, me));
             const newest = mine.at(-1);
             if (newest === undefined) {
                 return {

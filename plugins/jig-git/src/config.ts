@@ -12,13 +12,14 @@ export interface GitSettings {
     protected?: string[];
     commitMessage?: string;
     branchName?: string;
+    prTitle?: string;
     prTemplate?: string;
     cloneHost: string;
 }
 
 const DEFAULT_CLONE_HOST = "github.com";
 
-const TOP = new Set(["base", "protected", "commitMessage", "branchName", "prTemplate", "cloneHost"]);
+const TOP = new Set(["base", "protected", "commitMessage", "branchName", "prTitle", "prTemplate", "cloneHost"]);
 /** Settings that moved with CI to jig-ops, and where they are now. */
 const MOVED: Readonly<Record<string, string>> = { watch: "ops.watch", artifacts: "ops.artifacts" };
 const BRANCH_PATTERN = /^[A-Za-z0-9._/*-]+$/;
@@ -59,6 +60,7 @@ export function validateGitSection(raw: unknown): string[] {
     }
     if (raw.commitMessage !== undefined) checkRegExp(raw.commitMessage, "git.commitMessage", errors);
     if (raw.branchName !== undefined) checkRegExp(raw.branchName, "git.branchName", errors);
+    if (raw.prTitle !== undefined) checkRegExp(raw.prTitle, "git.prTitle", errors);
     if (raw.prTemplate !== undefined && (typeof raw.prTemplate !== "string" || raw.prTemplate === "")) {
         errors.push("git.prTemplate must be the path of a Markdown file");
     }
@@ -79,6 +81,7 @@ export function settingsFrom(raw: unknown): GitSettings {
         protected: section.protected as string[] | undefined,
         commitMessage: section.commitMessage as string | undefined,
         branchName: section.branchName as string | undefined,
+        prTitle: section.prTitle as string | undefined,
         prTemplate: section.prTemplate as string | undefined,
         cloneHost: (section.cloneHost as string | undefined) ?? DEFAULT_CLONE_HOST,
     };

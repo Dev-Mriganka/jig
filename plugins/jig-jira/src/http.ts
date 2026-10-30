@@ -43,9 +43,13 @@ export class NotSentError extends Error {
 }
 
 export class LostReplyError extends Error {
-    constructor(message: string) {
+    /** True when the transport that carried the request threw. A sign-in proxy that does not serve a path does that. */
+    readonly viaTransport: boolean;
+
+    constructor(message: string, viaTransport = false) {
         super(message);
         this.name = "LostReplyError";
+        this.viaTransport = viaTransport;
     }
 }
 
@@ -172,7 +176,7 @@ function failed(error: unknown, timeoutMs: number): unknown {
     if (error.code === "auth_failed") return new NotSentError(`could not sign in to Jira: ${error.message}`);
     // No transport has this name, or the request itself was wrong: nothing was sent.
     if (error.code === "no_transport" || error.code === "invalid_request") return new NotSentError(error.message);
-    return new LostReplyError(`no answer from Jira (${whyLost(error, timeoutMs)})`);
+    return new LostReplyError(`no answer from Jira (${whyLost(error, timeoutMs)})`, error.code === "transport_failed");
 }
 
 const NOT_JSON = Symbol("not json");
