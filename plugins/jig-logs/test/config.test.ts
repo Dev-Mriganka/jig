@@ -30,7 +30,7 @@ test("every documented field is accepted", () => {
             staging: { index: "app-staging-*", timeField: "timestamp", messageField: "log.message" },
             prod: {
                 index: "app-*,-app-debug-*",
-                filter: { "env.keyword": "prod", region: 7, canary: false },
+                filter: { "env.keyword": "prod", region: 7, canary: false, "ns.keyword": ["orders", "billing"] },
                 jigEnvironment: "production",
             },
         },
@@ -257,11 +257,13 @@ test("timeField and messageField are field names", () => {
     }
 });
 
-test("a filter maps 1 to 8 field names to the text, number or flag each must equal", () => {
+test("a filter maps 1 to 8 field names to the value each must equal, or a list of values it may equal", () => {
     const filter = (value: unknown) => errorsOf(section({ environments: { staging: { ...staging, filter: value } } }));
     assert.deepEqual(filter({ "env.keyword": "prod" }), []);
     assert.deepEqual(filter({ a: 1, b: 1.5, c: true, d: false }), []);
-    const range = "logs.environments.staging.filter must map 1 to 8 field names to the value each must equal";
+    assert.deepEqual(filter({ "ns.keyword": ["orders", "billing"], n: [1, 2], mixed: ["a", 1, false] }), []);
+    const range =
+        "logs.environments.staging.filter must map 1 to 8 field names to the value each must equal, or to a list of values it may equal";
     assert.deepEqual(filter({}), [range]);
     assert.deepEqual(filter([]), [range]);
     assert.deepEqual(filter("env"), [range]);
@@ -269,18 +271,25 @@ test("a filter maps 1 to 8 field names to the text, number or flag each must equ
     assert.deepEqual(filter({ "bad field": "x" }), [
         'logs.environments.staging.filter: "bad field" is not a field name',
     ]);
-    assert.deepEqual(filter({ env: "" }), [
-        "logs.environments.staging.filter.env must be text, a number, true or false",
-    ]);
-    assert.deepEqual(filter({ env: null }), [
-        "logs.environments.staging.filter.env must be text, a number, true or false",
-    ]);
-    assert.deepEqual(filter({ env: ["a", "b"] }), [
-        "logs.environments.staging.filter.env must be text, a number, true or false",
-    ]);
-    assert.deepEqual(filter({ env: Number.POSITIVE_INFINITY }), [
-        "logs.environments.staging.filter.env must be text, a number, true or false",
-    ]);
+    const single =
+        "logs.environments.staging.filter.env must be text, a number, true or false, or a list of 1 to 50 of them";
+    for (const bad of ["", null, Number.POSITIVE_INFINITY, {}, "a".repeat(201), "a\nb"]) {
+        assert.deepEqual(filter({ env: bad }), [single], JSON.stringify(bad));
+    }
+});
+
+test("a list in a filter holds 1 to 50 values of text, numbers or flags", () => {
+    const filter = (value: unknown) =>
+        errorsOf(section({ environments: { staging: { ...staging, filter: { ns: value } } } }));
+    const size = "logs.environments.staging.filter.ns must list 1 to 50 values";
+    const kinds = "logs.environments.staging.filter.ns must list only text, numbers, true or false";
+    assert.deepEqual(filter(Array.from({ length: 50 }, (_, i) => `ns-${i}`)), []);
+    assert.deepEqual(filter(["only"]), []);
+    assert.deepEqual(filter([]), [size], "an empty list is refused");
+    assert.deepEqual(filter(Array.from({ length: 51 }, (_, i) => `ns-${i}`)), [size]);
+    for (const bad of [[""], [null], [["a"]], [{}], ["ok", ""], [Number.NaN], ["a".repeat(201)], ["a\u0007"]]) {
+        assert.deepEqual(filter(bad), [kinds], JSON.stringify(bad));
+    }
 });
 
 test("jigEnvironment is the name of a jig-core environment", () => {

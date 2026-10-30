@@ -12,8 +12,11 @@ import { backends } from "./backends/index.ts";
 import type { LogBackend } from "./backends/index.ts";
 import { CONTROL, isObject, printable, refuse, shown } from "./values.ts";
 
-/** The value a `filter` entry must equal. */
+/** A value a `filter` entry may equal. */
 export type FilterValue = string | number | boolean;
+
+/** What one `filter` entry asks of its field: to equal one value, or to equal any of a list of values. */
+export type FilterSetting = FilterValue | readonly FilterValue[];
 
 /** Which kind of backend `logs.backend.url` is. A section without a type is Elasticsearch: it was the only one. */
 export type BackendType = "elasticsearch" | "loki";
@@ -33,8 +36,8 @@ export interface ElasticTarget extends Common {
     type?: "elasticsearch";
     /** An index pattern, such as `app-logs-*`. */
     index: string;
-    /** Fields that must equal a value, for an index that holds several environments. */
-    filter: Readonly<Record<string, FilterValue>>;
+    /** Fields that must equal a value, or any of a list, for an index that holds several environments. */
+    filter: Readonly<Record<string, FilterSetting>>;
     selector?: undefined;
 }
 
@@ -43,8 +46,9 @@ export interface LokiTarget extends Common {
     type: "loki";
     /** A LogQL stream selector, such as `{app="orders-api", env="staging"}`. */
     selector: string;
+    /** Labels that must equal a value, or any of a list: matchers added to the selector. */
+    filter: Readonly<Record<string, FilterSetting>>;
     index?: undefined;
-    filter?: undefined;
 }
 
 /**

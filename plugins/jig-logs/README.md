@@ -90,7 +90,7 @@ not configured instead of running half set up.
 | Field | Meaning |
 |---|---|
 | `backend` | Required. The `type` (`elasticsearch` or `loki`), its `url`, and `auth` or `transport` |
-| `environments` | Required, at least one. Each says where its logs are: an `index` or a `selector` |
+| `environments` | Required, at least one. Each says where its logs are: an `index` or a `selector`, and may add a `filter` |
 
 A password, key or token in `auth` is a secret reference such as
 `pass:logs/api-key` (see [Secrets](../../docs/secrets.md)), never the secret. A

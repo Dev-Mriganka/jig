@@ -33,6 +33,14 @@
           "term": {
             "canary": false
           }
+        },
+        {
+          "terms": {
+            "namespace.keyword": [
+              "orders",
+              "billing"
+            ]
+          }
         }
       ],
       "must": [

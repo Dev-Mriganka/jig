@@ -138,6 +138,9 @@ function evaluate(body: Json, docs: readonly Doc[]): Answer {
         } else if (clause.term !== undefined) {
             const [field, value] = Object.entries(clause.term)[0] as [string, unknown];
             rows = rows.filter((doc) => read(doc, field) === value);
+        } else if (clause.terms !== undefined) {
+            const [field, values] = Object.entries(clause.terms)[0] as [string, unknown[]];
+            rows = rows.filter((doc) => values.includes(read(doc, field)));
         }
     }
     for (const clause of must) {

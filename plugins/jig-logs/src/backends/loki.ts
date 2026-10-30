@@ -12,15 +12,16 @@
 //
 // Loki answers a log query with the lines of the streams it found, and has no count to give with them. The total of a
 // bucket is therefore the number of lines returned, and a lower bound when the bucket filled its limit.
-import type { LokiTarget, Target } from "../config.ts";
+import type { FilterSetting, LokiTarget, Target } from "../config.ts";
 import { final, transient } from "../failure.ts";
+import { checkFilter } from "../filter.ts";
 import type { LogQuery } from "../query.ts";
 import { parseBody } from "../response.ts";
 import type { Source } from "../response.ts";
 import { HOUR_MS } from "../time.ts";
 import { isObject } from "../values.ts";
 import type { LogBackend } from "./backend.ts";
-import { checkPipeline, literalPattern, quote, selectorProblem } from "./logql.ts";
+import { checkPipeline, LABEL_NAME, literalPattern, matcherFor, quote, selectorProblem } from "./logql.ts";
 
 /** Loki's default `max_entries_limit_per_query`, the most lines one query returns. An operator may set it lower. */
 const MAX_ENTRIES = 5000;
@@ -50,6 +51,16 @@ function limitFor(size: number): number {
     return Math.min(Math.max(size, 1), MAX_ENTRIES);
 }
 
+/**
+ * The streams of the environment: its selector, with a matcher added for each entry of its `filter`. Both come from the
+ * configuration. The selector was checked to end with `}`, so the matchers go in front of it.
+ */
+function streams({ selector, filter }: LokiTarget): string {
+    const added = Object.entries(filter).map(([label, setting]) => matcherFor(label, setting));
+    if (added.length === 0) return selector;
+    return `${selector.slice(0, -1).trimEnd()}, ${added.join(", ")}}`;
+}
+
 /** The selector, then the line filters that every backend understands, then the model's pipeline, if it wrote one. */
 function logql(query: LogQuery): string {
     const stages: string[] = [];
@@ -61,7 +72,7 @@ function logql(query: LogQuery): string {
     for (const text of query.exclude ?? []) stages.push(`!~ ${ignoringCase(text)}`);
     // Checked again here, so that a request is never built from a pipeline nobody looked at.
     if (query.kind === "query") stages.push(checkPipeline(query.text));
-    return [lokiTarget(query.target).selector, ...stages].join(" ");
+    return [streams(lokiTarget(query.target)), ...stages].join(" ");
 }
 
 // ---- reading a reply ---------------------------------------------------------------------------------------------
@@ -101,7 +112,7 @@ export const loki: LogBackend = {
 
     config: {
         backendFields: ["tenant"],
-        environmentFields: ["selector"],
+        environmentFields: ["selector", "filter"],
         needs: "a selector",
         exampleUrl: "https://logs.example.com:3100",
     },
@@ -120,12 +131,15 @@ export const loki: LogBackend = {
             const why = "Loki refuses a selector that can match every stream";
             errors.push(`${key}.selector needs a label that equals a value (= or =~): ${why}`);
         }
+        if (raw.filter !== undefined)
+            checkFilter(raw.filter, `${key}.filter`, { pattern: LABEL_NAME, noun: "label" }, errors);
     },
 
     environment(name, raw) {
         return {
             type: "loki",
             selector: (raw.selector as string).trim(),
+            filter: (raw.filter as Record<string, FilterSetting> | undefined) ?? {},
             timeField: TIME_FIELD,
             messageField: MESSAGE_FIELD,
             jigEnvironment: (raw.jigEnvironment as string | undefined) ?? name,
@@ -150,10 +164,15 @@ export const loki: LogBackend = {
         };
     },
 
-    // Only the selector, so it asks about the streams of the environment and about nothing the model wrote.
+    // Only the streams of the environment, so it asks about them and about nothing the model wrote.
     probe(query, range) {
-        const { selector } = lokiTarget(query.target);
-        return { query: selector, start: nanos(range.from), end: nanos(range.to), limit: "1", direction: "forward" };
+        return {
+            query: streams(lokiTarget(query.target)),
+            start: nanos(range.from),
+            end: nanos(range.to),
+            limit: "1",
+            direction: "forward",
+        };
     },
 
     wire(_target, connection) {

@@ -59,7 +59,6 @@ test("a field of the other type is an error that names the field and the type it
         ["index", "app-logs-*"],
         ["timeField", "timestamp"],
         ["messageField", "msg"],
-        ["filter", { env: "staging" }],
     ] as const) {
         assert.deepEqual(errorsOf(section(loki, { staging: { ...lokiStaging, [field]: value } })), [
             `logs.environments.staging.${field} is only used when logs.backend.type is "elasticsearch"`,
@@ -117,17 +116,53 @@ test("a selector is a LogQL stream selector with a label that equals a value", (
     }
 });
 
-test("a selector is kept as written, without the spaces around it, and the environment has no Elasticsearch fields", () => {
+test("a selector is kept as written, without the spaces around it, and the environment has no index", () => {
     const settings = settingsFrom(section(loki, { staging: { selector: `  ${SELECTOR}  `, jigEnvironment: "test" } }));
     const target = settings?.environments.get("staging");
     assert.deepEqual(target, {
         type: "loki",
         selector: SELECTOR,
+        filter: {},
         timeField: "@timestamp",
         messageField: "message",
         jigEnvironment: "test",
     });
-    assert.ok(!Object.hasOwn(target ?? {}, "index") && !Object.hasOwn(target ?? {}, "filter"));
+    assert.ok(!Object.hasOwn(target ?? {}, "index"));
+});
+
+// ---- the filter ------------------------------------------------------------------------------------------------------
+
+test("a Loki filter maps 1 to 8 label names to a value, or a list of values, and is kept as written", () => {
+    const filter = (value: unknown) => errorsOf(section(loki, { staging: { ...lokiStaging, filter: value } }));
+    assert.deepEqual(filter({ namespace: ["orders", "billing"], region: "eu", shard: 3, canary: false }), []);
+    const range =
+        "logs.environments.staging.filter must map 1 to 8 label names to the value each must equal, or to a list of values it may equal";
+    for (const bad of [
+        {},
+        [],
+        "namespace",
+        null,
+        Object.fromEntries(Array.from({ length: 9 }, (_, i) => [`l${i}`, "x"])),
+    ]) {
+        assert.deepEqual(filter(bad), [range], JSON.stringify(bad));
+    }
+    // A label is a name Loki's selector reads: no dots, no dashes, no leading digit.
+    for (const name of ["kubernetes.namespace", "name-space", "1ns", "bad label", ""]) {
+        assert.deepEqual(filter({ [name]: "x" }), [`logs.environments.staging.filter: "${name}" is not a label name`]);
+    }
+    assert.deepEqual(filter({ namespace: [] }), [
+        "logs.environments.staging.filter.namespace must list 1 to 50 values",
+    ]);
+    assert.deepEqual(filter({ namespace: Array.from({ length: 51 }, (_, i) => `n${i}`) }), [
+        "logs.environments.staging.filter.namespace must list 1 to 50 values",
+    ]);
+    const target = settingsFrom(section(loki, { staging: { ...lokiStaging, filter: { namespace: ["a", "b"] } } }));
+    assert.deepEqual(target?.environments.get("staging")?.filter, { namespace: ["a", "b"] });
+});
+
+test("filter is shared by both types, and is not reported as the other type's", () => {
+    assert.deepEqual(errorsOf(section(direct, { staging: { ...elasticStaging, filter: { env: ["a", "b"] } } })), []);
+    assert.deepEqual(errorsOf(section(loki, { staging: { ...lokiStaging, filter: { env: ["a", "b"] } } })), []);
 });
 
 // ---- the tenant ---------------------------------------------------------------------------------------------------------
