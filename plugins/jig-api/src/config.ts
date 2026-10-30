@@ -164,7 +164,10 @@ function checkEnvironments(raw: unknown, errors: string[]): Map<string, Environm
     const mappings = new Map<string, EnvironmentMapping>();
     if (raw === undefined) return mappings;
     if (!isObject(raw)) {
-        errors.push("api.environments: must be an object that maps your collections' environment names to jig-core's, such as { \"Staging\": \"staging\" }");
+        errors.push(
+            "api.environments: must be an object that maps your collections' environment names to jig-core's, " +
+                'such as { "Staging": "staging" }',
+        );
         return mappings;
     }
     if (Object.keys(raw).length > MAX_LIST) {

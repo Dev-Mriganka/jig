@@ -26,8 +26,8 @@ export const REFUSED_HEADERS: ReadonlySet<string> = new Set([
 /** How many times a path is percent-decoded when it is searched for "..". */
 const MAX_DECODE_ROUNDS = 5;
 
-function fail(message: string): never {
-    throw new InputError(`api call: ${message}`);
+function fail(message: string, who = "api call"): never {
+    throw new InputError(`${who}: ${message}`);
 }
 
 const present = (value: unknown): boolean => value !== undefined && value !== null;
@@ -58,7 +58,9 @@ export function checkUrl(value: unknown): { origin: string; rest: string } {
     const origin = match[1] as string;
     const rest = (match[2] as string) === "" ? "/" : (match[2] as string);
     const scheme = origin.slice(0, origin.indexOf(":")).toLowerCase();
-    if (scheme !== "http" && scheme !== "https") fail(`the address uses ${scheme}://, and only http and https are sent (not WebSocket, gRPC or MQTT)`);
+    if (scheme !== "http" && scheme !== "https") {
+        fail(`the address uses ${scheme}://, and only http and https are sent (not WebSocket, gRPC or MQTT)`);
+    }
     if (origin.includes("@")) fail("the address must not contain a user name or password");
     const path = PATH_AND_QUERY.exec(rest);
     if (path === null || climbs(rest)) {
@@ -113,7 +115,7 @@ export function checkHeaders(headers: unknown): Array<[string, string]> {
 export function checkTimeout(value: unknown, fallback: number = DEFAULT_TIMEOUT_SEC): number {
     if (!present(value)) return fallback;
     if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1 || value > MAX_TIMEOUT_SEC) {
-        fail(`timeoutSec must be a whole number from 1 to ${MAX_TIMEOUT_SEC} (got ${shown(value)})`);
+        fail(`timeoutSec must be a whole number from 1 to ${MAX_TIMEOUT_SEC} (got ${shown(value)})`, "api");
     }
     return value;
 }

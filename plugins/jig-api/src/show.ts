@@ -5,7 +5,7 @@ import type { Catalog } from "./catalog.ts";
 import type { ApiSettings } from "./config.ts";
 import { READ_METHODS } from "./engine/plan.ts";
 import { oneLine } from "./engine/values.ts";
-import { pathOf } from "./model.ts";
+import { CREDENTIAL_HEADERS, pathOf } from "./model.ts";
 import type { Auth, Collection, Environment, Problem, SavedRequest } from "./model.ts";
 import { secretNamesOf } from "./resolve.ts";
 
@@ -41,7 +41,8 @@ function neededVariables(collection: Collection, request: SavedRequest, secretNa
 
 function problemLines(problems: readonly Problem[]): string[] {
     if (problems.length === 0) return [];
-    return ["Problems:", ...problems.map((problem) => `  ${problem.level}: ${problem.file}${problem.key === "" ? "" : ` ${problem.key}`}: ${problem.message}`)];
+    const where = (problem: Problem): string => `${problem.file}${problem.key === "" ? "" : ` ${problem.key}`}`;
+    return ["Problems:", ...problems.map((problem) => `  ${problem.level}: ${where(problem)}: ${problem.message}`)];
 }
 
 export function listText(catalog: Catalog, settings: ApiSettings, filter: Filter): string {
@@ -59,7 +60,9 @@ export function listText(catalog: Catalog, settings: ApiSettings, filter: Filter
         });
         const kind = settings.collections.get(collection.name)?.kind ?? "";
         const environments = [...collection.environments.keys()];
-        lines.push(`${collection.name} (${kind}, ${collection.requests.length} request${collection.requests.length === 1 ? "" : "s"}; environments: ${environments.length === 0 ? "none" : environments.join(", ")})`);
+        const count = `${collection.requests.length} request${collection.requests.length === 1 ? "" : "s"}`;
+        const named = environments.length === 0 ? "none" : environments.join(", ");
+        lines.push(`${collection.name} (${kind}, ${count}; environments: ${named})`);
         for (const request of matching) {
             if (listed >= MAX_LISTED) {
                 more++;
@@ -131,8 +134,8 @@ export function showText(catalog: Catalog, settings: ApiSettings, request: Saved
         lines.push("Headers:");
         for (const [name, value] of request.headers) {
             const names = [...value.matchAll(/\{\{\s*([^{}]+?)\s*\}\}/g)].map((match) => match[1] as string);
-            const secret = names.some((variable) => secretNames.has(variable) || request.signsIn.includes(variable));
-            lines.push(`  ${name}: ${secret ? "(secret)" : oneLine(value, 120)}`);
+            const hidden = CREDENTIAL_HEADERS.has(name.toLowerCase()) || names.some((variable) => secretNames.has(variable));
+            lines.push(`  ${name}: ${hidden ? "(secret)" : oneLine(value, 120)}`);
         }
     }
     if (request.body !== undefined) {
@@ -142,7 +145,8 @@ export function showText(catalog: Catalog, settings: ApiSettings, request: Saved
             body.kind === "raw" || body.kind === "json" ? body.text
                 : body.kind === "graphql" ? [body.query, body.variables ?? ""].join("\n\n").trim()
                     : body.kind === "file" ? `file ${body.file.path}`
-                        : body.fields.map((field) => (field.kind === "file" ? `${field.name} = file ${field.file.path}` : `${field.name} = ${field.value}`)).join("\n");
+                        : body.fields.map((field) =>
+                            field.kind === "file" ? `${field.name} = file ${field.file.path}` : `${field.name} = ${field.value}`).join("\n");
         const bodyLines = text.split("\n");
         lines.push(...bodyLines.slice(0, SHOWN_BODY_LINES).map((line) => `  ${line}`));
         if (bodyLines.length > SHOWN_BODY_LINES) lines.push(`  [${bodyLines.length - SHOWN_BODY_LINES} more lines not shown]`);

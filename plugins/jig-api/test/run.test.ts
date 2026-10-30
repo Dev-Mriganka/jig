@@ -554,3 +554,39 @@ describe("secrets", () => {
         assert.equal(h.api.requests.length, 0);
     });
 });
+
+describe("limits", () => {
+    test("the timeout of a run is a whole number of seconds from 1 to 120", async () => {
+        for (const timeoutSec of [0, 121, 1.5, "30"]) {
+            const result = await run("Get order", { orderId: "1" }, { timeoutSec });
+            assert.match(result.blocked ?? "", /^jig-core could not decide: api: timeoutSec must be a whole number from 1 to 120/, String(timeoutSec));
+        }
+        h.configure(acmeSection(h, { timeoutSec: 45 }));
+        const result = await run("Get order", { orderId: "1" });
+        ok(result);
+        assert.equal(h.api.requests.length, 1);
+    });
+
+    test("a body of text is at most 1 MiB, and a request with files at most 20 MiB", async () => {
+        const file = path.join(h.dir, "big.postman_collection.json");
+        const item = (name: string, size: number) => ({ name, request: { method: "POST", url: { raw: "{{baseUrl}}/b" }, body: { mode: "raw", raw: "x".repeat(size) } } });
+        writeFileSync(file, JSON.stringify({ item: [item("Fits", 1024 * 1024), item("Too big", 1024 * 1024 + 1)] }));
+        const env = path.join(h.dir, "big-env.json");
+        writeFileSync(env, JSON.stringify({ values: [{ key: "baseUrl", value: h.api.origin, enabled: true }] }));
+        h.configure({ collections: { big: { postman: file, environments: { Staging: env } } }, environments: { Staging: "staging" }, allowPlainLocal: true });
+        ok(await h.call({ action: "run", request: "Fits", environment: "Staging" }));
+        const result = await h.call({ action: "run", request: "Too big", environment: "Staging" });
+        assert.equal(result.blocked, 'jig-core could not decide: the body of "Too big" is larger than 1 MiB');
+    });
+
+    test("show keeps back the value of a sign-in header that is written out in the file", async () => {
+        const directory = path.join(h.dir, "literal");
+        mkdirSync(directory);
+        writeFileSync(path.join(directory, "r.http"), "### Literal\nGET https://a.example.test/\nAuthorization: Bearer literal-token-0123456789\nX-Plain: visible\n");
+        h.configure({ collections: { literal: { http: directory } } });
+        const text = ok(await h.call({ action: "show", request: "Literal" }));
+        assert.ok(text.split("\n").includes("  Authorization: (secret)"));
+        assert.ok(text.split("\n").includes("  X-Plain: visible"));
+        assert.ok(!text.includes("literal-token-0123456789"));
+    });
+});

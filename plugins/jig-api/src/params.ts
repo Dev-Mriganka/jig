@@ -70,9 +70,15 @@ export const parameters = Type.Object({
 export type Call =
     | { action: "list"; collection?: string; folder?: string; text?: string }
     | { action: "show"; request: string; collection?: string; folder?: string; environment?: string }
-    | { action: "run"; request: string; environment: string; collection?: string; folder?: string; variables?: Record<string, unknown>; timeoutSec?: number }
+    | {
+        action: "run"; request: string; environment: string; collection?: string; folder?: string;
+        variables?: Record<string, unknown>; timeoutSec?: number;
+    }
     | { action: "run-folder"; folder: string; environment: string; collection?: string; variables?: Record<string, unknown>; timeoutSec?: number }
-    | { action: "call"; environment: string; method: string; url: string; collection?: string; body?: unknown; headers?: unknown; timeoutSec?: unknown };
+    | {
+        action: "call"; environment: string; method: string; url: string; collection?: string; body?: unknown;
+        headers?: unknown; timeoutSec?: unknown;
+    };
 
 const TEXT_PARAMS: readonly Param[] = ["collection", "folder", "request", "text", "environment", "method", "url"];
 
@@ -96,7 +102,9 @@ export function parseCall(input: Readonly<Record<string, unknown>>): Call {
     if (missing.length > 0) throw new InputError(`api ${action} needs ${missing.join(", ")}. ${usage(action)}`);
 
     for (const name of TEXT_PARAMS) {
-        if (present(input[name]) && typeof input[name] !== "string") throw new InputError(`api ${action}: ${name} must be text (got ${shown(input[name], 30)})`);
+        if (present(input[name]) && typeof input[name] !== "string") {
+            throw new InputError(`api ${action}: ${name} must be text (got ${shown(input[name], 30)})`);
+        }
     }
     if (present(input.variables) && !isObject(input.variables)) {
         throw new InputError(`api ${action}: variables must be an object of name to value, such as {"orderId": "123"}`);

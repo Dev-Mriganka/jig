@@ -119,6 +119,18 @@ export interface Collection {
     problems: readonly Problem[];
 }
 
+/** Headers whose values are credentials: the variables in them sign the request in, and the agent never gives them. */
+export const CREDENTIAL_HEADERS: ReadonlySet<string> = new Set(["authorization", "proxy-authorization", "cookie"]);
+
+/** The names that some environment declares secret. */
+export function declaredSecrets(environments: Iterable<Environment>): Set<string> {
+    const names = new Set<string>();
+    for (const environment of environments) {
+        for (const [name, variable] of environment.variables) if (variable.secret) names.add(name);
+    }
+    return names;
+}
+
 /** `Orders/Create order` for a request in the folder Orders. */
 export function pathOf(request: SavedRequest): string {
     return [...request.folder, request.name].join("/");

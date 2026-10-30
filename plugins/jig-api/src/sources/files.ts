@@ -21,6 +21,11 @@ export function readFailure(error: unknown): string {
     }
 }
 
+/** Why a read failed: our own words for a file that is too large, else the reason for the error code. */
+export function whyNotRead(error: unknown): string {
+    return error instanceof Error && !("code" in error) ? error.message : readFailure(error);
+}
+
 /** The text of a file, or an Error whose message says why not. A file over `maxBytes` is refused, not cut. */
 export function readText(file: string, maxBytes: number): string {
     const size = fs.statSync(file).size;

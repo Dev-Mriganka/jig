@@ -14,9 +14,9 @@ import type { Catalog } from "./catalog.ts";
 import { jigEnvironmentOf } from "./config.ts";
 import type { ApiSettings } from "./config.ts";
 import { addressProblem } from "./engine/address.ts";
-import { isMethod, sealed } from "./engine/plan.ts";
+import { isMethod, METHODS, sealed } from "./engine/plan.ts";
 import type { Plan, SignIn } from "./engine/plan.ts";
-import { joined, plainOf, upload } from "./engine/text.ts";
+import { byteLengthOf, isUpload, joined, plainOf, upload } from "./engine/text.ts";
 import type { Text, Upload } from "./engine/text.ts";
 import { InputError, shortList, shown } from "./engine/values.ts";
 import type { Auth, Body, Collection, Environment, FileRef, SavedRequest } from "./model.ts";
@@ -30,8 +30,10 @@ export interface PlanContext {
     kindOf(name: string): EnvironmentKind;
 }
 
+/** A body of text, and a body that carries files: the files are limited one by one as well. */
 export const MAX_SAVED_BODY_BYTES = 1024 * 1024;
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+const MAX_UPLOADED_BODY_BYTES = 2 * MAX_UPLOAD_BYTES;
 const MAX_HEADERS = 60;
 const HEADER_NAME = /^[!#$%&'*+.^_`|~0-9A-Za-z-]{1,60}$/;
 const HEADER_VALUE = /^[\x20-\x7e\t]{0,4000}$/;
@@ -86,7 +88,10 @@ function destination(ctx: PlanContext, address: string, hosts: ReadonlySet<strin
     if (problem !== undefined) throw new InputError(`${what}: the address ${problem}`);
     if (!hosts.has(url.host)) {
         const known = hosts.size === 0 ? "none (no request takes its host from a variable of the environment)" : shortList([...hosts], ", ", 70);
-        throw new InputError(`${what} goes to ${url.host}, which is not a host of ${label} (${known}); a request takes its host from its environment, such as {{baseUrl}}`);
+        throw new InputError(
+            `${what} goes to ${url.host}, which is not a host of ${label} (${known}); ` +
+                "a request takes its host from its environment, such as {{baseUrl}}",
+        );
     }
     return url.href;
 }
@@ -96,7 +101,9 @@ function destination(ctx: PlanContext, address: string, hosts: ReadonlySet<strin
 
 function checkedHeader(name: string, value: Text, refused: ReadonlySet<string>, request: string): readonly [string, Text] {
     if (!HEADER_NAME.test(name)) throw new InputError(`${quoted(request)} has a header name that cannot be sent: ${shown(name, 30)}`);
-    if (refused.has(name.toLowerCase())) throw new InputError(`${quoted(request)} sets the header ${name}, which the tool sets or which controls the connection`);
+    if (refused.has(name.toLowerCase())) {
+        throw new InputError(`${quoted(request)} sets the header ${name}, which the tool sets or which controls the connection`);
+    }
     const plain = plainOf(value);
     if (plain !== undefined && !HEADER_VALUE.test(plain)) throw new InputError(`the header ${name} of ${quoted(request)} must be printable ASCII`);
     return [name, value];
@@ -146,7 +153,9 @@ function bodyOf(body: Body, resolver: Resolver, collection: Collection, headers:
             return [uploadOf(collection, body.file)];
         case "graphql": {
             const query = plainOf(resolver.text(body.query, "graphql"));
-            if (query === undefined) throw new InputError(`the GraphQL query of ${quoted(request)} cannot hold a secret or a generated value: use a variable`);
+            if (query === undefined) {
+                throw new InputError(`the GraphQL query of ${quoted(request)} cannot hold a secret or a generated value: use a variable`);
+            }
             const variables = body.variables === undefined ? undefined : resolver.text(body.variables, "json");
             const plain = variables === undefined ? undefined : plainOf(variables);
             if (plain !== undefined) {
@@ -165,7 +174,10 @@ function bodyOf(body: Body, resolver: Resolver, collection: Collection, headers:
         }
         case "form": {
             if (body.encoding === "urlencoded") {
-                const pairs = body.fields.flatMap((field) => (field.kind === "text" ? [joined(`${encodeURIComponent(field.name)}=`, formEncoded(resolver.text(field.value, "plain")))] : []));
+                const pairs = body.fields.flatMap((field) => {
+                    if (field.kind !== "text") return [];
+                    return [joined(`${encodeURIComponent(field.name)}=`, formEncoded(resolver.text(field.value, "plain")))];
+                });
                 return joined(...pairs.flatMap((pair, index) => (index === 0 ? [pair] : ["&", pair])));
             }
             const boundary = boundaryOf(body);
@@ -180,7 +192,8 @@ function bodyOf(body: Body, resolver: Resolver, collection: Collection, headers:
                 }
                 const file = uploadOf(collection, field.file);
                 const filename = field.filename ?? file.upload;
-                return joined(head, `; filename="${quotedParam(filename)}"\r\nContent-Type: ${field.contentType ?? "application/octet-stream"}\r\n\r\n`, [file], "\r\n");
+                const type = field.contentType ?? "application/octet-stream";
+                return joined(head, `; filename="${quotedParam(filename)}"\r\nContent-Type: ${type}\r\n\r\n`, [file], "\r\n");
             });
             return joined(...parts, `--${boundary}--\r\n`);
         }
@@ -274,6 +287,10 @@ export function planRequest(ctx: PlanContext, request: SavedRequest, input: RunI
     if (body !== undefined && !["POST", "PUT", "PATCH", "DELETE"].includes(request.method)) {
         throw new InputError(`${name} is a ${request.method} with a body, and a ${request.method} carries none`);
     }
+    const limit = body?.some(isUpload) === true ? MAX_UPLOADED_BODY_BYTES : MAX_SAVED_BODY_BYTES;
+    if (body !== undefined && byteLengthOf(body) > limit) {
+        throw new InputError(`the body of ${name} is larger than ${limit / (1024 * 1024)} MiB`);
+    }
     return sealed({
         label: `api run ${name}`,
         system: `api:${collection.name}`,
@@ -286,7 +303,7 @@ export function planRequest(ctx: PlanContext, request: SavedRequest, input: RunI
         headers,
         body: body === undefined || (body.length === 0) ? undefined : body,
         signIn,
-        timeoutSec: input.timeoutSec ?? ctx.settings.timeoutSec,
+        timeoutSec: checkTimeout(input.timeoutSec, ctx.settings.timeoutSec),
         allowPlainLocal: ctx.settings.allowPlainLocal,
     });
 }
@@ -307,16 +324,20 @@ export function planCall(ctx: PlanContext, input: CallInput): Plan {
     const holders = ctx.catalog.selected(input.collection).filter((collection) => collection.environments.has(label));
     if (holders.length === 0) {
         const names = [...new Set(ctx.catalog.selected(input.collection).flatMap((collection) => [...collection.environments.keys()]))];
-        throw new InputError(`no environment named ${shown(input.environment, 30)}; known: ${names.length === 0 ? "none" : shortList(names, ", ", 70)}`);
+        const known = names.length === 0 ? "none" : shortList(names, ", ", 70);
+        throw new InputError(`no environment named ${shown(input.environment, 30)}; known: ${known}`);
     }
     const jigEnvironment = jigEnvironmentOf(ctx.settings, label);
     if (ctx.kindOf(jigEnvironment) === "production") {
-        throw new InputError(`call is never allowed in production, and ${label} counts as ${jigEnvironment}${ctx.settings.environments.has(label) ? "" : " because api.environments does not map it"}`);
+        const why = ctx.settings.environments.has(label) ? "" : " because api.environments does not map it";
+        throw new InputError(`call is never allowed in production, and ${label} counts as ${jigEnvironment}${why}`);
     }
     if (!ctx.settings.adHoc.has(jigEnvironment)) {
         throw new InputError(`call is not allowed in ${label}: add "${jigEnvironment}" to api.adHoc to allow it`);
     }
-    if (!isMethod(input.method)) throw new InputError(`api call: method must be one of GET, HEAD, OPTIONS, POST, PUT, PATCH, DELETE (got ${shown(input.method)})`);
+    if (!isMethod(input.method)) {
+        throw new InputError(`api call: method must be one of ${METHODS.join(", ")} (got ${shown(input.method)})`);
+    }
     const method = input.method;
 
     const given = checkUrl(input.url);

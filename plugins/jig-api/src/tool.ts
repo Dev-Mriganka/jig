@@ -9,7 +9,7 @@ import { loadCatalog } from "./catalog.ts";
 import { settingsOf } from "./config.ts";
 import type { ApiSettings } from "./config.ts";
 import { createHttp } from "./engine/http.ts";
-import type { HttpOptions, Sent } from "./engine/http.ts";
+import type { Http, HttpOptions, Sent } from "./engine/http.ts";
 import { fingerprintOfAll, READ_METHODS } from "./engine/plan.ts";
 import type { Plan } from "./engine/plan.ts";
 import { previewOf, previewOfAll } from "./engine/preview.ts";
@@ -99,7 +99,8 @@ function prepare(ctx: PlanContext, call: Extract<Call, { action: "run" | "run-fo
     const uses = [...new Set(found.requests.flatMap((request) => request.variables.filter((name) => !name.startsWith("$"))))];
     const unused = given.find(([name]) => !uses.includes(name));
     if (unused !== undefined) {
-        throw new InputError(`${JSON.stringify(unused[0])} is not a variable of any request in ${found.folder}; they use ${shortList(uses, ", ", 70)}`);
+        const list = shortList(uses, ", ", 70);
+        throw new InputError(`${JSON.stringify(unused[0])} is not a variable of any request in ${found.folder}; they use ${list}`);
     }
     const plans = found.requests.map((request) =>
         planRequest(ctx, request, { ...call, variables: Object.fromEntries(given.filter(([name]) => request.variables.includes(name))) }));
@@ -107,7 +108,11 @@ function prepare(ctx: PlanContext, call: Extract<Call, { action: "run" | "run-fo
     const first = plans[0] as Plan;
     // A folder is as strict as its strictest request: one write makes it a write.
     return {
-        plans, action: `${found.collection.name}/${found.folder}`, effect: writes ? "write" : "read", environment: first.jigEnvironment, folder: found.folder,
+        plans,
+        action: `${found.collection.name}/${found.folder}`,
+        effect: writes ? "write" : "read",
+        environment: first.jigEnvironment,
+        folder: found.folder,
     };
 }
 
@@ -119,7 +124,11 @@ function asInvalidInput(error: unknown): unknown {
 }
 
 /** Summary lines for a folder run: one per request, stopping at the first failure. */
-async function runFolder(http: ReturnType<typeof createHttp>, prepared: Prepared, signal: AbortSignal | undefined): Promise<{ text: string; ran: number; failed: boolean }> {
+async function runFolder(
+    http: Http,
+    prepared: Prepared,
+    signal: AbortSignal | undefined,
+): Promise<{ text: string; ran: number; failed: boolean }> {
     const lines: string[] = [];
     let failure: string | undefined;
     let ran = 0;
@@ -142,8 +151,11 @@ async function runFolder(http: ReturnType<typeof createHttp>, prepared: Prepared
         }
     }
     const first = prepared.plans[0] as Plan;
-    const head = `Folder ${prepared.folder ?? ""} in ${first.environment} (${first.jigEnvironment}): ${ran} of ${prepared.plans.length} ran${failure === undefined ? ", all answered 2xx" : ", stopped at the first failure"}`;
-    return { text: [head, ...lines, ...(failure === undefined ? [] : ["", "Failed request:", failure])].join("\n"), ran, failed: failure !== undefined };
+    const outcome = failure === undefined ? ", all answered 2xx" : ", stopped at the first failure";
+    const head = `Folder ${prepared.folder ?? ""} in ${first.environment} (${first.jigEnvironment}): ` +
+        `${ran} of ${prepared.plans.length} ran${outcome}`;
+    const text = [head, ...lines, ...(failure === undefined ? [] : ["", "Failed request:", failure])].join("\n");
+    return { text, ran, failed: failure !== undefined };
 }
 
 export function createTool(options: ApiOptions = {}): ApiTool {
@@ -196,10 +208,14 @@ export function createTool(options: ApiOptions = {}): ApiTool {
             executionMode: "sequential",
             async execute(toolCallId, params, signal) {
                 const call = parseCall(params);
-                const text = (value: string, details: Record<string, unknown> = {}) => ({ content: [{ type: "text" as const, text: value }], details });
+                const text = (value: string, details: Record<string, unknown> = {}) =>
+                    ({ content: [{ type: "text" as const, text: value }], details });
                 if (call.action === "list" || call.action === "show") {
                     const ctx = contextOf();
-                    if (call.action === "list") return text(listText(ctx.catalog, ctx.settings, { collection: call.collection, folder: call.folder, text: call.text }), { action: "list" });
+                    if (call.action === "list") {
+                        const filter = { collection: call.collection, folder: call.folder, text: call.text };
+                        return text(listText(ctx.catalog, ctx.settings, filter), { action: "list" });
+                    }
                     const request = ctx.catalog.request(call.request, call.collection, call.folder);
                     return text(showText(ctx.catalog, ctx.settings, request, call.environment), { action: "show", request: request.name });
                 }

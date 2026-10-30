@@ -9,9 +9,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { isObject } from "../engine/values.ts";
+import { CREDENTIAL_HEADERS, declaredSecrets } from "../model.ts";
 import type { Auth, Body, Collection, Environment, FormField, Problem, SavedRequest, Variable } from "../model.ts";
 import { unsupportedVariable, variablesIn } from "../template.ts";
-import { expandHome, readFailure, readText } from "./files.ts";
+import { expandHome, readFailure, readText, whyNotRead } from "./files.ts";
 import type { Source } from "./source.ts";
 
 export interface HttpConfig {
@@ -23,8 +24,6 @@ const PRIVATE_ENV = "http-client.private.env.json";
 const FILE_MAX_BYTES = 1024 * 1024;
 const MAX_FILES = 500;
 const SENT_METHODS: ReadonlySet<string> = new Set(["GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"]);
-/** Headers whose values are credentials: the variables in them are never the agent's to give. */
-const CREDENTIAL_HEADERS: ReadonlySet<string> = new Set(["authorization", "proxy-authorization", "cookie"]);
 
 function check(entry: Readonly<Record<string, unknown>>, at: string, errors: string[]): HttpConfig | undefined {
     const before = errors.length;
@@ -68,7 +67,7 @@ function readEnvFile(root: string, name: string, problems: Problem[]): EnvFile |
     try {
         raw = JSON.parse(readText(file, FILE_MAX_BYTES)) as unknown;
     } catch (error) {
-        const message = error instanceof SyntaxError ? "is not valid JSON" : error instanceof Error && !("code" in error) ? error.message : readFailure(error);
+        const message = error instanceof SyntaxError ? "is not valid JSON" : whyNotRead(error);
         problems.push({ file: name, key: "", message, level: "error" });
         return undefined;
     }
@@ -86,7 +85,9 @@ function readEnvFile(root: string, name: string, problems: Problem[]): EnvFile |
         const variables = new Map<string, string>();
         const { Security: security, ...rest } = values;
         if (security !== undefined) {
-            problems.push({ file: name, key: `${environment}.Security`, message: "is not read: {{$auth.token(...)}} is not supported", level: "warning" });
+            problems.push({
+                file: name, key: `${environment}.Security`, message: "is not read: {{$auth.token(...)}} is not supported", level: "warning",
+            });
         }
         flatten(rest, "", variables, (key, message) => problems.push({ file: name, key: `${environment}.${key}`, message, level: "warning" }));
         if (environment === "$shared") for (const [key, value] of variables) found.shared.set(key, value);
@@ -149,7 +150,8 @@ function findFiles(root: string, problems: Problem[]): string[] {
     };
     visit(root);
     if (found.length > MAX_FILES) {
-        problems.push({ file: ".", key: "", message: `holds more than ${MAX_FILES} request files; only the first ${MAX_FILES} are read`, level: "warning" });
+        const message = `holds more than ${MAX_FILES} request files; only the first ${MAX_FILES} are read`;
+        problems.push({ file: ".", key: "", message, level: "warning" });
     }
     return found.slice(0, MAX_FILES);
 }
@@ -369,6 +371,13 @@ interface Reading {
     secretNames: ReadonlySet<string>;
 }
 
+/** The user name and password of `Basic user password` or `Basic user:password`; none for an encoded credential. */
+function basicCredentials(first: string, second: string | undefined): { username: string; password: string } | undefined {
+    if (second !== undefined) return { username: first, password: second };
+    const colon = first.indexOf(":");
+    return colon < 0 ? undefined : { username: first.slice(0, colon), password: first.slice(colon + 1) };
+}
+
 function requestOf(parsed: Parsed, file: string, position: number, fileVariables: ReadonlyMap<string, string>, reading: Reading): SavedRequest {
     const folder = [...path.dirname(file).split(path.sep).filter((part) => part !== "." && part !== ""), path.basename(file)];
     const notes: string[] = [];
@@ -390,11 +399,9 @@ function requestOf(parsed: Parsed, file: string, position: number, fileVariables
     const authorization = headers.find(([name]) => name.toLowerCase() === "authorization");
     if (authorization !== undefined) {
         const basic = /^Basic\s+(\S+)(?:\s+(\S+))?$/i.exec(authorization[1]);
-        if (basic !== null && (basic[2] !== undefined || (basic[1] as string).includes(":"))) {
-            const [username, password] = basic[2] !== undefined
-                ? [basic[1] as string, basic[2]]
-                : [(basic[1] as string).slice(0, (basic[1] as string).indexOf(":")), (basic[1] as string).slice((basic[1] as string).indexOf(":") + 1)];
-            auth = { kind: "basic", username, password };
+        const credentials = basic === null ? undefined : basicCredentials(basic[1] as string, basic[2]);
+        if (credentials !== undefined) {
+            auth = { kind: "basic", ...credentials };
             headers = headers.filter((header) => header !== authorization);
         } else if (/^Digest\b/i.test(authorization[1])) {
             unsupported = "Digest authentication is not sent";
@@ -445,7 +452,7 @@ function load(config: HttpConfig, name: string): Collection {
     const problems: Problem[] = [];
     const root = config.folder;
     const environments = environmentsOf(root, problems);
-    const secretNames = new Set([...environments.values()].flatMap((environment) => [...environment.variables].filter(([, variable]) => variable.secret).map(([key]) => key)));
+    const secretNames = declaredSecrets(environments.values());
     const reading: Reading = { collection: name, secretNames };
 
     const requests: SavedRequest[] = [];
@@ -458,7 +465,7 @@ function load(config: HttpConfig, name: string): Collection {
             try {
                 text = readText(file, FILE_MAX_BYTES);
             } catch (error) {
-                problems.push({ file: relative, key: "", message: error instanceof Error && !("code" in error) ? error.message : readFailure(error), level: "error" });
+                problems.push({ file: relative, key: "", message: whyNotRead(error), level: "error" });
                 continue;
             }
             // The variables a file defines with `@name = value` belong to every request in it.

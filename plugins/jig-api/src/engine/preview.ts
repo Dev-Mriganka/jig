@@ -5,7 +5,7 @@ import type { Preview } from "../../../jig-core/src/contract.ts";
 import { prettyJson } from "./json.ts";
 import { describeSignIn, fingerprintOfAll, secretsOf } from "./plan.ts";
 import type { Plan } from "./plan.ts";
-import { displayOf, generatedIn, isUpload } from "./text.ts";
+import { byteLengthOf, displayOf, generatedIn, isUpload } from "./text.ts";
 import type { Text } from "./text.ts";
 import { SHOWN_LINES } from "./values.ts";
 import { whereOf } from "./render.ts";
@@ -20,13 +20,6 @@ function bodyLines(body: Text): string[] {
     const lines = (prettyJson(text) ?? text).split("\n");
     if (lines.length <= SHOWN_LINES) return lines;
     return [...lines.slice(0, SHOWN_LINES), `[${lines.length - SHOWN_LINES} more lines not shown; the whole body is sent]`];
-}
-
-function sizeOf(body: Text): number {
-    return body.reduce<number>((total, piece) => {
-        if (typeof piece === "string") return total + Buffer.byteLength(piece);
-        return total + (isUpload(piece) ? piece.bytes.byteLength : 0);
-    }, 0);
 }
 
 function truncated(summary: string): string {
@@ -45,7 +38,7 @@ export function planLines(plan: Plan): string[] {
     if (plan.headers.length > 0) lines.push("Headers:", ...plan.headers.map(([name, value]) => `  ${name}: ${displayOf(value)}`));
     if (plan.body !== undefined) {
         const kind = plan.body.some(isUpload) ? "with a file" : prettyJson(displayOf(plan.body)) === undefined ? "text" : "JSON";
-        lines.push(`Body (${kind}, ${sizeOf(plan.body)} bytes):`, ...bodyLines(plan.body));
+        lines.push(`Body (${kind}, ${byteLengthOf(plan.body)} bytes):`, ...bodyLines(plan.body));
     }
     const secrets = secretsOf(plan).map((secret) => secret.name);
     if (secrets.length > 0) lines.push(`Secrets, read when it is sent and never shown: ${secrets.join(", ")}`);

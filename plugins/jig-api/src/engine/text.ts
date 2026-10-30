@@ -72,6 +72,14 @@ export function displayOf(text: Text): string {
         .join("");
 }
 
+/** How many bytes the text is, as far as it is known: a secret and a generated value are not counted. */
+export function byteLengthOf(text: Text): number {
+    return text.reduce<number>((total, piece) => {
+        if (typeof piece === "string") return total + Buffer.byteLength(piece);
+        return total + (isUpload(piece) ? piece.bytes.byteLength : 0);
+    }, 0);
+}
+
 /** The secrets in a text, once each, by name. */
 export function secretsIn(text: Text): Secret[] {
     const seen = new Map<string, Secret>();

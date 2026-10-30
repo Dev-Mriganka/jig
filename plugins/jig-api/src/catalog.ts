@@ -51,7 +51,8 @@ export function loadCatalog(settings: ApiSettings): Catalog {
             if (typeof name !== "string" || name.trim() === "") throw new InputError("api needs request, the name of a saved request");
             const wanted = folder === undefined ? undefined : trimmed(folder);
             const found = catalog.selected(collection).flatMap((candidate) =>
-                candidate.requests.filter((request) => (request.name === name || pathOf(request) === name) && (wanted === undefined || inFolder(request, wanted))),
+                candidate.requests.filter((request) =>
+                    (request.name === name || pathOf(request) === name) && (wanted === undefined || inFolder(request, wanted))),
             );
             if (found.length === 1) return found[0] as SavedRequest;
             if (found.length > 1) {
@@ -59,7 +60,8 @@ export function loadCatalog(settings: ApiSettings): Catalog {
                 throw new InputError(`${shown(name, 40)} names ${found.length} requests (${shortList(where, ", ", 90)}): add collection or folder`);
             }
             const lower = name.toLowerCase();
-            const near = catalog.selected(collection).flatMap((candidate) => candidate.requests.filter((request) => request.name.toLowerCase().includes(lower)));
+            const near = catalog.selected(collection).flatMap((candidate) =>
+                candidate.requests.filter((request) => request.name.toLowerCase().includes(lower)));
             const hint = near.length === 0 ? "use list to see them" : `similar: ${shortList(near.map((request) => request.name), ", ", 70)}`;
             throw new InputError(`no request named ${shown(name, 40)}; ${hint}`);
         },
@@ -72,9 +74,11 @@ export function loadCatalog(settings: ApiSettings): Catalog {
                 .filter((match) => match.requests.length > 0);
             if (matches.length === 1) return { ...(matches[0] as { collection: Collection; requests: SavedRequest[] }), folder: wanted };
             if (matches.length > 1) {
-                throw new InputError(`${shown(wanted, 40)} is a folder of ${matches.map((match) => match.collection.name).join(" and ")}: add collection`);
+                const names = matches.map((match) => match.collection.name).join(" and ");
+                throw new InputError(`${shown(wanted, 40)} is a folder of ${names}: add collection`);
             }
-            const folders = [...new Set(catalog.selected(collection).flatMap((candidate) => candidate.requests.map((request) => folderPath(request))))].filter((path) => path !== "");
+            const paths = catalog.selected(collection).flatMap((candidate) => candidate.requests.map(folderPath));
+            const folders = [...new Set(paths)].filter((path) => path !== "");
             throw new InputError(`no folder named ${shown(wanted, 40)}${folders.length === 0 ? "" : `; folders: ${shortList(folders, ", ", 80)}`}`);
         },
 

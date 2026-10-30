@@ -1,6 +1,7 @@
-// What the model reads: a status line, the request and its environment, a few headers and the body. A non-2xx answer is a normal result, not an
-// error: the status and the body are what the model reasons from. JSON is re-indented with its numbers untouched and is not
-// cut here, because jig-core cuts a very long result and keeps the whole text in a file. Other text is cut at 200 lines.
+// What the model reads: a status line, the request and its environment, a few headers and the body. A non-2xx answer is a
+// normal result, not an error: the status and the body are what the model reasons from. JSON is re-indented with its numbers
+// untouched and is not cut here, because jig-core cuts a very long result and keeps the whole text in a file. Other text is cut
+// at 200 lines.
 import { STATUS_CODES } from "node:http";
 import { prettyJson } from "./json.ts";
 import { READ_METHODS } from "./plan.ts";

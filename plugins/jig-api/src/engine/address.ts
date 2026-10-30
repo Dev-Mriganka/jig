@@ -41,7 +41,9 @@ function ipv6Of(host: string): number[] | undefined {
     if (tail !== null) {
         const quad = ipv4Of(tail[1] as string);
         if (quad === undefined) return undefined;
-        text = `${text.slice(0, text.length - (tail[1] as string).length)}${((quad[0] << 8) | quad[1]).toString(16)}:${((quad[2] << 8) | quad[3]).toString(16)}`;
+        const high = ((quad[0] << 8) | quad[1]).toString(16);
+        const low = ((quad[2] << 8) | quad[3]).toString(16);
+        text = `${text.slice(0, text.length - (tail[1] as string).length)}${high}:${low}`;
     }
     const halves = text.split("::");
     if (halves.length > 2) return undefined;

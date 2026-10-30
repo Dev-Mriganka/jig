@@ -8,11 +8,10 @@
 // collection's) is refused by name, and a test script is ignored with a note.
 import path from "node:path";
 import { isObject } from "../engine/values.ts";
-import type {
-    Auth, Body, Collection, Environment, FormField, Problem, SavedRequest, Variable,
-} from "../model.ts";
+import { CREDENTIAL_HEADERS, declaredSecrets } from "../model.ts";
+import type { Auth, Body, Collection, Environment, FormField, Problem, SavedRequest, Variable } from "../model.ts";
 import { unsupportedVariable, variablesIn } from "../template.ts";
-import { expandHome, readFailure, readText } from "./files.ts";
+import { expandHome, readText, whyNotRead } from "./files.ts";
 import type { Source } from "./source.ts";
 
 export interface PostmanConfig {
@@ -26,8 +25,6 @@ const MAX_ENVIRONMENTS = 20;
 
 const SENT_METHODS: ReadonlySet<string> = new Set(["GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"]);
 const NOT_HTTP = /grpc|websocket|socket\.?io|mqtt|\bsse\b|event-?stream/i;
-/** Headers whose values are credentials: the variables in them are never the agent's to give. */
-const CREDENTIAL_HEADERS: ReadonlySet<string> = new Set(["authorization", "proxy-authorization", "cookie"]);
 
 const NAME = /^[^\u0000-\u001f\u007f]{1,60}$/;
 
@@ -111,7 +108,7 @@ function readJson(file: string, maxBytes: number, problems: Problem[]): unknown 
     try {
         content = readText(file, maxBytes);
     } catch (error) {
-        problems.push({ file: shown, key: "", message: error instanceof Error && !("code" in error) ? error.message : readFailure(error), level: "error" });
+        problems.push({ file: shown, key: "", message: whyNotRead(error), level: "error" });
         return undefined;
     }
     try {
@@ -146,7 +143,9 @@ function readEnvironment(name: string, file: string, problems: Problem[]): Envir
                 problems.push({
                     file: shown,
                     key: item.key,
-                    message: `is a secret with a value in the file. The value is ignored and never sent; give the secret in api.secrets as "${item.key}"`,
+                    message:
+                        `is a secret with a value in the file. The value is ignored and never sent; ` +
+                            `give the secret in api.secrets as "${item.key}"`,
                     level: "warning",
                 });
             }
@@ -207,11 +206,14 @@ function authOf(raw: unknown, reading: Reading, key: string): AuthResult | undef
                     reading.problems.push({
                         file: reading.shown,
                         key: `${key}.oauth2`,
-                        message: "holds an access token in the file. It is ignored and never sent; get tokens with a client-credentials or password grant",
+                        message:
+                            "holds an access token in the file. It is ignored and never sent; " +
+                                "get tokens with a client-credentials or password grant",
                         level: "warning",
                     });
                 }
-                return { unsupported: `OAuth 2.0 with ${grant === "" ? "no headless grant" : `the grant "${grant}"`} (it needs a browser; only client_credentials and password work)` };
+                const named = grant === "" ? "no headless grant" : `the grant "${grant}"`;
+                return { unsupported: `OAuth 2.0 with ${named} (it needs a browser; only client_credentials and password work)` };
             }
             if ((attributes.get("addTokenTo") ?? "header") !== "header") return { unsupported: "OAuth 2.0 with the token in the query string" };
             const prefix = attributes.get("headerPrefix");
@@ -249,7 +251,8 @@ function authTexts(auth: Auth): string[] {
         case "basic": return [auth.username, auth.password];
         case "apiKey": return [auth.name, auth.value];
         case "oauth2": {
-            return [auth.tokenUrl, auth.clientId, auth.clientSecret, auth.username, auth.password, auth.scope].filter((item): item is string => item !== undefined);
+            const fields = [auth.tokenUrl, auth.clientId, auth.clientSecret, auth.username, auth.password, auth.scope];
+            return fields.filter((item): item is string => item !== undefined);
         }
     }
 }
@@ -260,7 +263,8 @@ function scriptOf(events: unknown, listen: string): boolean {
     return (events as unknown[]).some((event) => {
         if (!isObject(event) || event.listen !== listen || event.disabled === true || !isObject(event.script)) return false;
         const { exec, src } = event.script;
-        const code = Array.isArray(exec) ? (exec as unknown[]).filter((line) => typeof line === "string").join("\n") : typeof exec === "string" ? exec : "";
+        const lines = Array.isArray(exec) ? (exec as unknown[]).filter((line) => typeof line === "string") : [exec];
+        const code = lines.filter((line) => typeof line === "string").join("\n");
         return code.trim() !== "" || (src !== undefined && src !== null && src !== "");
     });
 }
@@ -294,7 +298,8 @@ function rawAddress(url: Record<string, unknown>): string {
             : [];
         const protocol = typeof url.protocol === "string" && url.protocol !== "" ? `${url.protocol}://` : "";
         const port = typeof url.port === "string" && url.port !== "" ? `:${url.port}` : "";
-        raw = `${protocol}${host}${port}${segments.length > 0 ? `/${segments.join("/").replace(/^\/+/, "")}` : ""}${query.length > 0 ? `?${query.join("&")}` : ""}`;
+        const path = segments.length > 0 ? `/${segments.join("/").replace(/^\/+/, "")}` : "";
+        raw = `${protocol}${host}${port}${path}${query.length > 0 ? `?${query.join("&")}` : ""}`;
     }
     // Path variables (`/orders/:id`) take the values the URL object gives them.
     if (Array.isArray(url.variable)) {
@@ -376,10 +381,12 @@ function bodyOf(raw: unknown): BodyResult {
                         const files = sources.filter((source): source is string => typeof source === "string" && source !== "");
                         if (files.length === 0) notes.push(`the file field "${item.key}" has no file chosen, so it is left out`);
                         for (const file of files) {
-                            fields.push({ kind: "file", name: item.key, file: { path: file }, ...(contentType === undefined ? {} : { contentType }) });
+                            const typed = contentType === undefined ? {} : { contentType };
+                            fields.push({ kind: "file", name: item.key, file: { path: file }, ...typed });
                         }
                     } else {
-                        fields.push({ kind: "text", name: item.key, value: text(item.value) ?? "", ...(contentType === undefined ? {} : { contentType }) });
+                        const typed = contentType === undefined ? {} : { contentType };
+                        fields.push({ kind: "text", name: item.key, value: text(item.value) ?? "", ...typed });
                     }
                 }
             }
@@ -575,7 +582,7 @@ function load(config: PostmanConfig, name: string): Collection {
         const read = readEnvironment(environment, file, problems);
         if (read !== undefined) environments.set(environment, read);
     }
-    const secretNames = new Set([...environments.values()].flatMap((environment) => [...environment.variables].filter(([, variable]) => variable.secret).map(([key]) => key)));
+    const secretNames = declaredSecrets(environments.values());
 
     const reading: Reading = { collection: name, shown, problems, secretNames };
     const raw = readJson(config.file, COLLECTION_MAX_BYTES, problems);
@@ -590,7 +597,9 @@ function load(config: PostmanConfig, name: string): Collection {
         } else {
             const schema = isObject(raw.info) && typeof raw.info.schema === "string" ? raw.info.schema : "";
             if (schema !== "" && !/\/v2\.[01](?:\.0)?\//.test(schema)) {
-                problems.push({ file: shown, key: "info.schema", message: `is ${schema}: only collection format v2.0 and v2.1 are read`, level: "warning" });
+                problems.push({
+                    file: shown, key: "info.schema", message: `is ${schema}: only collection format v2.0 and v2.1 are read`, level: "warning",
+                });
             }
             for (const [key, value] of variablesOf(raw.variable)) variables.set(key, { value, secret: false });
             const top = authOf(raw.auth, reading, "auth");

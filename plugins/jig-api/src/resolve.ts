@@ -115,7 +115,10 @@ function written(name: string, value: string, slot: Slot, inString: boolean): st
             return value;
         case "graphql":
             if (!GRAPHQL_TOKEN.test(value)) {
-                throw new InputError(`${name} goes into a GraphQL query, so its value must be letters, digits and _ . : @ + - only; use a GraphQL variable for anything else`);
+                throw new InputError(
+                    `${name} goes into a GraphQL query, so its value must be letters, digits and _ . : @ + - only; ` +
+                        "use a GraphQL variable for anything else",
+                );
             }
             return value;
     }
@@ -133,6 +136,14 @@ function originEnd(url: string): number {
     if (scheme === null) return -1;
     const stop = url.slice(scheme[0].length).search(/[/?#]/);
     return stop < 0 ? url.length : scheme[0].length + stop;
+}
+
+/** Where one variable's text stands in an address, and whether the agent gave it. */
+interface Span {
+    name: string;
+    start: number;
+    end: number;
+    agent: boolean;
 }
 
 export interface Address {
@@ -173,7 +184,9 @@ export function createResolver(input: ScopeInput): Resolver {
     function variable(name: string, top: boolean, slot: Slot, inString: boolean, stack: readonly string[]): { pieces: Piece[]; agent: boolean } {
         if (name.startsWith("$")) {
             const generated = generatedKind(name);
-            if (generated === undefined) throw new InputError(`{{${name}}} is not supported (only $uuid, $timestamp and $isoTimestamp are made here)`);
+            if (generated === undefined) {
+                throw new InputError(`{{${name}}} is not supported (only $uuid, $timestamp and $isoTimestamp are made here)`);
+            }
             return { pieces: [{ generated }], agent: false };
         }
         if (secretNames.has(name)) {
@@ -212,9 +225,9 @@ export function createResolver(input: ScopeInput): Resolver {
     }
 
     /** The pieces of an address, with where the agent's values stand. */
-    function walkAddress(template: string, onlyOrigin: boolean): { text: string; spans: Array<{ name: string; start: number; end: number; agent: boolean }> } | undefined {
+    function walkAddress(template: string, onlyOrigin: boolean): { text: string; spans: Span[] } {
         let text = "";
-        const spans: Array<{ name: string; start: number; end: number; agent: boolean }> = [];
+        const spans: Span[] = [];
         for (const part of partsOf(template)) {
             if (typeof part === "string") {
                 text += part;
@@ -222,7 +235,11 @@ export function createResolver(input: ScopeInput): Resolver {
                 const found = variable(part.variable, true, "plain", false, []);
                 const start = text.length;
                 for (const piece of found.pieces) {
-                    if (typeof piece !== "string") throw new InputError(`${part.variable} is a secret or a generated value, and an address would show it: send it in a header or the body`);
+                    if (typeof piece !== "string") {
+                        throw new InputError(
+                            `${part.variable} is a secret or a generated value, and an address would show it: send it in a header or the body`,
+                        );
+                    }
                     // The agent's value is written for an address; a team's own value is written as it is.
                     text += found.agent ? encodeURIComponent(piece) : piece;
                 }
@@ -235,9 +252,7 @@ export function createResolver(input: ScopeInput): Resolver {
     }
 
     function addressOf(template: string, onlyOrigin: boolean): Address | undefined {
-        const walked = walkAddress(template, onlyOrigin);
-        if (walked === undefined) return undefined;
-        const { text, spans } = walked;
+        const { text, spans } = walkAddress(template, onlyOrigin);
         const end = originEnd(text);
         // Without a scheme the start of the text is the scheme and host, up to the first place the path could begin.
         const stop = end >= 0 ? end : text.search(/[/?#]/) >= 0 ? text.search(/[/?#]/) : text.length;
@@ -247,7 +262,8 @@ export function createResolver(input: ScopeInput): Resolver {
         }
         if (end < 0) {
             if (onlyOrigin) return undefined;
-            throw new InputError(`the address must start with https:// (or http://) once its variables are filled in; it starts ${JSON.stringify(text.slice(0, 30))}`);
+            const starts = JSON.stringify(text.slice(0, 30));
+            throw new InputError(`the address must start with https:// (or http://) once its variables are filled in; it starts ${starts}`);
         }
         return { url: text, origin: text.slice(0, end), fromVariables: spans.some((span) => span.start < end) };
     }
@@ -265,12 +281,17 @@ export function createResolver(input: ScopeInput): Resolver {
         finish() {
             if (unreferenced.size > 0) {
                 const names = [...unreferenced];
+                const one = names.length === 1;
                 throw new InputError(
-                    `${shortList(names, ", ", 60)} ${names.length === 1 ? "is a secret" : "are secrets"}, but api.secrets has no reference for ${names.length === 1 ? "it" : "them"} in ${label}`,
+                    `${shortList(names, ", ", 60)} ${one ? "is a secret" : "are secrets"}, ` +
+                        `but api.secrets has no reference for ${one ? "it" : "them"} in ${label}`,
                 );
             }
             if (missing.size > 0) {
-                throw new InputError(`no value for ${shortList([...missing], ", ", 60)} in ${label}: pass the ones the request uses in variables, or define them in the environment`);
+                throw new InputError(
+                    `no value for ${shortList([...missing], ", ", 60)} in ${label}: ` +
+                        "pass the ones the request uses in variables, or define them in the environment",
+                );
             }
         },
     };
