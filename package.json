@@ -34,7 +34,8 @@
       "./plugins/jig-jira/src/index.ts",
       "./plugins/jig-logs/src/index.ts",
       "./plugins/jig-api/src/index.ts",
-      "./plugins/jig-ops/src/index.ts"
+      "./plugins/jig-ops/src/index.ts",
+      "./plugins/jig-mongo/src/index.ts"
     ],
     "skills": [
       "./plugins/*/skills"
