@@ -12,9 +12,10 @@ how many hits the window holds, then one line per hit.
 
 ## Tool: `logs`
 
-Every call is a read. The first six rows decide what is searched. `match`,
-`exclude`, `around`, `chars` and `offset` only choose and shape the hits already
-fetched, so they never change the search.
+Every call is a read. The tool has no aggregations, dashboards or saved
+searches, and does not follow a log as it grows. The first six rows decide what
+is searched. `match`, `exclude`, `around`, `chars` and `offset` only choose and
+shape the hits already fetched, so they never change the search.
 
 | Parameter | Kind | What it does |
 |---|---|---|
@@ -100,8 +101,6 @@ is not configured instead of running half set up.
 - **Other backends,** such as SQL or the query languages of other products, and
   requests signed with AWS credentials, written when a job needs them and not in
   advance.
-- **Not planned:** anything that changes data, aggregations, dashboards, saved
-  searches and following a log as it grows.
 
 ## Layout
 
