@@ -1,6 +1,6 @@
 // A clock that only moves when a wait sleeps, so a rollout that takes minutes is checked in a few milliseconds. The
 // kubectl calls still run for real, but they do not move this clock.
-import type { Waiting } from "../../src/status.ts";
+import type { Waiting } from "../../src/runtime/kubernetes/status.ts";
 
 /** An hour after the pods of the fixtures were created. */
 export const NOW = Date.parse("2026-10-15T09:00:00Z");

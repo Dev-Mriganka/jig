@@ -1,6 +1,6 @@
 // Small helpers the modules share: the error that means "invalid input", the shape an action hands back, ways to read
 // kubectl's JSON, and ways to put a value or a piece of cluster text into a message.
-import type { Facts } from "../../jig-core/src/contract.ts";
+import type { Facts } from "../../../../jig-core/src/contract.ts";
 
 /**
  * A mistake in a call's input, or in the configuration it names. jig-core takes a `TypeError` from a tool's classify to

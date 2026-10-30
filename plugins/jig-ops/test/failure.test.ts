@@ -1,7 +1,7 @@
 // kubectl's complaints as one line that says what to do.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { explain, firstLines } from "../src/failure.ts";
+import { explain, firstLines } from "../src/runtime/kubernetes/failure.ts";
 import { rig } from "./support/rig.ts";
 
 const r = rig();

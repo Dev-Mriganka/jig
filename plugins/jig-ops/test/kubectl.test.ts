@@ -1,8 +1,8 @@
 // The one place kubectl is built and run: the arguments it gets, what it may be asked to do, its limits and its failures.
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, test } from "node:test";
-import { argvOf, cutMark, getJson, LOGS, READ, readKubectl, runKubectl, VERBS, wasCut } from "../src/kubectl.ts";
-import type { Verb } from "../src/kubectl.ts";
+import { argvOf, cutMark, getJson, LOGS, READ, readKubectl, runKubectl, VERBS, wasCut } from "../src/runtime/kubernetes/kubectl.ts";
+import type { Verb } from "../src/runtime/kubernetes/kubectl.ts";
 import { rig } from "./support/rig.ts";
 import type { Rig } from "./support/rig.ts";
 

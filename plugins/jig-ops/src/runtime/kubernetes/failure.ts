@@ -52,10 +52,12 @@ function scrub(text: string): string {
  */
 export function firstLines(text: string, count = 3): string {
     const lines: string[] = [];
-    for (const line of text.split("\n")) {
-        const trimmed = line.trim();
+    // Walks the text line by line instead of splitting it: a complaint of a million lines costs as much as three.
+    for (let from = 0; lines.length < count && from < text.length; ) {
+        const end = text.indexOf("\n", from);
+        const trimmed = text.slice(from, end < 0 ? text.length : end).trim();
+        from = end < 0 ? text.length : end + 1;
         if (trimmed !== "") lines.push(trimmed.slice(0, 500));
-        if (lines.length === count) break;
     }
     return oneLine(scrub(lines.join("; ")), 400);
 }

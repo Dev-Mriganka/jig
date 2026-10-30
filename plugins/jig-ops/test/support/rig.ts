@@ -1,7 +1,7 @@
 // A fake jig-core and a fake kubectl, wired together, for the tests that use the modules without the tool around them.
-import { readK8s } from "../../src/config.ts";
-import type { Target } from "../../src/config.ts";
-import type { Kube } from "../../src/kubectl.ts";
+import { readK8s } from "../../src/runtime/kubernetes/config.ts";
+import type { Target } from "../../src/runtime/kubernetes/config.ts";
+import type { Kube } from "../../src/runtime/kubernetes/kubectl.ts";
 import { installFakeKubectl } from "./fake-kubectl.ts";
 import type { FakeKubectl } from "./fake-kubectl.ts";
 import { installFakeJig } from "./fake-jig.ts";

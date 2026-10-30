@@ -1,8 +1,8 @@
 // The tool as a model and jig-core meet it: how a call is classified, what each action returns, and what a wrong call is told.
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, test } from "node:test";
-import { createDecisions } from "../src/decisions.ts";
-import { createTool } from "../src/tool.ts";
+import { createDecisions } from "../src/runtime/kubernetes/decisions.ts";
+import { createTool } from "../src/runtime/kubernetes/tool.ts";
 import { list, pod, workload } from "./support/fixtures.ts";
 import { ok, setupHarness } from "./support/harness.ts";
 import type { Harness } from "./support/harness.ts";
@@ -39,7 +39,7 @@ describe("classification", () => {
         assert.equal(h.declaration.masksOwnResults, undefined);
         assert.equal(h.declaration.preview, undefined, "a read has nothing to confirm");
         assert.equal(h.declaration.tool, "k8s");
-        assert.equal(h.declaration.plugin, "jig-k8s");
+        assert.equal(h.declaration.plugin, "jig-ops");
     });
 
     test("a read of production is a read in production: allowed by jig-core and masked there, and masked by nobody here", async () => {

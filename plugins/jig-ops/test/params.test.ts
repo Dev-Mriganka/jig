@@ -2,10 +2,10 @@
 // whose message says how to put the call right.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { readK8s } from "../src/config.ts";
-import type { K8sSettings } from "../src/config.ts";
-import { InputError } from "../src/values.ts";
-import { DEFAULT_TAIL, DEFAULT_WAIT_SECONDS, parseCall, usage } from "../src/params.ts";
+import { readK8s } from "../src/runtime/kubernetes/config.ts";
+import type { K8sSettings } from "../src/runtime/kubernetes/config.ts";
+import { InputError } from "../src/runtime/kubernetes/values.ts";
+import { DEFAULT_TAIL, DEFAULT_WAIT_SECONDS, parseCall, usage } from "../src/runtime/kubernetes/params.ts";
 import { section, withEntry } from "./support/section.ts";
 import type { Raw } from "./support/section.ts";
 

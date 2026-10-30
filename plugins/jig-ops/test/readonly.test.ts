@@ -3,23 +3,19 @@
 // context or a namespace the model chose, would each show up as a problem. The model cannot cause any of them, whatever it
 // sends, and these tests send a lot.
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import path from "node:path";
 import { afterEach, beforeEach, describe, test } from "node:test";
-import { fileURLToPath } from "node:url";
 import { problems } from "./support/argv.ts";
 import { list, pod, workload } from "./support/fixtures.ts";
 import { setupHarness } from "./support/harness.ts";
 import type { Harness } from "./support/harness.ts";
 import { section } from "./support/section.ts";
+import { codeOf, sources as readSources } from "./support/sources.ts";
 
 let h: Harness;
 beforeEach(() => {
     h = setupHarness();
 });
 afterEach(() => h.close());
-
-const SRC = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "src");
 
 /** Every verb of kubectl that changes something, or opens a way in, or leaves the cluster's API. */
 const WRITING_VERBS = [
@@ -237,18 +233,13 @@ describe("where the context and the namespace come from", () => {
 });
 
 describe("the code", () => {
-    const sources = fs
-        .readdirSync(SRC)
-        .filter((file) => file.endsWith(".ts"))
-        .map((file) => ({ file, text: fs.readFileSync(path.join(SRC, file), "utf8") }));
-    /** The code of a file without its comments. */
-    const codeOf = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "").replace(/\s\/\/ .*$/gm, "");
+    const sources = readSources();
 
     test("starts kubectl in one file only, and builds its argument list in that file only", () => {
         const starting = sources.filter(({ text }) => /\.exec\.run\(/.test(codeOf(text))).map(({ file }) => file);
-        assert.deepEqual(starting, ["kubectl.ts"]);
+        assert.deepEqual(starting, ["runtime/kubernetes/kubectl.ts"]);
         const building = sources.filter(({ text }) => /request-timeout|--context|--namespace/.test(codeOf(text))).map(({ file }) => file);
-        assert.deepEqual(building, ["kubectl.ts"]);
+        assert.deepEqual(building, ["runtime/kubernetes/kubectl.ts"]);
         for (const { file, text } of sources) {
             assert.ok(!/node:child_process|\bspawn\b|\bexecFile|\bexecSync\b|\bshell\s*:/.test(codeOf(text)), `${file} starts a process by itself`);
         }
@@ -264,7 +255,7 @@ describe("the code", () => {
     });
 
     test("lists three verbs, and runKubectl asks the list", () => {
-        const text = fs.readFileSync(path.join(SRC, "kubectl.ts"), "utf8");
+        const text = sources.find((source) => source.file === "runtime/kubernetes/kubectl.ts")?.text ?? "";
         assert.match(codeOf(text), /export const VERBS = \["get", "logs", "exec"\] as const;/);
         assert.match(codeOf(text), /if \(!\(VERBS as readonly string\[\]\)\.includes\(verb\)\) \{\s*throw/);
     });

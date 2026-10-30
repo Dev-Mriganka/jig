@@ -3,8 +3,8 @@
 // The context and namespace come from the configured target, the verb from the list below, and everything else from a
 // value a parseCall or a kubectl answer has already vouched for. kubectl is started by jig-core from an argument list,
 // never a shell, so a character in a value cannot mean anything but itself.
-import { jig } from "../../jig-core/src/client.ts";
-import type { RunResult } from "../../jig-core/src/contract.ts";
+import { jig } from "../../../../jig-core/src/client.ts";
+import type { RunResult } from "../../../../jig-core/src/contract.ts";
 import type { Target } from "./config.ts";
 import { explain } from "./failure.ts";
 

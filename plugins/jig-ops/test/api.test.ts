@@ -2,8 +2,8 @@
 // action is refused, and what goes wrong.
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, test } from "node:test";
-import { curlArgs } from "../src/api.ts";
-import { createDecisions, DECISION_EVENT, requireNotProduction } from "../src/decisions.ts";
+import { curlArgs } from "../src/runtime/kubernetes/api.ts";
+import { createDecisions, DECISION_EVENT, requireNotProduction } from "../src/runtime/kubernetes/decisions.ts";
 import { list, pod } from "./support/fixtures.ts";
 import { ok, setupHarness } from "./support/harness.ts";
 import type { Harness } from "./support/harness.ts";

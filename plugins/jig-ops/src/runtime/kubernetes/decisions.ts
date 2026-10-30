@@ -5,7 +5,7 @@
 // message names the kind. `api` runs a command in a pod, so it must never run where jig-core says production, whatever
 // the environment is called. classify can only refuse the one name that is always production (see params.ts); this
 // closes the rest.
-import type { DecisionEvent, EnvironmentKind, JIG_EVENTS } from "../../jig-core/src/contract.ts";
+import type { DecisionEvent, EnvironmentKind, JIG_EVENTS } from "../../../../jig-core/src/contract.ts";
 import type { Target } from "./config.ts";
 import { isObject } from "./values.ts";
 

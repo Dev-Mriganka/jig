@@ -4,8 +4,8 @@
 // that it is a read; jig-core decides what that means. A production read is allowed and jig-core masks the result, so
 // this plugin masks nothing itself (`masksOwnResults` stays unset).
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
-import { jig } from "../../jig-core/src/client.ts";
-import type { CallClass } from "../../jig-core/src/contract.ts";
+import { jig } from "../../../../jig-core/src/client.ts";
+import type { CallClass } from "../../../../jig-core/src/contract.ts";
 import { apiAction } from "./api.ts";
 import { settingsOf } from "./config.ts";
 import { requireNotProduction } from "./decisions.ts";

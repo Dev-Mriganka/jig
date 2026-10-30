@@ -1,12 +1,12 @@
 // The rollout of a service: the workloads behind the pods, the verdict, and waiting until a version is running.
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, test } from "node:test";
-import { readK8s } from "../src/config.ts";
-import { parsePod } from "../src/pods.ts";
-import type { Pod } from "../src/pods.ts";
-import { evaluate, parseWorkloads, podLines, verdictLine, workloadLines } from "../src/rollout.ts";
-import { nextDelay, POLL_FIRST_MS, POLL_MAX_MS, statusAction } from "../src/status.ts";
-import type { Call } from "../src/params.ts";
+import { readK8s } from "../src/runtime/kubernetes/config.ts";
+import { parsePod } from "../src/runtime/kubernetes/pods.ts";
+import type { Pod } from "../src/runtime/kubernetes/pods.ts";
+import { evaluate, parseWorkloads, podLines, verdictLine, workloadLines } from "../src/runtime/kubernetes/rollout.ts";
+import { nextDelay, POLL_FIRST_MS, POLL_MAX_MS, statusAction } from "../src/runtime/kubernetes/status.ts";
+import type { Call } from "../src/runtime/kubernetes/params.ts";
 import { fakeClock, NOW } from "./support/clock.ts";
 import type { FakeClock } from "./support/clock.ts";
 import { list, pod, workload } from "./support/fixtures.ts";

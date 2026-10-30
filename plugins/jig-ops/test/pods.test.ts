@@ -1,8 +1,8 @@
 // The pods of a service: how a pod is read from kubectl's JSON, which pod is the first Ready one, and the `pods` action.
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, test } from "node:test";
-import { age, firstReady, listPods, ownContainers, parsePod, podsAction, tagOf } from "../src/pods.ts";
-import type { Container } from "../src/pods.ts";
+import { age, firstReady, listPods, ownContainers, parsePod, podsAction, tagOf } from "../src/runtime/kubernetes/pods.ts";
+import type { Container } from "../src/runtime/kubernetes/pods.ts";
 import { fakeClock, NOW } from "./support/clock.ts";
 import { IMAGE, list, pod } from "./support/fixtures.ts";
 import { rig } from "./support/rig.ts";

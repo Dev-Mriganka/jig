@@ -124,6 +124,9 @@ export function installFakeJig(): FakeJig {
                 throw new Error("jig-k8s resolves no secrets");
             },
         },
+        environments: {
+            kindOf: (name: string) => (name === "local" || name === "external" ? name : name === "production" || name === "prod" ? "production" : "test"),
+        },
         transports: {
             register: () => {},
             request: async () => {

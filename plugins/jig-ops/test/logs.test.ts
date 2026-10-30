@@ -1,8 +1,8 @@
 // The logs action: which pod and container are read, the limits that reach kubectl, and what the lines look like.
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, test } from "node:test";
-import { logsAction } from "../src/logs.ts";
-import type { Call } from "../src/params.ts";
+import { logsAction } from "../src/runtime/kubernetes/logs.ts";
+import type { Call } from "../src/runtime/kubernetes/params.ts";
 import { list, pod } from "./support/fixtures.ts";
 import { rig } from "./support/rig.ts";
 import type { Rig } from "./support/rig.ts";

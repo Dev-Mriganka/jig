@@ -1,8 +1,8 @@
 // The `k8s` section: what is accepted, what is refused and how each refusal reads, and how a call finds its service.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { describeServices, findTarget, readK8s, settingsOf, validateK8s } from "../src/config.ts";
-import type { K8sSettings } from "../src/config.ts";
+import { describeServices, findTarget, readK8s, settingsOf, validateK8s } from "../src/runtime/kubernetes/config.ts";
+import type { K8sSettings } from "../src/runtime/kubernetes/config.ts";
 import { section, withEntry } from "./support/section.ts";
 
 function settings(raw: unknown = section()): K8sSettings {
