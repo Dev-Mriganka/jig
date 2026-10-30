@@ -253,6 +253,33 @@ describe("a request that is wrong", () => {
             "invalid_request",
         );
     });
+
+    test("default headers give way to the request's headers and to the credential's, even when the request says refuse", async () => {
+        const t = rig();
+        t.secrets.set("env:API_TOKEN", TOKEN);
+        t.replies.push(t.ok(), t.ok());
+        await t.http.request({
+            ...base,
+            defaultHeaders: { Accept: "text/plain", "User-Agent": "tool", authorization: "default" },
+            headers: { accept: "application/json" },
+            auth: { bearer: "env:API_TOKEN" },
+            onHeaderClash: "refuse",
+        });
+        assert.equal(t.sent[0]?.headers.accept, "application/json");
+        assert.equal(t.sent[0]?.headers["user-agent"], "tool");
+        assert.equal(t.sent[0]?.headers.authorization, `Bearer ${TOKEN}`);
+        // A header of the request itself that the credential also sets is still refused.
+        const error = await failure(
+            t.http.request({
+                ...base,
+                defaultHeaders: { Authorization: "default" },
+                headers: { AUTHORIZATION: "mine" },
+                auth: { bearer: "env:API_TOKEN" },
+                onHeaderClash: "refuse",
+            }),
+        );
+        assert.equal(error.code, "invalid_request");
+    });
 });
 
 // ---- the credential sources ---------------------------------------------------------------------------------------
@@ -725,6 +752,24 @@ describe("a request that gets no reply", () => {
         const error = await waiting;
         assert.deepEqual([error.code, error.notSent, error.message], ["aborted", false, "cancelled"]);
         assert.equal(error.cause, reason);
+    });
+
+    test("a signal that fires with a TimeoutError, such as AbortSignal.timeout, is a timeout and not a cancellation", async () => {
+        const t = rig();
+        t.replies.push(() => new Promise<Response>(() => {}));
+        const late = await failure(t.http.request(base, AbortSignal.timeout(20)));
+        assert.deepEqual([late.code, late.notSent, late.message], ["timeout", false, "timed out"]);
+        const before = await failure(
+            t.http.request(base, AbortSignal.abort(new DOMException("too slow", "TimeoutError"))),
+        );
+        assert.deepEqual(
+            [before.code, before.notSent, before.message],
+            ["timeout", true, "the time ran out before it was sent"],
+        );
+        const cancelled = await failure(
+            t.http.request(base, AbortSignal.abort(new DOMException("stop", "AbortError"))),
+        );
+        assert.deepEqual([cancelled.code, cancelled.message], ["aborted", "it was cancelled before it was sent"]);
     });
 
     test("a call cancelled before it starts, or while a secret is read, is aborted and notSent", async () => {

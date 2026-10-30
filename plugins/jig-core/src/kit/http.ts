@@ -99,11 +99,25 @@ function codeOf(error: unknown): string {
     return "";
 }
 
+/** True when the caller's signal fired because time ran out (`AbortSignal.timeout`), not because the call was cancelled. */
+function ranOut(caller: AbortSignal): boolean {
+    return isObject(caller.reason) && caller.reason.name === "TimeoutError";
+}
+
+/** The error for a caller's signal that has fired: the time ran out, or the call was cancelled. */
+function stopped(caller: AbortSignal, notSent: boolean, error?: unknown): HttpError {
+    if (ranOut(caller)) {
+        return new HttpError("timeout", notSent ? "the time ran out before it was sent" : "timed out", notSent, error);
+    }
+    const message = notSent ? "it was cancelled before it was sent" : "cancelled";
+    return new HttpError("aborted", message, notSent, caller.reason ?? error);
+}
+
 /** The error for a request that got no reply. The words come from the error code and never from Node's message, which
  *  can quote the address or a header. */
 function networkFailure(error: unknown, caller: AbortSignal | undefined, deadline: AbortSignal): HttpError {
     // The user stopped the call: that is the answer, whatever the network reported.
-    if (caller?.aborted === true) return new HttpError("aborted", "cancelled", false, caller.reason ?? error);
+    if (caller?.aborted === true) return stopped(caller, false, error);
     if (deadline.aborted) return new HttpError("timeout", "timed out", false);
     // `fetch` refuses the ports that browsers block, before it connects, and says so in words and not as a code.
     if (isObject(error) && isObject(error.cause) && error.cause.message === "bad port") {
@@ -286,7 +300,7 @@ export function createHttp(deps: HttpDeps): JigApi["http"] {
 
     function credentialFailure(error: unknown, caller: AbortSignal | undefined): HttpError {
         if (isHttpError(error)) return error;
-        if (caller?.aborted === true) return new HttpError("aborted", "cancelled", true, caller.reason ?? error);
+        if (caller?.aborted === true) return stopped(caller, true, error);
         const message = error instanceof Error ? error.message : String(error);
         return new HttpError("auth_failed", message, true, error);
     }
@@ -400,21 +414,33 @@ export function createHttp(deps: HttpDeps): JigApi["http"] {
         const signal = caller === undefined ? deadline : AbortSignal.any([caller, deadline]);
         if (signal.aborted) {
             // Nothing has gone out: say whether the call was cancelled or the time ran out first.
-            if (caller?.aborted === true)
-                throw new HttpError("aborted", "it was cancelled before it was sent", true, caller.reason);
+            if (caller?.aborted === true) throw stopped(caller, true);
             throw new HttpError("timeout", "the time ran out before it was sent", true);
         }
+        // The defaults first, then the request's own, which replace a default of the same name (ignoring case).
         const headers: Record<string, string> = {};
-        for (const [name, value] of Object.entries(request.headers ?? {})) headers[name] = value;
+        const put = (name: string, value: string): void => {
+            for (const given of Object.keys(headers))
+                if (given.toLowerCase() === name.toLowerCase()) delete headers[given];
+            headers[name] = value;
+        };
+        for (const [name, value] of Object.entries(request.defaultHeaders ?? {})) put(name, value);
+        const defaults = new Set(Object.keys(headers).map((name) => name.toLowerCase()));
+        for (const [name, value] of Object.entries(request.headers ?? {})) {
+            put(name, value);
+            defaults.delete(name.toLowerCase());
+        }
         if (credential !== undefined) {
             for (const [name, value] of Object.entries(credential.headers)) {
-                const same = Object.keys(headers).filter((given) => given.toLowerCase() === name.toLowerCase());
-                if (same.length > 0 && request.onHeaderClash === "refuse") {
+                const lower = name.toLowerCase();
+                const clash = Object.keys(headers).some(
+                    (given) => given.toLowerCase() === lower && !defaults.has(lower),
+                );
+                if (clash && request.onHeaderClash === "refuse") {
                     throw invalid(`header ${name} is set by the sign-in, so the request cannot have it too`);
                 }
-                // The credential's header replaces the request's of the same name.
-                for (const given of same) delete headers[given];
-                headers[name] = value;
+                // The credential's header replaces the request's, and a default's, of the same name.
+                put(name, value);
             }
         }
 
@@ -477,7 +503,7 @@ export function createHttp(deps: HttpDeps): JigApi["http"] {
             const reply = await untilAborted(deps.transports.request(name, sent, signal), signal);
             return fromTransport(reply, maxBytes);
         } catch (error) {
-            if (caller?.aborted === true) throw new HttpError("aborted", "cancelled", false, caller.reason ?? error);
+            if (caller?.aborted === true) throw stopped(caller, false, error);
             if (deadline.aborted) throw new HttpError("timeout", "timed out", false);
             const message = error instanceof Error ? error.message : String(error);
             // jig-core says so when no transport has this name; then nothing was sent.
@@ -512,8 +538,10 @@ export function createHttp(deps: HttpDeps): JigApi["http"] {
             ) {
                 throw invalid("onHeaderClash must be replace or refuse");
             }
-            for (const [name, value] of Object.entries(request.headers ?? {})) {
-                if (typeof value !== "string") throw invalid(`header ${name.slice(0, 40)} must be text`);
+            for (const given of [request.headers, request.defaultHeaders]) {
+                for (const [name, value] of Object.entries(given ?? {})) {
+                    if (typeof value !== "string") throw invalid(`header ${name.slice(0, 40)} must be text`);
+                }
             }
             const timeoutMs = Math.min(
                 MAX_TIMEOUT_MS,

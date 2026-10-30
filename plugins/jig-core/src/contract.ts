@@ -268,17 +268,21 @@ export interface HttpRequest {
     url: string;
     method: HttpMethod;
     headers?: Readonly<Record<string, string>>;
+    /** Headers the caller would send by default (an `Accept`, a `User-Agent`): a header in `headers` replaces one of the
+     *  same name, and so does the credential's, whatever `onHeaderClash` says. */
+    defaultHeaders?: Readonly<Record<string, string>>;
     /** Text, or bytes. A transport carries text only. */
     body?: string | Uint8Array;
     /** The credential, from a source the user configured. Not with `transport`: a transport signs in itself. */
     auth?: HttpAuth;
     /** The name of a registered transport that carries the request instead of the network. */
     transport?: string;
-    /** What happens when a header of the request has the same name (ignoring case) as one the credential sets: the
+    /** What happens when a header in `headers` has the same name (ignoring case) as one the credential sets: the
      *  credential's `replace`s it (the default), or the request is `refuse`d with `invalid_request`, so one of the two
      *  never silently wins. */
     onHeaderClash?: "replace" | "refuse";
-    /** From 1 ms to 10 minutes. Default 30 s. It starts after the credential is in hand: a secret store may wait for
+    /** From 1 ms to 10 minutes. Default 30 s. (A `signal` that fires with a `TimeoutError`, such as
+     *  `AbortSignal.timeout`, also ends the request as a `timeout`.) It starts after the credential is in hand: a secret store may wait for
      *  you to unlock it. */
     timeoutMs?: number;
     /** The most reply bytes that are read; more is cut and `truncated` is set. From 1 byte to 64 MiB. Default 4 MiB. */

@@ -61,7 +61,9 @@ const reply = await jig().http.request(
   expired token before it acted, so a write is not repeated.
 - **A header that the credential also sets replaces the request's** (ignoring
   case). A request can say `onHeaderClash: "refuse"` to get an `invalid_request`
-  error instead, so that one of the two never silently wins.
+  error instead, so that one of the two never silently wins. `defaultHeaders`
+  (an `Accept`, a `User-Agent`) always give way, to the request's `headers` and
+  to the credential's.
 - **The time limit starts after the credential is in hand.** A secret store may
   wait for you to unlock it, and that is not the server's time. A transport or a
   fetch that ignores its signal still times out.
