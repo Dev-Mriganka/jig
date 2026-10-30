@@ -146,9 +146,10 @@ test("every tool is declared to jig-core as a jig-git tool, with a preview for t
 
 const README = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "README.md"), "utf8");
 
-/** The rows of the README's table under `### \`tool\``: the actions in the first cell and the default in the last. */
+/** The rows of the README's table under `## Tool: \`tool\``: the actions in the first cell and the kind, with the
+ *  default decision, in the second. */
 function readmeRows(tool: string): Array<{ actions: string[]; fallback: string }> {
-    const start = README.indexOf(`### \`${tool}\``);
+    const start = README.indexOf(`## Tool: \`${tool}\``);
     assert.ok(start >= 0, `README has a section for ${tool}`);
     const rest = README.slice(start + 4);
     const end = rest.search(/\n##+ /);
@@ -160,7 +161,7 @@ function readmeRows(tool: string): Array<{ actions: string[]; fallback: string }
             const cells = line.split("|").map((cell) => cell.trim());
             return {
                 actions: [...(cells[1] ?? "").matchAll(/`([a-z_]+)`/g)].map((match) => match[1] as string),
-                fallback: cells[cells.length - 2] ?? "",
+                fallback: cells[2] ?? "",
             };
         });
 }
