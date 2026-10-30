@@ -10,6 +10,8 @@ export interface Deps {
     now(): Date;
     /** Looked up at each use, so the state folder is the one the environment names now. */
     paths(): Paths;
+    /** Pi's folder of session files, which `/lens usage` reads. */
+    sessionsDir(): string;
     /** From the `lens` section of jig.json, or the defaults. */
     settings(): LensSettings;
     /** The first of the program names that is on PATH, as an absolute path. */

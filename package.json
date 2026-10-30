@@ -44,10 +44,14 @@
             "./plugins/jig-api/src/index.ts",
             "./plugins/jig-ops/src/index.ts",
             "./plugins/jig-review/src/index.ts",
-            "./plugins/jig-mongo/src/index.ts"
+            "./plugins/jig-mongo/src/index.ts",
+            "./plugins/jig-theme/src/index.ts"
         ],
         "skills": [
             "./plugins/*/skills"
+        ],
+        "themes": [
+            "./plugins/jig-theme/themes/*.json"
         ]
     },
     "devDependencies": {

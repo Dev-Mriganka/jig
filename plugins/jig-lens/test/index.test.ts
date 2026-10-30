@@ -93,24 +93,31 @@ test("it needs nothing that is not in Node or Pi: no package of its own", () => 
     }
 });
 
-test("Pi is imported for its types only, except by display.ts, which draws with pi-tui's Box and Text", () => {
-    let drawing = 0;
+test("Pi is imported for its types only, except by display.ts, which draws with pi-tui's Box and Text, and usage-dashboard.ts, which reads keys", () => {
+    const drawing: Record<string, string[]> = {};
     for (const name of readdirSync(SRC)) {
         for (const line of readFileSync(path.join(SRC, name), "utf8").split("\n")) {
             if (!line.includes("@earendil-works/") || line.startsWith("import type ")) continue;
-            assert.equal(name, "display.ts", `${name}: ${line}`);
-            assert.match(line, /^import \{ Box, Text \} from "@earendil-works\/pi-tui";$/);
-            drawing++;
+            (drawing[name] ??= []).push(line);
         }
     }
-    assert.equal(drawing, 1);
+    assert.deepEqual(drawing, {
+        "display.ts": ['import { Box, Text } from "@earendil-works/pi-tui";'],
+        "usage-dashboard.ts": ['import { Key, matchesKey, truncateToWidth } from "@earendil-works/pi-tui";'],
+    });
 });
 
-test("nothing but the entry and display modules reaches pi-tui, so the rest loads without any of Pi", () => {
+test("nothing but display.ts and the usage view reaches pi-tui, and the view is loaded only when /lens usage runs", () => {
     const importers = readdirSync(SRC).filter((name) =>
         /from "@earendil-works\/pi-tui"/.test(readFileSync(path.join(SRC, name), "utf8")),
     );
-    assert.deepEqual(importers, ["display.ts"]);
+    assert.deepEqual(importers, ["display.ts", "usage-dashboard.ts"]);
+    // So the rest of the plugin loads without any of Pi: the view is imported when the command runs, and nowhere else.
+    for (const name of readdirSync(SRC)) {
+        const text = readFileSync(path.join(SRC, name), "utf8");
+        assert.doesNotMatch(text, /^import [^\n]*"\.\/usage-dashboard\.ts"/m, `${name} imports the view at load`);
+    }
+    assert.match(readFileSync(path.join(SRC, "lens.ts"), "utf8"), /await import\("\.\/usage-dashboard\.ts"\)/);
 });
 
 test("the importer only opens record files for reading", () => {

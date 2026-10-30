@@ -1,6 +1,6 @@
 ---
 name: jira
-description: Reading and changing Jira issues with the jira tool: comments, transitions, fields and new issues, and the wiki markup their text uses. Use when the user names an issue key, or asks to search, comment on, update, move or create a Jira issue.
+description: "Reading and changing Jira issues with the jira tool: comments, transitions, fields and new issues, and the wiki markup their text uses. Use when the user names an issue key, or asks to search, comment on, update, move or create a Jira issue."
 ---
 
 # Jira work

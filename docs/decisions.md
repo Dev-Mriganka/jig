@@ -48,14 +48,21 @@ Dated so the reasons stay attached.
 - **Palettes are Pi theme files,** not colours painted by an extension. Pi's
   `/settings`, its HTML export and its hot reload then work with them, and they
   work without the rest of Jig.
-- **A palette is about fifteen named colours and one shared role map.** Adding a
+- **A palette is seventeen named colours and one shared role map.** Adding a
   palette, or your own, means choosing those colours, not filling every role.
-  A palette can still set single roles where the map is not right for it.
+  A palette can still set single roles where the map is not right for it. The
+  first two palettes, drawn before the map, set 15 and 14 roles that way; the
+  other four set none.
 - **Your palettes are written into Pi's themes folder.** Pi finds a theme there
   by name, even one written after it started, and reloads the one in use when
   its file changes. `jig-theme` records a hash of each file it writes, and
   writes or deletes only a file whose hash still matches, so a file you changed
   by hand is never overwritten.
+- **`/theme reload` is a reload of Pi.** `jig.json` is read when a session starts,
+  and `jig-core` has no way to read it again on request, so a reload is the one
+  honest way to see an edit. Pi reads the themes folder before a session starts,
+  so it knows a palette that changed since by its old colours; the plugin writes
+  that palette's own file once more, which Pi's watcher takes as a change.
 - **Other plugins add footer parts on Pi's event bus,** `jig-theme:segment`. A
   plugin then does not depend on `jig-theme`, and nothing breaks without it.
 - **The usage history goes to `jig-lens`** as `/lens usage`, because it is about

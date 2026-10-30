@@ -120,7 +120,7 @@ test("in a real session every scope of /lens does the same, and a bad word says 
     await pi.prompt("/lens days 400");
     assert.deepEqual(notices, [
         "/lens days takes a whole number from 1 to 90.\n" +
-            "Usage: /lens [ticket KEY | session [id] | days N | grafana | datasette | rebuild | status]",
+            "Usage: /lens [ticket KEY | session [id] | days N | usage | grafana | datasette | rebuild | status]",
     ]);
     assert.equal(faux.state.callCount, 0, "no command asked the model anything");
     assert.equal(pi.sessionManager.getEntries().filter((entry) => entry.type === "custom").length, 4);

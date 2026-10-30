@@ -4,7 +4,7 @@ Jig is a set of plugins for the [Pi](https://pi.dev) coding agent. They decide
 what the agent may do, ask you when it matters, keep secrets out of its reach,
 and record what happened so you can see it later.
 
-**Status:** ten of the twelve plugins are built. Each plugin's README is the
+**Status:** eleven of the thirteen plugins are built. Each plugin's README is the
 specification that its code follows.
 
 ## What works today
@@ -19,7 +19,7 @@ team's saved API requests by name, with sign-in added by the tool. `jig-ops`
 looks at CI on GitHub Actions, GitLab CI or Jenkins and watches it until it
 finishes, deploys a version to a test environment and reads what runs, all from
 one service catalog. `jig-review` opens a private code review of the agent's changes in the browser, with comments the agent answers round by round, and you approve it with a passkey. `jig-mongo` explores, queries, explains and (in a test
-environment) changes MongoDB, with allow and deny lists that reach fields. The other plugins are designs.
+environment) changes MongoDB, with allow and deny lists that reach fields. `jig-theme` gives Pi six palettes as themes, palettes of your own from `jig.json`, a one-line footer of model, context, cache time and cost, and answers in the theme's text colour. The other plugins are designs.
 
 ## Where Jig sits
 
@@ -39,7 +39,7 @@ environment) changes MongoDB, with allow and deny lists that reach fields. The o
 |---|---|---|
 | [`jig-core`](plugins/jig-core/README.md) | built | The tool manager. It governs every tool the agent can call: Pi's own (`read`, `write`, `edit`, `bash`), Jig's, and other packages'. Rules per environment, approvals, secrets, sign-in, masking, background watches and records |
 | [`jig-git`](plugins/jig-git/README.md) | built | Local git, GitHub pull requests and reviews, and tags and releases |
-| [`jig-lens`](plugins/jig-lens/README.md) | built | A summary inside Pi of cost, tool failures, time spent waiting for you, blocked calls and checks; Grafana optional |
+| [`jig-lens`](plugins/jig-lens/README.md) | built | A summary inside Pi of cost, tool failures, time spent waiting for you, blocked calls and checks, and a quick view of cost and tokens from Pi's session files; Grafana optional |
 | [`jig-workflow`](plugins/jig-workflow/README.md) | design | Named workflows you define: stages, exit conditions and holds, test runs and acceptance scenarios |
 | [`jig-memory`](plugins/jig-memory/README.md) | built | Ticket folders, notes and evidence; later, recall of related tickets |
 | [`jig-mongo`](plugins/jig-mongo/README.md) | built | MongoDB: explore, indexes and plans, the full aggregation pipeline and writes in test environments; allow and deny lists that reach fields, production read-only |
@@ -48,6 +48,7 @@ environment) changes MongoDB, with allow and deny lists that reach fields. The o
 | [`jig-api`](plugins/jig-api/README.md) | built | Your team's saved API requests (Postman, `.http` files, Bruno, OpenAPI), run by name with only their variables filled, and sign-in added by the tool |
 | [`jig-ops`](plugins/jig-ops/README.md) | built | CI on GitHub Actions, GitLab CI or Jenkins and watching it until it finishes, deploy and run on a platform, from one service catalog |
 | [`jig-review`](plugins/jig-review/README.md) | built | Code review in the browser: line comments the agent answers round by round, and approval with a passkey |
+| [`jig-theme`](plugins/jig-theme/README.md) | built | Six palettes as Pi themes, your own in `jig.json`, a one-line footer of model, context, cache time and cost, and answers in the theme's text colour |
 | [`jig-agents`](plugins/jig-agents/README.md) | design | Subagents in terminal panes |
 
 Every plugin needs `jig-core`; otherwise they work on their own.

@@ -63,3 +63,5 @@
 | **Agent file** | A file that sets a subagent's role, its tools and its model, such as a planner, a reviewer, a scout or a worker. |
 | **Pin** | A hash of a script's folder. A script whose folder changed is refused until you pin it again. |
 | **Wiki markup** | Jira's text format. `jig-jira` shows it rendered before it is sent. |
+| **Palette** | The look of a theme as seventeen named colours, such as `text`, `accent` and `error`. One role map turns them into all of Pi's roles. `jig-theme` ships six, and you write your own in `jig.json` as a base, a few colours and a few roles. |
+| **Footer part** | One piece of the one-line footer, such as `model`, `context` or `cost`. You choose the parts and their order, and another plugin adds its own by emitting `jig-theme:segment`. |

@@ -2,17 +2,18 @@
 
 **Status: built.** The summary is tested with sample records, a fake Pi and a real
 Pi session on a scripted model, and was seen in Pi 1.4.0's terminal on Linux; the
-RPC notification is tested with a fake screen only. The dashboards were tried with
-Grafana 13.3 and its SQLite data source 4.0.6 on Linux. macOS is not tried yet.
+RPC notification is tested with a fake screen only. `/lens usage` is tested with session
+files and a fake screen, and was seen in the same terminal. The dashboards were tried
+with Grafana 13.3 and its SQLite data source 4.0.6 on Linux. macOS is not tried yet.
 
 `jig-lens` shows what `jig-core` [records](../jig-core/docs/records.md): cost, tool
 failures, and time spent waiting for you. `/lens` prints a summary inside Pi, with
 no server and no install. Grafana, or Datasette, is an optional deep dive. It
 never changes the records, and nothing leaves the machine.
 
-For cost, tokens and sessions alone, use TokenTelemetry, which reads Pi's own
-session logs (see [Reuse](../../docs/reuse.md)). `jig-lens` adds what only Jig's
-records hold: rule decisions, approvals and time waited, tickets and checks. For
+`/lens usage` is a quick view of cost and tokens from Pi's own session files;
+TokenTelemetry goes further (see [Reuse](../../docs/reuse.md)). `jig-lens` adds what only
+Jig's records hold: rule decisions, approvals and time waited, tickets and checks. For
 example, `/lens ticket PROJ-123` after a morning's work:
 
 ```text
@@ -47,13 +48,14 @@ Ticket PROJ-123, all time
 | `/lens ticket KEY` | One ticket, over all time |
 | `/lens session [id]` | One session. Without an id, this one |
 | `/lens days N` | The last N days, from 1 to 90, the last of them today |
+| `/lens usage` | An interactive view of cost and tokens from Pi's own session files: periods, graphs or models, cost or tokens |
 | `/lens grafana` | Imports, starts Grafana if it is not running, and opens its dashboards |
 | `/lens datasette` | The same for Datasette |
 | `/lens rebuild` | Deletes the index and imports every record file again. The viewers are not touched |
 | `/lens status` | The viewer that answers on the port, the index size and counts, the last import, and the lines that were skipped |
 
 Anything else, or the wrong arguments (`/lens days 91`), shows the usage line and
-does nothing: `Usage: /lens [ticket KEY | session [id] | days N | grafana | datasette | rebuild | status]`.
+does nothing: `Usage: /lens [ticket KEY | session [id] | days N | usage | grafana | datasette | rebuild | status]`.
 
 ## Rules
 
@@ -99,7 +101,8 @@ jig-lens/
             display.ts (what /lens shows), queries.ts, summary.ts, format.ts, period.ts (the
             figures and their text), start.ts, viewer.ts (Grafana, Datasette), import.ts,
             parse.ts, fields.ts, store.ts (the index), config.ts, paths.ts, programs.ts,
-            report.ts, deps.ts
+            report.ts, deps.ts; usage-dashboard.ts, usage-history.ts, usage-record.ts and
+            usage-names.ts (/lens usage, over Pi's session files)
   viewer/   Grafana provisioning and dashboards, as files; Datasette's metadata and queries
   test/     sample records, a fake Pi and a real Pi session, 100 000 calls timed, every
             dashboard query run on a real index
@@ -109,6 +112,7 @@ jig-lens/
 ## More detail
 
 - [The summary](docs/summary.md): scopes, sections, how it is shown, the commands
+- [The usage view](docs/usage.md): `/lens usage`, its keys, what it reads, naming the models
 - [From the records to the index](docs/import.md): imports, retention, one viewer process
 - [The index](docs/index-schema.md): tables, SQL indexes, how fast
 - [Grafana and Datasette](docs/viewers.md): the dashboards, why these viewers, what to install

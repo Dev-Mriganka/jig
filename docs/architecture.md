@@ -114,6 +114,7 @@ jig (this repository, generic)
   jig-git    tools: local git, GitHub PRs and reviews, releases; announces a push on the event bus
   jig-ops    tools: CI (GitHub Actions, GitLab, Jenkins), deploy and runtime from a service catalog; the CI watch
   jig-lens   observability: reads jig-core's records, local dashboard
+  jig-theme  the look: palettes as Pi themes, a footer, the answer colour; no tools
   jig-workflow, jig-memory, jig-mongo, jig-jira, jig-logs, jig-api, jig-ops,
   jig-review, jig-agents   (see Plugins)
 

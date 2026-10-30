@@ -15,6 +15,22 @@ export function stateDir(env: NodeJS.ProcessEnv = process.env): string {
     return join(base, "jig");
 }
 
+/**
+ * Pi's agent folder: `$PI_CODING_AGENT_DIR` with a leading `~` expanded, else `~/.pi/agent`. This is Pi's rule, repeated, so
+ * that the plugin needs nothing from Pi but its types to know where the session files are.
+ */
+export function agentDir(env: NodeJS.ProcessEnv = process.env): string {
+    const chosen = env.PI_CODING_AGENT_DIR;
+    if (chosen !== undefined && chosen !== "") {
+        if (chosen === "~") return homedir();
+        return chosen.startsWith("~/") ? join(homedir(), chosen.slice(2)) : resolve(chosen);
+    }
+    return join(homedir(), ".pi", "agent");
+}
+
+/** Where Pi keeps its session files, which `/lens usage` reads. */
+export const sessionsDir = (env: NodeJS.ProcessEnv = process.env): string => join(agentDir(env), "sessions");
+
 export interface Paths {
     /** jig-core's record files, `<YYYY-MM-DD>.jsonl`. Read only. */
     records: string;

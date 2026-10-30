@@ -24,7 +24,7 @@ parts live in a private company plugin kept at the company.
 |---|---|---|---|---|
 | [`jig-core`](../plugins/jig-core/README.md) | built | `watch`: list, stop; the tool manager, the watch engine and the `/jig` commands | environments, classification rules, extra personal-data field names for masking, sign-in services and transports | 1 |
 | [`jig-git`](../plugins/jig-git/README.md) | built | `git`: status, diff, log, show, blame, branches, fetch, clone, branch, worktree, commit, stash, sync, merge, rebase, cherry_pick, restore, push · `pr`: view, list, comments, create, edit, ready, comment, reply, resolve, review, merge · `release`: tags, releases, tag_create, tag_push, release_create | the GitHub organization, branch names, protected branches, the pull request template | 2 |
-| [`jig-lens`](../plugins/jig-lens/README.md) | built | none: the `/lens` command, over `jig-core`'s records | none | 2 |
+| [`jig-lens`](../plugins/jig-lens/README.md) | built | none: the `/lens` command, over `jig-core`'s records; `/lens usage`, over Pi's session files | names for the models in `/lens usage`, through the `jig-lens:model-names` event | 2 |
 | [`jig-workflow`](../plugins/jig-workflow/README.md) | design | `workflow`: list, status, start, bind, submit-plan, test, scenario, advance; holds through `jig-core` | its workflow files, the ticket key patterns they match, acceptance environments | 3 |
 | [`jig-memory`](../plugins/jig-memory/README.md) | built | no tools: ticket folders, notes and evidence, and the `/ticket` command; later cards and recall | ticket key patterns, folder location | 3 |
 | [`jig-mongo`](../plugins/jig-mongo/README.md) | built | `mongo`: databases, collections, schema, stats · indexes, index-stats, explain · count, find, distinct, sample, aggregate · insert, update, replace, delete, bulk, create-index, drop-index | its connections and routes (for example a tunnel through its own jump hosts), its production allow lists, secret references | 4 |
@@ -33,6 +33,7 @@ parts live in a private company plugin kept at the company.
 | [`jig-api`](../plugins/jig-api/README.md) | built | `api`: list, show, run, run-folder, call; `/api refresh` | where its collections live and how their environments map, a transport or sign-in service for APIs it reaches through one | 7 |
 | [`jig-ops`](../plugins/jig-ops/README.md) | built | `ci`: status, runs, run, log, rerun, trigger, watch · `deploy`: plan, run, status, rollback, watch · `runtime`: pods, rollout, logs, events, health | the service catalog, its CI servers and sign-in, its deploy methods, the "artifact ready" rules, transports | 7 |
 | [`jig-review`](../plugins/jig-review/README.md) | built | `start_interactive_code_review`, `record_interactive_review_resolution`; the `/code-review` command and its page | none | 8 |
+| [`jig-theme`](../plugins/jig-theme/README.md) | built | none: the `/theme` command, six palettes as Pi themes and a one-line footer | a company palette, footer defaults, footer parts of its own (such as a model spend) | 8 |
 | [`jig-agents`](../plugins/jig-agents/README.md) | design | `subagent`, `subagent_message`, `subagent_status`, `subagent_interrupt`, `subagent_done`, `caller_ping` | which model each role uses | 8, unless a store package replaces it |
 
 `jig-ops` has `ci`, `deploy` and `runtime`. `ci` has one adapter per CI system (GitHub
@@ -76,3 +77,4 @@ sign-in service or a transport from the company plugin.
 4. **The data and service tools,** one at a time, each with its company part.
 5. **Review and subagents,** unless a package from the Pi store does the job
    better (see [Reuse](reuse.md)).
+6. **`jig-theme`:** how Pi looks. Nothing depends on it, so it can come at any point.

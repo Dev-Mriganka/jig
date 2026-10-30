@@ -58,6 +58,14 @@ test("a ticket without a key, or with two, is refused", () => {
     assert.deepEqual(parseCommand("ticket A-1 B-2"), { kind: "usage", problem: "/lens ticket takes one ticket key." });
 });
 
+test("usage opens the usage view, and takes no arguments", () => {
+    assert.deepEqual(parseCommand("usage"), { kind: "usage-view" });
+    assert.deepEqual(parseCommand("  usage  "), { kind: "usage-view" });
+    for (const args of ["usage week", "usage 7", "usage today"]) {
+        assert.deepEqual(parseCommand(args), { kind: "usage", problem: "/lens usage takes no arguments." }, args);
+    }
+});
+
 test("a session with two ids is refused", () => {
     assert.deepEqual(parseCommand("session a b"), { kind: "usage", problem: "/lens session takes one session id." });
 });
@@ -82,7 +90,10 @@ test("days outside 1 to 90, or not a whole number, is refused with the range", (
 });
 
 test("the usage names every command on one line", () => {
-    assert.equal(USAGE, "Usage: /lens [ticket KEY | session [id] | days N | grafana | datasette | rebuild | status]");
+    assert.equal(
+        USAGE,
+        "Usage: /lens [ticket KEY | session [id] | days N | usage | grafana | datasette | rebuild | status]",
+    );
     for (const [word] of WORDS) assert.ok(USAGE.includes(word), word);
     assert.ok(!USAGE.includes("\n"));
 });
@@ -90,7 +101,7 @@ test("the usage names every command on one line", () => {
 test("the completions are the first words, each with what it does", () => {
     assert.deepEqual(
         (completions("") ?? []).map((item) => item.value),
-        ["ticket", "session", "days", "grafana", "datasette", "rebuild", "status"],
+        ["ticket", "session", "days", "usage", "grafana", "datasette", "rebuild", "status"],
     );
     assert.deepEqual(completions("gr"), [
         { value: "grafana", label: "grafana", description: "open the Grafana dashboards" },
