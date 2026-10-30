@@ -186,6 +186,8 @@ export class ReviewServer {
             return context.json(result, result.ok ? 200 : 409);
         });
 
+        app.get("/api/settings", async (context) => context.json(await this.handlers.getSettings()));
+
         app.patch("/api/settings", async (context) => {
             await this.handlers.updateSettings(parseSettingsUpdate(await readJson(context)));
             this.publish("review-updated");

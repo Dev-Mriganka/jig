@@ -1,0 +1,122 @@
+/* Tailwind scans only this folder: without source(".") it also reads dist/, README.md and the lockfile, so a build
+   differed depending on the previous build's output. */
+@import "tailwindcss" source(".");
+
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+.typing-dot {
+  animation: typing-dot 1.2s infinite ease-in-out;
+  background: #64748b;
+  border-radius: 9999px;
+  display: inline-block;
+  height: 0.25rem;
+  width: 0.25rem;
+}
+
+.animation-delay-150 {
+  animation-delay: 150ms;
+}
+
+.animation-delay-300 {
+  animation-delay: 300ms;
+}
+
+@keyframes typing-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+
+  40% {
+    opacity: 1;
+    transform: translateY(-0.15rem);
+  }
+}
+
+.diff {
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+    monospace;
+}
+
+.diff-gutter {
+  min-width: 4.5rem;
+  user-select: none;
+}
+
+.diff-line:hover .diff-comment-plus,
+.diff-gutter:hover .diff-comment-plus {
+  opacity: 1;
+}
+
+.diff-comment-gutter {
+  cursor: pointer;
+}
+
+.diff-widget {
+  background: #eff6ff;
+}
+
+.diff-code-edit {
+  background-color: rgb(250 204 21 / 0.35);
+  border-radius: 0.125rem;
+}
+
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: #6b7280;
+}
+
+.token.punctuation {
+  color: #475569;
+}
+
+.token.property,
+.token.tag,
+.token.boolean,
+.token.number,
+.token.constant,
+.token.symbol {
+  color: #b45309;
+}
+
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin {
+  color: #047857;
+}
+
+.token.operator,
+.token.entity,
+.token.url,
+.token.variable {
+  color: #334155;
+}
+
+.token.atrule,
+.token.attr-value,
+.token.function,
+.token.class-name {
+  color: #2563eb;
+}
+
+.token.keyword {
+  color: #7c3aed;
+}
+
+.token.regex,
+.token.important {
+  color: #be123c;
+}
