@@ -1,0 +1,61 @@
+{
+  "size": 20,
+  "timeout": "25s",
+  "track_total_hits": true,
+  "query": {
+    "bool": {
+      "filter": [
+        {
+          "range": {
+            "timestamp": {
+              "gte": "2026-10-13T10:00:00Z",
+              "lt": "2026-10-13T12:00:00Z",
+              "format": "strict_date_optional_time"
+            }
+          }
+        },
+        {
+          "term": {
+            "env.keyword": "prod"
+          }
+        },
+        {
+          "term": {
+            "tier.keyword": "web"
+          }
+        },
+        {
+          "term": {
+            "region_code": 7
+          }
+        },
+        {
+          "term": {
+            "canary": false
+          }
+        }
+      ],
+      "must": [
+        {
+          "query_string": {
+            "query": "error AND \"timed out\" AND tim*",
+            "default_field": "log.message",
+            "analyze_wildcard": true
+          }
+        }
+      ]
+    }
+  },
+  "sort": [
+    {
+      "timestamp": {
+        "order": "desc",
+        "unmapped_type": "date"
+      }
+    }
+  ],
+  "_source": [
+    "timestamp",
+    "log.message"
+  ]
+}
