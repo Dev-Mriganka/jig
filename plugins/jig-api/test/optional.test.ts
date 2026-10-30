@@ -51,9 +51,20 @@ describe("a JSON body", () => {
     test("the last property can be the one dropped, and the result is still JSON once the variables are filled", () => {
         const body = pruned(request({ method: "POST", body: { kind: "json", text } }), unset("city", "quantity")).body;
         const left = body?.kind === "json" ? body.text : "";
-        assert.equal(left, ['{', '  "customerId": "{{customerId}}",', '  "note": "{{note}}",', '  "address": {', '  }', '}'].join("\n"));
+        assert.equal(left, ['{', '  "customerId": "{{customerId}}",', '  "note": "{{note}}"', '}'].join("\n"));
         const filled = left.replace("{{customerId}}", "c-1").replace("{{note}}", "hi");
-        assert.deepEqual(JSON.parse(filled), { customerId: "c-1", note: "hi", address: {} });
+        assert.deepEqual(JSON.parse(filled), { customerId: "c-1", note: "hi" });
+    });
+
+    test("an object whose properties were all left out is left out, and one with a property left stays", () => {
+        const nested = ['{', '  "a": "{{a}}",', '  "outer": {', '    "inner": {', '      "x": "{{x}}"', '    },', '    "y": "{{y}}"', '  }', '}'].join("\n");
+        const text = (set: string[]): string => {
+            const body = pruned(request({ method: "POST", body: { kind: "json", text: nested } }), unset(...set)).body;
+            return body?.kind === "json" ? body.text : "";
+        };
+        assert.equal(text(["x", "y"]), ['{', '  "a": "{{a}}"', '}'].join("\n"));
+        assert.equal(text(["x"]), ['{', '  "a": "{{a}}",', '  "outer": {', '    "y": "{{y}}"', '  }', '}'].join("\n"));
+        assert.deepEqual(JSON.parse(text(["x"]).replace("{{a}}", "1").replace("{{y}}", "2")), { a: "1", outer: { y: "2" } });
     });
 
     test("a body that is not JSON is left as it is", () => {

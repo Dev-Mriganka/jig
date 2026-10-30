@@ -101,9 +101,9 @@ describe("a valid section", () => {
 
 describe("the collections", () => {
     test("a source is exactly one of the sources there are", () => {
-        assert.deepEqual(errorsOf({ collections: { a: {} } }), ["api.collections.a: needs a source: one of postman, http, bruno"]);
+        assert.deepEqual(errorsOf({ collections: { a: {} } }), ["api.collections.a: needs a source: one of postman, http, bruno, openapi"]);
         assert.deepEqual(errorsOf({ collections: { a: { yaml: "/work/x" } } }), [
-            "api.collections.a: needs a source: one of postman, http, bruno",
+            "api.collections.a: needs a source: one of postman, http, bruno, openapi",
             "api.collections.a.yaml: unknown field",
         ]);
         assert.deepEqual(errorsOf({ collections: { a: { http: HTTP, postman: POSTMAN } } }), ["api.collections.a: use exactly one source (got http, postman)"]);
@@ -125,6 +125,17 @@ describe("the collections", () => {
         assert.deepEqual(errorsOf({ collections: { a: { bruno: "work/bruno" } } }), ["api.collections.a.bruno: must be an absolute path or start with ~/"]);
         assert.deepEqual(errorsOf({ collections: { a: { bruno: 7 } } }), ["api.collections.a.bruno: must be the path of a Bruno collection folder"]);
         assert.deepEqual(errorsOf({ collections: { a: { bruno: "/work/bruno", environments: {} } } }), ["api.collections.a.environments: unknown field"]);
+    });
+
+    test("an OpenAPI collection names its spec, the environments it may run in, and the server of each", () => {
+        const settings = found({
+            collections: { a: { openapi: "~/work/spec.yaml", environments: ["Staging"], servers: { Staging: "https://stg.example.test/v1" } } },
+            environments: { Staging: "staging" },
+        });
+        assert.equal(settings.collections.get("a")?.kind, "openapi");
+        assert.deepEqual(errorsOf({ collections: { a: { openapi: "/work/spec.yaml" } } }), [
+            'api.collections.a.environments: required, the list of environments this spec may run in, such as ["Staging"]',
+        ]);
     });
 
     test("a path is absolute or starts with ~/, and is not text of no use", () => {

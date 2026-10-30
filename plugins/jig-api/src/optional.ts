@@ -30,6 +30,10 @@ function prunedUrl(url: string, unset: ReadonlySet<string>): string {
 /** A property line: `  "name": "{{variable}}",` or a number or flag written as `{{variable}}`. */
 const PROPERTY = /^\s*"(?:[^"\\]|\\.)*":\s*"?\{\{\s*([^{}]+?)\s*\}\}"?,?\s*$/;
 
+/** The line that opens an object property, and the line that closes an object: what is left of an object with nothing in it. */
+const OPENS = /^\s*"(?:[^"\\]|\\.)*":\s*\{\s*$/;
+const CLOSES = /^\s*\},?\s*$/;
+
 function prunedJson(text: string, unset: ReadonlySet<string>): string {
     const lines = text.split("\n");
     const kept = lines.filter((line) => {
@@ -37,6 +41,15 @@ function prunedJson(text: string, unset: ReadonlySet<string>): string {
         return name === undefined || !unset.has(name);
     });
     if (kept.length === lines.length) return text;
+    // An object whose properties were all left out is left out too: sending it empty would claim a value nobody gave.
+    for (let at = 0; at + 1 < kept.length; ) {
+        if (OPENS.test(kept[at] as string) && CLOSES.test(kept[at + 1] as string)) {
+            kept.splice(at, 2);
+            at = Math.max(0, at - 1);
+        } else {
+            at++;
+        }
+    }
     // The last property that is left must not end with a comma. A comma at the end of a line is never inside a JSON string.
     return kept.join("\n").replace(/,(\n\s*[}\]])/g, "$1");
 }

@@ -16,6 +16,7 @@ export const SERVICE_PASSWORD = { reference: "pass:acme/service-password", value
 export const API_KEY = { reference: "pass:acme/api-key", value: "key-7d3f9a41c5e2b860" };
 export const CLIENT_SECRET = { reference: "pass:acme/client-secret", value: "acme-client-secret-CANARY-31" };
 export const REPORT_KEY = { reference: "pass:acme/report-key", value: "rpt-key-2b7e9d4c01a5" };
+export const CLIENT_ID = { reference: "pass:acme/client-id", value: "acme-orders-cli" };
 
 /** Copies a fixture folder, with the example addresses replaced. */
 function copyFixture(kind: string, into: string, replace: ReadonlyArray<readonly [string, string]>): string {
@@ -56,7 +57,7 @@ export function copyAcme(h: Harness, kind: string): string {
 /** Everything of an `api` section but its collections: the environments, the secrets (given per environment, so that a staging
  *  token is never sent to production), and the switches. The secrets' values are set in the fake jig-core. */
 export function acmeSettings(h: Harness, collections: Record<string, unknown>, extra: Record<string, unknown> = {}): Record<string, unknown> {
-    for (const { reference, value } of [...Object.values(TOKENS), SERVICE_USER, SERVICE_PASSWORD, API_KEY, CLIENT_SECRET, REPORT_KEY]) h.jig.secrets.set(reference, value);
+    for (const { reference, value } of [...Object.values(TOKENS), SERVICE_USER, SERVICE_PASSWORD, API_KEY, CLIENT_SECRET, REPORT_KEY, CLIENT_ID]) h.jig.secrets.set(reference, value);
     const perEnvironment = (staging: string, production: string): Record<string, string> => ({
         Staging: staging, staging, Production: production, production,
     });
@@ -70,6 +71,17 @@ export function acmeSettings(h: Harness, collections: Record<string, unknown>, e
             apiKey: API_KEY.reference,
             clientSecret: CLIENT_SECRET.reference,
             "process.env.ACME_REPORT_KEY": REPORT_KEY.reference,
+            // The credential slots of the OpenAPI fixture are named for their security schemes.
+            bearerAuth: perEnvironment(TOKENS.staging.reference, TOKENS.production.reference),
+            "basicAuth.username": SERVICE_USER.reference,
+            "basicAuth.password": SERVICE_PASSWORD.reference,
+            apiKeyAuth: API_KEY.reference,
+            "clientCredentials.clientId": CLIENT_ID.reference,
+            "clientCredentials.clientSecret": CLIENT_SECRET.reference,
+            "passwordFlow.clientId": CLIENT_ID.reference,
+            "passwordFlow.clientSecret": CLIENT_SECRET.reference,
+            "passwordFlow.username": SERVICE_USER.reference,
+            "passwordFlow.password": SERVICE_PASSWORD.reference,
         },
         reads: ["Search orders"],
         adHoc: ["staging"],
@@ -112,6 +124,25 @@ export function brunoSection(h: Harness, format: "yaml" | "bru", extra: Record<s
 /** Sets the Bruno fixture as the configuration of the harness. */
 export function useBruno(h: Harness, format: "yaml" | "bru", extra: Record<string, unknown> = {}): Record<string, unknown> {
     const section = brunoSection(h, format, extra);
+    h.configure(section);
+    return section;
+}
+
+/**
+ * The `api` section for the OpenAPI fixture, as the collection `acme`. By default it may run in `Staging` only, against the fake
+ * API; `collection` replaces fields of the collection's own configuration (`environments`, `servers`, `allowProductionReads`).
+ */
+export function openapiSection(h: Harness, format: "yaml" | "json", collection: Record<string, unknown> = {}, extra: Record<string, unknown> = {}): Record<string, unknown> {
+    const file = path.join(copyAcme(h, "openapi"), `acme-orders.openapi.${format}`);
+    const environments = Array.isArray(collection.environments) ? (collection.environments as string[]) : ["Staging"];
+    const known: Record<string, string> = { Staging: `${h.api.origin}/v1`, Production: `${h.prod.origin}/v1` };
+    const servers = Object.fromEntries(environments.filter((name) => name in known).map((name) => [name, known[name]]));
+    return acmeSettings(h, { acme: { openapi: file, environments, servers, ...collection } }, extra);
+}
+
+/** Sets the OpenAPI fixture as the configuration of the harness. */
+export function useOpenApi(h: Harness, format: "yaml" | "json", collection: Record<string, unknown> = {}, extra: Record<string, unknown> = {}): Record<string, unknown> {
+    const section = openapiSection(h, format, collection, extra);
     h.configure(section);
     return section;
 }
