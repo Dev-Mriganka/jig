@@ -69,6 +69,8 @@ export interface Plan {
     signIn: SignIn;
     timeoutSec: number;
     allowPlainLocal: boolean;
+    /** A larger answer than the usual limit, for a request whose answer is a collection and not an API's reply. */
+    maxAnswerBytes?: number;
     fingerprint: string;
 }
 

@@ -104,6 +104,7 @@ export function createHttp(options: HttpOptions = {}): Http {
                     url: plan.url,
                     headers: mergedHeaders(own, signIn),
                     allowPlainLocal: plan.allowPlainLocal,
+                    ...(plan.maxAnswerBytes === undefined ? {} : { maxBytes: plan.maxAnswerBytes }),
                     ...(body === undefined ? {} : { body }),
                     ...(plan.signIn.kind === "transport" ? { transport: plan.signIn.name } : {}),
                 };
