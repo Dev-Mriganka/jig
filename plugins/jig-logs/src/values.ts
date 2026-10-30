@@ -1,0 +1,41 @@
+// Small helpers shared by the files of this plugin.
+
+export function isObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Control characters: the C0 and C1 ranges and the Unicode line and paragraph separators. They have no place in a
+ * phrase, a search term or a name. In a log line they would break it into several, and a terminal acts on an escape
+ * sequence that one starts, so a hostile message must not carry any into what is shown.
+ */
+export const CONTROL = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
+/** Runs of control characters, to be replaced. */
+export const CONTROL_RUNS = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g;
+
+/**
+ * Refuses a call whose parameters are wrong. The message says how to put it right. A `TypeError` is how jig-core's
+ * contract says "invalid input" (see `ToolDeclaration.preview`), so every refusal of a parameter is one.
+ */
+export function refuse(message: string): never {
+    throw new TypeError(message);
+}
+
+/** A value from a call, shortened and quoted for an error message. Text is quoted, so an empty value shows. */
+export function shown(value: unknown): string {
+    if (typeof value === "string") return JSON.stringify(printable(value));
+    if (Array.isArray(value)) return "a list";
+    if (typeof value === "object" && value !== null) return "an object";
+    return String(value);
+}
+
+/** A name from the configuration, safe to put in a message: no control characters, and short. */
+export function printable(text: string): string {
+    const clean = text.replace(CONTROL_RUNS, "?");
+    return clean.length > 40 ? `${clean.slice(0, 40)}...` : clean;
+}
+
+/** `1 hit`, `2 hits`. */
+export function plural(count: number, noun: string): string {
+    return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}

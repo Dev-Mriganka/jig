@@ -1,0 +1,39 @@
+{
+  "size": 50,
+  "timeout": "25s",
+  "track_total_hits": true,
+  "query": {
+    "bool": {
+      "filter": [
+        {
+          "range": {
+            "@timestamp": {
+              "gte": "2026-10-13T10:00:00Z",
+              "lt": "2026-10-13T12:00:00Z",
+              "format": "strict_date_optional_time"
+            }
+          }
+        }
+      ],
+      "must": [
+        {
+          "match_phrase": {
+            "message": "abc-123"
+          }
+        }
+      ]
+    }
+  },
+  "sort": [
+    {
+      "@timestamp": {
+        "order": "asc",
+        "unmapped_type": "date"
+      }
+    }
+  ],
+  "_source": [
+    "@timestamp",
+    "message"
+  ]
+}
