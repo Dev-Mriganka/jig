@@ -18,11 +18,21 @@ out, and a scope with nothing in it is one line.
 
 | Section | What it says |
 |---|---|
-| Cost | The total and the model turns; tokens in (new input, cache reads and cache writes) with the share read from the cache, and tokens out; the cost by model and by agent role. A single role called `main` is not listed |
-| Tools | Calls, how many failed and how many were blocked; the five tools that failed most, with why (`tool`, `not-run`, `withheld`); the five with the slowest 95th percentile of duration |
-| Your time | Questions asked, and how they were answered: allowed, allowed for the session, declined, dismissed; the wait in total and its median; the three tools that waited longest |
-| Blocked | Calls that never ran, grouped by who decided (`floor`, `rule`, `tool`, `table`, `unknown`) and why (`denied`, `no-screen`, `invalid`, `declined`, `dismissed`, `internal`), with the tools stopped |
-| Checks | The facts each tool reported on its latest call that has any, such as test counts or a CI conclusion, and how long ago |
+| Cost | The total and the model turns, tokens in and out, and the cost by model and by agent role |
+| Tools | Calls, failures and blocked calls; the tools that failed most; the slowest ones |
+| Your time | Questions asked and how they were answered; the wait in total and its median |
+| Blocked | Calls that never ran, grouped by who decided and why, with the tools stopped |
+| Checks | The facts each tool reported on its latest call, such as test counts or a CI conclusion |
+
+- **Cost:** tokens in are new input, cache reads and cache writes, with the share
+  read from the cache. A single role called `main` is not listed.
+- **Tools:** the five tools that failed most, with why (`tool`, `not-run`,
+  `withheld`), and the five with the slowest 95th percentile of duration.
+- **Your time:** answers are allowed, allowed for the session, declined or
+  dismissed. The three tools that waited longest are listed.
+- **Blocked:** who decided is `floor`, `rule`, `tool`, `table` or `unknown`; why
+  is `denied`, `no-screen`, `invalid`, `declined`, `dismissed` or `internal`.
+- **Checks:** each fact comes with how long ago it was reported.
 
 - **A tool with several actions is several lines** (`git push`, `git status`),
   as in the dashboards.
@@ -40,8 +50,10 @@ out, and a scope with nothing in it is one line.
 In a terminal the summary is an entry in the session, drawn in the chat with
 the colours of your theme. The model never receives it: Pi keeps such entries
 out of the conversation, and a test runs `/lens` in a real Pi session to see
-that nothing of it reaches the model. The code says why this way and not as a
-message, a status line or a panel (`src/display.ts`).
+that nothing of it reaches the model.
+
+The code says why this way and not as a message, a status line or a panel
+(`src/display.ts`).
 
 Over RPC, which has no chat to draw in, it is a notification with each section
 cut to its first line. With no screen at all (print and JSON modes) the summary

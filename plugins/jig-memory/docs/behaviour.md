@@ -8,23 +8,28 @@ How ticket memory works in a session. Back to the
 `<folder>/<KEY>/`, with its `evidence/` and `history/`, is created on activation
 with mode 0700. Files are created with mode 0600 and starting text: a notes
 template, an index header, a `plan.md` heading, and a `ticket.json` with an
-empty `repositories` list. A file that exists is never overwritten. A key is a
-plain folder name: a letter or digit, then letters, digits, `_`, `.` or `-`, at
-most 64 characters.
+empty `repositories` list. A file that exists is never overwritten.
+
+A key is a plain folder name: a letter or digit, then letters, digits, `_`, `.`
+or `-`, at most 64 characters.
 
 ## Activation
 
-A user message that names a key activates it when no ticket is active. When
-another ticket is active, the message only gets a hint, once per ticket
-(`PROJ-9 mentioned; /ticket PROJ-9 switches`). Two keys named while none is
-active make a choice, and nothing activates. `/ticket KEY` switches at once,
-`/ticket` shows the active ticket, and `/ticket off` clears it. Text that an
-extension sends never activates a ticket.
+A user message that names a key activates it when no ticket is active.
+- **When another ticket is active,** the message only gets a hint, once per
+  ticket (`PROJ-9 mentioned; /ticket PROJ-9 switches`).
+- **When two keys are named** while none is active, that is a choice, and
+  nothing activates.
+- **`/ticket KEY`** switches at once, `/ticket` shows the active ticket, and
+  `/ticket off` clears it.
+- **Text that an extension sends** never activates a ticket.
 
 Every change goes to `jig-core` as `setTicket`. The active ticket is recorded in
 the session with `appendEntry`, and `session_start` restores the last record on
-the branch. A ticket turned off stays off. A restored ticket does not send its
-notes again, because the session already holds them.
+the branch.
+
+A ticket turned off stays off. A restored ticket does not send its notes again,
+because the session already holds them.
 
 ## The notes message
 
@@ -50,12 +55,14 @@ restarts the count, and the edit that made the change does not count.
 
 A result of any tool except Pi's `read`, `ls`, `find`, `grep`, `write` and
 `edit` is evidence. Its text, as the model saw it, goes to a file in `evidence/`
-of up to 8 KB; a longer text is cut and the file says so. The index line is
-`- <time> | <tool> | <action> | <file>`. Of the call's input only `action` is
-kept, and only when it is a word of letters, `-` or `_` of up to 32 characters
-that starts with a letter, so a secret in any other argument is never written. A
-tool name that is not a plain name is written as `unnamed`. A result that cannot
-be saved is a warning, and the tool's result is not changed.
+of up to 8 KB; a longer text is cut and the file says so.
+- **The index line** is `- <time> | <tool> | <action> | <file>`.
+- **Of the call's input only `action` is kept,** and only when it is a word of
+  letters, `-` or `_` of up to 32 characters that starts with a letter, so a
+  secret in any other argument is never written.
+- **A tool name that is not a plain name** is written as `unnamed`.
+- **A result that cannot be saved** is a warning, and the tool's result is not
+  changed.
 
 ## Known gap
 

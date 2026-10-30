@@ -5,7 +5,9 @@ models in it. Back to the [jig-lens overview](../README.md).
 
 `/lens usage` is a quick view of cost and tokens, made from Pi's own session files. It
 needs no records, no import and no server, and it works for work done before Jig was
-installed. For what only Jig's records hold (rule decisions, approvals, the time you
+installed.
+
+For what only Jig's records hold (rule decisions, approvals, the time you
 waited, tickets and checks), use `/lens`. For more than a quick view of cost and
 tokens, TokenTelemetry goes further (see [Reuse](../../../docs/reuse.md)).
 

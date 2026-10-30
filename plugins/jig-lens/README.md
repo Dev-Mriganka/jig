@@ -2,9 +2,11 @@
 
 **Status: built.** The summary is tested with sample records, a fake Pi and a real
 Pi session on a scripted model, and was seen in Pi 1.4.0's terminal on Linux; the
-RPC notification is tested with a fake screen only. `/lens usage` is tested with session
-files and a fake screen, and was seen in the same terminal. The dashboards were tried
-with Grafana 13.3 and its SQLite data source 4.0.6 on Linux. macOS is not tried yet.
+RPC notification is tested with a fake screen only.
+
+`/lens usage` is tested with session files and a fake screen, and was seen in the
+same terminal. The dashboards were tried with Grafana 13.3 and its SQLite data
+source 4.0.6 on Linux. macOS is not tried yet.
 
 `jig-lens` shows what `jig-core` [records](../jig-core/docs/records.md): cost, tool
 failures, and time spent waiting for you. `/lens` prints a summary inside Pi, with
@@ -44,15 +46,15 @@ Ticket PROJ-123, all time
 
 | Command | What it does |
 |---|---|
-| `/lens` | Imports new lines, then shows today, this session, and the ticket the session is on, if it is on one |
+| `/lens` | Imports new lines, then shows today, this session, and the session's ticket |
 | `/lens ticket KEY` | One ticket, over all time |
 | `/lens session [id]` | One session. Without an id, this one |
 | `/lens days N` | The last N days, from 1 to 90, the last of them today |
-| `/lens usage` | An interactive view of cost and tokens from Pi's own session files: periods, graphs or models, cost or tokens |
+| `/lens usage` | An interactive view of cost and tokens from Pi's own session files |
 | `/lens grafana` | Imports, starts Grafana if it is not running, and opens its dashboards |
 | `/lens datasette` | The same for Datasette |
 | `/lens rebuild` | Deletes the index and imports every record file again. The viewers are not touched |
-| `/lens status` | The viewer that answers on the port, the index size and counts, the last import, and the lines that were skipped |
+| `/lens status` | The viewer on the port, the index size, the last import, and the lines skipped |
 
 Anything else, or the wrong arguments (`/lens days 91`), shows the usage line and
 does nothing: `Usage: /lens [ticket KEY | session [id] | days N | usage | grafana | datasette | rebuild | status]`.
@@ -97,15 +99,10 @@ the section when a session starts; a mistake names the key, and the defaults app
 
 ```text
 jig-lens/
-  src/      index.ts (the entry), lens.ts (the import and /lens), command.ts, scopes.ts,
-            display.ts (what /lens shows), queries.ts, summary.ts, format.ts, period.ts (the
-            figures and their text), start.ts, viewer.ts (Grafana, Datasette), import.ts,
-            parse.ts, fields.ts, store.ts (the index), config.ts, paths.ts, programs.ts,
-            report.ts, deps.ts; usage-dashboard.ts, usage-history.ts, usage-record.ts and
-            usage-names.ts (/lens usage, over Pi's session files)
+  src/      the import and /lens (lens, command, scopes), the figures (queries, summary, format, period),
+            the viewers (start, viewer), the index (store, import, parse), and usage-*.ts for /lens usage
   viewer/   Grafana provisioning and dashboards, as files; Datasette's metadata and queries
-  test/     sample records, a fake Pi and a real Pi session, 100 000 calls timed, every
-            dashboard query run on a real index
+  test/     sample records, a fake Pi and a real Pi session, 100 000 calls timed, every dashboard query
   docs/     the detail pages below
 ```
 

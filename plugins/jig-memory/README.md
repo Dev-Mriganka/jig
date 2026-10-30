@@ -4,10 +4,13 @@
 not yet in a real Pi session. Cards and recall are design (see
 [Later](#later)).
 
-`jig-memory` keeps what the agent learns about a ticket in files that outlive
-the session. Later it finds earlier tickets related to a new one. For example,
-naming `PROJ-123` in a message creates that ticket's folder with a notes file,
-and after a compaction the notes come back to the agent as a message.
+`jig-memory` keeps what the agent learns about a [ticket](../../docs/glossary.md#tickets-and-workflows)
+in files that outlive the session. Later it finds earlier tickets related to a
+new one.
+
+For example, naming `PROJ-123` in a message creates that ticket's folder with a
+notes file, and after a compaction the notes come back to the agent as a
+message.
 
 ![Three kinds of memory: ticket memory today, organizational and personal memory later, and the paths between them](../../docs/img/memory-kinds.svg)
 
@@ -19,7 +22,7 @@ Each ticket has a folder outside every repository:
 
 | File | What it holds |
 |---|---|
-| `notes.md` | A `## Now` block (status, next step, open questions) kept under 1 KB, then decisions. Old blocks move to `history/` |
+| `notes.md` | A `## Now` block kept under 1 KB (status, next step, open questions), then decisions |
 | `plan.md` | The plan `jig-workflow` asks you to approve |
 | `evidence/` | Tool results captured while the ticket is active, masked like everything else, with an index |
 | `ticket.json` | The repositories bound to the ticket |
@@ -52,8 +55,13 @@ plugin's rules. An error names the key, and the plugin then uses its defaults.
 
 | Field | Default | Meaning |
 |---|---|---|
-| `ticketPattern` | none | A regular expression for ticket keys, such as `[A-Z][A-Z0-9]+-\d+`. A key must not touch a letter or digit on either side. Without it, only `/ticket KEY` activates a ticket |
-| `folder` | `~/.local/share/jig/tickets`, or under `XDG_DATA_HOME` | Where ticket folders live: an absolute path, or one that starts with `~/`. An empty or relative `XDG_DATA_HOME` is ignored |
+| `ticketPattern` | none | A regular expression for ticket keys, such as `[A-Z][A-Z0-9]+-\d+` |
+| `folder` | `~/.local/share/jig/tickets` | Where ticket folders live: an absolute path, or one that starts with `~/` |
+
+- **`ticketPattern`:** a key must not touch a letter or digit on either side.
+  Without a pattern, only `/ticket KEY` activates a ticket.
+- **`folder`:** the default is under `XDG_DATA_HOME` when that is set. An empty
+  or relative `XDG_DATA_HOME` is ignored.
 
 ```json
 {

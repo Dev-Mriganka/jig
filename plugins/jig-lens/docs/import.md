@@ -30,9 +30,10 @@ In text, the same picture:
   again, so its tables can change without migrations.
 - **Imports are incremental and safe to repeat.** `jig-lens` remembers how far
   it has read each file and inserts by record id, so two sessions importing at
-  once, or a rebuild, cannot count anything twice. Only complete lines are
-  imported; a line still being written waits for the next import. A file is one
-  transaction, and it moves the file's offset too.
+  once, or a rebuild, cannot count anything twice.
+  - Only complete lines are imported; a line still being written waits for the
+    next import.
+  - A file is one transaction, and it moves the file's offset too.
 - **A line that is not a record is skipped,** counted, and shown by `/lens
   status`. It never stops the import. A record file that cannot be read is
   reported and the others are still imported.
