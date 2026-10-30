@@ -4,6 +4,10 @@
 //
 // A call never names a context, a namespace, a release or an address. It names a service and an environment, and this
 // catalog says where that is, so nothing outside the catalog can be reached through the tools.
+import { checkCi } from "./ci/config.ts";
+import type { CiConfig } from "./ci/config.ts";
+import { checkArtifacts, checkWatch } from "./ci/settings.ts";
+import type { ArtifactRule, WatchSettings } from "./ci/settings.ts";
 import { checkDeploy } from "./deploy/methods.ts";
 import type { DeployConfig } from "./deploy/methods.ts";
 import { checkKubernetes } from "./runtime/kubernetes/config.ts";
@@ -29,17 +33,21 @@ export interface Service {
     name: string;
     /** Where the code lives, for finding the CI run of a commit. */
     repo?: string;
-    /** The CI system and what to look at in it. Accepted and kept; nothing reads it until the `ci` tool exists. */
-    ci?: Readonly<Record<string, string>>;
+    /** The CI system and what to look at in it, for the `ci` tool and for the watch after a push. */
+    ci?: CiConfig;
     environments: ReadonlyMap<string, Environment>;
 }
 
 export interface Catalog {
     /** By service name. A Map, so that a name such as `constructor` is only ever a name. */
     services: ReadonlyMap<string, Service>;
+    /** How CI watches poll and when they give up, with the defaults filled in. */
+    watch: WatchSettings;
+    /** When "the artifact is ready", for every watch that passes. */
+    artifacts: readonly ArtifactRule[];
 }
 
-const SECTION_FIELDS: ReadonlySet<string> = new Set(["services"]);
+const SECTION_FIELDS: ReadonlySet<string> = new Set(["services", "watch", "artifacts"]);
 const SERVICE_FIELDS: ReadonlySet<string> = new Set(["repo", "ci", "environments"]);
 const ENVIRONMENT_FIELDS: ReadonlySet<string> = new Set(["deploy", "runtime", "health"]);
 /**
@@ -50,8 +58,6 @@ const RUNTIMES = ["kubernetes"] as const;
 const SERVICE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$/;
 const ENVIRONMENT_NAME = /^[A-Za-z][A-Za-z0-9_-]{0,39}$/;
 const REPO = /^[^\s\u0000-\u001f\u007f]{1,200}$/;
-const CI_SYSTEM = /^[a-z][a-z0-9-]{0,39}$/;
-const CI_FIELD = /^[A-Za-z][A-Za-z0-9_]{0,39}$/;
 const CONTROL = /[\u0000-\u001f\u007f]/;
 const MAX_SERVICES = 100;
 const MAX_ENVIRONMENTS = 20;
@@ -83,30 +89,6 @@ export function healthProblem(address: unknown): string | undefined {
     if (url.username !== "" || url.password !== "") return "must not contain a user name or password";
     if (url.hash !== "") return "must not contain a fragment";
     return undefined;
-}
-
-function checkCi(raw: unknown, at: string, errors: string[]): Record<string, string> | undefined {
-    if (!isObject(raw)) {
-        errors.push(
-            `${at}: must be an object with a system, such as { "system": "github-actions", "workflow": "build.yml" }`,
-        );
-        return undefined;
-    }
-    const before = errors.length;
-    const found: Record<string, string> = {};
-    for (const [key, value] of Object.entries(raw)) {
-        if (!CI_FIELD.test(key)) {
-            errors.push(`${at}: ${shown(key, 30)} is not a usable field name`);
-        } else if (typeof value !== "string" || value === "" || value.length > 200 || CONTROL.test(value)) {
-            errors.push(`${at}.${key}: must be text of 1 to 200 characters`);
-        } else if (key === "system" && !CI_SYSTEM.test(value)) {
-            errors.push(`${at}.system: must be the name of a CI system, such as github-actions`);
-        } else {
-            found[key] = value;
-        }
-    }
-    if (raw.system === undefined) errors.push(`${at}.system: required, the CI system, such as github-actions`);
-    return errors.length > before ? undefined : found;
 }
 
 function checkRuntime(raw: unknown, at: string, errors: string[]): Omit<Target, "service" | "environment"> | undefined {
@@ -182,7 +164,7 @@ function checkService(name: string, raw: unknown, at: string, errors: string[]):
         if (typeof raw.repo === "string" && REPO.test(raw.repo)) repo = raw.repo;
         else errors.push(`${at}.repo: must be text of 1 to 200 characters, no white space, such as acme/orders-api`);
     }
-    const ci = raw.ci === undefined ? undefined : checkCi(raw.ci, `${at}.ci`, errors);
+    const ci = raw.ci === undefined ? undefined : checkCi(raw.ci, `${at}.ci`, repo, errors);
 
     const environments = new Map<string, Environment>();
     if (!isObject(raw.environments) || Object.keys(raw.environments).length === 0) {
@@ -241,7 +223,9 @@ export function readOps(raw: unknown): { catalog?: Catalog; errors: string[] } {
         const service = checkService(name, entry, `ops.services.${name}`, errors);
         if (service !== undefined) services.set(name, service);
     }
-    return errors.length > 0 ? { errors } : { errors, catalog: { services } };
+    const watch = checkWatch(raw.watch, errors);
+    const artifacts = checkArtifacts(raw.artifacts, errors);
+    return errors.length > 0 ? { errors } : { errors, catalog: { services, watch, artifacts } };
 }
 
 /** The error messages for a raw section, for `registerSection`. An empty list means the section is valid. */
@@ -286,4 +270,43 @@ export function findEnvironment(catalog: Catalog, who: string, service: unknown,
         );
     }
     return target;
+}
+
+/** A service that has a CI entry: what the `ci` tool and the watch after a push act on. */
+export interface CiService {
+    name: string;
+    repo?: string;
+    ci: CiConfig;
+}
+
+function ciServiceOf(service: Service): CiService | undefined {
+    return service.ci === undefined
+        ? undefined
+        : { name: service.name, ...(service.repo === undefined ? {} : { repo: service.repo }), ci: service.ci };
+}
+
+/**
+ * The service a `ci` call names. A name nobody configured, or a service without a CI entry, is invalid input, and the
+ * message lists the services that have one, because the model has no other way to learn them.
+ */
+export function findCiService(catalog: Catalog, who: string, name: unknown): CiService {
+    const found = typeof name === "string" ? catalog.services.get(name) : undefined;
+    const withCi = [...catalog.services.values()].flatMap((service) => ciServiceOf(service) ?? []);
+    const known = withCi.length === 0 ? "none have one" : shortList(withCi.map((service) => `${service.name} (${service.ci.system})`));
+    if (found === undefined) {
+        throw new InputError(`${who}: no service named ${shown(name, 30)}. Services with a ci entry: ${known}`);
+    }
+    const service = ciServiceOf(found);
+    if (service === undefined) {
+        throw new InputError(`${who}: ${found.name} has no ci entry in the catalog. Services with a ci entry: ${known}`);
+    }
+    return service;
+}
+
+/** The services whose code lives in `repo`, and that have a CI entry. GitHub names are not case sensitive. */
+export function ciServicesOfRepo(catalog: Catalog, repo: string): CiService[] {
+    const wanted = repo.toLowerCase();
+    return [...catalog.services.values()].flatMap((service) =>
+        service.repo?.toLowerCase() === wanted ? (ciServiceOf(service) ?? []) : [],
+    );
 }

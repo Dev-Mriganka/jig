@@ -6,7 +6,6 @@
 //
 // A plan reads the cluster and changes nothing. Its fingerprint covers what the user is shown that can matter: the
 // service, the environment, the method, the exact argument list, the versions running now, and where the command goes.
-import { createHash } from "node:crypto";
 import type { EnvironmentKind, Preview } from "../../../jig-core/src/contract.ts";
 import type { Environment } from "../catalog.ts";
 import type { Target } from "../runtime/kubernetes/config.ts";
@@ -17,11 +16,7 @@ import { look } from "../runtime/kubernetes/wait.ts";
 import { lineOf } from "./command.ts";
 import type { Command } from "./command.ts";
 import { deployerOf } from "./methods.ts";
-
-/** A short digest of whatever was shown to the user. Equal digests mean the same plan. */
-export function digest(...parts: readonly unknown[]): string {
-    return createHash("sha256").update(JSON.stringify(parts)).digest("hex").slice(0, 32);
-}
+import { digest } from "../values.ts";
 
 /**
  * Why a deploy or a rollback may not be run in this environment, or undefined when it may. The floor of jig-core denies

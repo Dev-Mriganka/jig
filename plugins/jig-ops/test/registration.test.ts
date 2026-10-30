@@ -18,6 +18,7 @@ import { ROOT, sources } from "./support/sources.ts";
 function fakePi() {
     const tools = new Map<string, ToolDefinition>();
     const listening: string[] = [];
+    const emitted: string[] = [];
     const pi = {
         registerTool: (tool: ToolDefinition) => void tools.set(tool.name, tool),
         events: {
@@ -25,10 +26,12 @@ function fakePi() {
                 listening.push(channel);
                 return () => {};
             },
-            emit() {},
+            emit(channel: string) {
+                emitted.push(channel);
+            },
         },
     } as unknown as ExtensionAPI;
-    return { pi, tools, listening };
+    return { pi, tools, listening, emitted };
 }
 
 describe("the extension", () => {
@@ -38,9 +41,9 @@ describe("the extension", () => {
             const { pi, tools } = fakePi();
             assert.equal(typeof plugin, "function");
             jigOps()(pi);
-            assert.deepEqual([...tools.keys()], ["runtime", "deploy"]);
-            assert.deepEqual([...jig.declared.keys()], ["runtime", "deploy"]);
-            for (const name of ["runtime", "deploy"]) {
+            assert.deepEqual([...tools.keys()], ["runtime", "deploy", "ci"]);
+            assert.deepEqual([...jig.declared.keys()], ["runtime", "deploy", "ci"]);
+            for (const name of ["runtime", "deploy", "ci"]) {
                 const declaration = jig.declared.get(name);
                 assert.equal(declaration?.plugin, "jig-ops");
                 assert.equal(declaration?.tool, name);
@@ -48,24 +51,27 @@ describe("the extension", () => {
             }
             assert.equal(jig.declared.get("runtime")?.preview, undefined, "a read has nothing to confirm");
             assert.equal(typeof jig.declared.get("deploy")?.preview, "function", "a deploy is confirmed on a review screen");
+            assert.equal(typeof jig.declared.get("ci")?.preview, "function", "a rerun and a trigger are confirmed on a review screen");
             const check = jig.sections.get("ops");
             assert.ok(check, "the ops section");
             assert.deepEqual(check({ nonsense: 1 }), validateOps({ nonsense: 1 }), "the same checks");
             assert.deepEqual(check(section()), []);
             assert.equal(check({ services: {} }).length, 1);
-            assert.deepEqual([...jig.kinds.keys()], ["ops-rollout"]);
+            assert.deepEqual([...jig.kinds.keys()], ["ops-rollout", "ops-ci"]);
             assert.equal(jig.kinds.get("ops-rollout")?.plugin, "jig-ops");
+            assert.equal(jig.kinds.get("ops-ci")?.plugin, "jig-ops");
         } finally {
             jig.remove();
         }
     });
 
-    test("listens to no event: the kind of an environment is asked of jig-core when it is needed", () => {
+    test("listens to one event, the push jig-git announces: the kind of an environment is asked of jig-core when needed", () => {
         const jig = installFakeJig();
         try {
-            const { pi, listening } = fakePi();
+            const { pi, listening, emitted } = fakePi();
             jigOps()(pi);
-            assert.deepEqual(listening, []);
+            assert.deepEqual(listening, ["jig-git:pushed"]);
+            assert.deepEqual(emitted, [], "and publishes nothing until a watch passes");
         } finally {
             jig.remove();
         }
@@ -80,10 +86,10 @@ describe("the extension", () => {
         assert.equal(first.kinds.size, 0, "and no watch kind was registered with it");
         const late = installFakeJig();
         try {
-            assert.deepEqual([...late.declared.keys()], ["runtime", "deploy"], "the queued declarations ran when jig-core loaded");
+            assert.deepEqual([...late.declared.keys()], ["runtime", "deploy", "ci"], "the queued declarations ran when jig-core loaded");
             assert.ok(late.sections.has("ops"));
-            assert.ok(late.kinds.has("ops-rollout"));
-            assert.ok(tools.has("runtime") && tools.has("deploy"));
+            assert.ok(late.kinds.has("ops-rollout") && late.kinds.has("ops-ci"));
+            assert.ok(tools.has("runtime") && tools.has("deploy") && tools.has("ci"));
         } finally {
             late.remove();
         }
@@ -92,7 +98,7 @@ describe("the extension", () => {
     test("fails closed: without jig-core no tool runs, and nothing is started", async () => {
         const { pi, tools } = fakePi();
         jigOps()(pi);
-        for (const [name, action] of [["runtime", "pods"], ["deploy", "status"]] as const) {
+        for (const [name, action] of [["runtime", "pods"], ["deploy", "status"], ["ci", "runs"]] as const) {
             await assert.rejects(
                 (tools.get(name) as ToolDefinition).execute("c1", { action, service: "orders-api", environment: "staging" } as never, undefined, undefined, {} as never),
                 /jig-core is not loaded: enable jig-core, which governs every Jig tool/,

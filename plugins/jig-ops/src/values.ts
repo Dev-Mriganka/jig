@@ -1,5 +1,6 @@
 // Small helpers the modules share: the error that means "invalid input", the shape an action hands back, ways to read
 // kubectl's JSON, and ways to put a value or a piece of cluster text into a message.
+import { createHash } from "node:crypto";
 import type { Facts } from "../../jig-core/src/contract.ts";
 
 /**
@@ -132,6 +133,11 @@ export function duration(ms: number): string {
     const minutes = Math.floor(total / 60);
     const seconds = total % 60;
     return minutes > 0 ? `${minutes}m${String(seconds).padStart(2, "0")}s` : `${seconds}s`;
+}
+
+/** A short digest of whatever was shown to the user. Equal digests mean the same plan. */
+export function digest(...parts: readonly unknown[]): string {
+    return createHash("sha256").update(JSON.stringify(parts)).digest("hex").slice(0, 32);
 }
 
 /** What an action hands back to the tool. */

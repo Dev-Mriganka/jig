@@ -17,8 +17,13 @@ import type {
     Preview,
     RunOptions,
     RunResult,
+    SignInRequest,
+    SignInService,
     StartWatch,
     ToolDeclaration,
+    Transport,
+    TransportRequest,
+    TransportResponse,
     WatchKind,
 } from "../../../jig-core/src/contract.ts";
 
@@ -54,7 +59,19 @@ export interface FakeJig {
     /** Records that the user approved this preview for this call, as `approvedPreview` will return it. */
     approve(toolCallId: string, preview: Preview): void;
     /** The folders that start the PATH of the programs run, and the environment they get besides jig-core's own. */
-    useProgramsIn(bin: string, env: Readonly<Record<string, string>>): void;
+    useProgramsIn(bin: string | readonly string[], env: Readonly<Record<string, string>>): void;
+    /** Secret values by reference. An unknown reference is an error that never repeats it, as in jig-core. */
+    secrets: Map<string, string>;
+    /** Every reference asked for, in order. */
+    resolved: string[];
+    /** The sign-in services plugins asked for, by name; and every request one was asked to sign in. */
+    signInServices: Map<string, SignInService>;
+    signedIn: SignInRequest[];
+    /** The transports a test registers, and the requests that were sent through them. */
+    transports: Map<string, Transport>;
+    sent: TransportRequest[];
+    /** Every credential value handed out: secrets and sign-in headers. A test checks that none reaches a result. */
+    issued: Set<string>;
     /** Answers a program instead of starting it, when it returns a result. For cases a real process cannot make. */
     script: ((file: string, args: readonly string[], options: RunOptions) => RunResult | Error | undefined) | undefined;
     /** Makes this the jig-core that plugins reach. */
@@ -87,6 +104,13 @@ export function installFakeJig(): FakeJig {
     const approved = new Map<string, Preview>();
     let environments: Record<string, EnvironmentKind> = { ...DEFAULT_KINDS };
     const programs = { bin: "", env: {} as Readonly<Record<string, string>> };
+    const secrets = new Map<string, string>();
+    const resolved: string[] = [];
+    const signInServices = new Map<string, SignInService>();
+    const signedIn: SignInRequest[] = [];
+    const transports = new Map<string, Transport>();
+    const sent: TransportRequest[] = [];
+    const issued = new Set<string>();
     const fake = { script: undefined as FakeJig["script"] };
 
     function spawnProgram(file: string, args: readonly string[], options: RunOptions): Promise<RunResult> {
@@ -159,8 +183,13 @@ export function installFakeJig(): FakeJig {
         addFacts: (id, added) => void facts.set(id, [...(facts.get(id) ?? []), added]),
         setTicket: () => {},
         secrets: {
-            resolve: async () => {
-                throw new Error("jig-ops resolves no secrets");
+            async resolve(reference) {
+                resolved.push(reference);
+                const value = secrets.get(reference);
+                // Like jig-core, the error does not repeat the reference.
+                if (value === undefined) throw new Error("the secret could not be resolved");
+                issued.add(value);
+                return value;
             },
         },
         environments: {
@@ -168,15 +197,28 @@ export function installFakeJig(): FakeJig {
             kindOf: (name) => (Object.hasOwn(environments, name) ? (environments[name] as EnvironmentKind) : "production"),
         },
         transports: {
-            register: () => {},
-            request: async () => {
-                throw new Error("jig-ops makes no requests of its own");
+            register: (name, transport) => void transports.set(name, transport),
+            async request(name, request, signal): Promise<TransportResponse> {
+                const transport = transports.get(name);
+                if (transport === undefined) throw new Error(`no transport named "${name}"`);
+                sent.push(request);
+                try {
+                    const response = await transport.request(request, signal);
+                    return { ...response, headers: response.headers ?? {} };
+                } catch (error) {
+                    throw new Error(`transport "${name}" failed: ${error instanceof Error ? error.message : String(error)}`);
+                }
             },
         },
         signIn: {
-            register: () => {},
-            headers: async () => {
-                throw new Error("jig-ops signs in nothing itself");
+            register: (name, service) => void signInServices.set(name, service),
+            async headers(name, request, signal) {
+                const service = signInServices.get(name);
+                if (service === undefined) throw new Error(`no sign-in service is named "${name}"`);
+                signedIn.push(request);
+                const headers = await service.headers(request, signal);
+                for (const value of Object.values(headers)) issued.add(value);
+                return headers;
             },
         },
         mask: { text: (input) => input, value: (input) => input },
@@ -239,13 +281,20 @@ export function installFakeJig(): FakeJig {
         sections,
         facts,
         started,
+        secrets,
+        resolved,
+        signInServices,
+        signedIn,
+        transports,
+        sent,
+        issued,
         setSection: (name, value) => void values.set(name, value),
         setKinds(more) {
             environments = { ...DEFAULT_KINDS, ...more };
         },
         approve: (id, preview) => void approved.set(id, preview),
         useProgramsIn(bin, env) {
-            programs.bin = bin;
+            programs.bin = typeof bin === "string" ? bin : bin.join(path.delimiter);
             programs.env = env;
         },
         get script() {
@@ -259,6 +308,10 @@ export function installFakeJig(): FakeJig {
             values.clear();
             facts.clear();
             started.length = 0;
+            resolved.length = 0;
+            signedIn.length = 0;
+            sent.length = 0;
+            issued.clear();
             watches.length = 0;
             approved.clear();
             environments = { ...DEFAULT_KINDS };
