@@ -16,7 +16,7 @@ most 64 characters.
 
 A user message that names a key activates it when no ticket is active. When
 another ticket is active, the message only gets a hint, once per ticket
-(`ACME-9 mentioned; /ticket ACME-9 switches`). Two keys named while none is
+(`PROJ-9 mentioned; /ticket PROJ-9 switches`). Two keys named while none is
 active make a choice, and nothing activates. `/ticket KEY` switches at once,
 `/ticket` shows the active ticket, and `/ticket off` clears it. Text that an
 extension sends never activates a ticket.

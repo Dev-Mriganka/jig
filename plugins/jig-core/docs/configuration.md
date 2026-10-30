@@ -68,7 +68,7 @@ such as `git`, `lens` or `memory`.
 
 | Variable | Meaning |
 |---|---|
-| `JIG_STATE_DIR` | The state folder. Default: `${XDG_STATE_HOME:-~/.local/state}/jig`. Folders are private (0700) and files too (0600) |
+| `JIG_STATE_DIR` | The state folder. Default: `${XDG_STATE_HOME:-~/.local/state}/jig`; an empty or relative `XDG_STATE_HOME` is ignored. Folders are private (0700) and files too (0600) |
 | `JIG_AGENT_ROLE` | The role of this agent, such as `reviewer`. Default: `main`. Written to every record. A child agent is started with it set |
 | `JIG_PARENT_SESSION` | The session that started this one. Written to every record of a child agent |
 | `PI_CODING_AGENT_DIR` | Pi's own setting for its agent folder, and so for where `jig.json` is |

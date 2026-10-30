@@ -71,7 +71,7 @@ The actions are in the overview. Their details:
   Details:
     build: error TS2304
   Links:
-    https://ci.example/runs/9
+    https://ci.example.com/runs/9
   ```
 - **Messages are combined and spaced.** Results that end within 1 second of the
   first go in one message. Messages are at least 10 seconds apart. Only one
@@ -103,8 +103,8 @@ and the event.
 - **A file per watch** in `<state folder>/watches/<id>.json` (file 0600, folder
   0700). It holds the id, kind, plugin, title, spec, state, status, start time,
   deadline, stall time, session id and failure count. A finished watch keeps its
-  result. The id is 8 characters of a lowercase alphabet without `i`, `l`, `o`
-  and `u`.
+  result. The id is 8 characters: digits and lowercase letters, except `i`, `l`,
+  `o` and `u`.
 - **At session start,** the watches that are open or paused and belong to this
   session are loaded, and those whose kind is registered are polled again after
   2 seconds. A resumed session has the same id, so it gets its watches back.
