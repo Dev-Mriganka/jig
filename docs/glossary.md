@@ -33,7 +33,7 @@
 | **Watch** | A background check on a pull request, a CI run or a tag. It is saved, so it survives a restart of Pi, and it tells the agent once when its finish line is reached. |
 | **Finish line** | The condition that ends a watch, named when it starts, such as a named CI check passing or a pull request being merged. |
 | **Artifact ready** | The event `jig-git` publishes when a build, tag or release exists for the watched commit. A company plugin decides what follows; `jig-git` never deploys. |
-| **Lens index** | `jig-lens`'s SQLite copy of the records, which the dashboard reads. It can always be rebuilt from the records. |
+| **Lens index** | `jig-lens`'s SQLite copy of the records, which `/lens` and the optional Grafana dashboards read. It can always be rebuilt from the records. |
 | **Sandbox** | Bubblewrap around the agent's own shell and file tools. It hides credentials and keeps the agent's own tooling read-only. Linux only. |
 | **Ticket** | A unit of work in an issue tracker, followed by `jig-flow` and remembered by `jig-memory`. |
 | **Ticket folder** | A folder for one ticket, outside every repository: its notes, plan, evidence and the repositories bound to it. |
