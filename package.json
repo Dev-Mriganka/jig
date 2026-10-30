@@ -38,6 +38,7 @@
     "pi": {
         "extensions": [
             "./plugins/jig-core/src/index.ts",
+            "./plugins/jig-sandbox/src/index.ts",
             "./plugins/jig-memory/src/index.ts",
             "./plugins/jig-git/src/index.ts",
             "./plugins/jig-lens/src/index.ts",

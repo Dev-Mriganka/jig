@@ -87,7 +87,9 @@ export class Sandbox {
     sessionDir: string | undefined;
     programs: FoundPrograms = { found: {}, missing: [] };
     private broker: Broker | undefined;
-    private ready: Promise<void> = Promise.resolve();
+    /** Settles when the session's start has finished, whether or not it has begun: jig-core asks before it does. */
+    private ready: Promise<void>;
+    private markReady: () => void = () => undefined;
     private counter = 0;
     private started = false;
     private lastCwd: string;
@@ -104,6 +106,9 @@ export class Sandbox {
     constructor(deps: SandboxDeps) {
         this.deps = deps;
         this.lastCwd = process.cwd();
+        this.ready = new Promise<void>((resolve) => {
+            this.markReady = resolve;
+        });
         const mine = (place: string): boolean =>
             [deps.home(), "/tmp", deps.tmpRoot, this.lastCwd].some((root) => inside(place, root));
         this.files = withRealCache(deps.files, (place) => !mine(place), 30_000, deps.now);
@@ -137,9 +142,11 @@ export class Sandbox {
         this.started = true;
         this.lastCwd = cwd;
         this.state = { kind: "starting" };
-        this.ready = this.startInner(sessionId, cwd).catch((error: unknown) => {
-            this.state = { kind: "unavailable", reason: `the sandbox could not start: ${messageOf(error)}` };
-        });
+        void this.startInner(sessionId, cwd)
+            .catch((error: unknown) => {
+                this.state = { kind: "unavailable", reason: `the sandbox could not start: ${messageOf(error)}` };
+            })
+            .then(() => this.markReady());
         return this.ready;
     }
 
@@ -274,7 +281,7 @@ export class Sandbox {
 
     /** Stops the broker and removes the session's folders. Safe to call twice. */
     async stop(): Promise<void> {
-        await this.ready.catch(() => undefined);
+        if (this.started) await this.ready.catch(() => undefined);
         this.state = { kind: "stopped" };
         this.started = false;
         await this.shutdownBroker();

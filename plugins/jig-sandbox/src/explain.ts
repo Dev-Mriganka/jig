@@ -35,8 +35,12 @@ const ABSOLUTE = /(?:^|[\s'"`([=,:])(\/[^\s'"`()[\]:;,]*[^\s'"`()[\]:;,.])/g;
 /** `bash: .bashrc: Read-only file system`, `cp: /a/b: Permission denied`: the path sits between two colons. */
 const BETWEEN_COLONS = /^[^:]+: (.+?): [A-Z]/;
 
+/** A shell names itself and the line of the script before the error: `/usr/bin/bash: line 1: /a/b: Read-only file system`. */
+const SHELL_PREFIX = /^\S+: line \d+: /;
+
 /** The paths a line names, absolute, in the order they appear. */
-function pathsIn(line: string, cwd: string, home: string): string[] {
+function pathsIn(rawLine: string, cwd: string, home: string): string[] {
+    const line = rawLine.replace(SHELL_PREFIX, "");
     const found: string[] = [];
     const add = (text: string): void => {
         let candidate = text.trim().replace(/\\ /g, " ");

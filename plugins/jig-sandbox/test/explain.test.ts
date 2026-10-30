@@ -128,6 +128,15 @@ describe("the rest of the system", () => {
         assert.match(lines[0] ?? "", /cannot write \/usr\/local\/bin\/tool: it is outside the folders bash may write/);
     });
 
+    test("the shell's own name and the program it ran are not the place that was refused", () => {
+        const { lines } = explain("/usr/bin/bash: line 1: /usr/local/bin/tool: Read-only file system");
+        assert.equal(lines.length, 1);
+        assert.match(lines[0] ?? "", /cannot write \/usr\/local\/bin\/tool: it is outside/);
+        const locked = explain(`/usr/bin/bash: line 1: ${HOME}/.bashrc: Read-only file system`).lines;
+        assert.equal(locked.length, 1);
+        assert.match(locked[0] ?? "", /cannot write ~\/\.bashrc/);
+    });
+
     test("a read-only line with no path gets one general line, and an ordinary permission error none", () => {
         assert.match(explain("Read-only file system").lines[0] ?? "", /a write was refused/);
         assert.deepEqual(explain("cat: /etc/shadow: Permission denied").lines, []);
