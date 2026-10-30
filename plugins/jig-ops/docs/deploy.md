@@ -11,20 +11,36 @@ promises when one goes wrong. Back to the [jig-ops overview](../README.md).
 | `timeoutMinutes` | `watch` | How long to watch: 1 to 120, 15 by default |
 
 A call can name no release, chart, values file, value, image, context, namespace,
-flag or verb: those are the catalog's. The version is the only text of a call that
-reaches a command line, and it is checked to be an image tag. That is stricter
-than what `runtime rollout` accepts to wait for, because this one is written into
-a cluster: it can never be read as a flag, a digest or a second argument.
+flag or verb: those are the catalog's.
+
+The version is the only text of a call that reaches a command line, and it is
+checked to be an image tag. That is stricter than what `runtime rollout` accepts to
+wait for, because this one is written into a cluster: it can never be read as a
+flag, a digest or a second argument.
 
 ## The commands
 
 The only writes this plugin can make are these four. Context, namespace, release,
 chart, values and workload come from the catalog.
 
-| Method | Deploys with | Goes back with |
-|---|---|---|
-| `helm` | `helm upgrade --install <release> <chart> --kube-context <context> --namespace <namespace> [--values <file>] [--set <key>=<value>]... --set image.tag=<version> --wait=false` | `helm rollback <release> --kube-context <context> --namespace <namespace>` |
-| `kubectl-image` | `kubectl set image <workload> <container>=<image>:<version>`, with the context and namespace first | `kubectl rollout undo <workload>` |
+**`helm`** deploys with:
+
+```text
+helm upgrade --install <release> <chart> --kube-context <context> --namespace <namespace> [--values <file>] [--set <key>=<value>]... --set image.tag=<version> --wait=false
+```
+
+and goes back with:
+
+```text
+helm rollback <release> --kube-context <context> --namespace <namespace>
+```
+
+**`kubectl-image`** deploys with the following, with the context and namespace first, and goes back with
+`kubectl rollout undo <workload>`:
+
+```text
+kubectl set image <workload> <container>=<image>:<version>
+```
 
 - **The version is the last `--set`,** so nothing before it can win over it, and
   `image.tag` cannot be set in the catalog.
@@ -67,12 +83,11 @@ The command runs once, without a shell. If it is cut short, whether it took effe
 A rollback shows `Going back to: revision 4, which ran 1.4.2` instead.
 
 **The fingerprint** is a digest of the service, the environment, the method, the
-exact argument list, the versions running now and where the command goes. It
-changes when the version asked for, the versions running, the command or the
-service changes. It does not change when pods are scaled or become unready,
-because those are not a change of version. When the user approves, the run plans
-again with the cluster as it is, and **refuses with "changed since the preview"**
-if the fingerprint differs, naming the versions that run now. Nothing is run.
+exact argument list, the versions running now and where the command goes.
+- **It changes** when the version asked for, the versions running, the command or the service changes.
+- **It does not change** when pods are scaled or become unready, because those are not a change of version.
+- **When the user approves,** the run plans again with the cluster as it is, and **refuses with "changed since the preview"** if
+  the fingerprint differs, naming the versions that run now. Nothing is run.
 
 **What the preview does not show** is the contents of the chart or the values
 file: they are files on disk. A chart edited after the preview is not noticed.
@@ -94,18 +109,21 @@ A rollback is for test environments only: `jig-core` must say the environment is
 
 A command is started **once**. It ends in one of three ways:
 
-| It ended | What happens |
-|---|---|
-| It exited with `0` | The deploy is `started`. The model is told that nothing waits for the rollout |
-| It exited with an error | The deploy `failed`, and the error is one line that says whose it is to fix (sign-in, network, a locked release, a missing release or chart). It is not retried |
-| It was cut short | It ran longer than its limit (helm six minutes, which is longer than helm's own five for hooks; kubectl one minute), or the user cancelled the call while it ran |
+- **It exited with `0`:** the deploy is `started`. The model is told that nothing waits for the rollout.
+- **It exited with an error:** the deploy `failed`, and the error is one line that says whose it is to fix (sign-in, network, a
+  locked release, a missing release or chart). It is not retried.
+- **It was cut short:** it ran longer than its limit, or the user cancelled the call while it ran. The limit is helm six minutes
+  (longer than helm's own five for hooks) and kubectl one minute.
 
 A command that was cut short has an **unknown outcome**: it may have reached the
 cluster. The tool then reads the rollout once, even if the call was cancelled, and
-returns an error that shows what the cluster shows, says it was not run again, and
-tells the model to check `deploy status` and the user before doing anything else.
-A second deploy on top of an interrupted helm upgrade can leave a release locked.
-A program that could not start (it is not installed) ran nothing, and says so.
+returns an error that:
+- shows what the cluster shows;
+- says it was not run again;
+- tells the model to check `deploy status` and the user before doing anything else.
+
+A second deploy on top of an interrupted helm upgrade can leave a release locked. A
+program that could not start (it is not installed) ran nothing, and says so.
 
 ## Status
 
@@ -129,8 +147,8 @@ polls it every 10 seconds, saves its state, and sends the agent one message:
 | `timed-out` | The deadline came. The message says how far the rollout got and how long it waited |
 
 The saved spec holds the service, the environment and the version, never a context
-or a namespace: every poll finds them in the catalog as it is then. The watch's own
-deadline is five seconds before the engine's, so the last poll is the kind's and
-can say how far the rollout got. A watch for the same rollout that is already open
-is returned, not started twice. A poll that cannot read the cluster is a failed
-poll, which the engine counts: three in a row pause the watch with a notice.
+or a namespace: every poll finds them in the catalog as it is then.
+- **The watch's own deadline** is five seconds before the engine's, so the last poll is the kind's and can say how far the rollout
+  got.
+- **A watch for the same rollout** that is already open is returned, not started twice.
+- **A poll that cannot read the cluster** is a failed poll, which the engine counts: three in a row pause the watch with a notice.

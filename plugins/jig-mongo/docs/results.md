@@ -12,19 +12,22 @@ blocked before anything connects, and turned into BSON only where the driver is 
 | `{"$oid": "65f1..."}` | ObjectId |
 | `{"$date": "2026-01-31T09:00:00Z"}` or `{"$date": {"$numberLong": "..."}}` | Date |
 | `{"$numberInt"}`, `{"$numberLong"}`, `{"$numberDouble"}`, `{"$numberDecimal"}` | the typed number |
-| `{"$uuid"}`, `{"$binary"}`, `{"$timestamp"}`, `{"$regularExpression"}`, `{"$minKey"}`, `{"$maxKey"}`, `{"$ref", "$id"}` | the typed value |
+| `{"$uuid"}`, `{"$binary"}`, `{"$timestamp"}` and the other typed values | the typed value |
 | a whole number beyond 32 bits | a 64-bit integer; a smaller one stays a plain number |
 | `{"$regex": "^a", "$options": "i", "$exists": true}` | left as the query operators they are |
 
 Results come back as relaxed Extended JSON, so an `_id` or a date can be pasted into the next filter: `{"$oid": ...}`, `{"$date": ...}`,
-`{"$numberDecimal": ...}`, and `{"$numberLong": ...}` for an integer JSON cannot hold. A few values are shown as a note instead, so
-they cannot flood the context: binary data as `<binary 3 bytes>`, code as `<code 5 characters>`.
+`{"$numberDecimal": ...}`, and `{"$numberLong": ...}` for an integer JSON cannot hold.
+
+A few values are shown as a note instead, so they cannot flood the context: binary data as `<binary 3 bytes>`, code as
+`<code 5 characters>`.
 
 ## The text of a result
 
 A header line with the call and what came back, then one line of JSON for each document or value. Each line is valid JSON, because
-`jig-core` masks production results field by field. The text is cut at a whole document when it passes about 40,000 characters, and the
-header says `showing the first N`. A result at its limit says `possibly partial (limit 20 reached; narrow the filter or raise limit)`.
+`jig-core` masks production results field by field.
+- **The text is cut at a whole document** when it passes about 40,000 characters, and the header says `showing the first N`.
+- **A result at its limit** says `possibly partial (limit 20 reached; narrow the filter or raise limit)`.
 
 ```text
 mongo find staging orders.orders: 2 documents, possibly partial (limit 2 reached; narrow the filter or raise limit)
@@ -37,10 +40,15 @@ mongo find staging orders.orders: 2 documents, possibly partial (limit 2 reached
 | `count` | `42 documents match (exact)` |
 | `distinct` | the values, one per line, up to the limit |
 | `sample` | a random sample of documents |
-| `schema` | `status: string\|null (in 18 of 20)` for each field path, with `[]` for array elements: types and counts, never values. Sampled with the BSON type of each number kept. `limit` is the sample size |
-| `stats` | the numbers of the collection (`count`, `size`, `avgObjSize`, `storageSize`, `nindexes`, `totalIndexSize`) or of the database |
-| `indexes`, `index-stats` | one line per index: name, keys, options, and for `index-stats` how many times it was used and since when |
-| `explain` | the plan as `FETCH > IXSCAN(status_1)`, a warning for `COLLSCAN`, the rejected plans, and with `executionStats` (the default) documents returned, keys and documents examined, and the time |
+| `schema` | `status: string\|null (in 18 of 20)` for each field path: types and counts, never values |
+| `stats` | the numbers of the collection or of the database |
+| `indexes`, `index-stats` | one line per index: name, keys, options; and for `index-stats` its use |
+| `explain` | the plan as `FETCH > IXSCAN(status_1)`, a warning for `COLLSCAN`, and the rejected plans |
+
+- **`schema`:** `[]` marks array elements. The sample keeps the BSON type of each number, and `limit` is the sample size.
+- **`stats`:** `count`, `size`, `avgObjSize`, `storageSize`, `nindexes` and `totalIndexSize` for a collection.
+- **`index-stats`:** how many times each index was used, and since when.
+- **`explain`:** with `executionStats` (the default) it also gives documents returned, keys and documents examined, and the time.
 
 ## The record
 

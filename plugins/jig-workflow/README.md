@@ -4,8 +4,9 @@
 
 `jig-workflow` takes a piece of work, such as a ticket, through a
 **workflow**: a named, ordered list of stages. Each stage has a goal and the
-conditions that let the work move on. You write the workflows, and the plugin
-has none built in. For example:
+conditions that let the work move on.
+
+You write the workflows, and the plugin has none built in. For example:
 - `feature`: understand → plan → build → review → deliver → accept → done;
 - `bugfix`: reproduce → fix → verify → done;
 - `investigation`: gather → explain → done.
@@ -47,9 +48,14 @@ A project's `.pi/workflows/` folder is read too, once you trust the project.
 |---|---|
 | `name` | The handle you start it by: letters, digits and `-` |
 | `description` | One line, shown by `/workflow list` |
-| `match` | Optional. A ticket-key pattern. When exactly one workflow matches a ticket, `start` can leave the name out |
-| `stages` | In order. Each has an `id`, a `goal` the agent sees while in it, and `exit` conditions that must all hold before the work advances |
-| `holds` | Calls held until a condition holds. A held call is denied, with a reason that names the condition. `write` and `edit` are held only inside the work's bound repositories |
+| `match` | Optional. A ticket-key pattern, so `start` can leave the name out |
+| `stages` | In order: an `id`, a `goal` the agent sees, and `exit` conditions |
+| `holds` | Calls held until a condition holds, each with a reason that names it |
+
+- **`match`:** when exactly one workflow matches a ticket, `start` can leave the name out.
+- **`exit`:** every condition must hold before the work advances.
+- **`holds`:** a held call is denied, with a reason that names the condition. `write` and `edit` are held only inside the work's
+  bound repositories.
 
 ## Conditions
 
@@ -59,7 +65,7 @@ so a workflow file never runs code:
 | Condition | Holds when |
 |---|---|
 | `notes-updated` | The ticket's notes changed since the stage began (see `jig-memory`) |
-| `plan-approved` | You approved `plan.md`. The approval is bound to the plan's hash, so an edited plan needs approving again |
+| `plan-approved` | You approved `plan.md`; an edited plan needs approving again |
 | `tests-pass-at-head` | Each bound repository's tests passed at its exact HEAD |
 | `review-done` | A review of the change is recorded |
 | `pull-request-open` | Each bound repository has an open pull request for the work's branch |
@@ -72,13 +78,17 @@ so a workflow file never runs code:
 | Action | Kind | What it does |
 |---|---|---|
 | `list` | read | The workflows defined, with their stages |
-| `status` | read | The work's workflow and stage, what each exit condition still needs, and the holds in force. Without a ticket: every active piece of work |
-| `start` | local write | Starts a workflow by name for a ticket, at its first stage, and creates the ticket folder (see `jig-memory`) |
-| `bind` | local write | Creates a worktree for a repository on the work's branch, cut from the latest main branch |
-| `submit-plan` | local write | Checks `plan.md` (approach, repositories, numbered scenarios) and asks you to approve it |
-| `test` | local write | Runs a bound repository's tests at HEAD and records pass or fail for that exact commit |
-| `scenario` | local write | Records pass or fail for one scenario, naming its evidence. A pass needs evidence |
-| `advance` | local write | Moves to the next stage when every exit condition holds; otherwise lists what is missing |
+| `status` | read | The work's workflow and stage, what each exit condition still needs, and the holds in force |
+| `start` | local write | Starts a workflow by name for a ticket, and creates the ticket folder (see `jig-memory`) |
+| `bind` | local write | Creates a worktree for a repository on the work's branch |
+| `submit-plan` | local write | Checks `plan.md` and asks you to approve it |
+| `test` | local write | Runs a bound repository's tests at HEAD, and records the result for that commit |
+| `scenario` | local write | Records pass or fail for one scenario. A pass needs evidence |
+| `advance` | local write | Moves to the next stage when every exit condition holds, or lists what is missing |
+
+- **`status`** without a ticket gives every active piece of work.
+- **`bind`** cuts the worktree's branch from the latest main branch.
+- **`submit-plan`** checks the approach, the repositories and the numbered scenarios.
 
 ## Commands
 
@@ -107,6 +117,12 @@ so a workflow file never runs code:
   field, condition or stage is skipped, and `/workflow list` names the file and
   the key.
 
+## Company part (in the company plugin)
+
+- its workflow files, such as one per kind of ticket;
+- the ticket key patterns its workflows `match`;
+- which test environments count as acceptance environments.
+
 ## Later, from the design reviews
 
 ![A ticket over time: guides feed forward into Pi, and feedback comes back at four points: the edit loop, the checker loop, your one approval, and after the pull request](../../docs/img/ticket-loops.svg)
@@ -125,12 +141,6 @@ so a workflow file never runs code:
 ![How the full run decides: no test report fails, new tests that did not run fail, and only failures that are new compared with the main branch block](../../docs/img/check-full.svg)
 
 *How the full run decides. Each question answers a failure seen in real sessions, named in red on the right; a failure that already exists on the main branch never blocks a stage.*
-
-## Company part (in the company plugin)
-
-- its workflow files, such as one per kind of ticket;
-- the ticket key patterns its workflows `match`;
-- which test environments count as acceptance environments.
 
 ## Layout (planned)
 

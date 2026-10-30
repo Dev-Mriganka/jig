@@ -114,16 +114,23 @@ text sits on. A role whose background is `""`, the terminal's own, is measured o
 
 | Text | Ratio | Roles |
 |---|---|---|
-| Body text | 7:1 | `text`, `userMessageText`, `customMessageText`, `toolOutput`, `mdCodeBlock`, `syntaxVariable`, `searchMatchText` |
-| Muted text | 4.5:1 | `muted`, `mdLinkUrl`, `toolDiffContext`, `syntaxPunctuation`, `thinkingText`, `dim`, `syntaxComment` |
-| Words in colour | 4.5:1 | `accent`, `success`, `error`, `warning`, `toolTitle`, `mdHeading`, `mdLink`, `mdCode`, `mdListBullet`, `customMessageLabel`, `toolDiffAdded`, `toolDiffRemoved`, `syntaxKeyword`, `syntaxFunction`, `syntaxString`, `syntaxNumber`, `syntaxType`, `syntaxOperator` |
+| Body text | 7:1 | `text` and six more (below) |
+| Muted text | 4.5:1 | `muted` and six more (below) |
+| Words in colour | 4.5:1 | `accent` and seventeen more (below) |
 
-Each role is measured on the backgrounds it sits on. `text` and `muted` are measured on
-all of them, a selected row and a search match too. `userMessageText` is measured on
-your messages and the export's cards, `customMessageText` on custom messages,
-`toolOutput` on the three tool boxes, and the others on the page, your messages, custom
-messages and the tool boxes. `thinkingText` is measured on the page. Words in colour
-are measured on the page, your messages and a failed tool box.
+- **Body text:** `text`, `userMessageText`, `customMessageText`, `toolOutput`, `mdCodeBlock`, `syntaxVariable`, `searchMatchText`.
+- **Muted text:** `muted`, `mdLinkUrl`, `toolDiffContext`, `syntaxPunctuation`, `thinkingText`, `dim`, `syntaxComment`.
+- **Words in colour:** `accent`, `success`, `error`, `warning`, `toolTitle`, `mdHeading`, `mdLink`, `mdCode`, `mdListBullet`,
+  `customMessageLabel`, `toolDiffAdded`, `toolDiffRemoved`, `syntaxKeyword`, `syntaxFunction`, `syntaxString`, `syntaxNumber`,
+  `syntaxType`, `syntaxOperator`.
+
+Each role is measured on the backgrounds it sits on:
+- `text` and `muted` are measured on all of them, a selected row and a search match too.
+- `userMessageText` is measured on your messages and the export's cards, `customMessageText` on custom messages, and
+  `toolOutput` on the three tool boxes.
+- The other body and muted roles are measured on the page, your messages, custom messages and the tool boxes. `thinkingText` is
+  measured on the page.
+- Words in colour are measured on the page, your messages and a failed tool box.
 
 `jig-mono` goes further: its muted text keeps 7:1 and its body text 12:1.
 
@@ -175,6 +182,7 @@ need the exception.
 `jig-lime` and `jig-signal` set roles by hand because they were drawn before the role
 map and match the themes they came from role for role; a test compares every role with
 a copy of each. The other four set none: they are the map and their seventeen colours.
+
 When you base your own palette on one of the first two, a role they set by hand does not
 follow your `vars`; set it in your `colors`.
 

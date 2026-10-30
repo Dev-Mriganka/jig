@@ -1,9 +1,11 @@
 # Architecture
 
-## The idea
-
 One plugin, `jig-core`, manages every tool the agent can call, whoever wrote
-it. The covered tools are:
+it. That is why the safety rules live in one place, and a new tool is governed
+the day it is installed. (The [glossary](glossary.md) explains the words used
+here.)
+
+The covered tools are:
 - Pi's own: `read`, `write`, `edit`, `bash`, `ls`, `find`, `grep`;
 - Jig's own tools;
 - tools from any other package.
@@ -89,9 +91,14 @@ tool_execution_start → tool_call → tool_execution_update → tool_result →
 
 | It can | It cannot |
 |---|---|
-| Stop any call before it runs, and ask you first | See what a tool does inside its own code. A third-party tool that writes to production without saying so looks like any other call |
+| Stop any call before it runs, and ask you first | See what a tool does inside its own code |
 | Mask and redact any result before the model sees it | Un-send data a tool already sent somewhere |
-| Record every call of every tool | Know the environment of a `bash` command. A shell string can reach anything |
+| Record every call of every tool | Know the environment of a `bash` command |
+
+- **Inside a tool,** a third-party tool that writes to production without
+  saying so looks like any other call.
+- **A `bash` command** is a shell string, and a shell string can reach
+  anything.
 
 What closes those gaps:
 
@@ -118,10 +125,15 @@ jig (this repository, generic)
   jig-core   tool manager: classify, rules, approvals, secrets, sign-in, transports, signed-in HTTP requests, mask, redact, cap, record; watch engine
   jig-git    tools: local git, GitHub PRs and reviews, releases; announces a push on the event bus
   jig-ops    tools: CI (GitHub Actions, GitLab, Jenkins), deploy and runtime from a service catalog; the CI watch
-  jig-lens   observability: reads jig-core's records, local dashboard
+  jig-mongo  tool: MongoDB, with allow and deny lists
+  jig-jira   tool: Jira issues, with rendered previews
+  jig-logs   tool: log search (Elasticsearch, OpenSearch, Loki)
+  jig-api    tool: your saved API requests, run by name
+  jig-review tools: the code review in the browser, approved with a passkey
+  jig-memory ticket folders, notes and evidence; no tools
+  jig-lens   observability: reads jig-core's records, local dashboard; no tools
   jig-theme  the look: palettes as Pi themes, a footer, the answer colour; no tools
-  jig-workflow, jig-memory, jig-mongo, jig-jira, jig-logs, jig-api, jig-ops,
-  jig-review, jig-agents   (see Plugins)
+  jig-workflow, jig-agents   design (see Plugins)
 
 company plugin (separate, private repository)
   the company's environments, sign-in service, internal tools and backends

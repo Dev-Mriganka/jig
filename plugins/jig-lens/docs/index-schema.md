@@ -16,9 +16,13 @@ numbers as seconds.
 
 | Table | One row per | Columns |
 |---|---|---|
-| `call` | tool call | the tool-call record's fields under their own names (see [Records](../../jig-core/docs/records.md)), with `facts` as JSON text |
+| `call` | tool call | the record's fields under their own names (see [Records](../../jig-core/docs/records.md)) |
 | `turn` | model turn | the model-turn record's fields under their own names |
-| `imported` | record file | `file`, `bytes` (how far it has been read), `skipped` (lines that are not records) and `at` (when it was last imported) |
+| `imported` | record file | `file`, `bytes`, `skipped` and `at` |
+
+- **`call`** keeps `facts` as JSON text.
+- **`imported`:** `bytes` is how far the file has been read, `skipped` the lines
+  that are not records, and `at` when it was last imported.
 
 Read the facts with `json_extract(facts, '$.passed')`. A field that does not
 apply is `NULL`. The tables are plain, not `STRICT`, so that Datasette can read

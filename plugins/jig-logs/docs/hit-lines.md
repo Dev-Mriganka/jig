@@ -18,14 +18,37 @@ Hits 1-2 of 2 matching hits, none after these:
 2026-10-16T10:27:56.500Z …"quantity":4,"price":19.99},{"sku":"A-1204","quantity":4,"price":19.99},{"sku":"A-1205","quantity":4,"price":19.99}, {…}
 ```
 
-| Line | When it appears | What it says |
-|---|---|---|
-| The header | Always | The environment, the window, the [status](windows-and-buckets.md#the-status), how many hits the window holds (`at least 412 hits` is a lower bound), how many were fetched and how many are shown, and how many buckets were searched, with how many were split after a timeout. With no hit fetched it stops after the hit count and the buckets. When no window could be searched it reads `failed, no window could be searched` |
-| `Gaps:` and `Next:` | A window was not fully searched | The parts that were not searched, why, and what to change. Neighbouring gaps with the same reason read as one. Up to 5 are listed, then `(+N more)`; there is a `Next:` line for each of up to 3 reasons (see [Failures](failures.md#gaps-and-their-reasons)) |
-| `Availability:` | Nothing was found | Whether the window holds any documents at all: `the window holds 8123 documents in this environment without your phrase or query` (for Loki, which cannot count: `the window holds documents in this environment ...`), `no documents at all in this environment and window`, or `unknown` with the reason. It always adds that this proves nothing about retention |
-| The cut notice | A hit on this page shows `{…}` or `[…]` | That a body was cut for length, not hidden (see [Cutting a line](#cutting-a-line)) |
-| The filter line | `match` or `exclude` was given | How many of the fetched hits passed, as in the sample. When the window holds more hits than were fetched, it says that more may exist |
-| The page line | A filter is given, or the page does not show every fetched hit | Which hits are on the page and which `offset` comes next, such as `Hits 21-40 of 45 fetched hits, 5 more: call again with offset 40:`, or `Hit 25 of 25 matching hits, none after these:` for one hit |
+The lines, in order:
+- **The header** always appears. It gives the environment, the window, the
+  [status](windows-and-buckets.md#the-status), and how many hits the window holds
+  (`at least 412 hits` is a lower bound).
+  - It also says how many were fetched and how many are shown, and how many
+    buckets were searched, with how many were split after a timeout.
+  - With no hit fetched it stops after the hit count and the buckets. When no
+    window could be searched it reads `failed, no window could be searched`.
+- **`Gaps:` and `Next:`** appear when a window was not fully searched. They name
+  the parts that were not searched, why, and what to change.
+  - Neighbouring gaps with the same reason read as one.
+  - Up to 5 are listed, then `(+N more)`; there is a `Next:` line for each of up
+    to 3 reasons (see [Failures](failures.md#gaps-and-their-reasons)).
+- **`Availability:`** appears when nothing was found. It says whether the window
+  holds any documents at all, and always adds that this proves nothing about
+  retention.
+  - The forms are `the window holds 8123 documents in this environment without
+    your phrase or query`, `no documents at all in this environment and window`,
+    or `unknown` with the reason.
+  - For Loki, which cannot count, it reads `the window holds documents in this
+    environment ...`.
+- **The cut notice** appears when a hit on this page shows `{…}` or `[…]`. It says
+  that a body was cut for length, not hidden (see
+  [Cutting a line](#cutting-a-line)).
+- **The filter line** appears when `match` or `exclude` was given. It says how many
+  of the fetched hits passed, as in the sample, and, when the window holds more
+  hits than were fetched, that more may exist.
+- **The page line** appears when a filter is given, or the page does not show every
+  fetched hit. It says which hits are on the page and which `offset` comes next,
+  such as `Hits 21-40 of 45 fetched hits, 5 more: call again with offset 40:`, or
+  `Hit 25 of 25 matching hits, none after these:` for one hit.
 
 An `offset` past the end gets `offset 99 is past the end: there are only 45
 fetched hits (offsets 0 to 44).` and no hit lines. With a filter, the hits are
@@ -34,11 +57,13 @@ called `matching` and not `fetched`.
 ## Choosing and paging hits
 
 `match`, `exclude`, `around`, `chars` and `offset` are applied after the search,
-to the hits fetched. Elasticsearch is never sent them, so the same search with
-another view costs the same. Loki is also sent `match` and `exclude` as line
-filters (see [Loki](loki.md#what-loki-cannot-give)), so the hits it fetches
-already pass them, case-sensitively, and the view applies them again, ignoring
-case. `around`, `chars` and `offset` are never sent.
+to the hits fetched.
+- **Elasticsearch** is never sent them, so the same search with another view costs
+  the same.
+- **Loki** is also sent `match` and `exclude` as line filters (see
+  [Loki](loki.md#what-loki-cannot-give)), so the hits it fetches already pass them,
+  case-sensitively, and the view applies them again, ignoring case.
+- **`around`, `chars` and `offset`** are never sent.
 
 - **`match` and `exclude` read the whole message,** ignoring case, and not only
   the characters a line keeps, so a term near the end of a long message still
@@ -82,11 +107,12 @@ A line is the hit's time, a space, and its message.
   `offset`.
 - **Plain text cut at the limit ends in `…`.**
 - **`around` shows a window of `chars` characters** around the first place the
-  text occurs, ignoring case, with a quarter of them before it. The text is
-  plain text, not a pattern. The window starts and ends with `…` where it cuts,
-  and starts at a word when a space or a comma is within 24 characters. A message
-  without the text shows its first characters, and a message that fits is shown
-  whole.
+  text occurs, ignoring case, with a quarter of them before it.
+  - The text is plain text, not a pattern.
+  - The window starts and ends with `…` where it cuts, and starts at a word when a
+    space or a comma is within 24 characters.
+  - A message without the text shows its first characters, and a message that fits
+    is shown whole.
 
 ## Cutting a line
 
@@ -105,10 +131,11 @@ open.
   middle of a message: a JSON segment in it must close and parse there.
 - **The complete message stays in the backend.** Nothing is hidden: `{…}` means
   cut for length. One notice says so before the hits, once however many hits on
-  the page are cut. For a list it reads `[…] is a JSON list`. When `chars` is
-  already 4000, it no longer offers `chars` and reads `{…} is a JSON body longer
-  than 4000 characters, cut for length, not hidden: use around: "<term>" for the
-  part you need`.
+  the page are cut.
+  - For a list it reads `[…] is a JSON list`.
+  - When `chars` is already 4000, it no longer offers `chars` and reads `{…} is a
+    JSON body longer than 4000 characters, cut for length, not hidden: use around:
+    "<term>" for the part you need`.
 
 ## What a program reads
 

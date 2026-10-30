@@ -1,9 +1,50 @@
 # Configuration reference
 
-The fields of `jig.json` are in the [jig-core overview](../README.md#configure).
-This page holds what goes with them: how rules and classification rules match,
-secret references, the sections other plugins keep in the same file, and the
-environment variables.
+The fields of `jig.json`, with their limits, how rules and classification rules
+match, secret references, the sections other plugins keep in the same file, and
+the environment variables. Back to the [jig-core overview](../README.md#configure).
+
+## The fields
+
+- **`environments`:** a `kind` is `test` or `production`. A test environment can
+  set `mask: true`; production masking cannot be turned off. Built-in names
+  cannot be redefined, and an environment a company plugin made production
+  cannot be lowered.
+- **`rules`:** most specific first. A rule names a `tool`, optionally an
+  `action`, `environment` or `effect`, and a `decision` (`allow`, `ask` or
+  `deny`), and optionally an `approval` kind (`dialog`, `review` or `form`). A
+  rule that would lower the floor is refused at load, naming the file and the
+  key.
+- **`classify`:** a `tool`, optionally an `action`, a `param` with a `value` (or
+  a `pattern`), and the resulting `environment` and `effect`.
+- **`protectedPaths`:** `{ "secret": [...], "guarded": [...] }`, each path
+  absolute or starting with `~/`. A secret path is neither read nor written; a
+  guarded one can be read but not written. Nothing removes a default (see
+  [Protected paths](#protected-paths)).
+- **`secrets.backends`:** `pass`, `env`, `keychain`, `op`, `cmd` and `file`.
+  Only `pass` is on by default.
+- **`secrets.commands`:** the program, then its arguments, such as
+  `{ "gh": ["gh", "auth", "token"] }`. Used only when `cmd` is in
+  `secrets.backends`.
+- **`records.retentionDays`** and **`spill.retentionDays`:** whole numbers of
+  days, from 1 to 3650.
+
+## The `/jig` commands
+
+- **`/jig`** shows the tools governed and the plugins loaded, the tools still on
+  the unknown default, and the open watches (and how many are paused or wait
+  for their plugin). It also shows the configuration file with the state of each
+  plugin section, configuration errors, a failed records write, and problems
+  with saved watches.
+- **`/jig rules [tool]`** shows the effective decision per tool and action,
+  with where each came from: declaration, rule, hint or default.
+  - A tool whose schema lists its actions gets a line for each.
+  - A declared tool that classifies from the call itself says so.
+  - The protected paths of the file tools follow, each with its source: default,
+    your `jig.json` or a company plugin.
+- **`/jig records`** shows where today's records are, and a one-line summary:
+  calls (with errors and blocked ones), questions asked, time waited for you,
+  and model turns.
 
 ## Rules
 
@@ -14,9 +55,10 @@ environment variables.
   matches anything.
 - **A rule that would lower the floor is refused,** with the file and the key
   named, and the rest of the file still loads. That means a rule that names a
-  production environment and allows or asks for a write there. A rule with no
-  `effect` counts as covering writes, so give a production rule `effect:
-  "read"`. An environment name nobody defined counts as production.
+  production environment and allows or asks for a write there.
+  - A rule with no `effect` counts as covering writes, so give a production rule
+    `effect: "read"`.
+  - An environment name nobody defined counts as production.
 - **A wildcard rule cannot allow a tool that nothing classified.** Name the
   tool exactly, or classify it.
 - **"Allow for this session" is remembered for a tool, an action and an
@@ -55,36 +97,41 @@ removes one. `/jig rules` lists them all, each with where it came from
 - **Each entry** is an absolute path or starts with `~/`. A relative entry is an
   error that names the key. A path listed as `guarded` that is already `secret`
   stays `secret`, and one listed as `secret` that is guarded becomes `secret`.
-- **Built in.** Secret: `auth.json` and `mcp-auth.json` in Pi's agent folder;
-  in the home folder `.ssh`, `.gnupg`, `.password-store`, `.aws`, `.kube`,
-  `.azure`, `.config/gcloud`, `.config/gh`, `.config/glab-cli`, `.postman`,
-  `.docker/config.json`, `.netrc`, `.git-credentials`, `.npmrc`, `.pypirc`;
-  `gh`, `glab-cli` and `gcloud` in `$XDG_CONFIG_HOME` when it is set (and in
-  `%APPDATA%` on Windows). Guarded: the whole agent folder, which is
-  `~/.pi/agent` or where `PI_CODING_AGENT_DIR` points.
-- **Matching.** `~` is expanded and a relative path starts from Pi's working
-  folder. `..` is folded away, as Pi does before it opens a file, and also read
-  from a link's target, as the system does. Symlinks are followed through the
-  longest existing part, and a link that points at nothing yet is followed too,
-  because a write through it creates its target. A path equal to a protected
-  path or inside one matches; a protected path that is itself a link matches by
-  its real place too. On Windows and macOS case is ignored; on Linux it counts.
+- **Built in.** The list of secret and guarded defaults is in
+  [Permissions](../../../docs/permissions.md#protected-paths).
+- **Matching.**
+  - `~` is expanded and a relative path starts from Pi's working folder.
+  - `..` is folded away, as Pi does before it opens a file, and also read from a
+    link's target, as the system does.
+  - Symlinks are followed through the longest existing part. A link that points
+    at nothing yet is followed too, because a write through it creates its
+    target.
+  - A path equal to a protected path or inside one matches; a protected path
+    that is itself a link matches by its real place too.
+  - On Windows and macOS case is ignored; on Linux it counts.
 - **Per tool.**
 
   | Tool | Refused |
   |---|---|
   | `read` | inside a secret path |
-  | `grep` | inside a secret path, and when the folder it searches contains one (searching `~` would read `~/.ssh`; the message says to search a narrower folder). Without a `path`, the working folder is the one searched |
-  | `find`, `ls` | inside a secret path. They list names only, so a folder that contains one is fine |
+  | `grep` | inside a secret path, or when the folder it searches contains one |
+  | `find`, `ls` | inside a secret path |
   | `write`, `edit` | inside a secret or a guarded path |
+
+  Searching `~` with `grep` would read `~/.ssh`, so the message says to search
+  a narrower folder; without a `path`, the working folder is the one searched.
+  `find` and `ls` list names only, so a folder that contains a secret path is
+  fine.
 
 - **A refusal** is a deny with one line that names the protected path and never
   shows content. The record says `decisionSource: "floor"`.
-- **Not covered.** `bash` and `powershell` are the sandbox's job: until the
-  sandbox runs, a shell command can still read and write these paths. Variables
-  that move a tool's folder (`GH_CONFIG_DIR`, `CLOUDSDK_CONFIG`) are not read:
-  list that folder yourself. The check is made when the call starts, so a link
-  swapped afterwards by a shell command is not seen.
+- **Not covered.**
+  - `bash` and `powershell` are the sandbox's job: until the sandbox runs, a
+    shell command can still read and write these paths.
+  - Variables that move a tool's folder (`GH_CONFIG_DIR`, `CLOUDSDK_CONFIG`) are
+    not read: list that folder yourself.
+  - The check is made when the call starts, so a link swapped afterwards by a
+    shell command is not seen.
 
 ## Secret references
 
@@ -92,7 +139,7 @@ removes one. `/jig rules` lists them all, each with where it came from
 |---|---|---|
 | `pass:<entry>` | [pass](https://www.passwordstore.org/) | The first line of the entry. Entry names use letters, digits and `. _ @ + - /` |
 | `env:<NAME>` | the environment of the Pi process | The variable's value |
-| `keychain:<service>/<account>` | the macOS Keychain | `security find-generic-password -s <service> -a <account> -w`. The service is the part before the first `/` |
+| `keychain:<service>/<account>` | the macOS Keychain | `security find-generic-password`; the service is the part before the first `/` |
 | `op://<vault>/<item>/<field>` | the 1Password command-line tool | `op read`, with an optional section before the field |
 | `cmd:<name>` | a command you declared by name | The trimmed standard output of the command declared as `<name>`. See below |
 | `file:<absolute path>` | a file | The first line of the file, trimmed. A leading `~/` is the home folder. See below |
@@ -121,15 +168,20 @@ turn the backend on:
   `secrets.backends`.
 - **A name, never a command line.** A reference names a declared command. An
   undeclared name is refused (and not repeated in the error), so a model cannot
-  slip in a command of its own through a parameter. A command is the program,
-  then its arguments, as a list; no shell is used. A name is letters, digits and
-  `. _ -`. Your own declaration of a name replaces a company's.
+  slip in a command of its own through a parameter.
+  - A command is the program, then its arguments, as a list; no shell is used.
+  - A name is letters, digits and `. _ -`.
+  - Your own declaration of a name replaces a company's.
 - **What it uses.** The trimmed standard output, which must be non-empty and at
-  most 16 KiB. The program runs through `jig-core`'s own exec, with the same
-  timeout as the other backends and a short environment: the usual variables,
-  the ones a keyring or a pinentry needs to show its prompt, and the ones that
-  say where `gh`, `glab`, `gcloud`, `aws` and `kubectl` keep their
-  configuration. Tokens in Pi's environment are not passed on.
+  most 16 KiB.
+- **How it runs.** Through `jig-core`'s own exec, with the same timeout as the
+  other backends and a short environment:
+  - the usual variables;
+  - the ones a keyring or a pinentry needs to show its prompt;
+  - the ones that say where `gh`, `glab`, `gcloud`, `aws` and `kubectl` keep
+    their configuration.
+
+  Tokens in Pi's environment are not passed on.
 - **Errors show the exit code and nothing else.** The command's error output is
   never shown, because it may hold the very value being read.
 
@@ -171,8 +223,15 @@ such as `git`, `lens` or `memory`.
 
 | Variable | Meaning |
 |---|---|
-| `JIG_STATE_DIR` | The state folder. Default: `${XDG_STATE_HOME:-~/.local/state}/jig`; an empty or relative `XDG_STATE_HOME` is ignored. Folders are private (0700) and files too (0600) |
-| `JIG_AGENT_ROLE` | The role of this agent, such as `reviewer`. Default: `main`. Written to every record. A child agent is started with it set |
+| `JIG_STATE_DIR` | The state folder (see below) |
+| `JIG_AGENT_ROLE` | The role of this agent, such as `reviewer`. Default: `main`. Written to every record |
 | `JIG_PARENT_SESSION` | The session that started this one. Written to every record of a child agent |
 | `PI_CODING_AGENT_DIR` | Pi's own setting for its agent folder, and so for where `jig.json` is |
-| `BROWSER` | The program that opens a rendered preview. A name, optionally with arguments, and `%s` for the address. Default: `xdg-open`, or `open` on macOS |
+| `BROWSER` | The program that opens a rendered preview (see below) |
+
+- **`JIG_STATE_DIR`:** the default is `${XDG_STATE_HOME:-~/.local/state}/jig`. An
+  empty or relative `XDG_STATE_HOME` is ignored. Folders are private (0700) and
+  files too (0600).
+- **`JIG_AGENT_ROLE`:** a child agent is started with it set.
+- **`BROWSER`:** a name, optionally with arguments, and `%s` for the address.
+  The default is `xdg-open`, or `open` on macOS.

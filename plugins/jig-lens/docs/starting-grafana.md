@@ -9,10 +9,11 @@ Datasette.
    that is not the viewer, it says so and stops. If the viewer already answers,
    it does not start another.
 3. **It finds the program.** Grafana: `grafana`, else `grafana-server`, on `PATH`
-   (only in absolute folders). Datasette: `datasette`. It starts the program
-   detached, with a short environment (see [Viewer settings](viewer-settings.md)).
-   When Grafana's home folder is beside the program, or in `share/grafana`, it
-   passes `--homepath`; a packaged install's wrapper does that itself.
+   (only in absolute folders). Datasette: `datasette`.
+   - It starts the program detached, with a short environment (see
+     [Viewer settings](viewer-settings.md)).
+   - When Grafana's home folder is beside the program, or in `share/grafana`, it
+     passes `--homepath`; a packaged install's wrapper does that itself.
 4. **It waits up to a minute** for the viewer to answer, which Grafana's first
    start can need on a busy machine, and says when the program stops at once or
    never answers. What it printed is in `viewer.log`.

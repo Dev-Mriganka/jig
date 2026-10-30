@@ -23,9 +23,14 @@ In `~/.pi/agent/jig.json`, under `theme.palettes`. The key is the palette's name
 
 | Field | Meaning |
 |---|---|
-| `base` | Required. One of `jig-lime`, `jig-signal`, `jig-ember`, `jig-orchid`, `jig-mono`, `jig-paper`. The palette starts as a copy of it, and is light or dark as it is |
-| `vars` | Optional. Replaces named colours of the base (the [seventeen](palettes.md#the-seventeen-colours)). Every role that uses a colour follows it |
-| `colors` | Optional. Sets single Pi roles, after the [role map](palettes.md#the-role-map). The base's own hand-set roles are kept unless you set them again |
+| `base` | Required. One of the six palettes. Yours starts as a copy of it |
+| `vars` | Optional. Replaces named colours of the base (the [seventeen](palettes.md#the-seventeen-colours)) |
+| `colors` | Optional. Sets single Pi roles, after the [role map](palettes.md#the-role-map) |
+
+- **`base`:** one of `jig-lime`, `jig-signal`, `jig-ember`, `jig-orchid`, `jig-mono`, `jig-paper`. The palette is light or dark as
+  the base is.
+- **`vars`:** every role that uses a colour follows it.
+- **`colors`:** the base's own hand-set roles are kept unless you set them again.
 
 A colour is any form Pi accepts: `#4FD6BE` or `#4FD`, `oklch(62% 0.1 200)`,
 `okhsl(250 60% 55%)`, a 256-colour index (`39`), the name of one of the palette's own
@@ -41,8 +46,11 @@ A palette's name is also its file name, so it is held to a few rules:
 | Lower-case letters, digits and `-`, starting with a letter or digit, at most 40 characters | It is a file name, and nothing can leave the themes folder through it |
 | Not `system`, `dark` or `light` | Pi's own themes |
 | Not one of the six, `reload` or `footer` | The six are shipped; `reload` and `footer` are words of `/theme` |
-| Not a name another theme has | Checked when the palette is written. A theme from another package or from a project is left alone, and the palette is not written, with a warning that names it |
+| Not a name another theme has | Checked when the palette is written; the palette is then not written, with a warning |
 | At most 20 palettes | The folder is not a place for hundreds |
+
+- **A name another theme has:** a theme from another package or from a project is left alone.
+- **The six, `reload` and `footer`:** the six are shipped; `reload` and `footer` are words of `/theme`.
 
 A palette that breaks a rule is a configuration error: `jig-core` reports it with the
 key, for example `theme.palettes.sea.vars.nope: not a palette colour`, and every
@@ -75,9 +83,10 @@ writing, `jig-theme` asks Pi to load each palette, and names one that Pi cannot.
 
 The themes folder is also where you put themes by hand, so `jig-theme` only touches a
 file it can prove is its own. `<agentDir>/jig-theme/written.json` records the SHA-256
-of every file it wrote. It writes over a file, or deletes it, only when the file is
-absent or still has the recorded hash. Otherwise it leaves the file and says so, once
-for each start of a session:
+of every file it wrote.
+
+It writes over a file, or deletes it, only when the file is absent or still has the
+recorded hash. Otherwise it leaves the file and says so, once for each start of a session:
 
 | Warning | What happened | What to do |
 |---|---|---|
@@ -114,8 +123,8 @@ written and removed. Run it after you change `theme` in `jig.json`.
 
 | You see | Likely cause |
 |---|---|
-| The palette is not in `/theme` | `jig-core` found an error in `theme`, so all of it was dropped: look at the start-up report, or run `/jig` |
-| The palette is in the list, but its colours are the base's | The colour is in `colors` under a name that is not a role, or in `vars` under a name that is not a palette colour: both are reported as errors |
+| The palette is not in `/theme` | `jig-core` found an error in `theme`, so all of it was dropped: run `/jig` |
+| The palette is in the list, but its colours are the base's | A name in `colors` is not a role, or a name in `vars` is not a palette colour |
 | A role does not follow a `vars` change | The base sets that role by hand (`jig-lime`, `jig-signal`): set it in `colors` |
 | `jig.json` changed and nothing happened | A session has to start, or `/theme reload` run |
-| A colour is not what you wrote | The terminal has fewer colours than the theme: Pi approximates for 256 colours. Check `COLORTERM=truecolor` |
+| A colour is not what you wrote | The terminal has fewer colours than the theme; check `COLORTERM=truecolor` |

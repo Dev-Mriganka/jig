@@ -2,14 +2,20 @@
 
 **Status: built.** Every action below, tested against a fake of the driver's seam and a fake of the driver's client, and an
 SSH route tested with a fake `ssh`. An optional test runs every action against a real MongoDB when `JIG_TEST_MONGO_URI` is
-set, and passed once against MongoDB 8.0 on one machine. Not yet tried in everyday use, or against a managed service (see
-[Not verified yet](docs/not-verified.md)).
+set, and passed once against MongoDB 8.0 on one machine.
+
+Not yet tried in everyday use, or against a managed service (see [Not verified yet](docs/not-verified.md)).
 
 `jig-mongo` gives the agent a complete MongoDB tool: exploring, querying, indexes, query plans, aggregation and writes.
 `jig-core` decides each call by environment: reads run, a write to `staging` asks you with a preview, and every write to
-production is denied. What the agent may see is set by an allow list or a deny list. For example, to debug a stuck order the
-agent runs `count`, then `find` on `orders.orders` in `staging`. It then runs `explain` to see whether the query used an
-index, and `update` to fix the test document, after you approve the preview.
+production is denied. What the agent may see is set by an allow list or a deny list.
+
+For example, to debug a stuck order the agent runs `count`, then `find` on `orders.orders` in `staging`. It then runs `explain`
+to see whether the query used an index, and `update` to fix the test document, after you approve the preview.
+
+![How a jig-mongo call runs: jig-core decides by environment, the walk checks every field against the access lists, an allow list also reshapes the call, the route reaches MongoDB, and denied fields are stripped from the rows](../../docs/img/mongo-walk.svg)
+
+*How a call is checked and run. `jig-core` decides by environment, then the walk checks every field against the lists and refuses a denied one before anything runs. An allow list also reshapes the call, the route reaches MongoDB, and denied fields are stripped from the rows.*
 
 ## Tool: `mongo`
 
@@ -43,8 +49,8 @@ Parameters and results: [Results](docs/results.md).
   - `find` and `sample` strip denied fields from every result, at any depth. In production they return only allowed fields, as a
     forced projection.
   - `aggregate` is refused before it runs when it names a denied field anywhere: a rename such as `{ x: "$password" }`,
-    `$getField`, a `$lookup`, `$graphLookup` or `$unionWith` into a denied collection, `$replaceRoot`, a `$facet` branch. With an
-    allow list a projection of the allowed fields is also put in front of every stage ([Access](docs/access.md)).
+    `$getField`, a `$lookup`, `$graphLookup` or `$unionWith` into a denied collection, `$replaceRoot`, a `$facet` branch.
+  - With an allow list a projection of the allowed fields is also put in front of every stage ([Access](docs/access.md)).
 - **A denied collection cannot be written either.**
 
 ## Rules
@@ -81,10 +87,15 @@ In `~/.pi/agent/jig.json`, under `mongo`. An unknown field is an error, and the 
 
 | Field | Meaning |
 |---|---|
-| `connections` | Per environment, named as `jig-core` names it: `uri` (no credentials in it; one that has them is refused), `user`, `password` (a secret reference), optional `authSource` and `tls`, and an optional route `via` |
-| `via` | `{ "ssh": { host, user, key, port? } }`: an SSH forward through a bastion host, `key` a secret reference. Or `{ "tunnel": "<name>" }` for a company tunnel ([Connections](docs/connections.md)) |
-| `access` | Per environment: `deny` (a list of `db.collection`, `db.*`, `*.field` or `db.collection.field`) or `allow` (collections with their fields). Production must use `allow`; anything else is an error. `javascript: true` allows server-side JavaScript in a test environment |
+| `connections` | Per environment: `uri`, `user`, `password`, optional `authSource`, `tls` and `via` |
+| `via` | An SSH forward through a bastion host, or a company tunnel ([Connections](docs/connections.md)) |
+| `access` | Per environment: `deny` (a list of names) or `allow` (collections with their fields) |
 
+- **`uri`** holds no credentials: one that has them is refused. **`password`** is a secret reference.
+- **`via`** is `{ "ssh": { host, user, key, port? } }`, with `key` a secret reference, or `{ "tunnel": "<name>" }`.
+- **`deny`** is a list of `db.collection`, `db.*`, `*.field` or `db.collection.field`. Production must use `allow`; anything else
+  is an error.
+- **`javascript: true`** allows server-side JavaScript in a test environment.
 Use a read-only database user for production. The floor denies writes anyway, but the user is the second lock.
 
 ## Company part (in the company plugin)

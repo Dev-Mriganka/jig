@@ -1,9 +1,15 @@
 # Adding a source
 
 A source reads one kind of collection into saved requests. The tool, the variables, the planning and the sending know nothing of a
-file format, so a new source is one file in `src/sources/` and a line in `src/sources/index.ts`. The built ones are Postman files
-(`postman.ts`), `.http` folders (`http-file.ts`), Bruno (`bruno.ts`, with a reader for each of its two languages), OpenAPI
-(`openapi.ts`) and Postman's cloud (`postman-cloud.ts`). Back to the [jig-api overview](../README.md).
+file format, so a new source is one file in `src/sources/` and a line in `src/sources/index.ts`. Back to the
+[jig-api overview](../README.md).
+
+The built ones are:
+- Postman files (`postman.ts`);
+- `.http` folders (`http-file.ts`);
+- Bruno (`bruno.ts`, with a reader for each of its two languages);
+- OpenAPI (`openapi.ts`);
+- Postman's cloud (`postman-cloud.ts`).
 
 ## The interface
 
@@ -37,25 +43,41 @@ network (Postman's cloud) fetches to a local copy first, through the sending eng
 
 | Field | Meaning |
 |---|---|
-| `requests` | `SavedRequest`s: collection, folder path, name, `method`, `url` and `headers` as templates, a `body` (raw, JSON, form, file or GraphQL), `auth` (none, bearer, basic, apiKey in a header, or OAuth 2.0 with a headless grant), the `variables` it uses, which of them are `secrets` (declared by the environments) or `signsIn`, its own `defaults`, `scripts: { prerequest }`, and `unsupported` and `notes`. Optional: `optional` (variables that may stay unset, see below), `variableDocs` and `assertions` (shown by `show`) |
-| `environments` | By name, each with its `variables` (a secret has no value) and the file they came from. Optional `unavailable`: a reason that nothing can run in it |
+| `requests` | The `SavedRequest`s (see below) |
+| `environments` | By name, each with its `variables` (a secret has no value) and its file |
 | `variables` | The collection's own values, the weakest |
 | `auth`, `authRefused` | The sign-in of the whole collection, for an ad-hoc `call` that names the collection |
-| `productionReads` | Optional. Set by a source that is opt-in per environment (OpenAPI): `false` refuses reads in production, `true` leaves them to the rules. Writes in production are denied by the floor either way |
+| `productionReads` | Optional. Set by a source that is opt-in per environment (OpenAPI) |
 | `root` | The folder every file reference must stay inside |
 | `problems` | `{ file, key, message, level }` for everything found wrong, such as a secret that has a plain value |
 
-A source marks a variable secret from what its format says, refuses a plain value for it (a warning, no value kept), and sets
-`unsupported` for a protocol, a method or a sign-in it cannot express, with words that name it. The rest is done for it: scripts
-are refused from `scripts.prerequest`, the agent's values are checked against `variables`, `secrets` and `signsIn`, and every
-address is checked against the environment's hosts.
+- **A `SavedRequest`** has its collection, folder path, name, `method`, `url` and `headers` as templates, and a `body` (raw, JSON,
+  form, file or GraphQL).
+  - It has `auth`: none, bearer, basic, apiKey in a header, or OAuth 2.0 with a headless grant.
+  - It has the `variables` it uses, which of them are `secrets` (declared by the environments) or `signsIn`, and its own
+    `defaults`.
+  - It has `scripts: { prerequest }`, and `unsupported` and `notes`.
+  - Optional: `optional` (variables that may stay unset, see below), `variableDocs` and `assertions` (shown by `show`).
+- **An environment** may have `unavailable`: a reason that nothing can run in it.
+- **`productionReads`:** `false` refuses reads in production, `true` leaves them to the rules. Writes in production are denied by the
+  floor either way.
+
+A source does two things itself:
+- it marks a variable secret from what its format says, and refuses a plain value for it (a warning, no value kept);
+- it sets `unsupported` for a protocol, a method or a sign-in it cannot express, with words that name it.
+
+The rest is done for it: scripts are refused from `scripts.prerequest`, the agent's values are checked against `variables`,
+`secrets` and `signsIn`, and every address is checked against the environment's hosts.
 
 ## Optional variables
 
 A source that describes parameters (OpenAPI) lists in `optional` the variables that may stay unset. When nobody gives one a value,
-`optional.ts` leaves out what hangs on it before any variable is filled: a query pair written `name={{variable}}`, a header whose
-whole value is `{{variable}}`, and a JSON property on a line of its own (and an object that is left with none). A source that sets
-`optional` writes its templates in that shape.
+`optional.ts` leaves out what hangs on it before any variable is filled:
+- a query pair written `name={{variable}}`;
+- a header whose whole value is `{{variable}}`;
+- a JSON property on a line of its own (and an object that is left with none).
+
+A source that sets `optional` writes its templates in that shape.
 
 ## Registering it
 

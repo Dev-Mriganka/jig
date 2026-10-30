@@ -30,9 +30,10 @@ of a sign-in) whose host comes from a variable, the host that variable gives in 
 | `http://` to anything else | Everything is https |
 | An address with a user name or a password | Refused |
 
-The check reads the address as written (every spelling of an IPv4 address is read as the same address). A host name is not looked
-up, so a name that points at a blocked address is not caught; the names an environment may use are the ones the team wrote in its
-own files. The function that sends asks again for every request, whatever plan it was given.
+The check reads the address as written (every spelling of an IPv4 address is read as the same address).
+- **A host name is not looked up,** so a name that points at a blocked address is not caught; the names an environment may use are
+  the ones the team wrote in its own files.
+- **The function that sends asks again** for every request, whatever plan it was given.
 
 ## Redirects and cookies
 
@@ -43,55 +44,68 @@ request may carry a `Cookie` header its collection gives it.
 ## Files
 
 A file a request uploads (a form file, a whole body, a part of a multipart body) must resolve, after following links, to a path
-inside the collection folder: the folder of a Postman collection file, the `.http` folder, or the Bruno folder. A path outside it, a link out of it
-(to the file, or to a folder that holds it), a missing file, a folder, and a file over 10 MiB are refused with the reason. The file
-is read when the plan is made; the preview names it with its size and a digest, and the digest is in the fingerprint, so a file
-that changed while you read is "changed since the preview" and is not sent.
+inside the collection folder: the folder of a Postman collection file, the `.http` folder, or the Bruno folder.
+- **Refused, with the reason:** a path outside it, a link out of it (to the file, or to a folder that holds it), a missing file, a
+  folder, and a file over 10 MiB.
+- **The file is read when the plan is made.** The preview names it with its size and a digest, and the digest is in the fingerprint,
+  so a file that changed while you read is "changed since the preview" and is not sent.
 
 ## Scripts and protocols
 
-Scripts never run. A request that a pre-request script applies to is refused with its name and whose script it is: Postman's,
-Bruno's (a request's, a folder's or the collection's) and `.http` files'. A test script, a post-response script or a response
-handler is ignored with a note. WebSocket, gRPC and MQTT are listed and refused as unsupported, as are the sign-in types that need
-a browser, code or another request's answer. Each is named, so a reader knows what is missing. Bruno's asserts are shown and not run.
+Scripts never run.
+- **A pre-request script** makes a request refused, with its name and whose script it is: Postman's, Bruno's (a request's, a
+  folder's or the collection's) and `.http` files'.
+- **A test script, a post-response script or a response handler** is ignored with a note.
+- **Unsupported, and named,** so a reader knows what is missing: WebSocket, gRPC and MQTT, and the sign-in types that need a
+  browser, code or another request's answer.
+- **Bruno's asserts** are shown and not run.
 
 ## An OpenAPI spec is opt-in
 
 A spec runs only in the environments its configuration lists, only against the servers the configuration maps to them, and in
-production only for reads and only with `allowProductionReads` ([OpenAPI](openapi.md#where-it-runs)). Writes in production are denied
-by the floor, as for every source. A credential in a spec's examples or defaults is never used: a credential is a slot that
-`api.secrets` fills.
+production only for reads and only with `allowProductionReads` ([OpenAPI](openapi.md#where-it-runs)).
+
+Writes in production are denied by the floor, as for every source. A credential in a spec's examples or defaults is never used: a
+credential is a slot that `api.secrets` fills.
 
 ## Secrets in files and in the copy
 
 A secret a file marks (Postman `secret`, `http-client.private.env.json`, Bruno `vars:secret` and `secret: true`, an external secret
 manager) has no value here, and a value typed into the file is refused with a warning that names the file and never repeats the value.
-`{{process.env.NAME}}` of a Bruno collection is a secret; no `.env` file is read. The copy of a Postman cloud collection omits the
-value of a secret variable, is mode 0600, and never holds the API key ([Postman cloud](postman-cloud.md)). A message about a YAML or
-`.bru` file that cannot be read names its line and never quotes it.
+- **`{{process.env.NAME}}`** of a Bruno collection is a secret; no `.env` file is read.
+- **The copy of a Postman cloud collection** omits the value of a secret variable, is mode 0600, and never holds the API key
+  ([Postman cloud](postman-cloud.md)).
+- **A message about a YAML or `.bru` file** that cannot be read names its line and never quotes it.
 
 ## The agent
 
 The agent fills variables and nothing else. It cannot give a secret, a variable that signs in, a variable outside the request, or
 any part of the host; it cannot choose the method or the headers of a saved request. Its values are written as values
-([Variables](variables.md)). It can send an ad-hoc `call` only where the configuration lists the `jig-core` environment in
-`adHoc`, never in an environment that is production (asked of `jig-core`, so a company's own name for it counts), and never in a
-name that `api.environments` does not map, which counts as production. A name in `reads` cannot make `call` a read: only the
-method does.
+([Variables](variables.md)).
+
+It can send an ad-hoc `call` only where the configuration lists the `jig-core` environment in `adHoc`.
+- **Never in production:** that is asked of `jig-core`, so a company's own name for it counts.
+- **Never in an unmapped name:** a name that `api.environments` does not map counts as production.
+- **A name in `reads`** cannot make `call` a read: only the method does.
 
 ## What it does not guard
 
-- **A collection that the agent can write.** The files are read to classify a call, to preview it and to send it. A file that
-  changes between the preview and the send is caught ("changed since the preview"). A call that runs without asking has no
-  preview, so a file changed in the moments between its classification and its send is not caught. Keep collections where the agent
-  cannot write them.
+- **A collection that the agent can write.** The files are read to classify a call, to preview it and to send it.
+  - A file that changes between the preview and the send is caught ("changed since the preview").
+  - A call that runs without asking has no preview, so a file changed in the moments between its classification and its send is
+    not caught.
+  - Keep collections where the agent cannot write them.
 - **A name that points at a blocked address** (see above).
 - **What a saved request does by itself.** Whether a `POST` in `reads` really only reads, and what a `GET` does on a server that
   changes state, is the team's word. The tool does not read a GraphQL query to see whether it is a mutation.
 
 ## Limits
 
-A saved request's body is at most 1 MiB of text, or 20 MiB with files; a call's JSON body at most 256 KiB, with at most 10 headers;
-an answer is cut at 2 MiB, except the fetch of a Postman cloud collection, which may be 32 MiB; a Postman collection file is at most
-32 MiB and an environment export 2 MiB; a `.http` file and an environment file of a `.http` folder at most 1 MiB; at most 500 `.http`
-files; a Bruno file at most 1 MiB, at most 1000 request files, 12 folders deep; an OpenAPI spec at most 8 MiB.
+The limits:
+- **A saved request's body:** at most 1 MiB of text, or 20 MiB with files.
+- **A call:** a JSON body of at most 256 KiB, with at most 10 headers.
+- **An answer:** cut at 2 MiB, except the fetch of a Postman cloud collection, which may be 32 MiB.
+- **Postman:** a collection file at most 32 MiB, and an environment export 2 MiB.
+- **`.http`:** a file, and an environment file of a `.http` folder, at most 1 MiB; at most 500 files.
+- **Bruno:** a file at most 1 MiB, at most 1000 request files, 12 folders deep.
+- **OpenAPI:** a spec at most 8 MiB.

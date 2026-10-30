@@ -5,11 +5,13 @@ scripted model, pass. Watches are tested only against a fake Pi so far, and
 three parts are not built (see [Later](#later)).
 
 `jig-core` governs every tool call the agent makes, whoever wrote the tool: Pi's
-own tools, Jig's tools, and tools from other packages. For each call it works
-out where the call acts and whether it reads or writes, applies your rules, asks
-you when a rule says so, masks and redacts the result, and records the call. For
-example, `git push` is a write to `external`, so `jig-core` shows you the push
-and waits for your `y` before it runs. Every other Jig plugin needs it.
+own tools, Jig's tools, and tools from other packages. Every other Jig plugin
+needs it.
+
+For each call it works out where the call acts and whether it reads or writes,
+applies your rules, asks you when a rule says so, masks and redacts the result,
+and records the call. For example, `git push` is a write to `external`, so
+`jig-core` shows you the push and waits for your `y` before it runs.
 
 ![Every tool call passes through jig-core's hooks before and after it runs](../../docs/img/one-call.svg)
 
@@ -22,15 +24,26 @@ This tool lists and stops the watches of every plugin.
 
 | Action | Kind | What it does |
 |---|---|---|
-| `list` | read | This session's open and paused watches, and the ones that finished in the last 24 hours, oldest first. No parameters |
-| `stop` | local write | Cancels an open or paused watch, given its `id`. It ends as `stopped`, and the agent is not told |
+| `list` | read | This session's open and paused watches, and those that finished in the last 24 hours |
+| `stop` | local write | Cancels an open or paused watch, given its `id`. The agent is not told |
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `/jig` | Status: tools governed, plugins loaded, open watches, configuration problems |
+| `/jig rules [tool]` | The effective decision per tool and action, and where each came from |
+| `/jig records` | Where today's records are, and a one-line summary of the day |
+
+What each one shows in full is in the
+[configuration reference](docs/configuration.md#the-jig-commands).
 
 ## Rules
 
 - **The floor holds.** Whatever the configuration says, production writes are
   denied, production results are masked, credentials are hidden from `bash`,
   nothing that needs approval runs without a screen, and Pi's file tools
-  refuse protected paths: credential files, and writes to Pi's agent folder.
+  refuse protected paths (see [Permissions](../../docs/permissions.md)).
 - **Unknown tools ask.** A tool that nothing classifies counts as a write
   outside the machine, and asks until a rule or its own hints say otherwise.
 - **Approvals happen only inside the waiting call.** There is no web endpoint
@@ -41,18 +54,10 @@ This tool lists and stops the watches of every plugin.
 - **Programs run without a shell,** with a timeout, an output cap and a short
   environment. Git runs with hooks off, and refuses a repository whose own
   configuration would run a command.
-- **Records and saved watches stay on this machine,** and `jig-core` sends
-  nothing of its own anywhere: it sends only the requests that plugins ask for
+- **Nothing leaves this machine on its own.** Records and saved watches stay
+  here. `jig-core` sends only the requests that plugins ask for
   (`http.request`), with a credential it reads for them. It never signs in and
   stores no credential ([Decisions](../../docs/decisions.md)).
-
-## Commands
-
-| Command | What it does |
-|---|---|
-| `/jig` | Status: the tools governed and the plugins loaded, tools still on the unknown default, open watches (and how many are paused or wait for their plugin), the configuration file with the state of each plugin section, configuration errors, a failed records write, and problems with saved watches |
-| `/jig rules [tool]` | The effective decision per tool and action, with where each came from: declaration, rule, hint or default. A tool whose schema lists its actions gets a line for each. A declared tool that classifies from the call itself says so. The protected paths of the file tools follow, each with its source: default, your `jig.json` or a company plugin |
-| `/jig records` | Where today's records are, and a one-line summary: calls (with errors and blocked ones), questions asked, time waited for you, and model turns |
 
 ## Configure
 
@@ -62,17 +67,19 @@ All fields are optional.
 
 | Field | Default | Meaning |
 |---|---|---|
-| `environments` | `local`, `external`, `production` built in | Add environments with a `kind`: `test` or `production`. A test environment can be set to `mask: true`; production masking cannot be turned off. The built-in names cannot be redefined, and an environment a company plugin made production cannot be lowered |
-| `rules` | the default table in [Permissions](../../docs/permissions.md) | A list of rules, most specific first. Each one names a `tool`, optionally an `action`, `environment` or `effect`, and gives a `decision` (`allow`, `ask`, `deny`) and optionally an `approval` kind (`dialog`, `review`, `form`). Rules that would lower the floor are refused at load, with the file and the key named |
-| `classify` | none | How to classify tools Jig did not write: `tool`, optionally `action`, a `param` and `value` (or `pattern`), and the resulting `environment` and `effect` |
-| `protectedPaths` | the defaults in [Permissions](../../docs/permissions.md#protected-paths) | `{ "secret": [...], "guarded": [...] }`: paths to protect from Pi's file tools **in addition** to the defaults, each absolute or starting with `~/`. A `secret` path is neither read nor written, a `guarded` one can be read but not written. Nothing here removes a default |
-| `secrets.backends` | `["pass"]` | Which backends may resolve references: `pass`, `env`, `keychain`, `op`, `cmd`, `file` |
-| `secrets.commands` | none | Commands that `cmd:<name>` may run, by name: `{ "gh": ["gh", "auth", "token"] }`, the program and then its arguments. Only when `cmd` is in `secrets.backends` |
-| `records.retentionDays` | 90 | How long record files are kept, as a whole number of days from 1 to 3650 |
-| `spill.retentionDays` | 7 | How long spill files and rendered previews are kept, in the same range |
+| `environments` | `local`, `external`, `production` | Add test or production environments, each with a `kind` |
+| `rules` | the table in [Permissions](../../docs/permissions.md) | `allow`, `ask` or `deny` per tool, action, environment or effect |
+| `classify` | none | How to classify tools Jig did not write |
+| `protectedPaths` | the [defaults](../../docs/permissions.md#protected-paths) | More paths for Pi's file tools to refuse |
+| `secrets.backends` | `["pass"]` | Which backends may resolve secret references |
+| `secrets.commands` | none | The commands that `cmd:<name>` may run, by name |
+| `records.retentionDays` | 90 | Days record files are kept, from 1 to 3650 |
+| `spill.retentionDays` | 7 | Days spill files and rendered previews are kept |
 
-An unknown field is an error. It names the file and the key, and the plugin
-starts with the defaults rather than guessing. So is a wrong type or value.
+What each field means, with its limits, is in the
+[configuration reference](docs/configuration.md#the-fields). An unknown field is
+an error. It names the file and the key, and the plugin starts with the defaults
+rather than guessing. So is a wrong type or value.
 
 ```json
 {
@@ -86,19 +93,9 @@ starts with the defaults rather than guessing. So is a wrong type or value.
 }
 ```
 
-## Requires
-
-- Pi 1.4 or later.
-- At least one secret backend, if a Jig tool needs secrets: `pass` on Linux
-  first.
-- On Linux, a sandbox for `bash`. While Jig is tried beside the existing
-  harness, it borrows that harness's.
-
-## Later
-
-- **Command rules for `bash`** that split a shell string with tree-sitter.
-- **Hiding a tool that the rules deny completely** from the model.
-- **The form screen.** The form kind uses the selector for now.
+It needs Pi 1.4 or later, a secret backend if a Jig tool needs secrets (`pass`
+on Linux first), and, on Linux, a sandbox for `bash`. While Jig is tried beside
+the existing harness, it borrows that harness's sandbox.
 
 ## Company part (in the company plugin)
 
@@ -106,27 +103,23 @@ starts with the defaults rather than guessing. So is a wrong type or value.
   its targets count as production;
 - field names that hold personal data in its systems, for masking;
 - sign-in services and transports for its systems;
-- secret commands (`config.addSecretCommands`) and protected paths (`config.addProtectedPaths`)
-  for its own tools.
+- secret commands (`config.addSecretCommands`) and protected paths
+  (`config.addProtectedPaths`) for its own tools.
+
+## Later
+
+- **Command rules for `bash`** that split a shell string with tree-sitter.
+- **Hiding a tool that the rules deny completely** from the model.
+- **The form screen.** The form kind uses the selector for now.
 
 ## Layout
 
 ```text
 jig-core/
-  src/
-    contract.ts, client.ts, index.ts, api.ts, state.ts   what other plugins import; the extension, its API, its state
-    gate.ts, results.ts, classify.ts, decide.ts          the hooks, and the rules as pure functions
-    config.ts, environments.ts, paths.ts, errors.ts      jig.json, its environments, the state folder
-    protected-paths.ts                                   the paths Pi's file tools may not touch
-    approvals.ts, review.ts, preview.ts, preview-html.ts asking you, and the page for the browser
-    secrets.ts, signin.ts, transports.ts, redact.ts,
-    cap.ts, records.ts                                   secrets, sign-in, and what happens to data
-    exec.ts, git-config-guard.ts, commands.ts            running programs and git safely; /jig
-    kit/                                                 stateless helpers that plugins import (see the contract)
-    mask/                                                the masker, written separately
-    watch/                                               the watch engine and the `watch` tool
-  test/                                                  unit tests, and tests inside a real Pi session
-  docs/                                                  the detail pages below
+  src/      the hooks (gate, results), classify and decide, config, approvals, secrets, sign-in, transports,
+            redact, records, exec; mask/ (the masker), watch/ (the engine and its tool), kit/ (helpers plugins import)
+  test/     unit tests, and tests inside a real Pi session
+  docs/     the detail pages below
 ```
 
 ## More detail
@@ -137,7 +130,7 @@ jig-core/
 - [Results](docs/results.md): what happens to a result: redact, mask and cap
 - [Masking](docs/masking.md): what counts as personal data, and the tokens
 - [Records](docs/records.md): the line per call and per turn, facts, error kinds
-- [Configuration](docs/configuration.md): rule matching, secrets, sections, variables
+- [Configuration](docs/configuration.md): the fields, rule matching, secrets, sections, variables
 - [Running programs](docs/running-programs.md): no shell, and the checks on git
 - [Plugin contract](docs/plugin-contract.md): what a plugin gets from `jig-core`
 - [Reuse](../../docs/reuse.md#tool-manager): what `jig-core` borrows from

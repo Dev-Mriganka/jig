@@ -14,11 +14,11 @@ only when something changed:
    cannot be masked, so it is replaced by a note. What is masked, and how, is in
    [Masking](masking.md).
 3. **Cap.** Text over 50 000 characters is cut to its first 8 000, with a line
-   that names the spill file and says to read it with the `read` tool. The file
-   is `<state folder>/spill/<session>/<tool call id>.txt`, private, and holds
-   the text as the model would have seen it. Pi's own `read`, `bash`,
-   `powershell`, `grep`, `find` and `ls` cut their own output and are left
-   alone.
+   that names the spill file and says to read it with the `read` tool.
+   - The file is `<state folder>/spill/<session>/<tool call id>.txt`, private,
+     and holds the text as the model would have seen it.
+   - Pi's own `read`, `bash`, `powershell`, `grep`, `find` and `ls` cut their
+     own output and are left alone.
 
 If a step cannot be done, the result is withheld and the model reads "result
 withheld: it could not be masked" (or "redacted"). Pi lets an unchanged result

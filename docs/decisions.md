@@ -1,32 +1,61 @@
 # Decisions
 
-Dated so the reasons stay attached.
+Dated so the reasons stay attached. Each entry says what was decided, and why.
+
+## Contents
+
+- [2026-10-30: Jig never signs in; it reads a credential and keeps it from the agent](#2026-10-30-jig-never-signs-in-it-reads-a-credential-and-keeps-it-from-the-agent)
+- [2026-10-30: checks run on every push](#2026-10-30-checks-run-on-every-push)
+- [2026-10-30: jig-theme, the look, built on Pi's own themes](#2026-10-30-jig-theme-the-look-built-on-pis-own-themes)
+- [2026-10-30: reviews are approved in their page, and a passkey makes that unforgeable](#2026-10-30-reviews-are-approved-in-their-page-and-a-passkey-makes-that-unforgeable)
+- [2026-10-30: jig-mongo is built on the official driver, with the walk of a pipeline as one of two locks](#2026-10-30-jig-mongo-is-built-on-the-official-driver-with-the-walk-of-a-pipeline-as-one-of-two-locks)
+- [2026-10-30: jig-mongo is a complete MongoDB tool; no SQL tool for now](#2026-10-30-jig-mongo-is-a-complete-mongodb-tool-no-sql-tool-for-now)
+- [2026-10-30: CI and its watches live in jig-ops, one adapter per CI system](#2026-10-30-ci-and-its-watches-live-in-jig-ops-one-adapter-per-ci-system)
+- [2026-10-30: jig-api part 2: Bruno, OpenAPI and the Postman cloud, and the first dependency](#2026-10-30-jig-api-part-2-bruno-openapi-and-the-postman-cloud-and-the-first-dependency)
+- [2026-10-30: jig-ops runtime and deploy, as built](#2026-10-30-jig-ops-runtime-and-deploy-as-built)
+- [2026-10-30: jig-http becomes jig-api, and runs saved requests](#2026-10-30-jig-http-becomes-jig-api-and-runs-saved-requests)
+- [2026-10-30: jig-ops, one plugin for build, deploy and run](#2026-10-30-jig-ops-one-plugin-for-build-deploy-and-run)
+- [2026-10-30: jig-flow becomes jig-workflow, and workflows are named files](#2026-10-30-jig-flow-becomes-jig-workflow-and-workflows-are-named-files)
+- [2026-10-30: no jig-scripts in the generic set](#2026-10-30-no-jig-scripts-in-the-generic-set)
+- [2026-10-30: one tool manager over every tool](#2026-10-30-one-tool-manager-over-every-tool)
+- [2026-10-30: jig-core is our own code, and it runs the watches](#2026-10-30-jig-core-is-our-own-code-and-it-runs-the-watches)
+- [2026-10-30: a company's sign-in is a service, and its field names reach the masker](#2026-10-30-a-companys-sign-in-is-a-service-and-its-field-names-reach-the-masker)
+- [2026-10-30, later: the lens, lighter](#2026-10-30-later-the-lens-lighter)
+- [2026-10-30, later: the lens summary is an entry the model never reads](#2026-10-30-later-the-lens-summary-is-an-entry-the-model-never-reads)
+- [2026-10-30: the lens reads a copy of the records](#2026-10-30-the-lens-reads-a-copy-of-the-records)
+- [2026-10-30: how a watch tells the agent](#2026-10-30-how-a-watch-tells-the-agent)
+- [2026-10-30: jig-git's tools, and a watch that knows when it is done](#2026-10-30-jig-gits-tools-and-a-watch-that-knows-when-it-is-done)
+- [2026-10-30: built clean, beside the existing harness](#2026-10-30-built-clean-beside-the-existing-harness)
+- [Earlier decisions that still hold (2026-10-29)](#earlier-decisions-that-still-hold-2026-10-29)
 
 ## 2026-10-30: Jig never signs in; it reads a credential and keeps it from the agent
 
 - **No sign-in flow in Jig.** No plugin starts an OAuth flow, opens a browser to
-  log you in, asks for a password, or runs a device-code exchange. The tool that
-  owns a login does it: `gh` for GitHub, the Postman CLI for Postman, Pi's
-  `/mcp login` for MCP servers, a company plugin's sign-in service for its own
-  systems. They already do it well, and each has its own idea of expiry, refresh
-  and revocation that Jig would only copy badly.
+  log you in, asks for a password, or runs a device-code exchange.
+  - **The tool that owns a login does it:** `gh` for GitHub, the Postman CLI for
+    Postman, Pi's `/mcp login` for MCP servers, a company plugin's sign-in
+    service for its own systems.
+  - **Why:** they already do it well, and each has its own idea of expiry,
+    refresh and revocation that Jig would only copy badly.
 - **No stored credentials.** Jig keeps no token, key or password of its own:
   not in `jig.json`, not in a state folder, not in a plugin's section. A
   credential lives where its owner put it, and Jig only reads it from a source
   you configured (`pass`, `env`, `keychain`, `op`, or a named command such as
   `gh auth token`).
-- **What Jig does do, in `jig-core`:** it reads a credential that already
-  exists and attaches it to a request, so plugin code never sees the value, and
-  it registers the value with the redactor so it never reaches the model. A
-  client-credentials or password grant against a token endpoint, with the
-  client's secret read from a source you configured, is a request like any
-  other: the token is held in memory only, and no browser is involved.
+- **What Jig does do, in `jig-core`:**
+  - It reads a credential that already exists and attaches it to a request, so
+    plugin code never sees the value.
+  - It registers the value with the redactor, so it never reaches the model.
+  - A client-credentials or password grant against a token endpoint, with the
+    client's secret read from a source you configured, is a request like any
+    other: the token is held in memory only, and no browser is involved.
 - **And it keeps credential stores and its own files out of the agent's
-  reach.** Pi's file tools refuse the credential files of the tools Jig
-  delegates sign-in to, and refuse writes to Pi's agent folder, where Jig's
-  configuration and the passkey store live. That is a floor rule, so
-  configuration can add paths and never remove one (see
-  [Permissions](permissions.md)).
+  reach.**
+  - Pi's file tools refuse the credential files of the tools Jig delegates
+    sign-in to, and refuse writes to Pi's agent folder, where Jig's
+    configuration and the passkey store live.
+  - That is a floor rule, so configuration can add paths and never remove one
+    (see [Permissions](permissions.md)).
 - **Why now:** the passkey store in the entry below relies on the agent not
   being able to write the agent folder, and delegating sign-in to `gh` is safe
   only if the agent cannot read the token file `gh` keeps. Both promises were
@@ -34,24 +63,27 @@ Dated so the reasons stay attached.
 
 ## 2026-10-30: checks run on every push
 
-- **Biome for formatting and linting.** One tool for both, pinned to an exact
-  version, fast (the whole repository in about two seconds), with no plugins to
-  install. A pinned version matters: a new release can change what the
-  formatter writes, so a bump is a change you review. The repository had no
-  formatter, and `jig-api` alone had 512 lines over 120 characters.
+- **Biome for formatting and linting.** One tool for both, fast (the whole
+  repository in about two seconds), with no plugins to install.
+  - **Pinned to an exact version:** a new release can change what the formatter
+    writes, so a bump is a change you review.
+  - **Why now:** the repository had no formatter, and `jig-api` alone had 512
+    lines over 120 characters.
 - **Line width 120, 4-space indents, double quotes, semicolons, trailing commas
   everywhere.** That is how most of the code was already written, so it is the
   choice that changes the fewest lines. One commit formatted everything and
   nothing else; `.git-blame-ignore-revs` makes `git blame` skip it.
-- **Rules turned off, where the code is deliberate.**
-  `noNonNullAssertion` (131 hits): `noUncheckedIndexedAccess` is on, and
-  `items[0]!` is how the code says "this is there". `noControlCharactersInRegex`
-  (117): the code strips and refuses control characters from untrusted text on
-  purpose. In tests only: `noExplicitAny` (77), `noAssignInExpressions` (64)
-  and `noCommaOperator` (24), where fakes capture arguments inline, and
-  `noAdjacentSpacesInRegex` (10), where a test matches an aligned table with
-  its literal spaces. Source code keeps those four rules on. Every other
-  finding was fixed, or silenced on its own line with a reason (7 places).
+- **Rules turned off, where the code is deliberate:**
+  - `noNonNullAssertion` (131 hits): `noUncheckedIndexedAccess` is on, and
+    `items[0]!` is how the code says "this is there".
+  - `noControlCharactersInRegex` (117): the code strips and refuses control
+    characters from untrusted text on purpose.
+  - In tests only: `noExplicitAny` (77), `noAssignInExpressions` (64) and
+    `noCommaOperator` (24), where fakes capture arguments inline, and
+    `noAdjacentSpacesInRegex` (10), where a test matches an aligned table with
+    its literal spaces. Source code keeps those four rules on.
+  - Every other finding was fixed, or silenced on its own line with a reason (7
+    places).
 - **Left outside Biome:** `plugins/jig-logs/test/golden`, which the tests
   compare byte for byte; `package-lock.json`; and the review page
   (`plugins/jig-review/web`), which has its own package and 2-space style, and
@@ -88,11 +120,13 @@ Dated so the reasons stay attached.
   its file changes. `jig-theme` records a hash of each file it writes, and
   writes or deletes only a file whose hash still matches, so a file you changed
   by hand is never overwritten.
-- **`/theme reload` is a reload of Pi.** `jig.json` is read when a session starts,
-  and `jig-core` has no way to read it again on request, so a reload is the one
-  honest way to see an edit. Pi reads the themes folder before a session starts,
-  so it knows a palette that changed since by its old colours; the plugin writes
-  that palette's own file once more, which Pi's watcher takes as a change.
+- **`/theme reload` is a reload of Pi.** `jig.json` is read when a session
+  starts, and `jig-core` has no way to read it again on request, so a reload is
+  the one honest way to see an edit.
+  - Pi reads the themes folder before a session starts, so it knows a palette
+    that changed since by its old colours.
+  - The plugin writes that palette's own file once more, which Pi's watcher
+    takes as a change.
 - **Other plugins add footer parts on Pi's event bus,** `jig-theme:segment`. A
   plugin then does not depend on `jig-theme`, and nothing breaks without it.
 - **The usage history goes to `jig-lens`** as `/lens usage`, because it is about
@@ -106,18 +140,22 @@ Dated so the reasons stay attached.
   you across many turns, and the page is where you read it. Sending you back to Pi
   to type `y` after reading there was friction with no extra safety, once the
   approval itself cannot be forged.
-- **The old rule did not go.** [Approvals](approvals.md) say you approve inside the
-  waiting call, because a web endpoint is reachable from the agent's shell. That
-  reason still holds for a button. What changed is the endpoint: it checks a
-  WebAuthn signature over a fresh challenge, made by a key on your device after the
-  device checked you. The agent cannot make it, so the endpoint's address stops
-  mattering. A stolen cookie can comment as you; it cannot approve.
+- **The old rule did not go.** [Approvals](approvals.md) say you approve inside
+  the waiting call, because a web endpoint is reachable from the agent's shell.
+  That reason still holds for a button.
+  - **What changed is the endpoint:** it checks a WebAuthn signature over a
+    fresh challenge, made by a key on your device after the device checked you.
+  - **The agent cannot make it,** so the endpoint's address stops mattering. A
+    stolen cookie can comment as you; it cannot approve.
 - **A passkey, written on `node:crypto`.** No WebAuthn library: the checks are a
-  few hundred lines that can be read whole (a small CBOR decoder, the COSE key, the
-  challenge, origin, relying party id hash, user presence and verification, the
-  signature and the counter). Keys are ES256 and RS256, which is what Windows Hello,
-  Touch ID and security keys make. Attestation is `none`: a key is trusted because
-  you confirmed its fingerprint, not because of its make.
+  few hundred lines that can be read whole.
+  - **The checks:** a small CBOR decoder, the COSE key, the challenge, origin,
+    relying party id hash, user presence and verification, the signature and the
+    counter.
+  - **The keys:** ES256 and RS256, which is what Windows Hello, Touch ID and
+    security keys make.
+  - **Attestation is `none`:** a key is trusted because you confirmed its
+    fingerprint, not because of its make.
 - **Registering a key is an approval in Pi.** Before it is stored, Pi shows the
   SHA-256 fingerprint and asks `y`. Removing one asks in Pi too. So a key cannot be
   added from the page alone.
@@ -141,30 +179,49 @@ Dated so the reasons stay attached.
 
 ## 2026-10-30: jig-mongo is built on the official driver, with the walk of a pipeline as one of two locks
 
-- **The driver is `mongodb` 7.7.0, pinned exactly (Apache-2.0).** It is the supported way to speak to MongoDB: its wire protocol,
-  authentication, TLS and server selection are not worth rewriting, and `mongosh` would add a second language that runs code. It is the
-  only runtime dependency besides `yaml`, it is loaded on the first call, so a session that never reads MongoDB does not pay for it, and
-  only `driver.ts` imports it. Its own dependencies are `bson`, `@mongodb-js/saslprep` and `mongodb-connection-string-url`.
+- **The driver is `mongodb` 7.7.0, pinned exactly (Apache-2.0).** It is the
+  supported way to speak to MongoDB: its wire protocol, authentication, TLS and
+  server selection are not worth rewriting, and `mongosh` would add a second
+  language that runs code.
+  - It was the second runtime dependency, after `yaml`. The review page added
+    `hono`, `@hono/node-server` and `ignore` later.
+  - It is loaded on the first call, so a session that never reads MongoDB does
+    not pay for it, and only `driver.ts` imports it.
+  - Its own dependencies are `bson`, `@mongodb-js/saslprep` and
+    `mongodb-connection-string-url`.
 - **The tool talks to a seam, not to the driver.** `Backend` is what the tool asks of a database, and `adaptClient` turns it into driver
   calls. The tool is tested with a fake of the seam, the adapter with a fake client, and one optional test uses a real server when
   `JIG_TEST_MONGO_URI` is set.
 - **Results are relaxed Extended JSON.** A plain string for an id would not match an ObjectId in the next filter, so the model would
   waste calls on it. Binary data and code are shown as a note. A 64-bit integer that JSON cannot hold keeps its type: the driver's own
   relaxed form loses digits there.
-- **A pipeline is walked, and with an allow list it is also reshaped.** The walk refuses a reference to a denied or unlisted field in
-  every stage and sub-pipeline. It is a static check of a language with many corners, so with an allow list a projection of the allowed
-  fields is put in front of every stage and sub-pipeline: a corner the walk missed then reads nothing that is not listed.
-  `$objectToArray` is refused because it turns field names into values; `$graphLookup` is refused with an allow list because it cannot
-  be limited. A name that looks denied is refused even as the name of a new field, which is a small cost for a rule that is easy to state.
+- **A pipeline is walked, and with an allow list it is also reshaped.** The walk
+  refuses a reference to a denied or unlisted field in every stage and
+  sub-pipeline.
+  - **Why reshape too:** the walk is a static check of a language with many
+    corners, so with an allow list a projection of the allowed fields is put in
+    front of every stage and sub-pipeline. A corner the walk missed then reads
+    nothing that is not listed.
+  - **Refused outright:** `$objectToArray`, because it turns field names into
+    values, and `$graphLookup` with an allow list, because it cannot be limited.
+  - **A name that looks denied** is refused even as the name of a new field,
+    which is a small cost for a rule that is easy to state.
 - **A write reports counts, so a write names no denied field.** `modifiedCount` of `{"$set": {"password": "x"}}` would tell the agent
   whether the value equals "x". Filters, updates and documents are checked like reads.
-- **The preview's count is the guard.** The count is read just before the preview and again when the call runs, and the fingerprint
-  covers it. `limit` is the cap of a write of many (1000 by default, at most 2000), so one parameter keeps the meaning "how many".
-  Upserts and array filters are not supported yet: an upsert is a write whose count is zero.
+- **The preview's count is the guard.** The count is read just before the
+  preview and again when the call runs, and the fingerprint covers it.
+  - `limit` is the cap of a write of many (1000 by default, at most 2000), so
+    one parameter keeps the meaning "how many".
+  - Upserts and array filters are not supported yet: an upsert is a write whose
+    count is zero.
 - **A write is sent once.** The driver's `retryWrites` is off, and a lost reply is answered by one read, never by sending again.
-- **The SSH route is arguments only.** `-F /dev/null` leaves out ssh configuration that the agent's shell could have written, the host
-  and user are checked to be plain words, and the key lives in a private file only until ssh has signed in. A forward reaches one host,
-  so the address must be one `host:port`; the certificate is still checked against the database's own name.
+- **The SSH route is arguments only.**
+  - `-F /dev/null` leaves out ssh configuration that the agent's shell could
+    have written.
+  - The host and user are checked to be plain words, and the key lives in a
+    private file only until ssh has signed in.
+  - A forward reaches one host, so the address must be one `host:port`; the
+    certificate is still checked against the database's own name.
 - **A connection is never named `local` or `external`.** Writes to those are not asked about as writes to a test environment are.
 
 ## 2026-10-30: jig-mongo is a complete MongoDB tool; no SQL tool for now
@@ -185,32 +242,42 @@ Dated so the reasons stay attached.
 
 - **`ci` is built, and `jig-git` lost `checks`.** The tool has `status`, `runs`,
   `run`, `log`, `rerun`, `trigger` and `watch`, with one adapter each for GitHub
-  Actions, GitLab CI and Jenkins. `jig-git` keeps git, pull requests, reviews and
-  releases, and `pr view` keeps its one-line roll-up of the checks. The GitHub
-  logic, its tests and its watch moved; nothing was rewritten that did not have to be.
-- **An adapter says what it has.** Each has a table of the actions it supports and
-  the parameters each takes. An action it lacks is invalid input that names it, and
-  the call is blocked before anyone is asked. GitHub Actions has no `trigger` (a
-  workflow can deploy, and deploys have their own tool), Jenkins has no `rerun` (its
-  API has none, and a build that took a password cannot be rebuilt from what it
-  shows), and GitLab retries failed jobs only. GitHub's artifact list is part of
-  `run`, so the tool has seven actions and not eight.
+  Actions, GitLab CI and Jenkins.
+  - `jig-git` keeps git, pull requests, reviews and releases, and `pr view`
+    keeps its one-line roll-up of the checks.
+  - The GitHub logic, its tests and its watch moved; nothing was rewritten that
+    did not have to be.
+- **An adapter says what it has.** Each has a table of the actions it supports
+  and the parameters each takes. An action it lacks is invalid input that names
+  it, and the call is blocked before anyone is asked.
+  - **GitHub Actions** has no `trigger` (a workflow can deploy, and deploys have
+    their own tool).
+  - **Jenkins** has no `rerun` (its API has none, and a build that took a
+    password cannot be rebuilt from what it shows).
+  - **GitLab** retries failed jobs only.
+  - GitHub's artifact list is part of `run`, so the tool has seven actions and
+    not eight.
 - **The watch moved with CI.** It needs the same reads, the catalog knows the CI
   system, and two watches for one push (a GitHub one in `jig-git`, the rest in
-  `jig-ops`) would report twice. The kind is `ops-ci`, one for all systems; the spec
-  holds the name of the service and never its repository, address or job, so a poll
-  reads where the catalog says now. GitLab and Jenkins watch a pipeline or build to
-  its end, or named jobs or stages.
-- **A push starts a watch through an event.** `jig-git` cannot import `jig-ops`, and
-  must not know who listens. It publishes `jig-git:pushed` (`{ repo, branch, sha, pr? }`)
-  after a push and after a pull request, and `jig-ops` starts a watch for a service
-  that has the repository and a CI entry. The payload is checked, because anyone can
-  publish on the bus. The setting is `ops.watch.auto`.
-- **"Artifact ready" is now `jig-ops:artifact-ready`.** The plugin that publishes an
-  event owns its name, and `jig-git` no longer publishes this one. Nothing in this
-  repository listened to the old name. `git.watch` and `git.artifacts` became
-  `ops.watch` and `ops.artifacts`; the `git` section says where they went. The rules
-  stay global for now, not per service.
+  `jig-ops`) would report twice.
+  - The kind is `ops-ci`, one for all systems.
+  - The spec holds the name of the service and never its repository, address or
+    job, so a poll reads where the catalog says now.
+  - GitLab and Jenkins watch a pipeline or build to its end, or named jobs or
+    stages.
+- **A push starts a watch through an event.** `jig-git` cannot import `jig-ops`,
+  and must not know who listens. It publishes `jig-git:pushed`
+  (`{ repo, branch, sha, pr? }`) after a push and after a pull request.
+  - `jig-ops` starts a watch for a service that has the repository and a CI
+    entry.
+  - The payload is checked, because anyone can publish on the bus.
+  - The setting is `ops.watch.auto`.
+- **"Artifact ready" is now `jig-ops:artifact-ready`.** The plugin that
+  publishes an event owns its name, and `jig-git` no longer publishes this one.
+  Nothing in this repository listened to the old name.
+  - `git.watch` and `git.artifacts` became `ops.watch` and `ops.artifacts`; the
+    `git` section says where they went.
+  - The rules stay global for now, not per service.
 - **The CI host is `external` unless the catalog names an environment.** Reads are
   external reads, `rerun` and `trigger` external writes that ask. A CI server that is
   production, or a name `jig-core` does not know, gets masked reads and no writes.
@@ -226,33 +293,46 @@ Dated so the reasons stay attached.
 
 ## 2026-10-30: jig-api part 2: Bruno, OpenAPI and the Postman cloud, and the first dependency
 
-- **`yaml` is the repository's first runtime dependency (2.9.1, pinned exactly).** Bruno's default format is YAML and OpenAPI specs
-  are mostly YAML, and a YAML parser is not something to write: anchors, block scalars, flow styles and several ways to quote.
-  `yaml` (eemeli/yaml) was chosen over writing one, and over a parser that comes with a larger tree, because:
+- **`yaml` is the repository's first runtime dependency (2.9.1, pinned
+  exactly).** Bruno's default format is YAML and OpenAPI specs are mostly YAML.
+  A YAML parser is not something to write: anchors, block scalars, flow styles
+  and several ways to quote.
+
+  `yaml` (eemeli/yaml) was chosen over writing one, and over a parser that comes
+  with a larger tree, because:
   - it is ISC-licensed and has no dependencies of its own, so the lock file gains one package;
   - it parses and never evaluates: no custom tag runs code, aliases are capped, duplicate keys are an error;
   - it reports a code and a position for a mistake, so a message can name the line and never quote it (a line of an environment
     may hold a secret);
   - it ships its own types.
   It is used only to parse. Nothing is `eval`ed.
-- **Bruno's `.bru` language is read by a small reader of our own.** Its parser comes with a grammar library and a utility library, which
-  is more than a line format of a few block kinds needs, and the reader has to keep a secret's value out of every message anyway.
-  The format is documented in Bruno's pages and its own readers, which `docs/not-verified.md` lists.
+- **Bruno's `.bru` language is read by a small reader of our own.** Its parser
+  comes with a grammar library and a utility library, which is more than a line
+  format of a few block kinds needs.
+  - The reader has to keep a secret's value out of every message anyway.
+  - The format is documented in Bruno's pages and its own readers, which
+    `docs/not-verified.md` lists.
 - **No `.env` file is ever read.** Bruno reads `{{process.env.NAME}}` from one. Here it is a secret named `process.env.NAME`, filled
   from `api.secrets` like any other, so the file that is easiest to commit by mistake is never opened.
-- **OpenAPI is opt-in, per environment, and its hosts are configured.** A spec lists what an API can do, not what a team chose to
-  run, and its servers rarely match environment names. So it runs only in the environments listed in its own configuration, against
-  the servers that configuration maps to them, and in production only for reads and only with `allowProductionReads`. Writes in
-  production stay denied by the floor.
+- **OpenAPI is opt-in, per environment, and its hosts are configured.** A spec
+  lists what an API can do, not what a team chose to run, and its servers rarely
+  match environment names.
+  - So it runs only in the environments listed in its own configuration,
+    against the servers that configuration maps to them.
+  - In production it runs only reads, and only with `allowProductionReads`.
+    Writes in production stay denied by the floor.
 - **A credential in a spec is a slot, never a value.** Each security scheme becomes secret variables named for it, filled from
   `api.secrets` or by the company's sign-in. A token address on a host that is not one of the spec's servers is refused, so a client's
   secret is not sent to a host the environment does not have.
 - **Optional parameters are left out, not blanked.** A parameter or body property the spec does not require is sent only when the
   agent gives it, so a missing filter does not become an empty one.
-- **Postman's cloud is fetched by a command the person types.** `/api refresh` fetches to a local copy, and reading stays
-  synchronous, because a call is classified before it runs. The fetch is an ordinary request of the sending engine, so a transport
-  carries it and the key is read by `jig-core` when it is sent. The copy omits the values of secret variables and is private to the
-  user. A collection access key, which goes in the address, is not used.
+- **Postman's cloud is fetched by a command the person types.** `/api refresh`
+  fetches to a local copy, and reading stays synchronous, because a call is
+  classified before it runs.
+  - The fetch is an ordinary request of the sending engine, so a transport
+    carries it and the key is read by `jig-core` when it is sent.
+  - The copy omits the values of secret variables and is private to the user.
+  - A collection access key, which goes in the address, is not used.
 
 ## 2026-10-30: jig-ops runtime and deploy, as built
 

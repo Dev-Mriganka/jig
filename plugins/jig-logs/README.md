@@ -10,6 +10,10 @@ masks production results. For example, `logs` with the phrase `req-7f3a9c` in
 `staging` searches the last 2 hours and returns how many hits the window holds,
 then one line per hit.
 
+![How a jig-logs search runs: the search splits the window into buckets, the adapter builds one request per bucket, jig-core sends it with the credential, and the hit lines come back cut and, in production, masked](../../docs/img/logs-search.svg)
+
+*How a search runs. The search splits the window into buckets and the adapter builds one request for each. `jig-core` sends it with the credential, or a company transport does, and the hit lines come back cut and, in production, masked.*
+
 ## Backends
 
 `logs.backend.type` picks the backend. `phrase`, `match` and `exclude` mean the
@@ -36,16 +40,19 @@ the hits already fetched (Loki also receives `match` and `exclude` as filters).
 
 | Parameter | Kind | What it does |
 |---|---|---|
-| `phrase` or `query` | one of the two | `phrase`: an exact phrase in the message, such as a trace id, an account id or an error text (1 to 512 characters). `query`: a query in the backend's language, such as `AND`, `OR`, `NOT` and wildcards in Lucene, or `\|= "timeout" \| json` in LogQL (1 to 2000 characters) |
-| `environment` | required | Where to search: one of the environments in the configuration. A name nobody configured is refused, and the message lists the ones that exist |
-| `window` | optional | A relative window that ends now: `30m`, `2h` or `1d`, at most `7d`. Default `2h`. Not together with `from` and `to` |
-| `from`, `to` | optional, together | Exact times: ISO 8601 with a timezone, `to` exclusive, at most 7 days apart |
+| `phrase` or `query` | one of the two | `phrase`: an exact phrase in the message. `query`: a query in the backend's language |
+| `environment` | required | Where to search: one of the configured environments |
+| `window` | optional | A relative window that ends now, such as `30m`, `2h` or `1d`. Default `2h` |
+| `from`, `to` | optional, together | Exact times: ISO 8601 with a timezone, `to` exclusive |
 | `size` | optional | How many hits to fetch, 1 to 200. Default 50 |
 | `order` | optional | `asc` (default) fetches the oldest hits of the window, `desc` the newest |
-| `match`, `exclude` | optional | 1 to 5 plain texts of 1 to 200 characters, not patterns. A hit is shown only if its message contains all of `match` and none of `exclude`, ignoring case |
-| `around` | optional | One plain text. Each hit is shown as a window around the first place the text occurs in it, instead of its first characters |
-| `chars` | optional | How many characters a hit keeps, 40 to 4000. Default 300, or 4000 when 3 or fewer hits are shown. With `around`, the size of the window |
-| `offset` | optional | Which hit to start from among the fetched ones that pass `match` and `exclude`. Default 0. A page holds up to 20 hits, fewer when `chars` is large |
+| `match`, `exclude` | optional | Plain texts that a hit's message must, or must not, contain |
+| `around` | optional | One plain text: each hit is shown as a window around it |
+| `chars` | optional | How many characters a hit keeps, 40 to 4000 |
+| `offset` | optional | Which of the fetched hits to start from, for paging |
+
+The limits and the details of each parameter are in
+[Parameters](docs/parameters.md).
 
 The result is plain text: a header with the status and the counts, what is
 missing, then one line per hit. A wrong call is refused before anything is sent,
@@ -65,17 +72,14 @@ Usage: logs {phrase or query, environment, window?, ...}`.
 - **No credential in anything the model reads.** A secret is resolved when a
   request is made and stays in that call. An error names what failed (a status,
   an error code) and never repeats a header, a body, an address or the reply.
-- **Invalid input is not asked about.** `jig-core` classifies the call before it
-  runs; an environment nobody configured, or a Loki `query` that could reach
-  beyond the selector, gives a `TypeError`.
 - **A result says what it covers.** A call makes a limited number of requests in
   a limited time. A part of the window it could not search is a gap, named with
-  its reason, and the total is then "at least", as it is for Loki, which cannot
-  count and so reads "at least" whenever a bucket filled `size`.
+  its reason, and the total is then "at least" (Loki cannot count, so it always
+  is when a bucket filled `size`).
 - **Cut is not hidden.** A hit line is cut so that no JSON body or quoted value
   is left open. `{…}` means a body cut for length, not hidden.
-- **Facts.** After a search, the call's record carries `status`, `hits`,
-  `atLeast`, `fetched` and `requests`.
+- **Invalid input is not asked about,** and facts are recorded: `status`, `hits`,
+  `atLeast`, `fetched` and `requests` (see [Failures](docs/failures.md)).
 
 ## Configure
 
@@ -85,8 +89,14 @@ not configured instead of running half set up.
 
 | Field | Meaning |
 |---|---|
-| `backend` | Required. `type` is `elasticsearch` (the default, also OpenSearch) or `loki`; `url` is where it is, over `https://`; `auth` is one of four kinds, whose password, key or token is a secret reference such as `pass:logs/api-key` (see [Secrets](../../docs/secrets.md)), never the secret. Loki adds an optional `tenant` |
-| `environments` | Required, at least one. Each says where its logs are: an `index` for Elasticsearch (with `timeField`, `messageField` and `filter`), a `selector` for Loki, which comes from here and never from the model. `jigEnvironment` is the `jig-core` environment it is classified in, by default its own name |
+| `backend` | Required. The `type` (`elasticsearch` or `loki`), its `url`, and `auth` or `transport` |
+| `environments` | Required, at least one. Each says where its logs are: an `index` or a `selector` |
+
+A password, key or token in `auth` is a secret reference such as
+`pass:logs/api-key` (see [Secrets](../../docs/secrets.md)), never the secret. A
+Loki `selector` comes from here and never from the model. An environment's
+`jigEnvironment` is the `jig-core` environment it is classified in, by default its
+own name.
 
 [Configuration](docs/configuration.md) lists every field with its default and
 limits, and has an example for each type.
@@ -119,6 +129,7 @@ jig-logs/
 
 ## More detail
 
+- [Parameters](docs/parameters.md): every parameter of `logs`, with its limits
 - [Backends](docs/backends.md): what an adapter does, and how to write one
 - [Configuration](docs/configuration.md): every field, with its default and limits
 - [Loki](docs/loki.md): what a call becomes, its limits and its errors

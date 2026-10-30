@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="520" viewBox="0 0 960 520" role="img" aria-label="How a jig-api request runs. Your team&#x27;s collections, Postman files, .http files, Bruno, OpenAPI specs and a Postman cloud copy, are read into one list of saved requests. The agent runs a request by name with variable values. The tool fills only the variables: the host, method and headers stay as saved, and the environment decides the host, which is pinned. A write is previewed and asks you with the exact request, and is refused if it changed since you looked. jig-core then sends it, attaching the credential, and a lost reply is checked once and never sent again. The API answers, and the result is masked in production, has secrets removed, and has long text cut at 200 lines before the agent reads it." font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">
+  <rect x="0.5" y="0.5" width="959" height="519" rx="10" fill="#FAFBFA" stroke="#D2D9D3"/>
+  <defs>
+    <marker id="apirun-head-1d3b4d-11" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#1D3B4D"/></marker>
+  </defs>
+  <!-- the collections become one list -->
+  <rect x="30" y="40" width="230" height="132" rx="6" fill="#8C979D"/>
+  <text x="145.0" y="76.5" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">your team's collections</text>
+  <text x="145.0" y="93.5" font-size="12" fill="#FFFFFF" text-anchor="middle">Postman files</text>
+  <text x="145.0" y="110.5" font-size="12" fill="#FFFFFF" text-anchor="middle">.http files</text>
+  <text x="145.0" y="127.5" font-size="12" fill="#FFFFFF" text-anchor="middle">Bruno and OpenAPI</text>
+  <text x="145.0" y="144.5" font-size="12" fill="#FFFFFF" text-anchor="middle">a Postman cloud copy</text>
+  <path d="M260 106 H330" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#apirun-head-1d3b4d-11)"/>
+  <text x="295" y="96" font-size="12" fill="#3A4440" text-anchor="middle">read into</text>
+  <rect x="330" y="40" width="250" height="132" rx="6" fill="#5C9CAB"/>
+  <text x="455.0" y="85.0" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">one list of saved requests</text>
+  <text x="455.0" y="102.0" font-size="12" fill="#FFFFFF" text-anchor="middle">each has a name, a method,</text>
+  <text x="455.0" y="119.0" font-size="12" fill="#FFFFFF" text-anchor="middle">an address and variables;</text>
+  <text x="455.0" y="136.0" font-size="12" fill="#FFFFFF" text-anchor="middle">list and show describe it</text>
+  <path d="M690 106 H580" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#apirun-head-1d3b4d-11)"/>
+  <text x="635" y="96" font-size="12" fill="#3A4440" text-anchor="middle">by name</text>
+  <rect x="690" y="40" width="240" height="132" rx="6" fill="#5D4B7C"/>
+  <text x="810.0" y="85.0" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">the agent</text>
+  <text x="810.0" y="102.0" font-size="12" fill="#FFFFFF" text-anchor="middle">api run: Create order</text>
+  <text x="810.0" y="119.0" font-size="12" fill="#FFFFFF" text-anchor="middle">orderId = 123</text>
+  <text x="810.0" y="136.0" font-size="12" fill="#FFFFFF" text-anchor="middle">a name and variable values</text>
+  <!-- fill, preview, send -->
+  <path d="M455 172 V224 H160 V240" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#apirun-head-1d3b4d-11)"/>
+  <text x="470" y="190" font-size="12" fill="#3A4440">the saved request</text>
+  <rect x="30" y="240" width="260" height="110" rx="6" fill="#5C9CAB"/>
+  <text x="160.0" y="274.0" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">fill only the variables</text>
+  <text x="160.0" y="291.0" font-size="12" fill="#FFFFFF" text-anchor="middle">host, method and headers stay</text>
+  <text x="160.0" y="308.0" font-size="12" fill="#FFFFFF" text-anchor="middle">as saved; the environment</text>
+  <text x="160.0" y="325.0" font-size="12" fill="#FFFFFF" text-anchor="middle">decides the host, which is pinned</text>
+  <path d="M290 295 H360" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#apirun-head-1d3b4d-11)"/>
+  <text x="325" y="285" font-size="12" fill="#3A4440" text-anchor="middle">a request</text>
+  <rect x="360" y="240" width="260" height="110" rx="6" fill="#FBF5EA" stroke="#C08326" stroke-width="1.8"/>
+  <text x="490.0" y="274.0" font-size="13" fill="#8A5A12" font-weight="700" text-anchor="middle">the preview</text>
+  <text x="490.0" y="291.0" font-size="12" fill="#3A4440" text-anchor="middle">a write asks you, with the</text>
+  <text x="490.0" y="308.0" font-size="12" fill="#3A4440" text-anchor="middle">exact request; refused if it</text>
+  <text x="490.0" y="325.0" font-size="12" fill="#3A4440" text-anchor="middle">changed since you looked</text>
+  <path d="M620 295 H690" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#apirun-head-1d3b4d-11)"/>
+  <text x="655" y="285" font-size="12" fill="#3A4440" text-anchor="middle">approved</text>
+  <rect x="690" y="240" width="240" height="110" rx="6" fill="#1D3B4D"/>
+  <text x="810.0" y="274.0" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">jig-core sends it</text>
+  <text x="810.0" y="291.0" font-size="12" fill="#FFFFFF" text-anchor="middle">adds the credential,</text>
+  <text x="810.0" y="308.0" font-size="12" fill="#FFFFFF" text-anchor="middle">checks a lost reply once,</text>
+  <text x="810.0" y="325.0" font-size="12" fill="#FFFFFF" text-anchor="middle">production writes: denied</text>
+  <!-- the answer comes back -->
+  <path d="M810 350 V410" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#apirun-head-1d3b4d-11)"/>
+  <text x="826" y="385" font-size="12" fill="#3A4440">request + credential</text>
+  <rect x="690" y="410" width="240" height="80" rx="6" fill="#8C979D"/>
+  <text x="810.0" y="446.0" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">the API</text>
+  <text x="810.0" y="463.0" font-size="12" fill="#FFFFFF" text-anchor="middle">answers</text>
+  <path d="M690 450 H620" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#apirun-head-1d3b4d-11)"/>
+  <text x="655" y="440" font-size="12" fill="#3A4440" text-anchor="middle">answer</text>
+  <rect x="330" y="410" width="290" height="80" rx="6" fill="#5C9CAB"/>
+  <text x="475.0" y="437.5" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">the result</text>
+  <text x="475.0" y="454.5" font-size="12" fill="#FFFFFF" text-anchor="middle">masked in production, secrets removed,</text>
+  <text x="475.0" y="471.5" font-size="12" fill="#FFFFFF" text-anchor="middle">long text cut at 200 lines</text>
+  <path d="M330 450 H260" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#apirun-head-1d3b4d-11)"/>
+  <text x="295" y="440" font-size="12" fill="#3A4440" text-anchor="middle">result</text>
+  <rect x="30" y="410" width="230" height="80" rx="6" fill="#5D4B7C"/>
+  <text x="145.0" y="446.0" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">the agent</text>
+  <text x="145.0" y="463.0" font-size="12" fill="#FFFFFF" text-anchor="middle">reads status, headers, body</text>
+</svg>

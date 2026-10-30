@@ -29,10 +29,19 @@ in Loki's own documentation, and what was not, is in
 |---|---|
 | `backend.type` | `"loki"` |
 | `backend.url` | Where Loki is, without `/loki/api/v1`. It may hold a path, such as a gateway's prefix |
-| `backend.auth` | Any of the four kinds (see [Connecting](connecting.md)). For Grafana Cloud use `username` and `password`: the user shown in the Loki details of the stack, and an API token as a secret reference. Behind a gateway, `token` or `signIn` |
-| `backend.tenant` | Optional. Sent as the header `X-Scope-OrgID` on every request, through a transport too. Without it a Loki that has several tenants answers 401, "no org id". A Loki with `auth_enabled: false` has one tenant, `fake`, and needs none. Up to 300 visible characters; `a\|b` names two tenants |
-| `environments.<name>.selector` | Required. A LogQL stream selector with at least one `=` or `=~` matcher that has a value. It names the streams of the environment, and it comes from here and never from the model |
+| `backend.auth` | Any of the four kinds (see [Connecting](connecting.md)) |
+| `backend.tenant` | Optional. Sent as the header `X-Scope-OrgID` on every request |
+| `environments.<name>.selector` | Required. A LogQL stream selector with at least one `=` or `=~` matcher that has a value |
 
+- **`backend.auth`:** for Grafana Cloud use `username` and `password`: the user
+  shown in the Loki details of the stack, and an API token as a secret reference.
+  Behind a gateway, `token` or `signIn`.
+- **`backend.tenant`:** it is sent through a transport too. Without it a Loki that
+  has several tenants answers 401, "no org id". A Loki with `auth_enabled: false`
+  has one tenant, `fake`, and needs none. Up to 300 visible characters; `a\|b`
+  names two tenants.
+- **`selector`:** it names the streams of the environment, and it comes from here
+  and never from the model.
 An environment has no `index`, `timeField`, `messageField` or `filter`: they are
 Elasticsearch's, and Loki has a time and a line and nothing to choose. A field of
 the other type is reported by name.
@@ -72,9 +81,11 @@ This is a search for the phrase `req-7f3a9c`, with `match: ["timeout"]` and
 
 The texts are quoted strings: the backslash, the quote and every control
 character in them are escaped, so nothing in a phrase, a `match` or an `exclude`
-can close the string. The address carries the parameters encoded, so a text with
-`&` in it is still one value of `query`. The line filters come before the model's
-`query`, so Loki drops lines before it parses them.
+can close the string.
+
+The address carries the parameters encoded, so a text with `&` in it is still one
+value of `query`. The line filters come before the model's `query`, so Loki drops
+lines before it parses them.
 
 The parameters are in the address, as Loki's documentation shows them. So a
 sign-in service, a transport and a gateway in front of Loki see the query, as they

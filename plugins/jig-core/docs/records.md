@@ -19,10 +19,12 @@ it once.
 
 **Facts** are a few named numbers or short codes that a Jig tool adds to its
 own record, as declared in its contract: for example, tests passed and failed,
-or a CI run's conclusion. They are never free text. A string over 64
-characters is dropped, and so is anything that is not a number, a flag or a
-string. A fact whose name is over 64 characters is dropped too, a record keeps
-at most 50 facts, and string facts are redacted.
+or a CI run's conclusion. They are never free text. The limits:
+- a string over 64 characters is dropped, and so is anything that is not a
+  number, a flag or a string;
+- a fact whose name is over 64 characters is dropped too;
+- a record keeps at most 50 facts;
+- string facts are redacted.
 
 A record never contains tool arguments or tool output. An error is kept as its
 kind plus one masked and redacted line of at most 200 characters.
@@ -32,24 +34,38 @@ kind plus one masked and redacted line of at most 200 characters.
 | Field | Lines | Meaning |
 |---|---|---|
 | `id`, `kind`, `time` | all | A unique id, `call` or `turn`, and the time in ISO 8601, UTC |
-| `session`, `parentSession`, `agentRole`, `ticket` | all | The Pi session id; `$JIG_PARENT_SESSION` when set; `$JIG_AGENT_ROLE` (default `main`); the ticket set with `setTicket` |
+| `session`, `parentSession`, `agentRole`, `ticket` | all | The Pi session id; the parent session; the agent role; the ticket |
 | `tool`, `action`, `plugin` | call | What was called. `plugin` is the one that declared the tool, else where Pi says the tool came from |
 | `environment`, `environmentKind`, `effect` | call | Where it acted (the tool's own name for it and the kind behind it), and `read` or `write` |
-| `decision`, `decisionSource` | call | `allow`, `ask` or `deny`, and where it came from: `table`, `rule`, `tool`, `session`, `unknown` or `floor` |
-| `approval`, `answer`, `waitedMs` | call | When it asked: `dialog`, `review` or `form`; `allow`, `allow-session` or `decline`; the milliseconds the call waited, queue included |
+| `decision`, `decisionSource` | call | `allow`, `ask` or `deny`, and its source (see below) |
+| `approval`, `answer`, `waitedMs` | call | The kind of question, your answer, and the milliseconds the call waited |
 | `outcome`, `errorKind`, `error` | call | `ok`, `error` or `blocked`; the kind of failure; one line |
-| `durationMs`, `toolCallId`, `parentToolCallId`, `spill`, `facts` | call | How long the tool ran; Pi's call ids (a nested call is `<parent>/<n>`); the spill file; the tool's facts |
+| `durationMs`, `toolCallId`, `parentToolCallId`, `spill`, `facts` | call | How long the tool ran; Pi's call ids; the spill file; the tool's facts |
 | `model`, `input`, `output`, `cacheRead`, `cacheWrite`, `cost` | turn | The model id, the token counts, and the total cost in dollars |
 
 A field that does not apply is left out. A call that never reached jig-core (an
 unknown tool name, arguments that failed Pi's own checks) was never classified:
 it has no environment, effect or decision, and its error kind is `not-run`.
 
-Error kinds: `denied` and `no-screen` (a deny), `declined` and `dismissed` (the
-answer to a question), `invalid` (the tool's preview found the input invalid,
-so nobody was asked), `internal` (jig-core could not decide, so it blocked),
-`tool` (the tool ran and failed), `withheld` (the tool ran but its result could
-not be masked or redacted) and `not-run`.
+- **`session`, `parentSession`, `agentRole`:** the parent session is
+  `$JIG_PARENT_SESSION` when set, and the role is `$JIG_AGENT_ROLE` (default
+  `main`). The ticket is the one set with `setTicket`.
+- **`decisionSource`** is `table`, `rule`, `tool`, `session`, `unknown` or
+  `floor`.
+- **`approval`** is `dialog`, `review` or `form`; **`answer`** is `allow`,
+  `allow-session` or `decline`; **`waitedMs`** includes the time in the queue.
+- **`parentToolCallId`:** a nested call's id is `<parent>/<n>`.
+
+### Error kinds
+
+- **`denied`, `no-screen`:** a deny.
+- **`declined`, `dismissed`:** the answer to a question.
+- **`invalid`:** the tool's preview found the input invalid, so nobody was
+  asked.
+- **`internal`:** jig-core could not decide, so it blocked.
+- **`tool`:** the tool ran and failed.
+- **`withheld`:** the tool ran but its result could not be masked or redacted.
+- **`not-run`:** the call never reached jig-core.
 
 Records are kept for `records.retentionDays` and cleaned when a session starts.
 If a line cannot be written, the call goes on, and `/jig` says so.

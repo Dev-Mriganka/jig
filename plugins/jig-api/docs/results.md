@@ -19,16 +19,29 @@ location: /v1/orders/42
 
 | What | How it is shown |
 |---|---|
-| The status line | The method, the full address and the status with its standard words, never the server's own, so a server cannot put text there. A status without standard words has none |
-| The request | Its name, the collection, and the environment as the collection names it and as `jig-core` knows it; `call` for an ad-hoc request |
-| Headers | `content-type`, `location`, and trace or request ids (a name that holds `trace`, `request-id`, `requestid`, `correlation-id` or `correlationid`); at most 6, with names in lower case and each value on one line, cut at 200 characters. Cookies are never among them |
-| JSON | Re-indented by two spaces with its numbers, strings and escapes untouched, so a long id reads as the service sent it. It is recognised whatever the content type says. Not cut here: `jig-core` cuts a very long result and keeps the whole text in a file |
-| Other text | The first 200 lines, and a count of the rest. A line end of `\r\n` reads as one; a byte that is not UTF-8 becomes a replacement character |
+| The status line | The method, the full address and the status with its standard words |
+| The request | Its name, the collection and the environment; `call` for an ad-hoc request |
+| Headers | `content-type`, `location`, and trace or request ids; at most 6 |
+| JSON | Re-indented by two spaces, with its numbers, strings and escapes untouched |
+| Other text | The first 200 lines, and a count of the rest |
 | An empty body | `(empty body)` |
-| A binary body | Its size only, such as `(binary body, 8 bytes)`. A body is binary when a NUL byte is among its first 4096 bytes |
-| An answer over 2 MiB | Cut there, and the result says so: `[the answer was cut at 2097152 bytes]`. A JSON body that was cut is shown as text, because it is no longer JSON |
-| A redirect | A note that it was not followed, with its `location` header. A `3xx` without a `location` gets no note |
-| A write with a `5xx` or `408` answer | A note that it may still have been carried out: check with a `GET` before sending it again. A read, and a write that the server turned down with a `4xx`, get none |
+| A binary body | Its size only, such as `(binary body, 8 bytes)` |
+| An answer over 2 MiB | Cut there, and the result says so: `[the answer was cut at 2097152 bytes]` |
+| A redirect | A note that it was not followed, with its `location` header |
+| A write with a `5xx` or `408` answer | A note that it may still have been carried out |
+
+- **The status line** never uses the server's own words, so a server cannot put text there. A status without standard words has
+  none.
+- **The request line** gives the environment as the collection names it and as `jig-core` knows it.
+- **Headers:** a trace or request id is a name that holds `trace`, `request-id`, `requestid`, `correlation-id` or `correlationid`.
+  Names are in lower case, each value is on one line and cut at 200 characters, and cookies are never among them.
+- **JSON** is recognised whatever the content type says. It is not cut here: `jig-core` cuts a very long result and keeps the
+  whole text in a file.
+- **Other text:** a line end of `\r\n` reads as one, and a byte that is not UTF-8 becomes a replacement character.
+- **A body is binary** when a NUL byte is among its first 4096 bytes.
+- **A JSON body that was cut** is shown as text, because it is no longer JSON.
+- **A redirect** without a `location` gets no note.
+- **A read, and a write the server turned down with a `4xx`,** get no "may have been carried out" note.
 
 ## A folder
 
@@ -50,9 +63,11 @@ Request: Version (flows) in Staging (staging)
 ## What is removed
 
 A secret, a token or a sign-in header value that the tool sent, of 8 characters or more, is removed from the answer, in its headers and
-in its body, in case a server repeats what it was sent. It becomes `[redacted]`, in each of the forms a server may repeat it: as it is,
-inside JSON text, and URL-encoded. The token inside an `Authorization: Scheme token` header is removed on its own as well, because a
-server may repeat it without its scheme. A shorter value is left to `jig-core`, because removing it would blank ordinary words.
+in its body, in case a server repeats what it was sent.
+- **It becomes `[redacted]`,** in each of the forms a server may repeat it: as it is, inside JSON text, and URL-encoded.
+- **The token inside an `Authorization: Scheme token` header** is removed on its own as well, because a server may repeat it
+  without its scheme.
+- **A shorter value** is left to `jig-core`, because removing it would blank ordinary words.
 
 `Set-Cookie` headers never leave the tool: they are dropped from the answer, also when a transport gives them.
 

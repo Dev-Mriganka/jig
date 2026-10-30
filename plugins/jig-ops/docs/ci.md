@@ -48,9 +48,10 @@ names the adapter and says what it does have.
   there are masked and writes are denied before anyone is asked.
 - **A write is previewed.** The preview names the service, what is sent and the
   state it is sent against (the failed jobs of the pipeline, the newest pipeline of
-  the `ref`, the next build number). It carries a fingerprint. When the call runs,
-  the plan is worked out again, and if the fingerprint differs the call is refused:
-  "changed since the preview ... Nothing was sent".
+  the `ref`, the next build number). It carries a fingerprint.
+  - When the call runs, the plan is worked out again.
+  - If the fingerprint differs the call is refused: "changed since the preview ...
+    Nothing was sent".
 - **A write is sent once.** A timeout, a connection that broke, a gateway error or
   a cancelled call may mean that the CI system did what it was asked. The tool
   then reads once and tells the model what it found. It never sends the request
@@ -144,12 +145,15 @@ cannot read a version from its log; GitLab has no pull request comments, tags or
 releases here.
 
 What happens after "artifact ready" is a company decision. A company plugin may
-listen for the event, and it always tells the agent. It may start a deploy by
-itself only when all of these hold: its automatic deploy setting is on (off by
-default), the watch was started for a deploy you asked for, and the target is
-`staging` and replaces no one else's build there. The deploy goes through
-`ctx.executeTool`, so `jig-core` still asks for a test environment unless your rule
-allows it, and denies production.
+listen for the event, and it always tells the agent.
+
+It may start a deploy by itself only when all of these hold:
+- its automatic deploy setting is on (off by default);
+- the watch was started for a deploy you asked for;
+- the target is `staging` and replaces no one else's build there.
+
+The deploy goes through `ctx.executeTool`, so `jig-core` still asks for a test
+environment unless your rule allows it, and denies production.
 
 ## Events
 

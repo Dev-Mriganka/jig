@@ -23,8 +23,10 @@ checked, and again when a call is made, because `jig-core` decides which names a
 | `db.collection.field` | the field in that collection. A dotted path is one field: `*.profile.ssn` |
 
 A pattern of three or more parts is also read as a collection named `a.b`, because a collection name may hold dots. Denying both errs on
-the safe side. A field pattern matches wherever its names appear one after another in a path, so `*.notes` denies `notes` and
-`customer.notes`, and `*.profile.ssn` denies `profile.ssn` and `customer.profile.ssn.last4`.
+the safe side.
+
+A field pattern matches wherever its names appear one after another in a path, so `*.notes` denies `notes` and `customer.notes`,
+and `*.profile.ssn` denies `profile.ssn` and `customer.profile.ssn.last4`.
 
 ## The allow list
 
@@ -44,9 +46,11 @@ These hold in every environment, and a configuration can add to them but never r
 ## What each action does with the lists
 
 - **`find`, `sample`, `distinct`, `schema`:** every field named in the call is checked, a denied one is refused, and the result is
-  stripped of denied fields at any depth, through arrays, whatever the server sent. With an allow list the request has a forced inclusion
-  projection of the allowed fields, a requested field that is not allowed is refused, a field that is only partly allowed expands to the
-  allowed fields under it, and excluding fields (`{"status": 0}`) is refused.
+  stripped of denied fields at any depth, through arrays, whatever the server sent. With an allow list:
+  - the request has a forced inclusion projection of the allowed fields;
+  - a requested field that is not allowed is refused;
+  - a field that is only partly allowed expands to the allowed fields under it;
+  - excluding fields (`{"status": 0}`) is refused.
 - **`indexes`, `index-stats`:** an index on a field that may not be seen is left out, and the count says so. The condition of a partial
   index names fields, so it is not shown.
 - **`databases`, `collections`:** only what the lists allow.
@@ -63,15 +67,19 @@ A pipeline is checked in full before anything runs. A field reference is a `"$pa
 | It is refused | Because |
 |---|---|
 | a reference to a denied field, in any stage, nested expression or sub-pipeline | the value would be read |
-| a rename: `{ x: "$password" }`, `$addFields`, `$group` accumulators, `$sortByCount`, `$bucket`, `$setWindowFields`, `$redact` | the value would be copied under another name |
+| a rename: `{ x: "$password" }`, `$addFields`, `$group` accumulators, and more (below) | the value would be copied under another name |
 | `$getField` or `$setField` with a computed name | the name cannot be checked |
 | `$objectToArray` | it turns field names into values |
 | `$lookup`, `$graphLookup`, `$unionWith` into a denied collection, or by a denied field | the collection and its fields are checked like the pipeline's own |
-| `$replaceRoot` or `$replaceWith` with a denied field, or with a whole document that holds a denied path | the new root would carry it |
+| `$replaceRoot` or `$replaceWith` with a denied field or document | the new root would carry it |
 | a `$facet` branch that names a denied field | every sub-pipeline is walked |
 | `$jsonSchema`, `$text` (with an allow list), a query or stage operator the walk does not know | it names fields that cannot be checked |
 | a field name that looks denied, even as a new name | choose another name |
-| `$out` or `$merge` anywhere but last, in a sub-pipeline, or into a collection that may not be written | writes are previewed and checked |
+| `$out` or `$merge` anywhere but last, or into a collection that may not be written | writes are previewed and checked |
+
+- **A rename** also covers `$sortByCount`, `$bucket`, `$setWindowFields` and `$redact`.
+- **A `$replaceRoot` or `$replaceWith`** is refused with a denied field, or with a whole document that holds a denied path.
+- **`$out` or `$merge`** is also refused in a sub-pipeline.
 
 A variable stands for what it was given: `$map`, `$filter`, `$reduce` and `$let` bind `$$name` to the path of their input, so
 `$$line.token` is `items.token`. A variable that is not defined is refused.

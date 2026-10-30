@@ -26,14 +26,18 @@ A value stays a value. It is written into the text it lands in so that it cannot
 
 | Where it lands | How it is written |
 |---|---|
-| The address | Percent-encoded as one piece: `a/b?c=d` is one path segment, and `.` or `..` is refused. It can never be part of the scheme or the host |
+| The address | Percent-encoded as one piece, so `a/b?c=d` is one path segment |
 | A header | Printable ASCII only |
 | A JSON body, inside a string | Escaped: quotes, backslashes and line ends |
 | A JSON body, outside a string | A number, `true`, `false` or `null`, and nothing else |
 | A URL-encoded form | Percent-encoded |
 | XML or HTML | Escaped |
-| A GraphQL query | Letters, digits and `_ . : @ + -` only. Use a GraphQL variable for anything else; the `variables` of the operation are JSON and escaped like any JSON |
+| A GraphQL query | Letters, digits and `_ . : @ + -` only |
 | Plain text | As it is |
+
+- **The address:** `.` or `..` is refused, and a variable can never be part of the scheme or the host.
+- **A GraphQL query:** use a GraphQL variable for anything else. The `variables` of the operation are JSON and escaped like any
+  JSON.
 
 A value is text, a number or `true` or `false`, at most 2000 characters, with no control characters other than tab and line end.
 What it holds is never read again: `{{token}}` in a value is the text `{{token}}`.
@@ -44,10 +48,15 @@ together. The hosts a request may reach are the environment's own (see [Safety](
 
 ## Secrets
 
-A variable is a secret if an environment file declares it so (a Postman `secret` type, any key of `http-client.private.env.json`, a
-Bruno `vars:secret` or `secret: true`), if the format makes it one (Bruno's `{{process.env.NAME}}`, which is the secret named
-`process.env.NAME`; an OpenAPI security scheme, whose slots are named for it), or if `api.secrets` names it. Its value comes from the reference in `api.secrets`, resolved by `jig-core` at the moment the request
-is sent, and from nowhere else. A value for it in a file is refused and never sent.
+A variable is a secret in any of three cases:
+- **an environment file declares it** (a Postman `secret` type, any key of `http-client.private.env.json`, a Bruno `vars:secret` or
+  `secret: true`);
+- **the format makes it one** (Bruno's `{{process.env.NAME}}`, which is the secret named `process.env.NAME`; an OpenAPI security
+  scheme, whose slots are named for it);
+- **`api.secrets` names it.**
+
+Its value comes from the reference in `api.secrets`, resolved by `jig-core` at the moment the request is sent, and from nowhere
+else. A value for it in a file is refused and never sent.
 
 ```json
 "secrets": {

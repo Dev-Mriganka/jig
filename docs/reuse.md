@@ -55,7 +55,7 @@ What [`jig-core`](../plugins/jig-core/README.md) borrows:
 - **hiding a tool the rules deny completely,** so the model does not try it;
 - **decision events** on Pi's event bus.
 
-The first and third are not built yet.
+Not built yet: the tree-sitter split of `bash`, and hiding a denied tool.
 
 Also read, for patterns:
 
@@ -78,10 +78,19 @@ week. It offers:
 
 | Package | A week | Verdict | Why |
 |---|---|---|---|
-| `@adeildo/pi-ask-questions` | 1,291 | **use as is, on trial:** Jig's forms build on it, and it is the nicer-looking question tool | A deliberate port of rpiv's question format into a framed dialog: scrolling previews, a note per option, and it opens while the model is still writing. Its README says other packages can open it through `@adeildo/pi-kit`. Costs: the tool is named `ask_questions`, and there is no global note, no collapse key, and English only |
-| `pi-interview` | 5,521 | skip for approvals | The best-looking, in a browser window. But it answers through a local server that the agent's shell can reach |
+| `@adeildo/pi-ask-questions` | 1,291 | **use as is, on trial** | Jig's forms build on it, and it is the nicer-looking question tool (see below) |
+| `pi-interview` | 5,521 | skip for approvals | Best-looking, in a browser, but it answers through a local server the shell can reach |
 | `pi-ask-user` | 3,575 | skip | Search and timeouts, but no markdown previews |
 | `supi-ask-user`, `pi-ask`, `pi-questions`, `pi-agent-ask` | under 1,000 | skip | Look-alikes, or a different way of working |
+
+**`@adeildo/pi-ask-questions`, in detail:**
+- **What it is:** a deliberate port of rpiv's question format into a framed
+  dialog, with scrolling previews and a note per option. It opens while the
+  model is still writing.
+- **How Jig uses it:** its README says other packages can open it through
+  `@adeildo/pi-kit`.
+- **What it costs:** the tool is named `ask_questions`, and there is no global
+  note, no collapse key, and English only.
 
 ## Git, GitHub and CI
 
@@ -111,13 +120,15 @@ maintained).
   the machine to ask their providers about quota.
 - **What it lacks:** Jig's own fields, such as rule decisions, approvals, time
   waited and tickets. `jig-lens` adds those.
+- **A quick look without it:** `/lens usage` in `jig-lens` shows cost and
+  tokens from Pi's own session files, with no server.
 
 **Also considered:**
 
 | Tool | Verdict | Why |
 |---|---|---|
 | `@twkrash/pi-session-inspector` | use as is, if preferred | Pi-only and lighter; fewer views |
-| AI Observer | skip | One binary, but it listens on every network interface with no login, and cannot group by Jig's fields. Tried in a sandbox with no network |
+| AI Observer | skip | One binary, but it listens on every interface with no login and cannot group by Jig's fields |
 | agentrecap | skip | Reads Pi sessions well, but declares no licence |
 | OpenObserve | skip | A general logs, metrics and traces platform, with telemetry on and a login |
 
@@ -142,7 +153,7 @@ variables together. `jig-core` builds a small backend seam and borrows:
 
 | Package | Pattern |
 |---|---|
-| `@ian-pascoe/pi-secret` | A provider seam; grants you approve; redaction that also catches encoded forms of a secret, such as Base64 or URL encoding |
+| `@ian-pascoe/pi-secret` | A provider seam; grants you approve; redaction that also catches encoded forms, such as Base64 |
 | `@spences10/pi-redact` | Patterns for secret shapes, such as API keys, that Jig has not resolved itself |
 | `@prjct.app/pi-secrets`, `@jmcombs/pi-1password` | How to call the macOS Keychain and the 1Password CLI |
 

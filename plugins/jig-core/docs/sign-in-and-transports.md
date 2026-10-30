@@ -2,12 +2,14 @@
 
 Jig never signs in, and never stores a credential. The tool that owns a login
 does it: `gh` for GitHub, the Postman CLI for Postman, Pi's `/mcp login` for MCP
-servers, a company plugin's sign-in service for its own systems. `jig-core` only
-**reads a credential that already exists**, from a source you configured, and
-attaches it to a request, so the plugin that sends the request never sees the
-value. It also keeps the credential stores and its own files away from the
-agent (see [Protected paths](configuration.md#protected-paths)). Back to the
-[jig-core overview](../README.md). The decision is in
+servers, a company plugin's sign-in service for its own systems.
+
+`jig-core` only **reads a credential that already exists**, from a source you
+configured, and attaches it to a request, so the plugin that sends the request
+never sees the value. It also keeps the credential stores and its own files away
+from the agent (see [Protected paths](configuration.md#protected-paths)).
+
+Back to the [jig-core overview](../README.md). The decision is in
 [Decisions](../../../docs/decisions.md).
 
 A plugin sends a request with `jig().http.request(request, signal)` and names
@@ -15,10 +17,10 @@ where its credential comes from in `auth`. There are four places.
 
 | `auth` | Where the credential comes from | Who signs in |
 |---|---|---|
-| `{ bearer: ref }`, `{ basic: { user, password: ref } }`, `{ header: { name, value: ref, prefix? } }`, `{ query: { name, value: ref } }` | A **secret reference**: a store, a variable, a file or a command, read just before the request | The tool or person that put the secret there |
+| `{ bearer }`, `{ basic }`, `{ header }` or `{ query }` | A **secret reference**: a store, a variable, a file or a command, read just before the request | The tool or person that put the secret there |
 | `{ signIn: name }` | A company plugin's **sign-in service**, which returns the headers of each request | The company's service |
 | `transport: name` (instead of `auth`) | A company plugin's **transport**, which carries the whole request and holds the session | The company's proxy |
-| `{ oauth: { ... } }` | A **token endpoint**: a client-credentials or password grant, with the client's secret read from a secret reference | The token endpoint; no browser is involved |
+| `{ oauth: { ... } }` | A **token endpoint**: a client-credentials or password grant, with a secret reference | The token endpoint; no browser is involved |
 
 ## The request
 
@@ -53,9 +55,10 @@ const reply = await jig().http.request(
 - **A secret is read once for requests that share a signal.** The several
   requests of one call pass the same `signal` (`AbortSignal.any([])` makes one
   when the call has none), so a store that is locked asks you to unlock it once
-  and a search of many buckets does not run the backend for each. A failed read
-  is not kept, a request with no signal reads every time, and a sign-in service
-  is asked for every request, because it knows when a token has run out.
+  and a search of many buckets does not run the backend for each.
+  - A failed read is not kept, and a request with no signal reads every time.
+  - A sign-in service is asked for every request, because it knows when a token
+    has run out.
 - **A request is sent once.** Nothing is retried, except one resend after a 401
   for an OAuth token that came from the cache: the server turned it down for an
   expired token before it acted, so a write is not repeated.
@@ -79,9 +82,9 @@ of the address, or the address itself.
 | `code` | Meaning | `notSent` |
 |---|---|---|
 | `invalid_request` | The request is wrong (address, method, `auth`, a header, a transport that cannot carry it) | yes |
-| `auth_failed` | The credential could not be read or made: a secret that is missing or locked, a sign-in service that failed, a token endpoint that refused. The message is the reason, without the reference | yes |
+| `auth_failed` | The credential could not be read or made (a missing secret, a failed sign-in, a refused grant) | yes |
 | `no_transport` | No transport has that name | yes |
-| `ECONNREFUSED`, `ENOTFOUND`, `EAI_AGAIN`, `EHOSTUNREACH`, `ENETUNREACH`, `UND_ERR_CONNECT_TIMEOUT`, `bad_port` | The connection was never made | yes |
+| `ECONNREFUSED`, `ENOTFOUND` and other connect codes | The connection was never made | yes |
 | a TLS code such as `CERT_HAS_EXPIRED` | The certificate was not accepted. Certificate checks are never turned off | yes |
 | `ECONNRESET`, `EPIPE`, `UND_ERR_SOCKET`, other system codes, `network_error` | The connection failed or broke, and the server may have acted | no |
 | `transport_failed` | A transport threw or answered wrongly | no |
@@ -91,13 +94,19 @@ of the address, or the address itself.
 `notSent` is what a plugin needs for a write: when it is true, nothing happened
 on the other side, so it is safe to say so, and to send again.
 
+- **`auth_failed`** carries the reason as its message, without the reference.
+- **The connect codes** are `ECONNREFUSED`, `ENOTFOUND`, `EAI_AGAIN`,
+  `EHOSTUNREACH`, `ENETUNREACH`, `UND_ERR_CONNECT_TIMEOUT` and `bad_port`.
+
 ## A secret reference
 
 `{ bearer: "env:LOGS_TOKEN" }` and the other three shapes name a secret by
 reference. `jig-core` resolves it with an allowed backend just before the
 request, registers the value with the redactor, and puts it in the header or the
-query. The reference is never repeated in an error. The backends are listed in
-the [configuration reference](configuration.md#secret-references).
+query.
+
+The reference is never repeated in an error. The backends are listed in the
+[configuration reference](configuration.md#secret-references).
 
 ```json
 { "secrets": { "backends": ["pass", "env", "cmd"], "commands": { "gh": ["gh", "auth", "token"] } } }
@@ -123,10 +132,11 @@ auth: { query: { name: "api_key", value: "file:~/.config/orders-api/key" } }
 
 - **`cmd:<name>`** runs a command you declared by name in `secrets.commands`
   (or a company plugin declared with `config.addSecretCommands`), with no
-  shell, and uses its trimmed standard output. Delegating the login to `gh`
-  means `gh auth token` is the credential, and Jig holds no token file of its
-  own. An undeclared name is refused, so a model cannot slip in a command of its
-  own through a parameter.
+  shell, and uses its trimmed standard output.
+  - Delegating the login to `gh` means `gh auth token` is the credential, and
+    Jig holds no token file of its own.
+  - An undeclared name is refused, so a model cannot slip in a command of its
+    own through a parameter.
 - **`file:<absolute path>`** reads the first line of a file you point it at.
   Use it for a file another tool keeps up to date. It never reads Pi's agent
   folder.
@@ -138,6 +148,7 @@ auth: { query: { name: "api_key", value: "file:~/.config/orders-api/key" } }
 Some systems are signed in to by code, not by a stored password: a single
 sign-on gateway, for example. A company plugin supplies that code as a
 **sign-in service**, and a request names it with `auth: { signIn: "corp-sso" }`.
+
 The headers it returns are added to the request, and `jig-core` asks it again
 for the next request, because the service decides when a token has expired.
 The details are in [Sign-in services](#sign-in-services) below.
@@ -181,24 +192,25 @@ auth: {
 
 ## Sign-in services
 
-Some systems are signed in to by code, not by a stored password: a single
-sign-on gateway, for example. A company plugin supplies that code as a
-**sign-in service**.
+A company plugin supplies the code that signs a request in, such as for a single
+sign-on gateway, as a **sign-in service**.
 - **The company plugin registers it** with `signIn.register(name, service)`.
   Registering the same name again replaces the service.
 - **A request asks for it by name,** with `auth: { signIn: name }` in
   `http.request`, and the headers are added to the request without the plugin
-  seeing them. `signIn.headers(name, { system, url }, signal)` is the call
-  underneath. Tools such as `jig-jira` and `jig-logs` use it when their
-  configuration names a sign-in service instead of a secret reference. The
-  answer is the headers that authenticate that one request. Ask again for the
-  next request: the service decides when a token has expired.
+  seeing them.
+  - `signIn.headers(name, { system, url }, signal)` is the call underneath.
+  - Tools such as `jig-jira` and `jig-logs` use it when their configuration
+    names a sign-in service instead of a secret reference.
+  - The answer is the headers that authenticate that one request. Ask again for
+    the next request: the service decides when a token has expired.
 - **The values are hidden like secrets.** Each header value is registered with
   the redactor before it is returned, so it is removed from every later result
   with the same encodings as a secret (see
-  [What happens to a result](results.md)). The token in an
-  `Authorization` header is hidden on its own too, in case a server repeats it
-  without the scheme. An empty value is not registered.
+  [What happens to a result](results.md)).
+  - The token in an `Authorization` header is hidden on its own too, in case a
+    server repeats it without the scheme.
+  - An empty value is not registered.
 - **An error never shows a value.** An unknown name is an error that lists the
   names registered. A service that throws is an error that names the service
   and carries its message. A header whose value is not a string is an error

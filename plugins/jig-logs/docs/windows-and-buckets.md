@@ -32,12 +32,14 @@ that refuses a request over some length cuts every bucket to it (Loki says 721
 hours by default, which no bucket reaches).
 
 Buckets are searched from the end of the window that `order` names: `asc` starts
-with the oldest bucket and `desc` with the newest. A bucket asks for as many hits
-as are still wanted. Once `size` hits are collected, each bucket that remains asks
-for 0 hits and only adds its exact count to the total. Loki cannot count, so there
-each remaining bucket asks for one line and adds that, and the total is a lower
-bound (see [Loki](loki.md#what-loki-cannot-give)). The result lists the buckets in
-time order, whichever end was searched first.
+with the oldest bucket and `desc` with the newest.
+- **A bucket asks for as many hits as are still wanted.** Once `size` hits are
+  collected, each bucket that remains asks for 0 hits and only adds its exact
+  count to the total.
+- **Loki cannot count,** so there each remaining bucket asks for one line and adds
+  that, and the total is a lower bound (see [Loki](loki.md#what-loki-cannot-give)).
+- **The result lists the buckets in time order,** whichever end was searched
+  first.
 
 ## When a bucket fails
 
@@ -55,10 +57,12 @@ again. That covers:
 ones are halved.
 
 A half that fails is halved again, 4 times at most, so one hour becomes at most
-16 pieces and 31 requests. A bucket under 2 seconds is not halved, and no bucket
-is once the call is out of requests for searches (see [Budgets](#budgets)). The
-answer of a bucket that was halved is thrown away, so no hit is counted twice.
-With `desc`, the later half is searched first.
+16 pieces and 31 requests.
+- A bucket under 2 seconds is not halved, and no bucket is once the call is out of
+  requests for searches (see [Budgets](#budgets)).
+- The answer of a bucket that was halved is thrown away, so no hit is counted
+  twice.
+- With `desc`, the later half is searched first.
 
 What still fails is not hidden:
 - a bucket that cannot be halved any more, and came back with `timed_out` or
@@ -70,8 +74,9 @@ What still fails is not hidden:
 ## Budgets
 
 A call makes at most 64 requests and starts none after 150 seconds. One request
-is kept back for the check for data, so searches and halvings stop at 63. The
-windows a call did not reach are gaps with the reason `request_budget` or
+is kept back for the check for data, so searches and halvings stop at 63.
+
+The windows a call did not reach are gaps with the reason `request_budget` or
 `time_budget`: the newest with `asc`, the oldest with `desc`. While a call runs,
 it reports `searching staging logs, request 3` for each request, and never what
 was searched for.
@@ -92,8 +97,10 @@ window is missing or partial, or when the backend counted only up to a limit.
 One more request counts the documents of the window that have the environment's
 filter, without the phrase or query. The `Availability:` line then says whether
 the window holds any documents at all. It proves nothing about how long logs are
-kept. Loki has no count to give, so there the request asks the selector alone for
-one line, and the line says that the window holds documents, without a number.
+kept.
+
+Loki has no count to give, so there the request asks the selector alone for one
+line, and the line says that the window holds documents, without a number.
 
 When the call has already used its 64 requests or its 150 seconds, the check is
 not made. When the check fails, or finds nothing and reports a timeout or lost

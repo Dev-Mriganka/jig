@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="540" viewBox="0 0 980 540" role="img" aria-label="How a jig-mongo call runs. The agent calls mongo with a filter or a pipeline. jig-core decides by environment: a read runs, a write to a test environment asks with a count, and a write to production is denied. The call is then walked: every field in every stage and sub-pipeline is checked against the access lists, and a denied or unlisted field is refused before the call runs. With an allow list the call is reshaped, with a projection of the allowed fields put in front of every stage. It then runs through a route, a connection per environment, with an SSH forward or a company tunnel, to MongoDB. The results have denied fields stripped at any depth, and production results are masked. Test environments use a deny list and production uses an allow list, reads only." font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">
+  <rect x="0.5" y="0.5" width="979" height="539" rx="10" fill="#FAFBFA" stroke="#D2D9D3"/>
+  <defs>
+    <marker id="mongowalk-head-1d3b4d-11" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#1D3B4D"/></marker>
+    <marker id="mongowalk-head-a93c27-11" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#A93C27"/></marker>
+  </defs>
+  <!-- the call and jig-core -->
+  <rect x="30" y="30" width="190" height="96" rx="6" fill="#5D4B7C"/>
+  <text x="125.0" y="57.0" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">the agent</text>
+  <text x="125.0" y="74.0" font-size="12" fill="#FFFFFF" text-anchor="middle">mongo find, aggregate,</text>
+  <text x="125.0" y="91.0" font-size="12" fill="#FFFFFF" text-anchor="middle">update, in an</text>
+  <text x="125.0" y="108.0" font-size="12" fill="#FFFFFF" text-anchor="middle">environment</text>
+  <path d="M220 78 H290" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#mongowalk-head-1d3b4d-11)"/>
+  <text x="255" y="68" font-size="12" fill="#3A4440" text-anchor="middle">a call</text>
+  <rect x="290" y="30" width="250" height="96" rx="6" fill="#1D3B4D"/>
+  <text x="415.0" y="57.0" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">jig-core</text>
+  <text x="415.0" y="74.0" font-size="12" fill="#FFFFFF" text-anchor="middle">the environment decides:</text>
+  <text x="415.0" y="91.0" font-size="12" fill="#FFFFFF" text-anchor="middle">a read runs, a test write asks,</text>
+  <text x="415.0" y="108.0" font-size="12" fill="#FFFFFF" text-anchor="middle">a production write is denied</text>
+  <path d="M540 78 H610" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#mongowalk-head-1d3b4d-11)"/>
+  <text x="575" y="68" font-size="12" fill="#3A4440" text-anchor="middle">the call</text>
+  <rect x="610" y="30" width="340" height="96" rx="6" fill="#5C9CAB"/>
+  <text x="780.0" y="57.0" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">the walk</text>
+  <text x="780.0" y="74.0" font-size="12" fill="#FFFFFF" text-anchor="middle">every field, in every stage and</text>
+  <text x="780.0" y="91.0" font-size="12" fill="#FFFFFF" text-anchor="middle">sub-pipeline, is checked</text>
+  <text x="780.0" y="108.0" font-size="12" fill="#FFFFFF" text-anchor="middle">against the access lists</text>
+  <!-- refused, or reshaped -->
+  <path d="M640 126 V170 H540" fill="none" stroke="#A93C27" stroke-width="2.4" marker-end="url(#mongowalk-head-a93c27-11)"/>
+  <text x="592" y="163" font-size="12" fill="#3A4440" text-anchor="middle">denied</text>
+  <rect x="290" y="140" width="250" height="96" rx="6" fill="#F7E4DF" stroke="#A93C27" stroke-width="1.8"/>
+  <text x="415.0" y="167.0" font-size="13" fill="#A93C27" font-weight="700" text-anchor="middle">refused before it runs</text>
+  <text x="415.0" y="184.0" font-size="12" fill="#3A4440" text-anchor="middle">a denied or unlisted field,</text>
+  <text x="415.0" y="201.0" font-size="12" fill="#3A4440" text-anchor="middle">$objectToArray, or $graphLookup</text>
+  <text x="415.0" y="218.0" font-size="12" fill="#3A4440" text-anchor="middle">with an allow list</text>
+  <path d="M780 126 V190" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#mongowalk-head-1d3b4d-11)"/>
+  <text x="796" y="164" font-size="12" fill="#3A4440">allowed</text>
+  <rect x="610" y="190" width="340" height="96" rx="6" fill="#5C9CAB"/>
+  <text x="780.0" y="217.0" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">the reshape (allow list)</text>
+  <text x="780.0" y="234.0" font-size="12" fill="#FFFFFF" text-anchor="middle">a projection of the allowed fields</text>
+  <text x="780.0" y="251.0" font-size="12" fill="#FFFFFF" text-anchor="middle">in front of every stage, so a corner</text>
+  <text x="780.0" y="268.0" font-size="12" fill="#FFFFFF" text-anchor="middle">the walk missed reads nothing</text>
+  <!-- the route and the database -->
+  <path d="M780 286 V340" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#mongowalk-head-1d3b4d-11)"/>
+  <text x="796" y="319" font-size="12" fill="#3A4440">one query</text>
+  <rect x="610" y="340" width="340" height="96" rx="6" fill="#5C9CAB"/>
+  <text x="780.0" y="367.0" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">the route</text>
+  <text x="780.0" y="384.0" font-size="12" fill="#FFFFFF" text-anchor="middle">a connection per environment,</text>
+  <text x="780.0" y="401.0" font-size="12" fill="#FFFFFF" text-anchor="middle">an SSH forward or a company tunnel,</text>
+  <text x="780.0" y="418.0" font-size="12" fill="#FFFFFF" text-anchor="middle">a read-only user in production</text>
+  <path d="M610 388 H540" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#mongowalk-head-1d3b4d-11)"/>
+  <text x="575" y="378" font-size="12" fill="#3A4440" text-anchor="middle">query</text>
+  <rect x="290" y="340" width="250" height="96" rx="6" fill="#8C979D"/>
+  <text x="415.0" y="367.0" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">MongoDB</text>
+  <text x="415.0" y="384.0" font-size="12" fill="#FFFFFF" text-anchor="middle">a write is sent once:</text>
+  <text x="415.0" y="401.0" font-size="12" fill="#FFFFFF" text-anchor="middle">retries are off, and a lost</text>
+  <text x="415.0" y="418.0" font-size="12" fill="#FFFFFF" text-anchor="middle">reply is read, not resent</text>
+  <path d="M290 388 H240" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#mongowalk-head-1d3b4d-11)"/>
+  <text x="265" y="378" font-size="12" fill="#3A4440" text-anchor="middle">rows</text>
+  <rect x="30" y="340" width="210" height="96" rx="6" fill="#5C9CAB"/>
+  <text x="135.0" y="367.0" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">the results</text>
+  <text x="135.0" y="384.0" font-size="12" fill="#FFFFFF" text-anchor="middle">denied fields stripped</text>
+  <text x="135.0" y="401.0" font-size="12" fill="#FFFFFF" text-anchor="middle">at any depth, production</text>
+  <text x="135.0" y="418.0" font-size="12" fill="#FFFFFF" text-anchor="middle">masked by jig-core</text>
+  <path d="M135 340 V126" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#mongowalk-head-1d3b4d-11)"/>
+  <text x="151" y="240" font-size="12" fill="#3A4440">stripped rows</text>
+  <!-- the two kinds of list -->
+  <rect x="30" y="458" width="450" height="64" rx="6" fill="#E2F1E7" stroke="#2C7A4B" stroke-width="1.8"/>
+  <text x="255.0" y="486.0" font-size="13" fill="#2C7A4B" font-weight="700" text-anchor="middle">Test environments: a deny list</text>
+  <text x="255.0" y="503.0" font-size="12" fill="#3A4440" text-anchor="middle">readable except what you list; a write asks, with a count</text>
+  <rect x="500" y="458" width="450" height="64" rx="6" fill="#F7E4DF" stroke="#A93C27" stroke-width="1.8"/>
+  <text x="725.0" y="486.0" font-size="13" fill="#A93C27" font-weight="700" text-anchor="middle">Production: an allow list, reads only</text>
+  <text x="725.0" y="503.0" font-size="12" fill="#3A4440" text-anchor="middle">nothing is readable until you list it; writes are denied</text>
+</svg>

@@ -26,8 +26,9 @@ Made when it is sent: $uuid
 ```
 
 - **The sign-in is named and never shown.** It reads `none`, `a bearer token`, `a user name and password (HTTP Basic)`,
-  `an API key in the <name> header`, `an OAuth token (client credentials)`, `sign-in service "<name>"` or `transport "<name>"`, and
-  for all but the first, `added by the tool`. No reference, token or address of a sign-in is in the preview.
+  `an API key in the <name> header`, `an OAuth token (client credentials)`, `sign-in service "<name>"` or `transport "<name>"`.
+  - For all but the first, it adds `added by the tool`.
+  - No reference, token or address of a sign-in is in the preview.
 - **A secret is shown by the name of its variable.** `{{token}}` where it is used, and a line that lists them. The preview reads no
   secret; the value is read when the request is sent.
 - **A file is shown by its name, size and digest,** never its content.
@@ -47,11 +48,16 @@ The plan is made again right before the call is sent. If what would be sent now 
 api run "Create order": changed since the preview; run it again to see the new preview. Nothing was sent.
 ```
 
-What is compared is the collection, the request, its environment and `jig-core`'s name for it, how it signs in (the kind, and the name
-of a service or a transport), the secrets it uses with their references (never their values), the method, the full address, the
-headers, the body and the digest of every file in it. A generated value is a mark, so it is the same at the preview and at the send.
-Header names are compared in lower case and in any order. The timeout is left out, because it changes how long the tool waits and not
-what it sends. A change is caught whether the call, the configuration or a file changed while you read.
+What is compared:
+- the collection, the request, its environment and `jig-core`'s name for it;
+- how it signs in (the kind, and the name of a service or a transport);
+- the secrets it uses with their references (never their values);
+- the method, the full address, the headers, the body and the digest of every file in it.
+
+A generated value is a mark, so it is the same at the preview and at the send. Header names are compared in lower case and in any
+order. The timeout is left out, because it changes how long the tool waits and not what it sends.
+
+A change is caught whether the call, the configuration or a file changed while you read.
 
 The message names the call without its query, its body or its headers.
 
@@ -59,11 +65,15 @@ The message names the call without its query, its body or its headers.
 
 A request is sent once. These are the three ways it can end without an answer:
 
-| The tool says | When | Message |
-|---|---|---|
-| Nothing was sent | The request never left: no connection, a name that does not resolve, a certificate that is not accepted, an address that is not allowed, a sign-in that failed, a call cancelled before it was sent | `api run "Create order": could not connect (ECONNREFUSED). Nothing was sent.` |
-| The outcome is unknown | A write got no answer: it timed out, the connection dropped or was reset, a transport failed, or the call was cancelled in flight | `api run "Create order": no answer (timed out after 30 s). The outcome is unknown: the server may have carried it out. It was not sent again. Check with a GET before trying again.` |
-| It can be sent again | A read got no answer | `api run "Get order": no answer (timed out after 30 s). A GET changes nothing, so it can be sent again.` |
+- **Nothing was sent:** the request never left. That is no connection, a name that does not resolve, a certificate that is not
+  accepted, an address that is not allowed, a sign-in that failed, or a call cancelled before it was sent.
+  - Example: `api run "Create order": could not connect (ECONNREFUSED). Nothing was sent.`
+- **The outcome is unknown:** a write got no answer. It timed out, the connection dropped or was reset, a transport failed, or the
+  call was cancelled in flight.
+  - Example: `api run "Create order": no answer (timed out after 30 s). The outcome is unknown: the server may have carried it
+    out. It was not sent again. Check with a GET before trying again.`
+- **It can be sent again:** a read got no answer.
+  - Example: `api run "Get order": no answer (timed out after 30 s). A GET changes nothing, so it can be sent again.`
 
 Certificate checks are never turned off, and a certificate that is not accepted is a failure before the request is written. A reply
 that comes after the timeout is too late, and does not cause a second send.

@@ -18,9 +18,11 @@ The root file decides, and only the files of that format are read.
 | `opencollection.yml` | OpenCollection YAML, the default of a new collection since Bruno 3.1 | `*.yml` | `folder.yml` | `environments/*.yml` |
 | `bruno.json` | The `.bru` language | `*.bru` | `folder.bru`, and `collection.bru` at the root | `environments/*.bru` |
 
-A folder with neither is a problem. Hidden folders, `node_modules`, links and the folders that `bruno.json` (`ignore`) or
-`extensions.bruno.ignore` of the YAML file name are not read. A YAML collection may also hold its folders and requests inline,
-under `items:` of the root file. Requests are in Bruno's order: by `seq`, then by name; a folder sorts among the requests by its own `seq`.
+A folder with neither is a problem.
+- **Not read:** hidden folders, `node_modules`, links, and the folders that `bruno.json` (`ignore`) or `extensions.bruno.ignore`
+  of the YAML file name.
+- **Inline:** a YAML collection may also hold its folders and requests inline, under `items:` of the root file.
+- **Order:** requests are in Bruno's order: by `seq`, then by name; a folder sorts among the requests by its own `seq`.
 
 ## Requests
 
@@ -28,14 +30,17 @@ under `items:` of the root file. Requests are in Bruno's order: by `seq`, then b
 |---|---|
 | Folders | The folder path of each request, named as the folder file names it, such as `Partner/Nested` |
 | HTTP and GraphQL requests | A request. A GraphQL request is a `POST` of `{"query": ..., "variables": ...}` |
-| The address | As written, with a `#fragment` dropped. `:id` takes the value of its path parameter, or becomes a variable `{{id}}` when the file gives none |
+| The address | As written, with a `#fragment` dropped; `:id` is a path parameter |
 | Query parameters | They are the address's query string, as Bruno keeps them there |
-| Headers | The collection's, then the folder's, then the request's. A request's replaces the same header above it, whatever the case |
+| Headers | The collection's, then the folder's, then the request's, which replaces the same header above |
 | Body: JSON, text, XML | Raw text, written with escaping for the agent's values; Bruno's content type is added |
 | Body: form-urlencoded, multipart | Forms. A multipart value `@file(a\|b)` is files, with `@contentType(...)` kept |
 | Body: file | The whole body is a file |
 | `docs` | Shown by `show` |
 | Switched off (`~` in `.bru`, `disabled: true` in YAML) | Left out |
+
+- **A path parameter** `:id` takes the value the file gives, or becomes a variable `{{id}}` when the file gives none.
+- **A header** of a request replaces the same header above it, whatever the case.
 
 A body of the type `sparql` is refused. `{{$guid}}`, `{{$timestamp}}` and `{{$isoTimestamp}}` are made when the request is sent;
 any other `{{$name}}`, such as `{{$randomInt}}`, refuses the request.
@@ -43,8 +48,9 @@ any other `{{$name}}`, such as `{{$randomInt}}`, refuses the request.
 ## Variables
 
 The collection's `vars:pre-request` are its own values, the weakest. A folder's and a request's are values for the requests below
-them. A name that starts with `@` is local to the request, and the `@` is dropped. The values are text: Bruno allows a JavaScript
-literal there, and nothing is evaluated. The environment's values win over all of these ([Variables](variables.md)).
+them. The environment's values win over all of these ([Variables](variables.md)).
+- **A name that starts with `@`** is local to the request, and the `@` is dropped.
+- **The values are text:** Bruno allows a JavaScript literal there, and nothing is evaluated.
 
 ## Sign-in
 
@@ -55,10 +61,14 @@ A request without an `auth` has none. A folder whose sign-in is `none` or `inher
 |---|---|
 | `bearer`, `basic` | A Bearer token, HTTP Basic |
 | `apikey`, placed in the header | The key in the header it names |
-| `oauth2`, `client_credentials` or `password` | A token from the access token address, sent as a Bearer token ([Sign-in](auth.md)). The client signs in with HTTP Basic when the file says `basic_auth_header`, else in the form, which is Bruno's own default |
-| `apikey` in the query string, or `oauth2` with the token in the query string or a prefix other than Bearer | **Refused** |
+| `oauth2`, `client_credentials` or `password` | A token from the access token address, sent as a Bearer token ([Sign-in](auth.md)) |
+| `apikey` in the query string, or an `oauth2` token placed other than as Bearer | **Refused** |
 | `oauth2` with `authorization_code`, `implicit` or another grant | **Refused**, naming the grant: they need a browser |
 | `digest`, `ntlm`, `awsv4`, `oauth1`, `wsse`, `akamai-edgegrid` | **Refused**, naming the type |
+
+- **For `oauth2`,** the client signs in with HTTP Basic when the file says `basic_auth_header`, else in the form, which is Bruno's
+  own default.
+- **A refused `oauth2`** is one with the token in the query string or a prefix other than Bearer.
 
 A refusal in a folder refuses only the requests that inherit it. The additional parameters of an OAuth token request are not sent,
 with a note.
