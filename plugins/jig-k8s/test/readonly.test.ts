@@ -266,6 +266,6 @@ describe("the code", () => {
     test("lists three verbs, and runKubectl asks the list", () => {
         const text = fs.readFileSync(path.join(SRC, "kubectl.ts"), "utf8");
         assert.match(codeOf(text), /export const VERBS = \["get", "logs", "exec"\] as const;/);
-        assert.match(codeOf(text), /if \(!\(VERBS as readonly string\[\]\)\.includes\(verb\)\) throw/);
+        assert.match(codeOf(text), /if \(!\(VERBS as readonly string\[\]\)\.includes\(verb\)\) \{\s*throw/);
     });
 });

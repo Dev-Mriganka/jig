@@ -1,5 +1,5 @@
-// Small helpers the modules share: the error that means "invalid input", the shape an action hands back, and ways to put a
-// value or a piece of cluster text into a message.
+// Small helpers the modules share: the error that means "invalid input", the shape an action hands back, ways to read
+// kubectl's JSON, and ways to put a value or a piece of cluster text into a message.
 import type { Facts } from "../../jig-core/src/contract.ts";
 
 /**
@@ -17,6 +17,16 @@ export class InputError extends TypeError {
 
 export function isObject(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** The objects in a list from kubectl's JSON, whatever else is in it. A missing list is an empty one. */
+export function objects(value: unknown): Array<Record<string, unknown>> {
+    return (Array.isArray(value) ? value : []).filter(isObject);
+}
+
+/** A number from kubectl's JSON, or 0 when there is none. */
+export function count(value: unknown): number {
+    return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
 /** A string that has something in it. */

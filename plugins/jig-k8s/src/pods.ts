@@ -4,7 +4,7 @@ import { DNS_LABEL, DNS_SUBDOMAIN } from "./config.ts";
 import type { Target } from "./config.ts";
 import { getJson } from "./kubectl.ts";
 import type { Kube } from "./kubectl.ts";
-import { isObject, plural, str } from "./values.ts";
+import { count, isObject, objects, plural, str } from "./values.ts";
 import type { Outcome } from "./values.ts";
 
 export interface Container {
@@ -56,22 +56,30 @@ function imageName(image: string): string {
 
 /**
  * The containers that run the service itself, as against the sidecars a platform adds. The configured container wins; a
- * pod with one container has no sidecar; otherwise the container or the image that is named like the service. When none is,
- * every container is.
+ * pod with one container has no sidecar; otherwise the container or the image that is named like the service. When none
+ * is, every container is.
  */
 export function ownContainers(containers: readonly Container[], target: Target): Container[] {
     const configured = containers.filter((container) => container.name === target.container);
     if (configured.length > 0) return configured;
     if (containers.length === 1) return [...containers];
-    const named = containers.filter((container) => container.name === target.service || imageName(container.image) === target.service);
+    const named = containers.filter(
+        (container) => container.name === target.service || imageName(container.image) === target.service,
+    );
     return named.length > 0 ? named : [...containers];
 }
 
-/** The containers of a pod spec. A name goes into a command line later (`-c`), so one that Kubernetes would not allow, and
- *  that could be read as a flag, is left out. */
-function containersOf(list: unknown): Container[] {
-    return (Array.isArray(list) ? list : [])
-        .filter(isObject)
+/** The tags of the containers that have one. */
+export function tagsOf(containers: readonly Container[]): string[] {
+    return containers.flatMap((container) => (container.tag === undefined ? [] : [container.tag]));
+}
+
+/**
+ * The containers of a pod spec. A name goes into a command line later (`-c`), so one that Kubernetes would not allow,
+ * and that could be read as a flag, is left out.
+ */
+export function containersOf(list: unknown): Container[] {
+    return objects(list)
         .map((container) => {
             const image = str(container.image) ?? "";
             return { name: str(container.name) ?? "", image, tag: tagOf(image) };
@@ -89,46 +97,55 @@ function terminatedReason(status: Record<string, unknown>): string | undefined {
     return status.state.terminated.exitCode === 0 ? undefined : (str(status.state.terminated.reason) ?? "Error");
 }
 
+const firstOf = (reasons: Array<string | undefined>): string | undefined =>
+    reasons.find((reason) => reason !== undefined);
+
+/** What `kubectl get pods` prints under STATUS, decided in the order kubectl decides it. */
+function statusOf(status: Record<string, unknown>, terminating: boolean): string {
+    if (terminating) return "Terminating";
+    const initWaiting = firstOf(objects(status.initContainerStatuses).map(waitingReason));
+    if (initWaiting !== undefined) return `Init:${initWaiting}`;
+    const statuses = objects(status.containerStatuses);
+    return (
+        firstOf(statuses.map(waitingReason)) ??
+        firstOf(statuses.map(terminatedReason)) ??
+        str(status.reason) ??
+        str(status.phase) ??
+        "Unknown"
+    );
+}
+
+/** The reason a container of the pod waits, when it is one that does not pass by itself. */
+function failingOf(status: Record<string, unknown>): string | undefined {
+    const waiting = [...objects(status.initContainerStatuses), ...objects(status.containerStatuses)].map(waitingReason);
+    return waiting.find((reason) => reason !== undefined && FAILING_REASONS.includes(reason));
+}
+
 export function parsePod(raw: unknown, target: Target): Pod | undefined {
     if (!isObject(raw) || !isObject(raw.metadata)) return undefined;
     // The name goes into a command line later (`logs`, `exec`), so one Kubernetes would not allow is not a pod.
     const name = str(raw.metadata.name);
     if (name === undefined || !DNS_SUBDOMAIN.test(name)) return undefined;
     const status = isObject(raw.status) ? raw.status : {};
-    const statuses = (Array.isArray(status.containerStatuses) ? status.containerStatuses : []).filter(isObject);
-    const initStatuses = (Array.isArray(status.initContainerStatuses) ? status.initContainerStatuses : []).filter(isObject);
     const spec = isObject(raw.spec) ? raw.spec : {};
+    const statuses = objects(status.containerStatuses);
     const containers = containersOf(spec.containers);
-
     const terminating = str(raw.metadata.deletionTimestamp) !== undefined;
-    const waiting = [...initStatuses.map(waitingReason), ...statuses.map(waitingReason)].filter((reason): reason is string => reason !== undefined);
-    const initWaiting = initStatuses.map(waitingReason).find((reason) => reason !== undefined);
-    // The order kubectl uses for its STATUS column.
-    const display = terminating
-        ? "Terminating"
-        : initWaiting !== undefined
-            ? `Init:${initWaiting}`
-            : (statuses.map(waitingReason).find((reason) => reason !== undefined) ??
-                statuses.map(terminatedReason).find((reason) => reason !== undefined) ??
-                str(status.reason) ??
-                str(status.phase) ??
-                "Unknown");
-    const conditions = (Array.isArray(status.conditions) ? status.conditions : []).filter(isObject);
     const created = Date.parse(str(raw.metadata.creationTimestamp) ?? "");
 
     return {
         name,
-        ready: conditions.some((condition) => condition.type === "Ready" && condition.status === "True"),
+        ready: objects(status.conditions).some((c) => c.type === "Ready" && c.status === "True"),
         readyContainers: statuses.filter((container) => container.ready === true).length,
         totalContainers: containers.length,
-        status: display,
-        restarts: statuses.reduce((sum, container) => sum + (typeof container.restartCount === "number" ? container.restartCount : 0), 0),
+        status: statusOf(status, terminating),
+        restarts: statuses.reduce((sum, container) => sum + count(container.restartCount), 0),
         created: Number.isFinite(created) ? created : undefined,
         terminating,
         containers,
         initContainers: containersOf(spec.initContainers).map((container) => container.name),
-        tags: ownContainers(containers, target).map((container) => container.tag).filter((tag): tag is string => tag !== undefined),
-        failing: waiting.find((reason) => FAILING_REASONS.includes(reason)),
+        tags: tagsOf(ownContainers(containers, target)),
+        failing: failingOf(status),
     };
 }
 
@@ -183,7 +200,7 @@ export async function podsAction(kube: Kube, now: number): Promise<Outcome> {
         text: `${plural(pods.length, "pod")} of ${where}:\n${pods.map((pod) => podLine(pod, now)).join("\n")}`,
         facts: { pods: pods.length, ready },
         details: {
-            pods: pods.map((pod) => ({ name: pod.name, ready: pod.ready, status: pod.status, restarts: pod.restarts, tags: pod.tags })),
+            pods: pods.map(({ name, ready, status, restarts, tags }) => ({ name, ready, status, restarts, tags })),
         },
     };
 }

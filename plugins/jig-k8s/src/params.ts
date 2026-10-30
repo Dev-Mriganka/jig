@@ -1,6 +1,6 @@
-// The parameters of the `k8s` tool, and the checks that turn them into a Call. Everything that reaches kubectl has passed
-// through parseCall: the service and the environment are configured ones, and every other value has a known shape and
-// size. parseCall does no I/O.
+// The parameters of the `k8s` tool, and the checks that turn them into a Call. Everything that reaches kubectl has
+// passed through parseCall: the service and the environment are configured ones, and every other value has a known
+// shape and size. parseCall does no I/O.
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import { DNS_LABEL, DNS_SUBDOMAIN, describeServices, findTarget, notSetUp } from "./config.ts";
@@ -19,7 +19,9 @@ export const MAX_WAIT_SECONDS = 600;
 export const parameters = Type.Object(
     {
         action: StringEnum(ACTIONS, { description: "pods, status, logs or api" }),
-        service: Type.String({ description: "A configured service. An unknown name is refused with the names there are" }),
+        service: Type.String({
+            description: "A configured service. An unknown name is refused with the names there are",
+        }),
         environment: Type.String({ description: "One of the service's environments, such as staging" }),
         waitFor: Type.Optional(Type.String({
             description: "status: wait until every pod is ready on this image tag or version, as pods shows it",
@@ -27,10 +29,15 @@ export const parameters = Type.Object(
         timeoutSec: Type.Optional(Type.Integer({
             minimum: 1,
             maximum: MAX_WAIT_SECONDS,
-            description: `status with waitFor: seconds to wait, at most ${MAX_WAIT_SECONDS} (default ${DEFAULT_WAIT_SECONDS})`,
+            description:
+                `status with waitFor: seconds to wait, at most ${MAX_WAIT_SECONDS} (default ${DEFAULT_WAIT_SECONDS})`,
         })),
-        pod: Type.Optional(Type.String({ description: "logs: a pod of the service, as pods shows it. Default: the first ready pod" })),
-        container: Type.Optional(Type.String({ description: "logs: a container of the pod. Default: the service's own container" })),
+        pod: Type.Optional(Type.String({
+            description: "logs: a pod of the service, as pods shows it. Default: the first ready pod",
+        })),
+        container: Type.Optional(Type.String({
+            description: "logs: a container of the pod. Default: the service's own container",
+        })),
         tail: Type.Optional(Type.Integer({
             minimum: 1,
             maximum: MAX_TAIL,
@@ -41,7 +48,9 @@ export const parameters = Type.Object(
             maximum: MAX_SINCE_SECONDS,
             description: "logs: only lines from the last this many seconds",
         })),
-        previous: Type.Optional(Type.Boolean({ description: "logs: the log of the container's previous run, after a crash" })),
+        previous: Type.Optional(Type.Boolean({
+            description: "logs: the log of the container's previous run, after a crash",
+        })),
         path: Type.Optional(Type.String({
             description: "api, test environments only: starts with /, at most one ?query, no ..",
         })),
@@ -84,7 +93,7 @@ export function usage(action: Action): string {
 
 /** jig-core always treats this environment name as production. Whether any other name is production is jig-core's to
  *  say, and the plugin hears it per call (see decisions.ts). */
-export const PRODUCTION = "production";
+const PRODUCTION = "production";
 
 /** The characters a path and a query may hold. No `[ ] { }` (curl would read them as a pattern), no `#`, no `\`. */
 const CHARS = "A-Za-z0-9._~/!$&'()*+,;=:@%-";
@@ -118,13 +127,16 @@ function integer(action: Action, value: unknown, name: string, min: number, max:
 
 function text(action: Action, value: unknown, name: string, pattern: RegExp, what: string): string | undefined {
     if (!present(value)) return undefined;
-    if (typeof value !== "string" || !pattern.test(value)) fail(action, `${name} must be ${what} (got ${shown(value)})`);
+    if (typeof value !== "string" || !pattern.test(value)) {
+        fail(action, `${name} must be ${what} (got ${shown(value)})`);
+    }
     return value;
 }
 
 /**
  * True when the text holds ".." once it is percent-decoded as far as it goes. A server or a proxy in front of it may
- * decode twice, so `%252e%252e` must not pass as a name. Text that is still changing after several rounds is refused too.
+ * decode twice, so `%252e%252e` must not pass as a name. Text that is still changing after several rounds is refused
+ * too.
  */
 function climbs(path: string): boolean {
     let current = path;
@@ -153,11 +165,13 @@ function checkPath(path: unknown): { path: string; query: string } {
  *  checked when the call runs, from jig-core's own decision. */
 function productionRefusal(settings: K8sSettings, target: Target): InputError {
     const open = [...(settings.services.get(target.service)?.values() ?? [])]
-        .filter((other) => other.jigEnvironment !== PRODUCTION && other.container !== undefined && other.port !== undefined)
+        .filter((other) => other.jigEnvironment !== PRODUCTION)
+        .filter((other) => other.container !== undefined && other.port !== undefined)
         .map((other) => other.environment);
     const instead = open.length === 0 ? "" : `; ${target.service} has it in ${shortList(open, 60)}`;
     return new InputError(
-        `k8s api is refused in production (${target.service} in ${target.environment}): it runs in test environments only${instead}`,
+        `k8s api is refused in production (${target.service} in ${target.environment}): ` +
+            `it runs in test environments only${instead}`,
     );
 }
 
@@ -191,7 +205,9 @@ export function parseCall(input: Readonly<Record<string, unknown>>, settings: K8
         }
         case "logs": {
             const previous = input.previous;
-            if (present(previous) && typeof previous !== "boolean") fail(action, `previous must be true or false (got ${shown(previous)})`);
+            if (present(previous) && typeof previous !== "boolean") {
+                fail(action, `previous must be true or false (got ${shown(previous)})`);
+            }
             return {
                 action,
                 target,

@@ -2,8 +2,8 @@
 // kubectl context, the namespace and the pod selector). jig-core checks the section with validateK8s when a session
 // starts, so the rest of the plugin reads settings that are valid.
 //
-// A call never names a context or a namespace. It names a service and an environment, and this table says where that is,
-// so nothing outside the table can be reached through the tool.
+// A call never names a context or a namespace. It names a service and an environment, and this table says where that
+// is, so nothing outside the table can be reached through the tool.
 import { InputError, isObject, shortList, shown } from "./values.ts";
 
 /** One service in one environment: everything kubectl needs to find its pods. */
@@ -11,7 +11,8 @@ export interface Target {
     service: string;
     /** The environment's name in this section and in a call. */
     environment: string;
-    /** The jig-core environment that rules and masking know it by. A name jig-core does not know counts as production. */
+    /** The jig-core environment that rules and masking know it by. A name jig-core does not know counts as
+     *  production. */
     jigEnvironment: string;
     context: string;
     namespace: string;
@@ -47,13 +48,20 @@ const MAX_SERVICES = 100;
 const MAX_ENVIRONMENTS = 20;
 const MAX_LABELS = 10;
 
-const NOT_SET_UP = 'k8s is not set up: add a "k8s" section with "services" to jig.json (/jig lists configuration problems)';
+const NOT_SET_UP =
+    'k8s is not set up: add a "k8s" section with "services" to jig.json (/jig lists configuration problems)';
 
 export function notSetUp(): InputError {
     return new InputError(NOT_SET_UP);
 }
 
-function checkPattern(value: unknown, pattern: RegExp, key: string, what: string, errors: string[]): string | undefined {
+function checkPattern(
+    value: unknown,
+    pattern: RegExp,
+    key: string,
+    what: string,
+    errors: string[],
+): string | undefined {
     if (value === undefined) {
         errors.push(`${key}: required, ${what}`);
         return undefined;
@@ -75,14 +83,20 @@ function labelsOf(selector: string): Array<[string, string]> | undefined {
     return pairs.length <= MAX_LABELS ? pairs : undefined;
 }
 
-function checkSelector(value: unknown, key: string, errors: string[]): { text: string; labels: Array<[string, string]> } | undefined {
+function checkSelector(
+    value: unknown,
+    key: string,
+    errors: string[],
+): { text: string; labels: Array<[string, string]> } | undefined {
     if (value === undefined) {
         errors.push(`${key}: required, a label selector for the pods, such as app=orders-api`);
         return undefined;
     }
     const labels = typeof value === "string" ? labelsOf(value) : undefined;
     if (typeof value === "string" && labels !== undefined) return { text: value, labels };
-    errors.push(`${key}: must be 1 to ${MAX_LABELS} comma-separated key=value pairs, such as app=orders-api (equality only)`);
+    errors.push(
+        `${key}: must be 1 to ${MAX_LABELS} comma-separated key=value pairs, such as app=orders-api (equality only)`,
+    );
     return undefined;
 }
 
@@ -102,8 +116,20 @@ function checkEntry(raw: unknown, at: string, errors: string[]): Entry | undefin
     const before = errors.length;
     for (const key of Object.keys(raw)) if (!ENTRY_FIELDS.has(key)) errors.push(`${at}.${key}: unknown field`);
 
-    const context = checkPattern(raw.context, CONTEXT, `${at}.context`, "a kubectl context name, such as prod-cluster", errors);
-    const namespace = checkPattern(raw.namespace, DNS_LABEL, `${at}.namespace`, "a namespace name, such as orders", errors);
+    const context = checkPattern(
+        raw.context,
+        CONTEXT,
+        `${at}.context`,
+        "a kubectl context name, such as prod-cluster",
+        errors,
+    );
+    const namespace = checkPattern(
+        raw.namespace,
+        DNS_LABEL,
+        `${at}.namespace`,
+        "a namespace name, such as orders",
+        errors,
+    );
     const selector = checkSelector(raw.selector, `${at}.selector`, errors);
     const container = raw.container === undefined
         ? undefined
@@ -132,7 +158,9 @@ function checkEnvironments(raw: unknown, errors: string[]): Map<string, string> 
     }
     for (const [name, value] of Object.entries(raw)) {
         if (!ENVIRONMENT_NAME.test(name)) {
-            errors.push(`k8s.environments: ${shown(name, 30)} is not a usable environment name (letters, digits, _ and -)`);
+            errors.push(
+                `k8s.environments: ${shown(name, 30)} is not a usable environment name (letters, digits, _ and -)`,
+            );
         } else if (typeof value !== "string" || !ENVIRONMENT_NAME.test(value)) {
             errors.push(`k8s.environments.${name}: must be the name of a jig-core environment, such as staging`);
         } else {
@@ -142,9 +170,13 @@ function checkEnvironments(raw: unknown, errors: string[]): Map<string, string> 
     return names;
 }
 
-function checkServices(raw: unknown, mapping: ReadonlyMap<string, string>, errors: string[]): K8sSettings["services"] | undefined {
+function checkServices(
+    raw: unknown,
+    mapping: ReadonlyMap<string, string>,
+    errors: string[],
+): K8sSettings["services"] | undefined {
     if (raw === undefined) {
-        errors.push('k8s.services: required, an object that maps a service name to its environments');
+        errors.push("k8s.services: required, an object that maps a service name to its environments");
         return undefined;
     }
     if (!isObject(raw)) {
@@ -178,7 +210,9 @@ function checkServices(raw: unknown, mapping: ReadonlyMap<string, string>, error
         }
         for (const [environment, rawEntry] of environments) {
             if (!ENVIRONMENT_NAME.test(environment)) {
-                errors.push(`${at}: ${shown(environment, 30)} is not a usable environment name (letters, digits, _ and -)`);
+                errors.push(
+                    `${at}: ${shown(environment, 30)} is not a usable environment name (letters, digits, _ and -)`,
+                );
                 continue;
             }
             const entry = checkEntry(rawEntry, `${at}.${environment}`, errors);
@@ -225,7 +259,8 @@ export function validateK8s(raw: unknown): string[] {
 
 const parsed = new WeakMap<object, K8sSettings | undefined>();
 
-/** The settings in a raw section, or undefined when it is absent or invalid. Read again only when the object changes. */
+/** The settings in a raw section, or undefined when it is absent or invalid. Read again only when the object
+ *  changes. */
 export function settingsOf(raw: unknown): K8sSettings | undefined {
     if (!isObject(raw)) return undefined;
     if (!parsed.has(raw)) parsed.set(raw, readK8s(raw).settings);
@@ -234,7 +269,9 @@ export function settingsOf(raw: unknown): K8sSettings | undefined {
 
 /** `orders-api (staging, production), billing (staging)`: what a message offers when a service name is wrong. */
 export function describeServices(settings: K8sSettings): string {
-    return shortList([...settings.services].map(([name, targets]) => `${name} (${shortList([...targets.keys()], 60)})`));
+    return shortList(
+        [...settings.services].map(([name, targets]) => `${name} (${shortList([...targets.keys()], 60)})`),
+    );
 }
 
 /**
@@ -242,14 +279,17 @@ export function describeServices(settings: K8sSettings): string {
  * there are, because the model has no other way to learn them.
  */
 export function findTarget(settings: K8sSettings, service: unknown, environment: unknown): Target {
-    const environments = typeof service === "string" ? settings.services.get(service) : undefined;
-    if (environments === undefined) {
-        throw new InputError(`k8s: no service named ${shown(service, 30)}. Known services: ${describeServices(settings)}`);
+    const name = typeof service === "string" ? service : undefined;
+    const environments = name === undefined ? undefined : settings.services.get(name);
+    if (name === undefined || environments === undefined) {
+        throw new InputError(
+            `k8s: no service named ${shown(service, 30)}. Known services: ${describeServices(settings)}`,
+        );
     }
     const target = typeof environment === "string" ? environments.get(environment) : undefined;
     if (target === undefined) {
         throw new InputError(
-            `k8s: ${service as string} has no environment ${shown(environment, 30)}. ` +
+            `k8s: ${name} has no environment ${shown(environment, 30)}. ` +
                 `Known environments: ${shortList([...environments.keys()])}`,
         );
     }

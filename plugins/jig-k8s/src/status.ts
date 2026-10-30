@@ -1,8 +1,8 @@
 // `status`: the rollout of a service, seen once, or watched until its pods run a given version.
 //
-// A wait polls the cluster and backs off between polls, so a long rollout costs a few dozen reads and not hundreds. It ends
-// when the version is running, when a pod cannot come up, or when the time is up; the last two are results, not errors, so
-// the model sees which pod failed or how far the rollout got.
+// A wait polls the cluster and backs off between polls, so a long rollout costs a few dozen reads and not hundreds. It
+// ends when the version is running, when a pod cannot come up, or when the time is up; the last two are results, not
+// errors, so the model sees which pod failed or how far the rollout got.
 import type { Kube } from "./kubectl.ts";
 import type { Call } from "./params.ts";
 import { listPods } from "./pods.ts";
@@ -41,23 +41,32 @@ async function look(kube: Kube, version: string | undefined): Promise<Snapshot> 
 
 function render(kube: Kube, snapshot: Snapshot, version: string | undefined, now: number, waited?: string): string {
     const { target } = kube;
-    const head = `${target.service} in ${target.environment} (namespace ${target.namespace}): ${verdictLine(snapshot.rollout, target, version, waited)}`;
-    return [head, workloadLines(snapshot.workloads), podLines(snapshot.pods, version, now)].filter((line) => line !== "").join("\n");
+    const verdict = verdictLine(snapshot.rollout, target, version, waited);
+    const head = `${target.service} in ${target.environment} (namespace ${target.namespace}): ${verdict}`;
+    const lines = [head, workloadLines(snapshot.workloads), podLines(snapshot.pods, version, now)];
+    return lines.filter((line) => line !== "").join("\n");
 }
 
 function outcome(text: string, snapshot: Snapshot, more: { polls: number; timedOut: boolean }): Outcome {
-    const { rollout } = snapshot;
+    const { verdict, live, settled, wanted, tags } = snapshot.rollout;
     return {
         text,
-        facts: { verdict: rollout.verdict, pods: rollout.live.length, ready: rollout.settled, polls: more.polls, timedOut: more.timedOut },
-        details: { verdict: rollout.verdict, pods: rollout.live.length, ready: rollout.settled, wanted: rollout.wanted, tags: rollout.tags, ...more },
+        facts: { verdict, pods: live.length, ready: settled, polls: more.polls, timedOut: more.timedOut },
+        details: { verdict, pods: live.length, ready: settled, wanted, tags, ...more },
     };
 }
 
 /** The error of a wait that the user stopped. The rollout goes on whatever happens to the wait. */
 function stopped(last: Snapshot | undefined): Error {
-    const seen = last === undefined ? "" : ` (last seen: ${last.rollout.verdict}, ${last.rollout.settled} of ${last.rollout.wanted} ready)`;
-    return new Error(`k8s status: the wait was stopped${seen}. The rollout itself is not affected: run status with waitFor to wait again`);
+    let seen = "";
+    if (last !== undefined) {
+        const { verdict, settled, wanted } = last.rollout;
+        seen = ` (last seen: ${verdict}, ${settled} of ${wanted} ready)`;
+    }
+    return new Error(
+        `k8s status: the wait was stopped${seen}. ` +
+            "The rollout itself is not affected: run status with waitFor to wait again",
+    );
 }
 
 async function waitForVersion(kube: Kube, version: string, timeoutSec: number, deps: Waiting): Promise<Outcome> {
@@ -83,7 +92,10 @@ async function waitForVersion(kube: Kube, version: string, timeoutSec: number, d
             return outcome(text, last, { polls, timedOut: true });
         }
 
-        deps.progress(`${kube.target.service} ${kube.target.environment}: ${settled} of ${Math.max(wanted, live.length)} ready on ${version}, running ${tags.join(", ") || "no tag"}`);
+        const { service, environment } = kube.target;
+        const running = tags.join(", ") || "no tag";
+        const of = Math.max(wanted, live.length);
+        deps.progress(`${service} ${environment}: ${settled} of ${of} ready on ${version}, running ${running}`);
         try {
             await deps.sleep(Math.min(delay, deadline - deps.now()), kube.signal);
         } catch (error) {
@@ -95,7 +107,11 @@ async function waitForVersion(kube: Kube, version: string, timeoutSec: number, d
 }
 
 /** `status`: the workloads and pods of the service, and whether they are running one version. */
-export async function statusAction(kube: Kube, call: Extract<Call, { action: "status" }>, deps: Waiting): Promise<Outcome> {
+export async function statusAction(
+    kube: Kube,
+    call: Extract<Call, { action: "status" }>,
+    deps: Waiting,
+): Promise<Outcome> {
     if (call.waitFor === undefined) {
         const snapshot = await look(kube, undefined);
         return outcome(render(kube, snapshot, undefined, deps.now()), snapshot, { polls: 1, timedOut: false });

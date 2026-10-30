@@ -1,5 +1,6 @@
-// `logs`: the last lines of one pod's log. The pod is the one the call names or the first Ready one, and it must be a pod of
-// the service: the selector decides which pods the tool can reach, so a pod name cannot lead to another service's logs.
+// `logs`: the last lines of one pod's log. The pod is the one the call names or the first Ready one, and it must be a
+// pod of the service: the selector decides which pods the tool can reach, so a pod name cannot lead to another
+// service's logs.
 import type { Target } from "./config.ts";
 import { cutMark, LOGS, readKubectl, wasCut } from "./kubectl.ts";
 import type { Kube } from "./kubectl.ts";
@@ -17,7 +18,9 @@ function choosePod(pods: readonly Pod[], given: string | undefined, target: Targ
         const found = pods.find((pod) => pod.name === given);
         if (found !== undefined) return found;
         const offer = pods.length === 0 ? "it has no pods" : `use ${shortList(pods.map((pod) => pod.name), 120)}`;
-        throw new Error(`${given} is not a pod of ${target.service} in ${target.environment} (${offer}). Run pods to see them`);
+        throw new Error(
+            `${given} is not a pod of ${target.service} in ${target.environment} (${offer}). Run pods to see them`,
+        );
     }
     const ready = firstReady(pods);
     if (ready === undefined) {
@@ -36,7 +39,9 @@ function choosePod(pods: readonly Pod[], given: string | undefined, target: Targ
 function chooseContainer(pod: Pod, given: string | undefined, target: Target): string | undefined {
     if (given !== undefined) {
         const names = [...pod.containers.map((container) => container.name), ...pod.initContainers];
-        if (!names.includes(given)) throw new Error(`${pod.name} has no container ${given} (it has ${shortList(names, 120)})`);
+        if (!names.includes(given)) {
+            throw new Error(`${pod.name} has no container ${given} (it has ${shortList(names, 120)})`);
+        }
         return given;
     }
     const own = ownContainers(pod.containers, target);
@@ -72,7 +77,8 @@ export async function logsAction(kube: Kube, call: Extract<Call, { action: "logs
         ...(call.sinceSeconds === undefined ? [] : [`last ${call.sinceSeconds} s`]),
         ...(call.previous ? ["previous run"] : []),
     ].join(", ");
-    const head = `${whose(pod, container)}: ${plural(lines.length, "line")} (${window})${cut ? `, cut at ${LOGS.maxBytes / MIB} MiB` : ""}`;
+    const cutNote = cut ? `, cut at ${LOGS.maxBytes / MIB} MiB` : "";
+    const head = `${whose(pod, container)}: ${plural(lines.length, "line")} (${window})${cutNote}`;
     return {
         text: `${head}\n${lines.length === 0 ? "(no lines)" : lines.join("\n")}`,
         facts: { lines: lines.length, previous: call.previous, cut },

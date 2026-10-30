@@ -1,6 +1,8 @@
 // The tool as a model and jig-core meet it: how a call is classified, what each action returns, and what a wrong call is told.
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, test } from "node:test";
+import { createDecisions } from "../src/decisions.ts";
+import { createTool } from "../src/tool.ts";
 import { list, pod, workload } from "./support/fixtures.ts";
 import { ok, setupHarness } from "./support/harness.ts";
 import type { Harness } from "./support/harness.ts";
@@ -214,6 +216,44 @@ describe("status", () => {
         h.clock.afterSleep = () => controller.abort();
         const result = await h.call({ action: "status", ...POD, waitFor: "1.4.3" }, { signal: controller.signal });
         assert.match(result.error?.message ?? "", /^k8s status: the wait was stopped/);
+    });
+});
+
+describe("status, with the real clock and real timers", () => {
+    // The harness gives the tool a clock that moves when a wait sleeps. Without one, the tool uses Date.now and setTimeout.
+    const real = () => createTool({ decisions: createDecisions() }).definition;
+    const stale = () => h.kubectl.answer({ pods: list(pod("orders-api-0", { tag: "1.4.2" }), pod("orders-api-1", { tag: "1.4.2" })), workloads: list(workload("orders-api")) });
+
+    test("a wait that runs out of time takes that time, and says so", async () => {
+        stale();
+        const started = Date.now();
+        const result = await real().execute("real-1", { action: "status", ...POD, waitFor: "9.9.9", timeoutSec: 1 } as never, undefined, undefined, {} as never);
+        const first = result.content[0];
+        assert.match(first?.type === "text" ? first.text : "", /^orders-api in staging \(namespace orders-staging\): Still rolling after waiting [12]s: 0 of 2 pods ready on 9\.9\.9; pods run 1\.4\.2\./);
+        const took = Date.now() - started;
+        assert.ok(took >= 900 && took < 6000, `${took} ms`);
+    });
+
+    test("a wait the user stops ends at once, and not at the limit", async () => {
+        stale();
+        const controller = new AbortController();
+        setTimeout(() => controller.abort(), 200);
+        const started = Date.now();
+        await assert.rejects(
+            real().execute("real-2", { action: "status", ...POD, waitFor: "9.9.9", timeoutSec: 60 } as never, controller.signal, undefined, {} as never),
+            /^Error: k8s status: the wait was stopped/,
+        );
+        assert.ok(Date.now() - started < 5000, `${Date.now() - started} ms`);
+    });
+
+    test("a call that was already stopped does not start", async () => {
+        stale();
+        const controller = new AbortController();
+        controller.abort();
+        await assert.rejects(
+            real().execute("real-3", { action: "status", ...POD, waitFor: "9.9.9" } as never, controller.signal, undefined, {} as never),
+            /^Error: (kubectl was aborted|k8s status: the wait was stopped)/,
+        );
     });
 });
 

@@ -9,9 +9,9 @@ import type { Target } from "./config.ts";
 import { explain } from "./failure.ts";
 
 /**
- * Every kubectl command this plugin can run: two that read, and `exec`, which only the `api` action uses to run curl in a
- * pod. A verb that is not here cannot be built: `delete`, `scale`, `apply`, `edit`, `rollout restart`, `port-forward`,
- * `cp` and the rest of the writes are not a matter of being refused later, they are not in the code.
+ * Every kubectl command this plugin can run: two that read, and `exec`, which only the `api` action uses to run curl
+ * in a pod. A verb that is not here cannot be built: `delete`, `scale`, `apply`, `edit`, `rollout restart`,
+ * `port-forward`, `cp` and the rest of the writes are not a matter of being refused later, they are not in the code.
  */
 export const VERBS = ["get", "logs", "exec"] as const;
 export type Verb = (typeof VERBS)[number];
@@ -47,7 +47,13 @@ export function wasCut(stdout: string, limit: number): boolean {
 /** What every command starts with: kubectl's own time limit, and the context and namespace of the target. The `=` form
  *  keeps a value from ever being read as a flag. */
 export function argvOf(target: Target, verb: Verb, args: readonly string[], limits: Limits): string[] {
-    return [`--request-timeout=${limits.requestSec}s`, `--context=${target.context}`, `--namespace=${target.namespace}`, verb, ...args];
+    return [
+        `--request-timeout=${limits.requestSec}s`,
+        `--context=${target.context}`,
+        `--namespace=${target.namespace}`,
+        verb,
+        ...args,
+    ];
 }
 
 /** jig-core starts programs with a short list of environment variables. kubectl also needs to know where the user's
@@ -59,7 +65,9 @@ function environment(): Record<string, string> {
 
 /** Runs kubectl and returns what it did, whether it succeeded or not. A command that ran out of time is an error. */
 export async function runKubectl(kube: Kube, verb: Verb, args: readonly string[], limits: Limits): Promise<RunResult> {
-    if (!(VERBS as readonly string[]).includes(verb)) throw new Error(`kubectl ${String(verb)} is not allowed: this tool only reads`);
+    if (!(VERBS as readonly string[]).includes(verb)) {
+        throw new Error(`kubectl ${String(verb)} is not allowed: this tool only reads`);
+    }
     const result = await jig().exec.run("kubectl", argvOf(kube.target, verb, args, limits), {
         timeoutMs: limits.timeoutMs,
         signal: kube.signal,
@@ -67,7 +75,9 @@ export async function runKubectl(kube: Kube, verb: Verb, args: readonly string[]
         env: environment(),
     });
     if (result.timedOut) {
-        throw new Error(`kubectl ${verb} timed out after ${limits.timeoutMs / 1000} s: the cluster is slow or unreachable`);
+        throw new Error(
+            `kubectl ${verb} timed out after ${limits.timeoutMs / 1000} s: the cluster is slow or unreachable`,
+        );
     }
     return result;
 }

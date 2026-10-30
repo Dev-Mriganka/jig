@@ -1,14 +1,39 @@
-// kubectl's complaint (its stderr) as the one line a person or the model can act on. A raw message is only ever shown as its
-// first lines, with any credential in an address removed.
+// kubectl's complaint (its stderr) as the one line a person or the model can act on. A raw message is only ever shown
+// as its first lines, with any credential in an address removed.
 import type { Target } from "./config.ts";
 import { oneLine } from "./values.ts";
 
 // Checked in this order: "Unable to connect ... getting credentials ... token expired" is a sign-in problem, not a
 // network one, although it starts like one.
-const NOT_SIGNED_IN =
-    /Token has expired|SSO session|ExpiredToken|token (?:is )?expired|\(Unauthorized\)|getting credentials|exec plugin|Unable to locate credentials/i;
-const UNREACHABLE =
-    /Unable to connect|no such host|dial tcp|i\/o timeout|TLS handshake timeout|Client\.Timeout|context deadline exceeded|connection refused|was refused|network is unreachable|no route to host/i;
+const NOT_SIGNED_IN = new RegExp(
+    [
+        "Token has expired",
+        "SSO session",
+        "ExpiredToken",
+        "token (?:is )?expired",
+        "\\(Unauthorized\\)",
+        "getting credentials",
+        "exec plugin",
+        "Unable to locate credentials",
+    ].join("|"),
+    "i",
+);
+const UNREACHABLE = new RegExp(
+    [
+        "Unable to connect",
+        "no such host",
+        "dial tcp",
+        "i/o timeout",
+        "TLS handshake timeout",
+        "Client\\.Timeout",
+        "context deadline exceeded",
+        "connection refused",
+        "was refused",
+        "network is unreachable",
+        "no route to host",
+    ].join("|"),
+    "i",
+);
 const NO_CONTEXT = /context "[^"]*" does not exist|no context exists/i;
 const FORBIDDEN = /Error from server \(Forbidden\)/i;
 const NO_NAMESPACE = /Error from server \(NotFound\): namespaces? "[^"]*" not found/i;
@@ -22,8 +47,8 @@ function scrub(text: string): string {
 }
 
 /**
- * The first few non-empty lines of kubectl's complaint, on one line. The lines are taken before anything is scrubbed, and
- * each is cut: kubectl's complaint can be megabytes long, and nothing here may take longer for it.
+ * The first few non-empty lines of kubectl's complaint, on one line. The lines are taken before anything is scrubbed,
+ * and each is cut: kubectl's complaint can be megabytes long, and nothing here may take longer for it.
  */
 export function firstLines(text: string, count = 3): string {
     const lines: string[] = [];
@@ -78,7 +103,8 @@ export function explain(stderr: string, code: number, what: string, target: Targ
     }
     if (NOT_STARTED.test(stderr)) {
         return new Error(
-            `The container is not running yet (${reason}): try again shortly, or read the log of its last run with previous: true`,
+            `The container is not running yet (${reason}): ` +
+                "try again shortly, or read the log of its last run with previous: true",
         );
     }
     return new Error(`${what} failed (exit ${code}): ${firstLines(stderr) || "no error text"}`);

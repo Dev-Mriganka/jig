@@ -1,9 +1,10 @@
 // What jig-core decided about a call, as far as `api` needs it: the kind of the environment the call was decided in.
 //
-// Which environments are production is jig-core's to say, and the contract gives a plugin no way to ask. What jig-core does
-// publish, on Pi's event bus, is its decision for every call before the call runs (`jig:decision`), and that message names
-// the kind. `api` runs a command in a pod, so it must never run where jig-core says production, whatever the environment is
-// called. classify can only refuse the one name that is always production (see params.ts); this closes the rest.
+// Which environments are production is jig-core's to say, and the contract gives a plugin no way to ask. What jig-core
+// does publish, on Pi's event bus, is its decision for every call before the call runs (`jig:decision`), and that
+// message names the kind. `api` runs a command in a pod, so it must never run where jig-core says production, whatever
+// the environment is called. classify can only refuse the one name that is always production (see params.ts); this
+// closes the rest.
 import type { DecisionEvent, EnvironmentKind, JIG_EVENTS } from "../../jig-core/src/contract.ts";
 import type { Target } from "./config.ts";
 import { isObject } from "./values.ts";
@@ -47,19 +48,21 @@ export function createDecisions(): Decisions {
 }
 
 /**
- * Refuses an `api` call unless jig-core said, for this very call, that the environment is not production. A call jig-core did
- * not announce, or announced for another environment, cannot be vouched for, and fails closed.
+ * Refuses an `api` call unless jig-core said, for this very call, that the environment is not production. A call
+ * jig-core did not announce, or announced for another environment, cannot be vouched for, and fails closed.
  */
 export function requireNotProduction(decisions: Decisions, toolCallId: string, target: Target): void {
     const where = `${target.service} in ${target.environment}`;
     const decision = decisions.seen(toolCallId);
     if (decision === undefined || decision.environment !== target.jigEnvironment) {
         throw new Error(
-            `k8s api could not confirm that ${where} is not production: jig-core did not say which environment it decided this call in. ` +
-                "Nothing was run",
+            `k8s api could not confirm that ${where} is not production: ` +
+                "jig-core did not say which environment it decided this call in. Nothing was run",
         );
     }
     if (decision.kind === "production") {
-        throw new Error(`k8s api is refused in production (${where}): it runs in test environments only. Nothing was run`);
+        throw new Error(
+            `k8s api is refused in production (${where}): it runs in test environments only. Nothing was run`,
+        );
     }
 }

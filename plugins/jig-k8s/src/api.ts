@@ -1,9 +1,10 @@
-// `api`: a GET on a path of the service, made from inside one of its Ready pods with curl, on the port the target names.
-// The pod must have curl; the tool adds nothing to the pod.
+// `api`: a GET on a path of the service, made from inside one of its Ready pods with curl, on the port the target
+// names. The pod must have curl; the tool adds nothing to the pod.
 //
-// The request is fixed. Only the path (and its query) comes from the call, after parseCall has checked it, and it is one
-// argument of curl's command line, which no shell reads. The call has no method, no header and no body, so there is nothing
-// to put on curl's standard input and nothing to hide from kubectl's: an API that wants a body is not reachable here.
+// The request is fixed. Only the path (and its query) comes from the call, after parseCall has checked it, and it is
+// one argument of curl's command line, which no shell reads. The call has no method, no header and no body, so there
+// is nothing to put on curl's standard input and nothing to hide from kubectl's: an API that wants a body is not
+// reachable here.
 import { explain, firstLines } from "./failure.ts";
 import { cutMark, runKubectl, wasCut } from "./kubectl.ts";
 import type { Kube, Limits } from "./kubectl.ts";
@@ -13,10 +14,15 @@ import { clean, shortList } from "./values.ts";
 import type { Outcome } from "./values.ts";
 
 /** How long curl waits for the answer, inside the pod. */
-export const CURL_TIMEOUT_SEC = 20;
+const CURL_TIMEOUT_SEC = 20;
 
-/** The reply is capped at 2 MiB. kubectl gets a little longer than curl, so curl's own timeout is the one that speaks. */
-export const API: Limits = { timeoutMs: (CURL_TIMEOUT_SEC + 15) * 1000, requestSec: CURL_TIMEOUT_SEC + 10, maxBytes: 2 * 1024 * 1024 };
+/** The reply is capped at 2 MiB. kubectl gets a little longer than curl, so that curl's own timeout is the one that
+ *  speaks. */
+export const API: Limits = {
+    timeoutMs: (CURL_TIMEOUT_SEC + 15) * 1000,
+    requestSec: CURL_TIMEOUT_SEC + 10,
+    maxBytes: 2 * 1024 * 1024,
+};
 
 /** curl prints this after the body (`-w`), so the status can be told from a body that happens to end like a status. */
 const STATUS_MARK = "\n__status:";
@@ -36,7 +42,10 @@ function curlProblem(stderr: string, code: number, pod: string, port: number): s
     const exit = match === null ? code : Number(match[1] ?? match[2]);
     switch (exit) {
         case 7:
-            return `nothing accepted the connection on localhost:${port} inside ${pod}: the service may be starting, or listen on another port`;
+            return (
+                `nothing accepted the connection on localhost:${port} inside ${pod}: ` +
+                "the service may be starting, or listen on another port"
+            );
         case 28:
             return `the request timed out after ${CURL_TIMEOUT_SEC} s inside ${pod}`;
         case 18:
@@ -61,11 +70,17 @@ export async function apiAction(kube: Kube, call: Extract<Call, { action: "api" 
     const { target } = kube;
     const pod = firstReady(await listPods(kube));
     if (pod === undefined) {
-        throw new Error(`${target.service} has no ready pod in ${target.environment} to call: run pods, and try again when one is ready`);
+        throw new Error(
+            `${target.service} has no ready pod in ${target.environment} to call: ` +
+                "run pods, and try again when one is ready",
+        );
     }
     if (!pod.containers.some((container) => container.name === call.container)) {
         const have = shortList(pod.containers.map((container) => container.name), 120);
-        throw new Error(`${pod.name} has no container ${call.container} (it has ${have}): fix "container" in the k8s section of jig.json`);
+        throw new Error(
+            `${pod.name} has no container ${call.container} (it has ${have}): ` +
+                'fix "container" in the k8s section of jig.json',
+        );
     }
 
     const path = `${call.path}${call.query}`;
@@ -75,18 +90,23 @@ export async function apiAction(kube: Kube, call: Extract<Call, { action: "api" 
         if (NO_CURL.test(result.stderr)) {
             throw new Error(`${pod.name} has no curl in container ${call.container}: api needs curl inside the pod`);
         }
-        // curl's own failure comes back through kubectl; anything else is kubectl's (sign-in, network) and reads as such.
-        if (CURL_FAILED.test(result.stderr)) throw new Error(curlProblem(result.stderr, result.code, pod.name, call.port));
+        // curl's own failure comes back through kubectl; anything else is kubectl's (sign-in, network) and reads as
+        // such.
+        if (CURL_FAILED.test(result.stderr)) {
+            throw new Error(curlProblem(result.stderr, result.code, pod.name, call.port));
+        }
         throw explain(result.stderr, result.code, `curl inside ${pod.name}`, target);
     }
 
     const where = `GET ${path} on ${pod.name}:${call.port}`;
-    // A reply longer than the limit was cut, and a cut reply has lost the end where the status is. A status found inside it
-    // could be part of the body, so none is looked for.
+    // A reply longer than the limit was cut, and a cut reply has lost the end where the status is. A status found
+    // inside it could be part of the body, so none is looked for.
     if (wasCut(result.stdout, API.maxBytes)) {
         const body = clean(result.stdout.slice(0, result.stdout.length - cutMark(API.maxBytes).length));
         return {
-            text: `${where} -> the reply is larger than ${API.maxBytes / (1024 * 1024)} MiB and was cut; its HTTP status was not read\n${body}`,
+            text:
+                `${where} -> the reply is larger than ${API.maxBytes / (1024 * 1024)} MiB and was cut; ` +
+                `its HTTP status was not read\n${body}`,
             facts: { cut: true },
             details: { pod: pod.name, cut: true },
         };

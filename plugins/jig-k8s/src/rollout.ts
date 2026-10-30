@@ -1,12 +1,12 @@
-// Is the service running the version it should? The workloads (deployments and statefulsets) behind the pods are read here,
-// and `evaluate` turns pods and workloads into a verdict. Nothing in `evaluate` reads a cluster, so every case is a plain
-// function of a few objects.
+// Is the service running the version it should? The workloads (deployments and statefulsets) behind the pods are read
+// here, and `evaluate` turns pods and workloads into a verdict. Nothing in `evaluate` reads a cluster, so every case is
+// a plain function of a few objects.
 import type { Target } from "./config.ts";
 import { getJson } from "./kubectl.ts";
 import type { Kube } from "./kubectl.ts";
-import { ownContainers, podLine, tagOf } from "./pods.ts";
-import type { Container, Pod } from "./pods.ts";
-import { isObject, plural, str } from "./values.ts";
+import { containersOf, ownContainers, podLine, tagsOf } from "./pods.ts";
+import type { Pod } from "./pods.ts";
+import { count, isObject, objects, plural, str } from "./values.ts";
 
 export interface Workload {
     kind: "StatefulSet" | "Deployment";
@@ -14,13 +14,12 @@ export interface Workload {
     desired: number;
     ready: number;
     updated: number;
-    /** A statefulset: its current revision, and `current -> update` while it rolls. A deployment: its revision number. */
+    /** A statefulset: its current revision, and `current -> update` while it rolls. A deployment: its revision
+     *  number. */
     revision: string | undefined;
     /** The tags the workload's pod template asks for, for the service's own containers. */
     tags: string[];
 }
-
-const count = (value: unknown): number => (typeof value === "number" && Number.isFinite(value) ? value : 0);
 
 /** True when every pair is among the labels. */
 function carries(labels: unknown, wanted: Target["labels"]): boolean {
@@ -35,31 +34,32 @@ function owns(item: Record<string, unknown>, target: Target): boolean {
     const spec = isObject(item.spec) ? item.spec : {};
     const selector = isObject(spec.selector) ? spec.selector.matchLabels : undefined;
     const template = isObject(spec.template) ? spec.template : {};
-    return carries(selector, target.labels) || carries(isObject(template.metadata) ? template.metadata.labels : undefined, target.labels);
+    const podLabels = isObject(template.metadata) ? template.metadata.labels : undefined;
+    return carries(selector, target.labels) || carries(podLabels, target.labels);
+}
+
+function revisionOf(kind: Workload["kind"], item: Record<string, unknown>, status: Record<string, unknown>) {
+    if (kind === "Deployment") {
+        const metadata = isObject(item.metadata) ? item.metadata : {};
+        const annotations = isObject(metadata.annotations) ? metadata.annotations : {};
+        return str(annotations["deployment.kubernetes.io/revision"]);
+    }
+    const current = str(status.currentRevision);
+    const update = str(status.updateRevision);
+    if (current === undefined || update === undefined || current === update) return current ?? update;
+    return `${current} -> ${update}`;
 }
 
 export function parseWorkloads(raw: unknown, target: Target): Workload[] {
-    const items = isObject(raw) && Array.isArray(raw.items) ? raw.items : [];
     const found: Workload[] = [];
-    for (const item of items) {
-        if (!isObject(item) || !isObject(item.metadata) || !owns(item, target)) continue;
+    for (const item of objects(isObject(raw) ? raw.items : undefined)) {
         const kind = item.kind === "StatefulSet" || item.kind === "Deployment" ? item.kind : undefined;
-        const name = str(item.metadata.name);
-        if (kind === undefined || name === undefined) continue;
+        const name = isObject(item.metadata) ? str(item.metadata.name) : undefined;
+        if (kind === undefined || name === undefined || !owns(item, target)) continue;
 
         const spec = isObject(item.spec) ? item.spec : {};
         const status = isObject(item.status) ? item.status : {};
         const template = isObject(spec.template) && isObject(spec.template.spec) ? spec.template.spec : {};
-        const containers: Container[] = (Array.isArray(template.containers) ? template.containers : []).filter(isObject).map((container) => {
-            const image = str(container.image) ?? "";
-            return { name: str(container.name) ?? "", image, tag: tagOf(image) };
-        });
-        const annotations = isObject(item.metadata.annotations) ? item.metadata.annotations : {};
-        const current = str(status.currentRevision);
-        const update = str(status.updateRevision);
-        const revision = kind === "StatefulSet"
-            ? (current !== undefined && update !== undefined && current !== update ? `${current} -> ${update}` : (current ?? update))
-            : str(annotations["deployment.kubernetes.io/revision"]);
         found.push({
             kind,
             name,
@@ -67,8 +67,8 @@ export function parseWorkloads(raw: unknown, target: Target): Workload[] {
             desired: spec.replicas === undefined ? 1 : count(spec.replicas),
             ready: count(status.readyReplicas),
             updated: count(status.updatedReplicas),
-            revision,
-            tags: ownContainers(containers, target).map((container) => container.tag).filter((tag): tag is string => tag !== undefined),
+            revision: revisionOf(kind, item, status),
+            tags: tagsOf(ownContainers(containersOf(template.containers), target)),
         });
     }
     return found;
@@ -105,7 +105,8 @@ export interface Rollout {
  */
 export function evaluate(pods: readonly Pod[], workloads: readonly Workload[], version: string | undefined): Rollout {
     const live = pods.filter((pod) => !pod.terminating);
-    const wanted = Math.max(1, workloads.length > 0 ? workloads.reduce((sum, workload) => sum + workload.desired, 0) : live.length);
+    const desired = workloads.length > 0 ? workloads.reduce((sum, workload) => sum + workload.desired, 0) : live.length;
+    const wanted = Math.max(1, desired);
     const onVersion = (pod: Pod) => version === undefined || pod.tags.includes(version);
     const settled = live.filter((pod) => pod.ready && onVersion(pod)).length;
     const tags = [...new Set(live.flatMap((pod) => pod.tags))];
@@ -128,8 +129,10 @@ export function verdictLine(rollout: Rollout, target: Target, version: string | 
     switch (rollout.verdict) {
         case "running":
             return `Running: ${settled} of ${plural(of, "pod")} ready on ${version ?? run}.`;
-        case "rolling":
-            return `Still rolling${after}: ${settled} of ${plural(of, "pod")} ready${version === undefined ? "" : ` on ${version}`}; pods run ${run}.`;
+        case "rolling": {
+            const on = version === undefined ? "" : ` on ${version}`;
+            return `Still rolling${after}: ${settled} of ${plural(of, "pod")} ready${on}; pods run ${run}.`;
+        }
         case "failing": {
             const pod = rollout.failing as Pod;
             return (
@@ -148,7 +151,8 @@ export function workloadLines(workloads: readonly Workload[]): string {
         .map((workload) => {
             const revision = workload.revision === undefined ? "" : `, revision ${workload.revision}`;
             const image = workload.tags.length === 0 ? "" : `, image ${workload.tags.join(", ")}`;
-            return `Workload: ${workload.kind} ${workload.name}, ${workload.ready}/${workload.desired} ready, ${workload.updated} updated${revision}${image}.`;
+            const counts = `${workload.ready}/${workload.desired} ready, ${workload.updated} updated`;
+            return `Workload: ${workload.kind} ${workload.name}, ${counts}${revision}${image}.`;
         })
         .join("\n");
 }

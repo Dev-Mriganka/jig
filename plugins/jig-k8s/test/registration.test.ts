@@ -7,7 +7,6 @@ import { describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Check } from "typebox/value";
-import { withdrawJig } from "../../jig-core/src/client.ts";
 import { validateK8s } from "../src/config.ts";
 import { DECISION_EVENT } from "../src/decisions.ts";
 import plugin, { jigK8s } from "../src/index.ts";
