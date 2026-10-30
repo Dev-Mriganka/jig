@@ -82,11 +82,12 @@ describe("the dependency", () => {
         assert.deepEqual(importers, [path.join("sources", "yaml.ts")]);
     });
 
-    test("the manifest pins it exactly, beside jig-review's three run-time dependencies and jig-mongo's driver and its `socks`", () => {
+    test("the manifest pins it exactly, beside jig-review's three run-time dependencies, jig-mongo's driver and its `socks`, and jig-sandbox's runtime", () => {
         const manifest = JSON.parse(fs.readFileSync(path.join(SRC, "..", "..", "..", "package.json"), "utf8")) as {
             dependencies: Record<string, string>;
         };
         assert.deepEqual(Object.keys(manifest.dependencies).sort(), [
+            "@anthropic-ai/sandbox-runtime",
             "@hono/node-server",
             "hono",
             "ignore",

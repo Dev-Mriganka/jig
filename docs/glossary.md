@@ -71,7 +71,10 @@ is refused and you see the new preview.
 | **Transport** | Company plugin code that carries a tool's requests to one of its systems. |
 | **Signed-in request** | A request `jig-core` sends for a plugin, adding the credential, so the plugin never sees it. |
 | **Spill file** | Where the full result goes when the text shown to the model is cut. |
-| **Sandbox** | Bubblewrap around the agent's shell and file tools. It hides credentials. Linux only. |
+| **Sandbox** | The operating-system box `jig-sandbox` runs the agent's `bash` in (bubblewrap on Linux and WSL2, Seatbelt on macOS). It hides credentials and keeps the agent from planting what runs later outside. |
+| **Broker** | The small process, one per session, in which the sandbox runtime runs, so its placeholder files and signal handlers stay out of Pi and the project. |
+| **Locked path** | A path the sandbox lets `bash` read and never write, because something outside the sandbox runs it later: `~/.bashrc`, `PATH` folders, git hooks, Pi's settings. |
+| **Ask-first path** | A toolchain folder such as `~/.sdkman` that `bash` can write once you say yes, for the session or always. |
 
 - **Masking** never touches identifiers. A company plugin can name more fields
   that hold personal data (see [Masking](../plugins/jig-core/docs/masking.md)).

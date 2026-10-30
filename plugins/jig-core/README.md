@@ -94,8 +94,8 @@ rather than guessing. So is a wrong type or value.
 ```
 
 It needs Pi 1.4 or later, a secret backend if a Jig tool needs secrets (`pass`
-on Linux first), and, on Linux, a sandbox for `bash`. While Jig is tried beside
-the existing harness, it borrows that harness's sandbox.
+on Linux first), and a sandbox for `bash`, which [`jig-sandbox`](../jig-sandbox/README.md)
+is. Without one, `/jig` and session start say plainly that `bash` is not sandboxed.
 
 ## Company part (in the company plugin)
 

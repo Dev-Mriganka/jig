@@ -71,6 +71,8 @@ export function installFakeJig(): FakeJig {
             registerSection: () => {},
             section: (name: string) => sections.get(name),
         },
+        protectedPaths: { list: () => [] },
+        sandbox: { register: () => undefined },
         exec: {
             run: async () => {
                 throw new Error("the review plugin runs git only");

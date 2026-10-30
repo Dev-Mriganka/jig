@@ -83,10 +83,14 @@ export function createApprovals(options: ApprovalsOptions = {}): Approvals {
     }
 
     async function showSelector(ctx: AskContext, request: AskRequest): Promise<Answer | undefined> {
-        const picked = await ctx.ui.select(selectorTitle(request), [ALLOW, ALLOW_SESSION, DECLINE], signalOption(ctx));
-        if (picked === ALLOW) return "allow";
-        if (picked === ALLOW_SESSION) return "allow-session";
-        if (picked === DECLINE) return "decline";
+        // A tool can say what the buttons mean for its call. The three words stay distinct, so one answer is never two.
+        const given = request.preview.answers;
+        const words = [word(given?.allow, ALLOW), word(given?.session, ALLOW_SESSION), word(given?.decline, DECLINE)];
+        const labels = new Set(words).size === 3 ? words : [ALLOW, ALLOW_SESSION, DECLINE];
+        const picked = await ctx.ui.select(selectorTitle(request), labels, signalOption(ctx));
+        if (picked === labels[0]) return "allow";
+        if (picked === labels[1]) return "allow-session";
+        if (picked === labels[2]) return "decline";
         return undefined;
     }
 
@@ -141,6 +145,16 @@ export function createApprovals(options: ApprovalsOptions = {}): Approvals {
             });
         },
     };
+}
+
+/** A button's words from a tool: a short line of plain text, or the usual words. */
+function word(given: unknown, usual: string): string {
+    return typeof given === "string" &&
+        given.length > 0 &&
+        given.length <= 60 &&
+        !/[\u0000-\u001f\u007f-\u009f]/.test(given)
+        ? given
+        : usual;
 }
 
 function signalOption(ctx: AskContext): { signal: AbortSignal } | undefined {

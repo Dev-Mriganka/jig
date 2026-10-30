@@ -13,6 +13,8 @@
 //   user writes only what they change; with no section of their own, the defaults must pass the check alone, and when
 //   they do not (a field only the user can give) the plugin is simply not configured and `/jig` says why.
 import { readFileSync } from "node:fs";
+import { matchesName } from "./classify.ts";
+import { namesOutsideCommand } from "./decide.ts";
 import { errorMessage } from "./errors.ts";
 import { isObject } from "./kit/values.ts";
 import { buildEnvironments } from "./environments.ts";
@@ -365,11 +367,12 @@ export function parseRules(raw: unknown, path: string, fail: Fail): Rule[] {
             bad(here, "must be an object");
             return;
         }
-        knownFields(item, ["tool", "action", "environment", "effect", "decision", "approval"], here, bad);
+        knownFields(item, ["tool", "action", "environment", "effect", "command", "decision", "approval"], here, bad);
         const tool = text(item, "tool", here, bad, true);
         const action = text(item, "action", here, bad, false);
         const environment = text(item, "environment", here, bad, false);
         const effect = choice(item, "effect", EFFECTS, here, bad, false);
+        const command = text(item, "command", here, bad, false);
         const decision = choice(item, "decision", DECISIONS, here, bad, true);
         const approval = choice(item, "approval", APPROVALS, here, bad, false);
         if (valid && tool !== undefined && decision !== undefined) {
@@ -379,6 +382,7 @@ export function parseRules(raw: unknown, path: string, fail: Fail): Rule[] {
                 ...(action === undefined ? {} : { action }),
                 ...(environment === undefined ? {} : { environment }),
                 ...(effect === undefined ? {} : { effect }),
+                ...(command === undefined ? {} : { command }),
                 ...(approval === undefined ? {} : { approval }),
             });
         }
@@ -660,6 +664,19 @@ export interface ProtectedDefaults {
  * but `decide.ts` applies the floor last, so it cannot change a production write.
  */
 export function floorViolation(rule: Rule, environments: Environments): string | undefined {
+    // A rule that tries to allow `bash` outside its sandbox must name the command. (A rule with no action leaves outside
+    // alone: `decide.ts` keeps asking for it, so a general `bash` rule is still fine.)
+    if (
+        rule.decision === "allow" &&
+        rule.action === "outside" &&
+        matchesName(rule.tool, "bash") &&
+        !namesOutsideCommand(rule)
+    ) {
+        return (
+            'a rule can allow bash to run outside its sandbox only if it names the tool "bash", the action "outside" and a ' +
+            'command pattern that names something, such as "docker compose *"; "allow" without them is refused'
+        );
+    }
     if (rule.decision === "deny" || rule.environment === undefined) return undefined;
     if (environments.kindOf(rule.environment) !== "production") return undefined;
     if (rule.effect === "read") return undefined;

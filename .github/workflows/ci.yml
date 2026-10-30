@@ -10,7 +10,8 @@ permissions:
 
 jobs:
   checks:
-    runs-on: ubuntu-latest
+    # Pinned: jig-sandbox's tests run the real sandbox, which depends on the kernel and AppArmor settings of the image.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - name: Check out the repository
@@ -39,6 +40,14 @@ jobs:
         run: |
           git config --global user.name ci
           git config --global user.email ci@example.com
+
+      # jig-sandbox's escape and keep-working tests run the real sandbox, and fail (they are not skipped) when it cannot run.
+      # Ubuntu 24.04 stops unprivileged programs from making a user namespace, which bubblewrap needs.
+      - name: Install the programs the sandbox needs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap socat ripgrep
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
 
       - name: Types and Biome
         run: npm run check

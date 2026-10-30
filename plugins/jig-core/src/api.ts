@@ -10,11 +10,25 @@ import {
 } from "./config.ts";
 import type { Facts, JigApi } from "./contract.ts";
 import { git, run } from "./exec.ts";
+import type { ExecGuard } from "./exec.ts";
 import { ensureConfigLoaded, loadPersonalConfig } from "./state.ts";
 import type { JigState } from "./state.ts";
 import { oneOfProblem } from "./section-defaults.ts";
 
 export function buildApi(state: JigState): JigApi {
+    // Asked at each use: the sandbox registers after this API is built, and can be switched off and on.
+    const guard: ExecGuard = {
+        writable(real) {
+            const provider = state.sandbox;
+            if (provider === undefined || !provider.active) return false;
+            try {
+                return provider.canWrite(real);
+            } catch {
+                // A sandbox that cannot answer is treated as one that lets bash write: the program is refused.
+                return true;
+            }
+        },
+    };
     return {
         version: 1,
 
@@ -161,6 +175,22 @@ export function buildApi(state: JigState): JigApi {
             },
         },
 
-        exec: { run, git },
+        protectedPaths: {
+            list: () => state.policy().protectedPaths.map((entry) => ({ ...entry })),
+        },
+
+        sandbox: {
+            register(provider) {
+                if (typeof provider?.canWrite !== "function") {
+                    throw new TypeError("sandbox.register: the provider needs a canWrite function");
+                }
+                state.sandbox = provider;
+            },
+        },
+
+        exec: {
+            run: (file, args, options) => run(file, args, options, guard),
+            git: (repo, args, options) => git(repo, args, options, guard),
+        },
     };
 }

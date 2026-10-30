@@ -97,6 +97,30 @@ describe("1. the tool's own declaration", () => {
         assert.equal(result.plugin, "jig-git");
     });
 
+    test("a declaration that extends the defaults answers for the calls it knows, and leaves the rest to rules and defaults", () => {
+        const outside: CallClass = { action: "outside", environment: "local", effect: "write", atLeast: "ask" };
+        const tool: ToolDeclaration = {
+            tool: "bash",
+            plugin: "jig-sandbox",
+            extendsDefaults: true,
+            classify: (input) => (input.outside === true ? outside : undefined),
+        };
+        const rules: ClassifyRule[] = [
+            { tool: "bash", param: "command", pattern: "^kubectl", environment: "staging", effect: "write" },
+        ];
+        const dependencies = deps({ declarations: [tool], rules });
+        assert.deepEqual(classify("bash", { command: "x", outside: true }, dependencies), {
+            ...outside,
+            source: "declaration",
+            plugin: "jig-sandbox",
+        });
+        const ruled = classify("bash", { command: "kubectl get pods" }, dependencies);
+        assert.equal(ruled.source, "rule");
+        assert.equal(ruled.environment, "staging");
+        const plain = classify("bash", { command: "ls" }, dependencies);
+        assert.deepEqual(plain, { environment: "local", effect: "write", source: "builtin" });
+    });
+
     test("a declaration that returns something invalid is an error, so the call is blocked rather than guessed", () => {
         const bad = [
             { environment: "", effect: "read" },

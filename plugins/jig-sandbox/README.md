@@ -1,7 +1,9 @@
 # jig-sandbox: the agent's shell, in a sandbox that stays out of the way
 
-**Status: design.** Built on [Anthropic's sandbox runtime](https://github.com/anthropics/sandbox-runtime)
-(Apache-2.0): bubblewrap on Linux and WSL2, Seatbelt on macOS.
+**Status: built, except background tasks and the `filtered` and `ask` network modes, which are design.**
+Built on [Anthropic's sandbox runtime](https://github.com/anthropics/sandbox-runtime) (Apache-2.0): bubblewrap on
+Linux and WSL2, Seatbelt on macOS. The escape and keep-working tests run on Linux and WSL2; the macOS side is
+written from the runtime's documentation and not yet tested on a Mac.
 
 `jig-sandbox` runs the `bash` commands the agent sends inside an operating-system
 sandbox, and keeps two promises:
@@ -16,14 +18,14 @@ says which rule and why, and offers a way through.
 
 ![Pi, Jig's tools, your own commands and the broker run on the host; the agent's bash runs in the sandbox, where paths are hidden, locked, ask-first or writable](../../docs/img/sandbox-boundary.svg)
 
-*Where the line runs. Your own `!` commands and Jig's tools stay outside; only what the agent runs in `bash` is inside, and the hidden paths are the same list `jig-core` protects from Pi's file tools.*
+*Where the line runs. Your own `!` commands and Jig's tools stay outside; only what the agent runs in `bash` is inside, and the hidden paths start from the list `jig-core` protects from Pi's file tools.*
 
 ## Inside and outside
 
 | Inside the sandbox | Outside it |
 |---|---|
-| The agent's `bash`, foreground and background | Your own `!` commands: they are yours |
-| Subagents' `bash` | Jig's tools (`git`, `jira`, `mongo`, ...), through `jig-core`'s rules |
+| The agent's `bash` (background tasks: later) | Your own `!` commands: they are yours |
+| Subagents' `bash`, when it is the registered tool | Jig's tools (`git`, `jira`, `mongo`, ...), through `jig-core`'s rules |
 | | Pi itself and its file tools, which `jig-core`'s protected paths cover |
 
 ## The four kinds of path
@@ -35,8 +37,9 @@ says which rule and why, and offers a way through.
 | **Ask first** | Toolchain managers (`~/.sdkman`, `~/.nvm`, `~/.pyenv`, ...) | Writable once you say yes |
 | **Writable** | The project, your home folder, `/tmp`, build caches (`~/.gradle/caches`, `~/.m2/repository`, `~/.npm`) | As outside |
 
-Hidden and locked are exact lists, shared with `jig-core`'s protected paths, and
-everything not on them is writable. Every entry and its reason is in [The rules](docs/rules.md).
+Hidden and locked are exact lists that start from `jig-core`'s protected paths, so the
+file tools and `bash` cannot disagree, and everything not on them is writable. Every
+entry and its reason is in [The rules](docs/rules.md).
 
 ## When a command hits a rule
 
@@ -48,8 +51,8 @@ everything not on them is writable. Every entry and its reason is in [The rules]
   and the agent runs it again. With no screen to ask on, the answer is no.
 - **Git config keeps working.** `git config` and `git remote add` work in the sandbox.
   If a command adds a setting that would run a program outside it (`core.fsmonitor`,
-  an alias starting with `!`, a filter), `jig-sandbox` puts the file back as it was
-  and says what it removed.
+  an alias starting with `!`, a filter), `jig-sandbox` takes that setting out, keeps the
+  rest of the change, and says what it removed.
 - **One command can run outside, if you approve it.** When the sandbox blocks
   something the agent needs and no Jig tool does it (Docker, a script that needs
   your credentials, a build that must reach a private repository), the agent asks
@@ -64,27 +67,21 @@ everything not on them is writable. Every entry and its reason is in [The rules]
 
 | Mode | What it does |
 |---|---|
-| `open` (default) | The machine's own network, as outside: every host, plain DNS, `localhost`, servers started by earlier commands |
-| `filtered` | Through the sandbox's proxy: every public host, except cloud metadata addresses, private and `localhost` addresses, and hosts on `deny`. A background task's server and `localhost` ports you list are still reachable |
-| `ask` | `filtered`, and a new host waits while Pi asks you: once, this session, always or no |
-| `off` | No network |
+| `open` (default) | The machine's own network, as outside: every host, plain DNS, `localhost` |
+| `off` | No network at all, `localhost` included |
+| `filtered` (design) | Through the sandbox's proxy: every public host, except cloud metadata addresses, private and `localhost` addresses, and hosts on `deny` |
+| `ask` (design) | `filtered`, and a new host waits while Pi asks you: once, this session, always or no |
 
-In every mode, `ssh` has no keys (they are hidden), so git over SSH goes through Jig's
-`git` tool, and Unix sockets are closed, the Docker socket included: through Docker
-a command could run anything as root. `docker: true` opens that one socket,
-knowingly.
+A mode that is not built yet means `off`, and `/sandbox` says so: a setting is never
+read as a more open one. In every mode, `ssh` has no keys (they are hidden), so git
+over SSH goes through Jig's `git` tool, and Unix sockets are closed, the Docker socket
+included: through Docker a command could run anything as root. For Docker, the agent
+asks to [run that command outside](docs/when-blocked.md#running-one-command-outside).
 
-**When to choose `filtered`.** In `open` mode a command can reach anything on this
-machine's `localhost`, including a tunnel `jig-core` opened for a database. If your
-tunnels lead to production, `filtered` keeps bash away from them.
-
-## Background tasks
-
-`bash` with `background: true` starts a server, a watcher or a long build and returns
-at once. The agent reads its output, lists and stops tasks, and is woken when a task
-ends or prints a line you asked to watch for. `/ps` shows them; the footer counts
-them. Tasks run in the sandbox too, and stop when the session ends. Details in
-[Background tasks](docs/background.md).
+**When to choose `off`, and later `filtered`.** In `open` mode a command can reach
+anything on this machine's `localhost`, including a tunnel `jig-core` opened for a
+database. If your tunnels lead to production, a mode with its own network keeps bash
+away from them. A server a command starts lives as long as the command does.
 
 ## Fails closed, says so
 
@@ -99,11 +96,10 @@ them. Tasks run in the sandbox too, and stop when the session ends. Details in
 
 | Command | What it does |
 |---|---|
-| `/sandbox` | Whether bash is sandboxed, every rule and where it came from |
+| `/sandbox` | Whether bash is sandboxed, every rule and where it came from, and this session's outside runs |
 | `/sandbox doctor` | Checks the requirements and runs the proof commands |
-| `/sandbox allowed` | Folders and hosts you allowed always; `forget <path or host>` |
+| `/sandbox allowed` | Folders you allowed; `add <folder>` and `forget <folder>` |
 | `/sandbox off`, `/sandbox on` | Turns it off or on for this session only |
-| `/ps` | Background tasks: output, stop |
 
 ## Configure
 
@@ -111,19 +107,20 @@ In `~/.pi/agent/jig.json`, under `sandbox`. Every field is optional.
 
 | Field | Default | Meaning |
 |---|---|---|
-| `share` | none | Folders writable although a rule says otherwise, such as a Windows work folder under `/mnt` |
+| `share` | none | Folders writable although a rule hides them, such as a Windows work folder under `/mnt` |
 | `hide`, `lock` | none | More hidden or locked paths |
-| `network.mode` | `open` | `open`, `filtered`, `ask` or `off` |
-| `network.allow`, `network.deny` | none | Hosts, with `*.example.com` and an optional `:port` |
-| `network.localhost` | none | `localhost` ports reachable in `filtered` and `ask`, such as a local database |
+| `network.mode` | `open` | `open` or `off`; `filtered` and `ask` mean `off` until they are built |
+| `network.allow`, `network.deny`, `network.localhost` | none | Hosts and `localhost` ports for `filtered` and `ask`; checked now, used later |
 | `env.keep` | none | Variables passed in although their names look like credentials |
-| `docker` | `false` | Opens the Docker socket |
-| `background` | 4 tasks, 4 hours | `maxTasks`, `maxRuntimeMinutes` |
+| `programs` | found on `PATH` | Absolute paths of `bwrap`, `socat` and `ripgrep` when they are elsewhere |
+| `docker`, `background` | | Reserved: `docker` is not supported on Linux (see Network), `background` is for background tasks |
 
 ## Install
 
-Linux and WSL2: `sudo apt install bubblewrap socat ripgrep`. macOS: `brew install ripgrep`.
-Native Windows is not supported yet.
+Linux and WSL2: `sudo apt install bubblewrap socat ripgrep`. On Ubuntu 24.04, if the doctor
+says bubblewrap cannot make a user namespace:
+`sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0`. macOS: nothing to
+install, the sandbox is part of the system. Native Windows is not supported yet.
 
 ## Company part (in the company plugin)
 
@@ -132,14 +129,27 @@ locked paths, through `jig-core`'s section defaults and protected paths.
 
 ## Later
 
+- **Background tasks and `/ps`** ([design](docs/background.md)): a server started by a command
+  ends with it until then.
+- **The `filtered` and `ask` network modes** and the `localhost` bridge that goes with them.
 - **Stand-in credentials:** a command gets a placeholder, and the proxy puts the real
   value back only on the way to an allowed host, so a build can reach a private
   repository without ever seeing its token.
 - Native Windows.
 
+## Layout
+
+```text
+broker/broker.mjs   the only place the runtime runs: a plain-JavaScript child process
+src/                index.ts (entry), bash.ts (the tool, and one command outside), sandbox.ts (the session),
+                    rules.ts + lists.ts + repos.ts (the rules as data), audit.ts + gitconfig.ts (after a command),
+                    ask.ts + allowed.ts (questions), explain.ts, env.ts, output.ts, commands.ts, doctor.ts
+test/               rules as data, and the escape and keep-working tests in the real sandbox
+```
+
 ## More detail
 
 - [The rules](docs/rules.md): every hidden, locked and ask-first path, and why
 - [When a command hits a rule](docs/when-blocked.md): the messages, the prompts, the ways through
-- [Background tasks](docs/background.md): the tools, limits, waking, `/ps`
+- [Background tasks](docs/background.md): the tools, limits, waking, `/ps` (design)
 - [Design](docs/design.md): how it is built, what the earlier sandbox taught us, the tests

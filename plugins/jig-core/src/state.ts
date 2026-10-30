@@ -11,7 +11,7 @@ import type { Classification } from "./classify.ts";
 import { buildPolicy, defaultConfig, emptyAdditions, loadConfigFile } from "./config.ts";
 import type { CompanyAdditions, LoadedConfig, Policy, SectionCheck } from "./config.ts";
 import { JIG_EVENTS } from "./contract.ts";
-import type { ApprovalKind, Decision, EnvironmentKind, Preview, ToolDeclaration } from "./contract.ts";
+import type { ApprovalKind, Decision, EnvironmentKind, Preview, SandboxProvider, ToolDeclaration } from "./contract.ts";
 import type { DecisionSource } from "./decide.ts";
 import { errorMessage } from "./errors.ts";
 import { createMasker, dailyMaskKey } from "./mask/index.ts";
@@ -125,6 +125,8 @@ export interface JigState {
     /** The merged configuration. Rebuilt when something changes it. */
     policy(): Policy;
     invalidatePolicy(): void;
+    /** The sandbox that runs `bash`, once a plugin registers one. */
+    sandbox: SandboxProvider | undefined;
     /** The last time writing a record failed, for `/jig`. */
     recordsProblem: string | undefined;
     /** Problems from loading that are not configuration, such as a plugin whose start-up callback threw. */
@@ -260,6 +262,7 @@ export function createState(pi: ExtensionAPI, options: JigCoreOptions = {}): Jig
         invalidatePolicy() {
             policy = undefined;
         },
+        sandbox: undefined,
         recordsProblem: undefined,
         startupProblems: [],
     };
