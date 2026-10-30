@@ -10,17 +10,23 @@ anything is shared:
 - line comments, then **Ask** (one comment, now) or **Finish review** (all of them);
 - **Approve**, with a passkey.
 
-The comments reach the agent as a message, the agent answers each one, and the next round shows what
-changed. For example, after the agent changes `orders-api`, `/code-review --branch` opens everything since
-the branch left the main branch; you comment on two lines and Finish review, the agent fixes one and
-answers the other, and you approve the second round with Windows Hello.
+The comments reach the agent as a message, the agent answers each one, and the next round
+shows what changed.
+
+For example, after the agent changes `orders-api`, `/code-review --branch` opens everything
+since the branch left the main branch. You comment on two lines and Finish review, the agent
+fixes one and answers the other, and you approve the second round with Windows Hello.
 
 ## Tools
 
 | Tool | Kind | What it does |
 |---|---|---|
-| `start_interactive_code_review` | local write | Opens the review in your browser, as `/code-review` does. Its result never contains the page link, so the agent cannot use the page |
-| `record_interactive_review_resolution` | local write | The agent records how it handled each comment: `fixed`, `answered` or `wont-fix`, with a small diff and the lines it changed |
+| `start_interactive_code_review` | local write | Opens the review in your browser, as `/code-review` does |
+| `record_interactive_review_resolution` | local write | The agent records how it handled each comment |
+
+- **`start_interactive_code_review`:** its result never contains the page link, so the agent cannot use the page.
+- **`record_interactive_review_resolution`:** the answer is `fixed`, `answered` or `wont-fix`, with a small diff and the lines it
+  changed.
 
 Neither can approve. Both are declared to `jig-core`, which classifies them as local writes.
 
@@ -54,14 +60,17 @@ Approve in the page needs proof that you are there, and the agent cannot give it
 
 | Way | What happens | Recorded as |
 |---|---|---|
-| **Passkey** | The page asks your device to sign a fresh challenge. Windows Hello, Touch ID or a security key checks you; the server checks the signature | `passkey` |
-| **Fallback** | No passkey registered and you decline to register one, or your browser has none: the page marks the review "approved in page", and Pi asks you `y` or `n`. It counts only after `y` | `page-and-pi` |
+| **Passkey** | The page asks your device to sign a fresh challenge; the server checks the signature | `passkey` |
+| **Fallback** | The page marks the review "approved in page", and Pi asks you `y` or `n` | `page-and-pi` |
+
+A passkey is checked by Windows Hello, Touch ID or a security key. The fallback is for when no passkey is registered and you
+decline to register one, or your browser has none; it counts only after `y`.
 
 The first Approve on a machine offers to **register a passkey**. Pi then shows the key's SHA-256
-fingerprint and asks you to confirm it before it is stored. A passkey is a public key, stored in
-`<agent folder>/jig-review/passkeys.json`, which the agent's shell does not write. The settings page lists
-the keys by fingerprint and removes one, confirmed in Pi. [Passkeys](docs/passkeys.md) has the checks,
-the store and what happens to a tampered file.
+fingerprint and asks you to confirm it before it is stored.
+- **A passkey is a public key,** stored in `<agent folder>/jig-review/passkeys.json`, which the agent's shell does not write.
+- **The settings page** lists the keys by fingerprint and removes one, confirmed in Pi.
+- **[Passkeys](docs/passkeys.md)** has the checks, the store and what happens to a tampered file.
 
 On approval the plugin:
 - records it in the review store, with how and when, and the full commit of each repository when the
@@ -81,7 +90,7 @@ On approval the plugin:
 - **Records stay out of the agent's reach.** Reviews, settings and passkeys live under Pi's agent folder.
 - **Git goes through `jig-core`,** with hooks off and a repository's risky `.git/config` refused.
 
-## Settings
+## Configure
 
 `/code-review settings`, or the page's settings page:
 
@@ -91,11 +100,26 @@ On approval the plugin:
 | `autoOpenBrowser` | `false` | Open the browser for it |
 | `diffView` | `split` | `split` or `unified` |
 
+## Company part (in the company plugin)
+
+None. `jig-review` needs nothing from a company: it works on a repository's own git history.
+
 ## Later: after a checker agent
 
 ![A fresh-context checker reviews the change first: a pass goes to your code review, a revise goes back to the maker, and after two rounds you decide](../../docs/img/fresh-checker.svg)
 
 *A read-only checker agent in a fresh context reviews the change before this review (see [`jig-workflow`](../jig-workflow/README.md)): a pass goes to your code review, a revise goes back to the maker with findings, and after two rounds the decision comes to you with both reports.*
+
+## Layout
+
+```text
+jig-review/
+  src/      coordinator, store, server, tools, git sources, approval service
+  src/passkey/   WebAuthn on node:crypto: CBOR, checks, challenges, the store
+  web/      the page: sources, build tooling, and the built files in web/dist
+  test/     one file per module, a fake authenticator and a fake Pi
+  docs/     the detail pages above
+```
 
 ## More detail
 
@@ -108,14 +132,3 @@ On approval the plugin:
 ## Origin
 
 Adapted from `@dbaida/pi-interactive-code-review` (MIT).
-
-## Layout
-
-```text
-jig-review/
-  src/      coordinator, store, server, tools, git sources, approval service
-  src/passkey/   WebAuthn on node:crypto: CBOR, checks, challenges, the store
-  web/      the page: sources, build tooling, and the built files in web/dist
-  test/     one file per module, a fake authenticator and a fake Pi
-  docs/     the detail pages above
-```

@@ -6,10 +6,14 @@ The browser side of `jig-review`. Back to the [jig-review overview](../README.md
 
 | Page | Address | What it is |
 |---|---|---|
-| Files changed | `/review/<id>/files` | A file tree and the diffs, split or unified. Hover a line to comment. **Ask** sends one comment now; **Finish review** sends all drafts, and a general comment, together. The review's own repository folder prefixes each path |
-| Conversation | `/review/<id>/conversation` | Your comments, the agent's answers (with the small diff it gave), each new round, and the approval, with how it was given |
+| Files changed | `/review/<id>/files` | A file tree and the diffs, split or unified. Hover a line to comment |
+| Conversation | `/review/<id>/conversation` | Your comments, the agent's answers, each new round, and the approval |
 | Reviews | `/reviews` | Every review record for this workspace, newest first. A review that is not the open one is read-only |
 | Settings | `/settings` | The three settings, and the registered passkeys by fingerprint, with Remove and Register |
+
+- **On Files changed,** **Ask** sends one comment now; **Finish review** sends all drafts, and a general comment, together. The
+  review's own repository folder prefixes each path.
+- **On Conversation,** the agent's answers come with the small diff it gave, and the approval with how it was given.
 
 Approve is in the Finish review dialog. With a passkey registered it goes straight to your device's
 prompt. Without one it offers to register a passkey, or to approve in Pi. While Pi is asking, the page
