@@ -25,7 +25,8 @@
     "extensions": [
       "./plugins/jig-core/src/index.ts",
       "./plugins/jig-memory/src/index.ts",
-      "./plugins/jig-git/src/index.ts"
+      "./plugins/jig-git/src/index.ts",
+      "./plugins/jig-logs/src/index.ts"
     ],
     "skills": [
       "./plugins/*/skills"
