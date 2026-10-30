@@ -221,6 +221,104 @@ export interface Transport {
     request(request: TransportRequest, signal?: AbortSignal): Promise<TransportResponse>;
 }
 
+/** The methods a request may use. A transport carries only GET, POST, PUT, PATCH and DELETE. */
+export type HttpMethod = "GET" | "HEAD" | "OPTIONS" | "POST" | "PUT" | "PATCH" | "DELETE";
+
+/** A value of a token request: plain text such as a client id, or a secret reference read just before the request. */
+export type HttpValue = string | { ref: string };
+
+/**
+ * A token from a token endpoint, with no browser: the client-credentials grant (RFC 6749, section 4.4) or the
+ * password grant (section 4.3). jig-core reads the secrets, asks for the token, keeps it in memory until shortly
+ * before it expires, and sends it as a bearer token. The token is never written anywhere.
+ */
+export interface HttpOAuth {
+    grant: "client_credentials" | "password";
+    tokenUrl: string;
+    clientId: HttpValue;
+    /** A client with a secret signs in with HTTP Basic unless `clientAuth` is `body`. */
+    clientSecret?: HttpValue;
+    /** For the password grant. */
+    username?: HttpValue;
+    password?: HttpValue;
+    scope?: string;
+    /** Where the client's id and secret go: HTTP Basic (RFC 6749 asks for it first), or the form. Default `header`. */
+    clientAuth?: "header" | "body";
+    /** A label that keeps tokens apart, such as `api:orders/staging`. A token is reused only for the same label and
+     *  the same settings. */
+    cache?: string;
+}
+
+/**
+ * Where the credential of a request comes from. Exactly one. A `ref` is a secret reference (`env:LOGS_TOKEN`,
+ * `cmd:gh`, `pass:work/token`) that jig-core resolves just before the request, so plugin code never sees the value.
+ */
+export type HttpAuth =
+    | { bearer: string }
+    | { basic: { user: string; password: string } }
+    | { header: { name: string; value: string; prefix?: string } }
+    | { query: { name: string; value: string } }
+    | { signIn: string }
+    | { oauth: HttpOAuth };
+
+/** One HTTP request for `http.request`. */
+export interface HttpRequest {
+    /** The system, as sign-in services and transports are told it, such as `jira` or `logs`. */
+    system: string;
+    url: string;
+    method: HttpMethod;
+    headers?: Readonly<Record<string, string>>;
+    /** Headers the caller would send by default (an `Accept`, a `User-Agent`): a header in `headers` replaces one of the
+     *  same name, and so does the credential's, whatever `onHeaderClash` says. */
+    defaultHeaders?: Readonly<Record<string, string>>;
+    /** Text, or bytes. A transport carries text only. */
+    body?: string | Uint8Array;
+    /** The credential, from a source the user configured. Not with `transport`: a transport signs in itself. */
+    auth?: HttpAuth;
+    /** The name of a registered transport that carries the request instead of the network. */
+    transport?: string;
+    /** What happens when a header in `headers` has the same name (ignoring case) as one the credential sets: the
+     *  credential's `replace`s it (the default), or the request is `refuse`d with `invalid_request`, so one of the two
+     *  never silently wins. */
+    onHeaderClash?: "replace" | "refuse";
+    /** From 1 ms to 10 minutes. Default 30 s. (A `signal` that fires with a `TimeoutError`, such as
+     *  `AbortSignal.timeout`, also ends the request as a `timeout`.) It starts after the credential is in hand: a secret store may wait for
+     *  you to unlock it. */
+    timeoutMs?: number;
+    /** The most reply bytes that are read; more is cut and `truncated` is set. From 1 byte to 64 MiB. Default 4 MiB. */
+    maxBytes?: number;
+}
+
+export interface HttpResponse {
+    status: number;
+    /** Lower-case names. A redirect is never followed: its address is `headers.location`. */
+    headers: Readonly<Record<string, string>>;
+    /** What the reply set, as `name=value`. There is no cookie jar. */
+    cookies: readonly string[];
+    /** The body as text, cut at `maxBytes`. Credentials that were sent are replaced by `[redacted]`. */
+    body: string;
+    /** How many bytes of the reply were read. */
+    bytes: number;
+    /** True when the reply was longer than `maxBytes` and was cut. */
+    truncated: boolean;
+    /** True when the first 4 KiB of the reply hold a NUL byte, so it is probably not text. */
+    binary: boolean;
+}
+
+/**
+ * Why a request got no reply. `code` is one of: `invalid_request`, `auth_failed`, `no_transport`, `transport_failed`,
+ * `timeout`, `aborted`, a system or TLS code such as `ECONNREFUSED` or `CERT_HAS_EXPIRED`, or `network_error` when the
+ * failure had no code. The message never holds a header value, a credential or the query of the address.
+ */
+export interface HttpErrorInfo extends Error {
+    readonly name: "HttpError";
+    readonly code: string;
+    /** True when the request cannot have reached the server (a bad request, a credential that could not be read, no
+     *  connection, a certificate that was refused, a call cancelled first). False when it may have, so a write may have
+     *  happened. */
+    readonly notSent: boolean;
+}
+
 /** jig-core's run-time API, reached through `jig()` in client.ts. */
 export interface JigApi {
     readonly version: 1;
@@ -279,6 +377,17 @@ export interface JigApi {
         headers(name: string, request: SignInRequest, signal?: AbortSignal): Promise<Readonly<Record<string, string>>>;
     };
 
+    /**
+     * Sends one HTTP request with a credential that jig-core reads for it, so plugin code never sees the value. It never
+     * follows a redirect (a 3xx comes back with its `location`), caps the reply, and throws an `HttpError` with a `code`
+     * for a request that got no reply. Requests that share one `signal` read a secret once, so the several requests of
+     * one call may pass the same signal (`AbortSignal.any([])` makes one when the call has none). See
+     * `docs/plugin-contract.md` and `docs/sign-in-and-transports.md`.
+     */
+    readonly http: {
+        request(request: HttpRequest, signal?: AbortSignal): Promise<HttpResponse>;
+    };
+
     /** Replaces customer personal data with tokens that stay the same all day. Throws if it cannot mask;
      *  the caller then drops the result. */
     readonly mask: {
@@ -300,6 +409,14 @@ export interface JigApi {
         addEnvironments(environments: Readonly<Record<EnvironmentName, EnvironmentConfig>>): void;
         addRules(rules: readonly Rule[]): void;
         addClassifyRules(rules: readonly ClassifyRule[]): void;
+        /** Paths Pi's own file tools must not touch, on top of the built-in ones: `secret` paths are neither read nor
+         *  written, `guarded` paths can be read but not written. Each path is absolute or starts with `~/`. This can only
+         *  add: the built-in paths and the user's own cannot be removed. */
+        addProtectedPaths(paths: { secret?: readonly string[]; guarded?: readonly string[] }): void;
+        /** Commands that a secret reference `cmd:<name>` may run, by name: `{ gh: ["gh", "auth", "token"] }`. The first
+         *  word is the program, the rest its arguments; no shell is used. A name the user also declares in `jig.json`
+         *  (`secrets.commands`) takes the user's command. They run only when `cmd` is in `secrets.backends`. */
+        addSecretCommands(commands: Readonly<Record<string, readonly string[]>>): void;
         /** Field names that hold personal data in a company's own systems. The masker treats them like its
          *  built-in personal fields and turns their values into `personal#` tokens. */
         addMaskFields(fields: readonly string[]): void;

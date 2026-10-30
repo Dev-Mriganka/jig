@@ -1,7 +1,14 @@
 // The API other plugins reach through `jig()` (see client.ts and contract.ts). Each function is a thin step onto the
 // state the hooks work on.
 import { layered } from "./section-defaults.ts";
-import { addCompanyClassifyRules, addCompanyEnvironments, addCompanyRules, OWN_SECTIONS } from "./config.ts";
+import {
+    addCompanyClassifyRules,
+    addCompanyEnvironments,
+    addCompanyProtectedPaths,
+    addCompanyRules,
+    addCompanySecretCommands,
+    OWN_SECTIONS,
+} from "./config.ts";
 import type { Facts, JigApi } from "./contract.ts";
 import { git, run } from "./exec.ts";
 import { ensureConfigLoaded, loadPersonalConfig } from "./state.ts";
@@ -61,6 +68,8 @@ export function buildApi(state: JigState): JigApi {
             headers: (name, request, signal) => state.signIn.headers(name, request, signal),
         },
 
+        http: { request: (request, signal) => state.http.request(request, signal) },
+
         mask: {
             text: (input) => state.masker().text(input),
             value: <T>(input: T): T => state.masker().value(input),
@@ -86,6 +95,13 @@ export function buildApi(state: JigState): JigApi {
             addClassifyRules(rules) {
                 addCompanyClassifyRules(state.company, rules);
                 state.invalidatePolicy();
+            },
+            addProtectedPaths(paths) {
+                addCompanyProtectedPaths(state.company, paths);
+                state.invalidatePolicy();
+            },
+            addSecretCommands(commands) {
+                addCompanySecretCommands(state.company, commands);
             },
             addMaskFields: (fields) => state.addMaskFields(fields),
             registerSection(name, validate) {

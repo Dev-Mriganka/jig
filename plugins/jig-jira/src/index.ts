@@ -8,7 +8,7 @@ import type { JiraOptions } from "./tool.ts";
 
 export type { JiraOptions };
 
-/** The extension, with parts a test can replace (the `fetch` that reaches Jira). Pi loads the default export below. */
+/** The extension, with parts a test can replace (the timeouts). Pi loads the default export below. */
 export function jigJira(options: JiraOptions = {}): ExtensionFactory {
     return (pi: ExtensionAPI) => {
         const tool = createTool(options);

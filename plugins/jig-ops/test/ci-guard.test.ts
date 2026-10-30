@@ -2,6 +2,7 @@
 // supplies every address, project, job and credential; and a write is sent from one place each, once. These tests read the
 // sources, because a call cannot show that a path does not exist.
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, test } from "node:test";
 import { codeOf, sources } from "./support/sources.ts";
 
@@ -11,19 +12,27 @@ const code = (file: string) => codeOf(all.find((source) => source.file === file)
 const occurrences = (file: string, pattern: RegExp) => [...code(file).matchAll(pattern)].length;
 
 describe("the requests the adapters make", () => {
-    test("leave this process in one file: the network, the transports, the secrets and the sign-in services", () => {
+    test("leave this process in one file, through jig-core: no adapter calls the network, a transport, a secret store or a sign-in service itself", () => {
+        assert.deepEqual(where(/\.http\.request\(/), ["ci/request.ts"]);
         assert.deepEqual(
             where(/\bfetch(?:Impl)?\(/).filter((file) => file.startsWith("ci/")),
-            ["ci/request.ts"],
+            [],
         );
-        assert.deepEqual(where(/transports\.request\(/), ["ci/request.ts"]);
-        assert.deepEqual(where(/secrets\.resolve\(/), ["ci/request.ts"]);
-        assert.deepEqual(where(/signIn\.headers\(/), ["ci/request.ts"]);
+        assert.deepEqual(where(/transports\.request\(/), []);
+        assert.deepEqual(where(/secrets\.resolve\(/), []);
+        assert.deepEqual(where(/signIn\.headers\(/), []);
     });
 
     test("never follow a redirect, because it would carry the credential to an address the catalog never named", () => {
-        assert.match(code("ci/request.ts"), /redirect: "manual"/);
+        // jig-core's request never follows one (its own tests prove it); no adapter asks for it.
+        assert.deepEqual(
+            where(/redirect\s*:/).filter((file) => file.startsWith("ci/")),
+            [],
+        );
         assert.deepEqual(where(/redirect:\s*"follow"/), []);
+        const kit = readFileSync(new URL("../../jig-core/src/kit/http.ts", import.meta.url), "utf8");
+        assert.match(kit, /redirect: "manual"/);
+        assert.doesNotMatch(kit, /redirect:\s*"follow"/);
     });
 
     test("only ever read, or POST: no other method exists", () => {
@@ -32,9 +41,14 @@ describe("the requests the adapters make", () => {
         assert.deepEqual(where(/method: "POST"/), ["ci/gitlab-api.ts", "ci/jenkins-api.ts"]);
     });
 
-    test("add the credential in that file only: a header name of a sign-in is written once", () => {
+    test("name where the credential comes from in that file only: a header name of a sign-in is written once, and no value is built", () => {
         assert.deepEqual(where(/PRIVATE-TOKEN/), ["ci/request.ts"]);
-        assert.deepEqual(where(/authorization: `Basic/), ["ci/request.ts"]);
+        assert.deepEqual(where(/basic: \{ user:/), ["ci/request.ts"]);
+        assert.deepEqual(where(/authorization:\s*`/i), []);
+        assert.deepEqual(
+            where(/Buffer\.from\(/).filter((file) => file.startsWith("ci/")),
+            [],
+        );
     });
 
     test("take the address from the catalog: no adapter writes a host of its own", () => {

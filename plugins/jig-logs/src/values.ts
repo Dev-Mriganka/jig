@@ -1,8 +1,7 @@
 // Small helpers shared by the files of this plugin.
+import { isObject } from "../../jig-core/src/kit/values.ts";
 
-export function isObject(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+export { isObject };
 
 /**
  * Control characters: the C0 and C1 ranges and the Unicode line and paragraph separators. They have no place in a

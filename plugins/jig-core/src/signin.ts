@@ -5,6 +5,7 @@
 // Every tool result after that is cleaned of them, and an error from here never repeats one.
 import type { SignInRequest, SignInService } from "./contract.ts";
 import { errorMessage } from "./errors.ts";
+import { printable } from "./kit/text.ts";
 import type { Redactor } from "./redact.ts";
 
 export interface SignIn {
@@ -19,12 +20,6 @@ export interface SignInOptions {
 
 /** The most registered names an error lists. */
 const MAX_NAMES_SHOWN = 10;
-
-/** A name or header from another package, safe to put in a message: no control characters, and short. */
-function printable(text: string): string {
-    const clean = text.replace(/[\u0000-\u001f\u007f]/g, "?");
-    return clean.length > 60 ? `${clean.slice(0, 60)}...` : clean;
-}
 
 /** `Authorization` and `Proxy-Authorization` hold `<scheme> <credential>`. */
 const SCHEME_HEADER = /^(?:proxy-)?authorization$/i;

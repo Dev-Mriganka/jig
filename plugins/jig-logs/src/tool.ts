@@ -19,8 +19,6 @@ type Input = Readonly<Record<string, unknown>>;
 export interface LogsDeps {
     /** The clock. Relative windows end now. */
     now?: () => number;
-    /** The network, for direct requests. */
-    fetch?: typeof fetch;
     /** How long one request may take. Default 30 seconds. */
     timeoutMs?: number;
 }
@@ -57,7 +55,6 @@ export function createLogsTool(deps: LogsDeps = {}): JigTool {
             const send = sender(settings.backend, backendOf(target).wire(target, settings.backend), {
                 signal,
                 timeoutMs: deps.timeoutMs,
-                fetch: deps.fetch,
             });
             const progress = (text: string) => onUpdate?.({ content: [{ type: "text", text }], details: undefined });
             const outcome = await runSearch(query, { send, signal, now, progress });

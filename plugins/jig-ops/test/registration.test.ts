@@ -427,7 +427,7 @@ const all = sources();
 const IMPORT = /^\s*(?:import|export)\s+(?:type\s+)?(?:[^'"]*?\sfrom\s+)?["']([^"']+)["']/gm;
 
 describe("the code", () => {
-    test("reaches jig-core only through its contract and its client", () => {
+    test("reaches jig-core only through its contract, its client and its kit of stateless helpers", () => {
         assert.ok(all.length >= 12);
         for (const { file, text } of all) {
             for (const match of text.matchAll(IMPORT)) {
@@ -435,7 +435,7 @@ describe("the code", () => {
                 if (specifier.includes("jig-core")) {
                     assert.match(
                         specifier,
-                        /^(?:\.\.\/)+jig-core\/src\/(?:contract|client)\.ts$/,
+                        /^(?:\.\.\/)+jig-core\/src\/(?:contract|client|kit\/[a-z-]+)\.ts$/,
                         `${file}: ${specifier}`,
                     );
                 }

@@ -63,6 +63,10 @@ in with HTTP Basic). The table is Postman's.
 - **The grant.** The tool sends `grant_type` with the client (and the account), as a form. It accepts a `200` answer with an
   `access_token` of 1 to 8192 printable characters without a space, and sends it as a Bearer token. A token type other than `bearer` is
   refused. An answer of over 64 KiB is not read.
+- **`jig-core` does the grant,** not this plugin: the client's secret and the account's password are read from their references
+  and never pass through `jig-api`, and the token is fetched, kept and sent by `jig-core`'s request
+  ([Credential sources](../../jig-core/docs/sign-in-and-transports.md#a-token-endpoint-oauth-with-no-browser)). The rules below are
+  `jig-core`'s, and the texts of the errors are the same as before.
 - **The token is kept in memory** until 60 seconds before its `expires_in`, which may be a number or text. A token that lives 60 seconds
   or less is never reused. Without an `expires_in`, or with one that is not a positive number, it is kept until a `401` says otherwise.
   It is kept per collection and environment, and dropped when the sign-in settings change: the address, the client id, any reference or
@@ -70,8 +74,8 @@ in with HTTP Basic). The table is Postman's.
 - **A `401` for a kept token** gets one new token and one repeat of the call, even for a write: the server turned the request down
   before it ran. A `401` for a token just issued is the answer, with a note: "The server rejected a newly issued token: the account may
   lack access to this path." There is no third try. Only a `401` replaces a token: a `403` or a `500` does not.
-- **The token is never written to disk, logged, shown or put in an error.** `jig-core` cannot hide it, because it did not resolve it, so
-  the tool removes it from every answer itself (see [Results](results.md#what-is-removed)).
+- **The token is never written to disk, logged, shown or put in an error.** `jig-core` hides it from every result, and removes it from
+  every answer before it comes back (see [Results](results.md#what-is-removed)).
 - **A sign-in that fails** means nothing was sent to the API, and says why in one line: the endpoint's status and the standard error
   code, never its own words, the account or the secrets. Only the codes of RFC 6749, section 5.2, are repeated. A redirect from the token
   endpoint is not followed, and secrets that cannot be read stop the sign-in before the endpoint is asked.

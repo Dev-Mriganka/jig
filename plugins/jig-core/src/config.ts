@@ -11,12 +11,15 @@
 //   A section that fails its check is lost on its own: the plugin uses its defaults, and jig-core's settings stay.
 import { readFileSync } from "node:fs";
 import { errorMessage } from "./errors.ts";
+import { isObject } from "./kit/values.ts";
 import { buildEnvironments } from "./environments.ts";
 import type { Environments } from "./environments.ts";
 import type { ApprovalKind, ClassifyRule, Decision, Effect, EnvironmentConfig, Rule } from "./contract.ts";
+import { expandProtected, isListablePath, mergeProtected } from "./protected-paths.ts";
+import type { ProtectedPath, ProtectedSource } from "./protected-paths.ts";
 
 /** The secret backends jig-core can resolve. `secrets.backends` chooses which of them are allowed. */
-export const SECRET_BACKENDS = ["pass", "env", "keychain", "op"] as const;
+export const SECRET_BACKENDS = ["pass", "env", "keychain", "op", "cmd", "file"] as const;
 export type SecretBackend = (typeof SECRET_BACKENDS)[number];
 
 /** Something wrong in configuration: where it is, which key, and what is wrong. */
@@ -32,11 +35,18 @@ export function describeProblem(problem: Problem): string {
     return `${problem.source}: ${problem.key}: ${problem.message}`;
 }
 
+/** Paths to add to the protected ones, as written: absolute, or starting with `~/`. */
+export interface ProtectedPathLists {
+    secret: string[];
+    guarded: string[];
+}
+
 export interface JigConfig {
     environments: Record<string, EnvironmentConfig>;
     rules: Rule[];
     classify: ClassifyRule[];
-    secrets: { backends: SecretBackend[] };
+    protectedPaths: ProtectedPathLists;
+    secrets: { backends: SecretBackend[]; commands: Record<string, string[]> };
     records: { retentionDays: number };
     spill: { retentionDays: number };
 }
@@ -46,14 +56,23 @@ export function defaultConfig(): JigConfig {
         environments: {},
         rules: [],
         classify: [],
-        secrets: { backends: ["pass"] },
+        protectedPaths: { secret: [], guarded: [] },
+        secrets: { backends: ["pass"], commands: {} },
         records: { retentionDays: 90 },
         spill: { retentionDays: 7 },
     };
 }
 
 /** The top-level keys of the file that jig-core owns. A plugin cannot register a section under one of these names. */
-export const OWN_SECTIONS: readonly string[] = ["environments", "rules", "classify", "secrets", "records", "spill"];
+export const OWN_SECTIONS: readonly string[] = [
+    "environments",
+    "rules",
+    "classify",
+    "protectedPaths",
+    "secrets",
+    "records",
+    "spill",
+];
 
 /** A plugin's check of its own section: error messages that name the key, or an empty list when it is fine. */
 export type SectionCheck = (raw: unknown) => readonly string[];
@@ -135,6 +154,8 @@ export function parseConfig(
         config.environments = parseEnvironments(value.environments, "environments", fail);
     if (value.rules !== undefined) config.rules = parseRules(value.rules, "rules", fail);
     if (value.classify !== undefined) config.classify = parseClassifyRules(value.classify, "classify", fail);
+    if (value.protectedPaths !== undefined)
+        config.protectedPaths = parseProtectedPaths(value.protectedPaths, "protectedPaths", fail);
     if (value.secrets !== undefined) config.secrets = parseSecrets(value.secrets, fail);
     if (value.records !== undefined) config.records = parseRetention(value.records, "records", fail, config.records);
     if (value.spill !== undefined) config.spill = parseRetention(value.spill, "spill", fail, config.spill);
@@ -164,10 +185,6 @@ function runSectionCheck(check: SectionCheck, raw: unknown): string[] {
 // ---- checking one section ----------------------------------------------------------------------------------------
 
 type Fail = (key: string, message: string) => void;
-
-function isObject(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 /** A key name is shown, never its value: strip control characters and cap the length. */
 function printable(name: string): string {
@@ -340,13 +357,82 @@ export function parseClassifyRules(raw: unknown, path: string, fail: Fail): Clas
     return rules;
 }
 
-function parseSecrets(raw: unknown, fail: Fail): { backends: SecretBackend[] } {
-    const out: { backends: SecretBackend[] } = { backends: ["pass"] };
+/** The longest list and the longest path accepted: more is a mistake, not a configuration. */
+const MAX_PROTECTED_ENTRIES = 200;
+const MAX_PROTECTED_PATH_CHARS = 1024;
+
+/** `{ secret: [...], guarded: [...] }`. Each path is absolute or starts with `~/`; a relative one has no meaning here. */
+export function parseProtectedPaths(raw: unknown, path: string, fail: Fail): ProtectedPathLists {
+    const out: ProtectedPathLists = { secret: [], guarded: [] };
+    if (!isObject(raw)) {
+        fail(path, "must be an object with lists of paths: secret and guarded");
+        return out;
+    }
+    knownFields(raw, ["secret", "guarded"], path, fail);
+    for (const kind of ["secret", "guarded"] as const) {
+        const list = raw[kind];
+        if (list === undefined) continue;
+        const here = at(path, kind);
+        if (!Array.isArray(list)) {
+            fail(here, "must be a list of paths");
+            continue;
+        }
+        if (list.length > MAX_PROTECTED_ENTRIES) {
+            fail(here, `lists more than ${MAX_PROTECTED_ENTRIES} paths`);
+            continue;
+        }
+        list.forEach((item, index) => {
+            const key = `${here}[${index}]`;
+            if (typeof item !== "string" || item === "" || item.length > MAX_PROTECTED_PATH_CHARS) {
+                fail(key, `must be a path of up to ${MAX_PROTECTED_PATH_CHARS} characters`);
+            } else if (/[\u0000-\u001f\u007f]/.test(item)) {
+                fail(key, "must not hold control characters");
+            } else if (!isListablePath(item)) {
+                fail(key, "must be an absolute path, or start with ~/");
+            } else out[kind].push(item);
+        });
+    }
+    return out;
+}
+
+/** What a secret command is called: a word that a reference `cmd:<name>` can hold. */
+const COMMAND_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+const MAX_COMMAND_WORDS = 32;
+const MAX_COMMAND_WORD_CHARS = 1024;
+
+/** `{ "gh": ["gh", "auth", "token"] }`: each name stands for one program and its arguments, run without a shell. */
+export function parseSecretCommands(raw: unknown, path: string, fail: Fail): Record<string, string[]> {
+    const out: Record<string, string[]> = {};
+    if (!isObject(raw)) {
+        fail(path, "must be an object that maps a command name to a list: the program, then its arguments");
+        return out;
+    }
+    for (const [name, words] of Object.entries(raw)) {
+        const here = at(path, name);
+        if (!COMMAND_NAME.test(name)) {
+            fail(here, "is not a command name: use letters, digits and . _ - (up to 64)");
+        } else if (!Array.isArray(words) || words.length === 0 || words.length > MAX_COMMAND_WORDS) {
+            fail(here, `must be a list of 1 to ${MAX_COMMAND_WORDS} words: the program, then its arguments`);
+        } else if (
+            words.some((word) => typeof word !== "string" || word === "" || word.length > MAX_COMMAND_WORD_CHARS) ||
+            words.some((word) => /[\u0000-\u001f\u007f]/.test(word as string))
+        ) {
+            fail(here, "must hold only non-empty text words without control characters");
+        } else {
+            out[name] = words as string[];
+        }
+    }
+    return out;
+}
+
+function parseSecrets(raw: unknown, fail: Fail): { backends: SecretBackend[]; commands: Record<string, string[]> } {
+    const out: { backends: SecretBackend[]; commands: Record<string, string[]> } = { backends: ["pass"], commands: {} };
     if (!isObject(raw)) {
         fail("secrets", "must be an object");
         return out;
     }
-    knownFields(raw, ["backends"], "secrets", fail);
+    knownFields(raw, ["backends", "commands"], "secrets", fail);
+    if (raw.commands !== undefined) out.commands = parseSecretCommands(raw.commands, "secrets.commands", fail);
     if (raw.backends === undefined) return out;
     if (!Array.isArray(raw.backends)) {
         fail("secrets.backends", `must be a list of ${SECRET_BACKENDS.join(", ")}`);
@@ -358,7 +444,7 @@ function parseSecrets(raw: unknown, fail: Fail): { backends: SecretBackend[] } {
             backends.push(name as SecretBackend);
         else fail(`secrets.backends[${index}]`, `must be one of ${SECRET_BACKENDS.join(", ")}`);
     });
-    return { backends };
+    return { backends, commands: out.commands };
 }
 
 function parseRetention(
@@ -388,13 +474,24 @@ export interface CompanyAdditions {
     environments: Record<string, EnvironmentConfig>;
     rules: Rule[];
     classify: ClassifyRule[];
+    protectedPaths: ProtectedPathLists;
+    /** Commands for `cmd:<name>` secret references that company plugins declared. */
+    secretCommands: Record<string, string[]>;
     problems: Problem[];
     /** How many rules came in so far, valid or not, so a problem names a stable position. */
     received: { rules: number; classify: number };
 }
 
 export function emptyAdditions(): CompanyAdditions {
-    return { environments: {}, rules: [], classify: [], problems: [], received: { rules: 0, classify: 0 } };
+    return {
+        environments: {},
+        rules: [],
+        classify: [],
+        protectedPaths: { secret: [], guarded: [] },
+        secretCommands: {},
+        problems: [],
+        received: { rules: 0, classify: 0 },
+    };
 }
 
 const COMPANY = "company";
@@ -432,6 +529,21 @@ export function addCompanyClassifyRules(additions: CompanyAdditions, raw: unknow
     additions.received.classify += Array.isArray(raw) ? raw.length : 0;
 }
 
+/** Paths a company plugin adds to the protected ones. Only additions: there is no way to take one away. */
+export function addCompanyProtectedPaths(additions: CompanyAdditions, raw: unknown): void {
+    const fail: Fail = (key, message) => additions.problems.push({ source: COMPANY, key, message });
+    const added = parseProtectedPaths(raw, "protectedPaths", fail);
+    additions.protectedPaths.secret.push(...added.secret);
+    additions.protectedPaths.guarded.push(...added.guarded);
+}
+
+/** Commands a company plugin declares for `cmd:<name>` references. A later declaration of a name replaces an earlier
+ *  one; the user's own `secrets.commands` replaces both. */
+export function addCompanySecretCommands(additions: CompanyAdditions, raw: unknown): void {
+    const fail: Fail = (key, message) => additions.problems.push({ source: COMPANY, key, message });
+    Object.assign(additions.secretCommands, parseSecretCommands(raw, "secretCommands", fail));
+}
+
 /** `rules[1].tool` becomes `rules[4].tool` when three rules came before this call. */
 function shiftIndex(key: string, section: string, offset: number): string {
     return key.replace(
@@ -449,7 +561,16 @@ export interface Policy {
     /** Personal rules first, then the company's: the first match decides, so the personal file wins. */
     rules: Rule[];
     classify: ClassifyRule[];
+    /** What Pi's file tools may not touch: the defaults, then what the personal file and company plugins added. */
+    protectedPaths: ProtectedPath[];
     problems: Problem[];
+}
+
+/** What the defaults and the system tell `buildPolicy` about protected paths. */
+export interface ProtectedDefaults {
+    entries: readonly ProtectedPath[];
+    home: string;
+    platform?: NodeJS.Platform;
 }
 
 /**
@@ -471,7 +592,27 @@ export function floorViolation(rule: Rule, environments: Environments): string |
     );
 }
 
-export function buildPolicy(personal: LoadedConfig, company: CompanyAdditions): Policy {
+/** The configured paths as entries. Added paths only ever extend the defaults. */
+function addedProtected(
+    lists: ProtectedPathLists,
+    source: ProtectedSource,
+    defaults: ProtectedDefaults,
+): ProtectedPath[] {
+    const out: ProtectedPath[] = [];
+    for (const kind of ["secret", "guarded"] as const) {
+        for (const text of lists[kind]) {
+            const absolute = expandProtected(text, defaults.home, defaults.platform);
+            if (absolute !== undefined) out.push({ path: absolute, shown: text, kind, source });
+        }
+    }
+    return out;
+}
+
+export function buildPolicy(
+    personal: LoadedConfig,
+    company: CompanyAdditions,
+    protectedDefaults: ProtectedDefaults = { entries: [], home: "" },
+): Policy {
     const problems = [...personal.problems, ...company.problems];
 
     const merged = buildEnvironments([
@@ -500,6 +641,14 @@ export function buildPolicy(personal: LoadedConfig, company: CompanyAdditions): 
         environments: merged.environments,
         rules,
         classify: [...personal.config.classify, ...company.classify],
+        protectedPaths: mergeProtected(
+            protectedDefaults.entries,
+            [
+                ...addedProtected(personal.config.protectedPaths, "personal", protectedDefaults),
+                ...addedProtected(company.protectedPaths, "company", protectedDefaults),
+            ],
+            protectedDefaults.platform,
+        ),
         problems,
     };
 }

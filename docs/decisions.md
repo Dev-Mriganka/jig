@@ -2,6 +2,36 @@
 
 Dated so the reasons stay attached.
 
+## 2026-10-30: Jig never signs in; it reads a credential and keeps it from the agent
+
+- **No sign-in flow in Jig.** No plugin starts an OAuth flow, opens a browser to
+  log you in, asks for a password, or runs a device-code exchange. The tool that
+  owns a login does it: `gh` for GitHub, the Postman CLI for Postman, Pi's
+  `/mcp login` for MCP servers, a company plugin's sign-in service for its own
+  systems. They already do it well, and each has its own idea of expiry, refresh
+  and revocation that Jig would only copy badly.
+- **No stored credentials.** Jig keeps no token, key or password of its own:
+  not in `jig.json`, not in a state folder, not in a plugin's section. A
+  credential lives where its owner put it, and Jig only reads it from a source
+  you configured (`pass`, `env`, `keychain`, `op`, or a named command such as
+  `gh auth token`).
+- **What Jig does do, in `jig-core`:** it reads a credential that already
+  exists and attaches it to a request, so plugin code never sees the value, and
+  it registers the value with the redactor so it never reaches the model. A
+  client-credentials or password grant against a token endpoint, with the
+  client's secret read from a source you configured, is a request like any
+  other: the token is held in memory only, and no browser is involved.
+- **And it keeps credential stores and its own files out of the agent's
+  reach.** Pi's file tools refuse the credential files of the tools Jig
+  delegates sign-in to, and refuse writes to Pi's agent folder, where Jig's
+  configuration and the passkey store live. That is a floor rule, so
+  configuration can add paths and never remove one (see
+  [Permissions](permissions.md)).
+- **Why now:** the passkey store in the entry below relies on the agent not
+  being able to write the agent folder, and delegating sign-in to `gh` is safe
+  only if the agent cannot read the token file `gh` keeps. Both promises were
+  open until Pi's own file tools were covered.
+
 ## 2026-10-30: checks run on every push
 
 - **Biome for formatting and linting.** One tool for both, pinned to an exact

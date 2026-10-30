@@ -33,6 +33,7 @@ export function jigCore(options: JigCoreOptions = {}): ExtensionFactory {
     return (pi: ExtensionAPI) => {
         const state = createState(pi, options);
         state.configPath = () => configFile(getAgentDir());
+        state.agentDir = () => getAgentDir();
         const api = buildApi(state);
 
         pi.on("session_start", (_event, ctx) => startSession(state, ctx));

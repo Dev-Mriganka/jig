@@ -2,10 +2,19 @@
 // and which leave the outcome unknown, what is refused before a request is made, and that a redirect is handed back and not
 // followed.
 import assert from "node:assert/strict";
-import { describe, test } from "node:test";
+import { afterEach, beforeEach, describe, test } from "node:test";
 import type { TestContext } from "node:test";
 import { exchange, LostReplyError, MAX_ANSWER_BYTES, NotSentError } from "../src/engine/wire.ts";
 import type { Wire } from "../src/engine/wire.ts";
+import { installFakeJig } from "./support/fake-jig.ts";
+import type { FakeJig } from "./support/fake-jig.ts";
+
+// The exchange sends through jig-core's request logic, which the fake jig provides over the stubbed fetch.
+let jig: FakeJig;
+beforeEach(() => {
+    jig = installFakeJig();
+});
+afterEach(() => jig.remove());
 
 const wire = (extra: Partial<Wire> = {}): Wire => ({
     system: "http:api",

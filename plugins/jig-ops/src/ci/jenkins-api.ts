@@ -116,7 +116,7 @@ export type Crumb = Readonly<Record<string, string>>;
 
 export function jenkinsApi(config: JenkinsConfig, ctx: CiContext): JenkinsApi {
     const http = { system: "jenkins", url: config.url, auth: config.auth } as const;
-    const send = sender(http, { signal: ctx.signal, fetch: ctx.fetch, timeoutMs: ctx.timeoutMs });
+    const send = sender(http, { signal: ctx.signal, timeoutMs: ctx.timeoutMs });
     // A job in a folder is `/job/folder/job/name`. Each part is encoded, so a space or a slash in a name is only a
     // name.
     const job = `/job/${config.job.split("/").map(encodeURIComponent).join("/job/")}`;

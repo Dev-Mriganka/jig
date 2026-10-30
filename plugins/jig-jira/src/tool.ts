@@ -19,8 +19,6 @@ import { InputError } from "./values.ts";
 import { runWrite } from "./writes.ts";
 
 export interface JiraOptions {
-    /** For tests: stands in for the global `fetch`, so a fake Jira on this machine can answer for the https address. */
-    fetch?: typeof fetch;
     timeouts?: Timeouts;
 }
 

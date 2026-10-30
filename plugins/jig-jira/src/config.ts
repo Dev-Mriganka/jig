@@ -1,5 +1,6 @@
 // The `jira` section of jig.json: where the Jira is, how to sign in, and which fields `update` may set. jig-core checks
 // the section with validateJira when a session starts, so the rest of the plugin reads settings that are valid.
+import { isObject } from "../../jig-core/src/kit/values.ts";
 import { builtInField, isFieldId, isFieldReference } from "./fields.ts";
 
 /** How requests are signed in. Exactly one of four, as the section's `auth` object says. */
@@ -57,10 +58,6 @@ export function httpsOnly(address: unknown): URL | undefined {
     } catch {
         return undefined;
     }
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function checkSite(value: unknown, errors: string[]): string | undefined {

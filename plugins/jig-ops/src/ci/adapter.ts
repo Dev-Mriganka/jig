@@ -75,8 +75,6 @@ export interface WatchPlan {
 export interface CiContext {
     /** The call's own signal: stopping the call stops its requests. */
     signal: AbortSignal | undefined;
-    /** The network, for the adapters that speak HTTP. Default: the global `fetch`. */
-    fetch?: typeof fetch;
     /** How long one request may take. Default: thirty seconds. */
     timeoutMs?: number;
     /** The clock. Default: the real one. */

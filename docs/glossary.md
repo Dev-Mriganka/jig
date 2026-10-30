@@ -13,7 +13,7 @@
 | **Environment** | Where a call acts: `local`, `external`, `production`, or a company's test environment such as `staging`. |
 | **Effect** | Whether a call reads or writes. |
 | **Decision** | What the rules say for a call: allow, ask or deny. |
-| **The floor** | The rules configuration cannot lower: production writes denied, production results masked, credentials hidden from `bash`, no approval without a screen. |
+| **The floor** | The rules configuration cannot lower: production writes denied, production results masked, credentials hidden from `bash`, no approval without a screen, and Pi's file tools refused on protected paths (credential files, and writes to Pi's agent folder). |
 | **Declaration** | How a Jig tool tells `jig-core` the environment and effect of each of its actions. |
 | **Classification** | Working out a call's environment and effect, from the tool's declaration, a configuration rule, Pi's built-in defaults for its own tools, the tool's hints or the default. |
 | **Unknown tool** | A tool that nothing classifies. It counts as a write outside the machine, so it asks until a rule or the tool's hints say otherwise. |

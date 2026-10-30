@@ -2,7 +2,6 @@
 // must give the same answers, because everything above the request function is the same code.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createLogsTool } from "../src/tool.ts";
 import { errorReply, hit, rangeOf, searchReply } from "./support/fake-search.ts";
 import type { Answer, Recorded, Responder } from "./support/fake-search.ts";
 import { docs, NOW, ok, world } from "./support/world.ts";
@@ -317,14 +316,11 @@ test("direct: an address nobody listens at is an error that names the cause, not
     // is not used, because a test file running in parallel can take a freed port before the request reaches it.
     const refused = Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:9"), { code: "ECONNREFUSED" });
     const w = await world(t);
-    const closed = createLogsTool({
-        now: () => NOW,
-        fetch: async () => {
-            throw new TypeError("fetch failed", { cause: refused });
-        },
+    w.jig.setFetch(async () => {
+        throw new TypeError("fetch failed", { cause: refused });
     });
     await assert.rejects(
-        closed.definition.execute("c", call as never, undefined, undefined, {} as never),
+        w.tool.definition.execute("c", call as never, undefined, undefined, {} as never),
         new Error("cannot reach the backend (ECONNREFUSED): check backend.url, the network and the certificate"),
     );
     assert.equal(w.requests.length, 0);

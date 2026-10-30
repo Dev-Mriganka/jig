@@ -16,14 +16,18 @@ appears in:
 | `keychain:service/account` | macOS Keychain, through the `security` command | macOS | built; turn on in `secrets.backends` |
 | `op://vault/item/field` | 1Password CLI | Linux, macOS, Windows | built; turn on in `secrets.backends` |
 | `env:NAME` | an environment variable of the Pi process | any | built; turn on in `secrets.backends` |
+| `cmd:gh` | a command you declared by name, such as `gh auth token` | any | built; turn on in `secrets.backends`, declare in `secrets.commands` |
+| `file:~/.config/tool/token` | the first line of a file | any | built; turn on in `secrets.backends` |
 
-All four are built, and `secrets.backends` says which may resolve a reference
+All six are built, and `secrets.backends` says which may resolve a reference
 (`pass` alone by default). A new machine or employer means setting a different
 reference, not changing tools.
 
 **Jig will not build its own password manager.** A homemade password store is a
 security liability, and every platform already has one with a command-line
-interface.
+interface. **Nor does it sign in:** the tool that owns a login does it, and
+`cmd:gh` reads the token `gh auth token` prints, so Jig keeps none of its own
+(see [Decisions](decisions.md)).
 
 ## Rules
 
@@ -49,3 +53,6 @@ reference.
 The headers are treated like secrets: `jig-core` removes their values from
 every result before the model sees it. See
 [Sign-in services](../plugins/jig-core/docs/sign-in-and-transports.md#sign-in-services).
+A request names a reference, a sign-in service or a transport in `auth`, and
+`jig-core` attaches the credential so a plugin never sees it (see
+[Credential sources](../plugins/jig-core/docs/sign-in-and-transports.md)).

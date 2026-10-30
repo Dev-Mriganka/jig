@@ -50,7 +50,7 @@ test("the viewer files are found beside the source", () => {
     }
 });
 
-test("it reaches jig-core only through its client and contract, the way plugins are meant to", () => {
+test("it reaches jig-core only through its client, contract and kit, the way plugins are meant to", () => {
     const allowed = new Set(["client.ts", "contract.ts"]);
     let found = 0;
     for (const name of readdirSync(SRC)) {
@@ -58,7 +58,11 @@ test("it reaches jig-core only through its client and contract, the way plugins 
             /from "(\.\.\/\.\.\/jig-core\/[^"]+)"/g,
         )) {
             found++;
-            assert.ok(allowed.has(path.basename(match[1] ?? "")), `${name} imports ${match[1]}`);
+            const target = match[1] ?? "";
+            assert.ok(
+                allowed.has(path.basename(target)) || /\/jig-core\/src\/kit\/[a-z-]+\.ts$/.test(target),
+                `${name} imports ${target}`,
+            );
         }
     }
     assert.ok(found >= 1, "and it does use the client");

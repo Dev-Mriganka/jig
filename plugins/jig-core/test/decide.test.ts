@@ -198,6 +198,25 @@ describe("the floor", () => {
         );
     });
 
+    test("a protected path is denied whatever a rule, the tool, a session allow or the screen says", () => {
+        const refusal = "read is refused: ~/.ssh holds credentials, so the file tools neither read nor write it";
+        const read = call("local", "read", { tool: "read" });
+        for (const extra of [
+            {},
+            { rules: [{ tool: "read", decision: "allow" } as Rule] },
+            { rules: [{ tool: "*", decision: "allow" } as Rule] },
+            { sessionAllows: new Set([sessionKey(read)]) },
+            { hasUI: false },
+        ]) {
+            const verdict = run(read, { ...extra, protectedRefusal: refusal });
+            assert.equal(verdict.decision, "deny", JSON.stringify(extra));
+            assert.equal(verdict.source, "floor");
+            assert.equal(verdict.floor, "protected-path");
+            assert.equal(verdict.reason, refusal, "the reason is the line that names the path");
+        }
+        assert.equal(run(read).decision, "allow", "and without one, the call is as before");
+    });
+
     test("an ask with no screen becomes a deny", () => {
         for (const c of [
             call("external", "write"),

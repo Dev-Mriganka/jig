@@ -18,7 +18,9 @@ before it gave:
 3. the first matching rule, which can be stricter or looser;
 4. a session allow, which turns an ask into an allow;
 5. the floor: a production write is denied, an unknown tool is allowed only by
-   a rule that names it exactly, and an ask with no screen is denied.
+   a rule that names it exactly, an ask with no screen is denied, and a call to
+   one of Pi's file tools that touches a protected path is denied (see
+   [Protected paths](configuration.md#protected-paths)).
 
 ## The screens
 

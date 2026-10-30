@@ -428,12 +428,11 @@ describe("only https", () => {
 
     test("a request to an http address is never made, whatever the settings say", async () => {
         let called = false;
-        const http = createHttp(settings("http://jira.example.test"), {
-            fetch: (async () => {
-                called = true;
-                return new Response("{}");
-            }) as typeof fetch,
-        });
+        h.jig.setFetch((async () => {
+            called = true;
+            return new Response("{}");
+        }) as typeof fetch);
+        const http = createHttp(settings("http://jira.example.test"));
         await assert.rejects(
             http.request({ method: "GET", path: "/myself" }),
             (error: unknown) => error instanceof NotSentError && error.message === "the Jira address must be https",
@@ -443,12 +442,11 @@ describe("only https", () => {
 
     test("a redirect is not followed: the request asks for it to be handed back", async () => {
         const inits: RequestInit[] = [];
-        const http = createHttp(settings(SITE), {
-            fetch: (async (_url: string, init: RequestInit) => {
-                inits.push(init);
-                return new Response("", { status: 302, headers: { location: "http://plain.example.test/login" } });
-            }) as unknown as typeof fetch,
-        });
+        h.jig.setFetch((async (_url: string, init: RequestInit) => {
+            inits.push(init);
+            return new Response("", { status: 302, headers: { location: "http://plain.example.test/login" } });
+        }) as unknown as typeof fetch);
+        const http = createHttp(settings(SITE));
         await assert.rejects(
             http.request({ method: "GET", path: "/myself" }),
             (error: unknown) =>
@@ -461,12 +459,11 @@ describe("only https", () => {
 
     test("the address is built from the site: a path under it is kept, and the query is encoded", async () => {
         const urls: string[] = [];
-        const http = createHttp(settings("https://jira.example.test/jira"), {
-            fetch: (async (url: string) => {
-                urls.push(url);
-                return new Response("{}", { status: 200 });
-            }) as unknown as typeof fetch,
-        });
+        h.jig.setFetch((async (url: string) => {
+            urls.push(url);
+            return new Response("{}", { status: 200 });
+        }) as unknown as typeof fetch);
+        const http = createHttp(settings("https://jira.example.test/jira"));
         await http.request({
             method: "GET",
             path: "/search",

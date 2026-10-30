@@ -109,7 +109,7 @@ export interface GitlabApi {
 export function gitlabApi(config: GitlabConfig, ctx: CiContext): GitlabApi {
     const send = sender(
         { system: "gitlab", url: config.url, auth: config.auth },
-        { signal: ctx.signal, fetch: ctx.fetch, timeoutMs: ctx.timeoutMs },
+        { signal: ctx.signal, timeoutMs: ctx.timeoutMs },
     );
     const project = `/api/v4/projects/${encodeURIComponent(config.project)}`;
     const queryOf = (query: Readonly<Record<string, string | number>> = {}): string => {

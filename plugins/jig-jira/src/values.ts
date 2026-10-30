@@ -1,27 +1,17 @@
 // Reading what Jira sends back. Jira's answers differ by version and by edition, so every reader here accepts a missing
 // or oddly shaped value and gives an empty one, and only the code that needs a field decides that its absence is an error.
+import { InputError, isObject } from "../../jig-core/src/kit/values.ts";
 
 export type Obj = Record<string, unknown>;
 
-export const isObject = (value: unknown): value is Obj =>
-    typeof value === "object" && value !== null && !Array.isArray(value);
+/** Shared with the other plugins (jig-core's `kit/values.ts`). A mistake in a call's input is an InputError, a
+ *  TypeError that jig-core reads as "invalid input"; tool.ts keeps a TypeError from a bug here from being mistaken for one. */
+export { InputError, isObject };
 export const obj = (value: unknown): Obj => (isObject(value) ? value : {});
 export const arr = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 export const str = (value: unknown): string => (typeof value === "string" ? value : "");
 export const int = (value: unknown): number =>
     typeof value === "number" && Number.isFinite(value) ? Math.trunc(value) : 0;
-
-/**
- * A mistake in a call's input. jig-core takes a `TypeError` from a preview to mean "invalid input" and blocks the call
- * without asking, so every such finding is an InputError, which is a TypeError. A TypeError from a bug in this plugin is
- * not an InputError, and tool.ts keeps it from being mistaken for one.
- */
-export class InputError extends TypeError {
-    constructor(message: string) {
-        super(message);
-        this.name = "InputError";
-    }
-}
 
 /** A message from anything that was thrown. */
 export function errorMessage(error: unknown): string {

@@ -23,6 +23,13 @@ The tool tables of `jig-git` and `jig-jira` are read by their tests.
   modify it.
 - **The floor in [Permissions](docs/permissions.md) is not configurable.** Do
   not add settings that lower it.
+- **No sign-in and no stored credentials in any plugin.** No OAuth or
+  device-code flow, no browser login, no password prompt, no token written to a
+  file. The tool that owns a login does it (`gh`, the Postman CLI, Pi's
+  `/mcp login`, a company plugin's sign-in service). A plugin gets a credential
+  from a source the user configured, through `jig-core`, which attaches it to
+  the request so the plugin never sees the value. See
+  [Decisions](docs/decisions.md).
 - **Approvals happen inside the waiting tool call.** Never add a web endpoint
   that approves, with one exception: `jig-review`'s page approves only with a
   WebAuthn passkey signature the agent cannot make, or marks "approved in page"

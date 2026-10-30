@@ -33,6 +33,59 @@ environment variables.
 - **The first matching rule wins,** yours before a company plugin's. A rule
   beats Pi's built-in defaults, so a rule on `bash` can reclassify a command.
 
+## Protected paths
+
+Pi's own file tools (`read`, `write`, `edit`, `grep`, `find`, `ls`) refuse some
+paths. This is part of the floor: `protectedPaths` in `jig.json` and
+`config.addProtectedPaths` in a company plugin can **add** paths, and nothing
+removes one. `/jig rules` lists them all, each with where it came from
+(default, your `jig.json`, a company plugin).
+
+```json
+{
+  "protectedPaths": {
+    "secret": ["~/.config/other-cli", "/srv/keys"],
+    "guarded": ["~/dotfiles"]
+  }
+}
+```
+
+- **Two kinds.** `secret`: no reading and no writing. `guarded`: reading is
+  allowed, writing is not.
+- **Each entry** is an absolute path or starts with `~/`. A relative entry is an
+  error that names the key. A path listed as `guarded` that is already `secret`
+  stays `secret`, and one listed as `secret` that is guarded becomes `secret`.
+- **Built in.** Secret: `auth.json` and `mcp-auth.json` in Pi's agent folder;
+  in the home folder `.ssh`, `.gnupg`, `.password-store`, `.aws`, `.kube`,
+  `.azure`, `.config/gcloud`, `.config/gh`, `.config/glab-cli`, `.postman`,
+  `.docker/config.json`, `.netrc`, `.git-credentials`, `.npmrc`, `.pypirc`;
+  `gh`, `glab-cli` and `gcloud` in `$XDG_CONFIG_HOME` when it is set (and in
+  `%APPDATA%` on Windows). Guarded: the whole agent folder, which is
+  `~/.pi/agent` or where `PI_CODING_AGENT_DIR` points.
+- **Matching.** `~` is expanded and a relative path starts from Pi's working
+  folder. `..` is folded away, as Pi does before it opens a file, and also read
+  from a link's target, as the system does. Symlinks are followed through the
+  longest existing part, and a link that points at nothing yet is followed too,
+  because a write through it creates its target. A path equal to a protected
+  path or inside one matches; a protected path that is itself a link matches by
+  its real place too. On Windows and macOS case is ignored; on Linux it counts.
+- **Per tool.**
+
+  | Tool | Refused |
+  |---|---|
+  | `read` | inside a secret path |
+  | `grep` | inside a secret path, and when the folder it searches contains one (searching `~` would read `~/.ssh`; the message says to search a narrower folder). Without a `path`, the working folder is the one searched |
+  | `find`, `ls` | inside a secret path. They list names only, so a folder that contains one is fine |
+  | `write`, `edit` | inside a secret or a guarded path |
+
+- **A refusal** is a deny with one line that names the protected path and never
+  shows content. The record says `decisionSource: "floor"`.
+- **Not covered.** `bash` and `powershell` are the sandbox's job: until the
+  sandbox runs, a shell command can still read and write these paths. Variables
+  that move a tool's folder (`GH_CONFIG_DIR`, `CLOUDSDK_CONFIG`) are not read:
+  list that folder yourself. The check is made when the call starts, so a link
+  swapped afterwards by a shell command is not seen.
+
 ## Secret references
 
 | Reference | Backend | What it reads |
@@ -41,10 +94,60 @@ environment variables.
 | `env:<NAME>` | the environment of the Pi process | The variable's value |
 | `keychain:<service>/<account>` | the macOS Keychain | `security find-generic-password -s <service> -a <account> -w`. The service is the part before the first `/` |
 | `op://<vault>/<item>/<field>` | the 1Password command-line tool | `op read`, with an optional section before the field |
+| `cmd:<name>` | a command you declared by name | The trimmed standard output of the command declared as `<name>`. See below |
+| `file:<absolute path>` | a file | The first line of the file, trimmed. A leading `~/` is the home folder. See below |
 
 A reference whose backend is not in `secrets.backends` is an error that says
 so. Every backend has a timeout, 60 seconds by default, which includes the time
 you need to unlock a store. An error never repeats the reference or a value.
+
+### `cmd`: a command that owns the login
+
+`cmd:gh` runs a command that you declared by name, so the tool that owns a login
+does it and Jig stores nothing. Declare commands in `secrets.commands` of
+`jig.json` (a company plugin can add more with `config.addSecretCommands`), and
+turn the backend on:
+
+```json
+{
+  "secrets": {
+    "backends": ["pass", "cmd"],
+    "commands": { "gh": ["gh", "auth", "token"] }
+  }
+}
+```
+
+- **Off by default,** like every backend but `pass`: `cmd` must be in
+  `secrets.backends`.
+- **A name, never a command line.** A reference names a declared command. An
+  undeclared name is refused (and not repeated in the error), so a model cannot
+  slip in a command of its own through a parameter. A command is the program,
+  then its arguments, as a list; no shell is used. A name is letters, digits and
+  `. _ -`. Your own declaration of a name replaces a company's.
+- **What it uses.** The trimmed standard output, which must be non-empty and at
+  most 16 KiB. The program runs through `jig-core`'s own exec, with the same
+  timeout as the other backends and a short environment: the usual variables,
+  the ones a keyring or a pinentry needs to show its prompt, and the ones that
+  say where `gh`, `glab`, `gcloud`, `aws` and `kubectl` keep their
+  configuration. Tokens in Pi's environment are not passed on.
+- **Errors show the exit code and nothing else.** The command's error output is
+  never shown, because it may hold the very value being read.
+
+### `file`: the first line of a file
+
+`file:/home/me/.config/orders-api/token` and `file:~/.config/orders-api/token`
+read the first line of a file, for a credential that another tool keeps up to
+date.
+
+- **Off by default:** `file` must be in `secrets.backends`.
+- **A regular file,** at most 64 KiB, whose first line is not empty. The path
+  must be absolute, or start with `~/`. Permission bits are not checked: files
+  on a Windows drive seen from WSL all show 0777.
+- **Never Pi's agent folder,** not by its path and not through a link: the
+  files there are Pi's own sign-in, and a reference must not be a way to read
+  them.
+- **Errors say what is wrong** (not there, not a file, too large, empty) and
+  never show the content.
 
 ## Sections of other plugins
 
@@ -60,7 +163,7 @@ such as `git`, `lens` or `memory`.
 - **A top-level key that neither jig-core nor a plugin registered** is an
   unknown field.
 - **A plugin cannot register a name jig-core uses itself:** `environments`,
-  `rules`, `classify`, `secrets`, `records`, `spill`.
+  `rules`, `classify`, `protectedPaths`, `secrets`, `records`, `spill`.
 - **Order does not matter.** A plugin that loads before jig-core waits for it,
   and a section registered after the file was read is checked at once.
 

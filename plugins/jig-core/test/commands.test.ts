@@ -315,10 +315,11 @@ describe("/jig rules", () => {
         const harness = await begin({ tools: many });
         await jigCommand(harness, "rules");
         assert.equal(harness.ui.selects.length, 1);
+        const options = harness.ui.selects[0]?.options ?? [];
         assert.equal(
-            harness.ui.selects[0]?.options.length,
+            options.findIndex((line) => line.startsWith("Protected paths")),
             32,
-            "the 30 tools, and a line for each of the two actions of jig-core's own `watch`",
+            "the 30 tools, and a line for each of the two actions of jig-core's own `watch`, then the protected paths",
         );
         await jigCommand(harness, "rules tool_03");
         assert.equal(harness.ui.selects.length, 1, "one line is a notice");

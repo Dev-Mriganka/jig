@@ -124,6 +124,9 @@ nothing until the file is fixed (`/jig` lists the problems).
 - **Collections with scripts,** run by their own CLI only in a test environment you opt into,
   with the output masked again.
 - **Asserts,** as declared in Bruno and Hurl files. Bruno's are read and shown today; `run-folder` would report them.
+- **Running Postman collections with the Postman CLI and Bruno collections with `bru`,** so those tools sign in
+  themselves and Jig holds no credential for them. Not built: Jig never signs in (see
+  [Decisions](../../docs/decisions.md)).
 
 ## Layout
 
@@ -131,7 +134,7 @@ nothing until the file is fixed (`/jig` lists the problems).
 jig-api/
   src/      the tool and its checks (index, tool, params, config, ad-hoc, refresh), collections (model, template,
             catalog, sources/ with one adapter per format), a request worked out (resolve, planning, optional, show),
-            engine/ (sending, sign-in, OAuth, previews, results)
+            engine/ (sending through jig-core's request, previews, results)
   skills/   api/SKILL.md: list, show, then run; read before you write
   test/     fixtures of an example orders API in every format, the engine's tests, the safety tests
   docs/     the detail pages below

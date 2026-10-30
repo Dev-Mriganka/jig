@@ -98,7 +98,13 @@ export interface FakeContext {
 
 /** A context for a hook: with a screen (default) or without, in the given mode, in the given session. */
 export function fakeContext(
-    options: { ui?: FakeUiScript | false; mode?: "tui" | "rpc" | "print"; session?: string; signal?: AbortSignal } = {},
+    options: {
+        ui?: FakeUiScript | false;
+        mode?: "tui" | "rpc" | "print";
+        session?: string;
+        signal?: AbortSignal;
+        cwd?: string;
+    } = {},
 ): FakeContext {
     const screen = fakeUi(options.ui === false ? {} : (options.ui ?? { select: () => "Allow" }));
     const ctx = {
@@ -106,7 +112,7 @@ export function fakeContext(
         mode: options.mode ?? (options.ui === false ? "print" : "rpc"),
         ui: screen.ui,
         signal: options.signal,
-        cwd: process.cwd(),
+        cwd: options.cwd ?? process.cwd(),
         sessionManager: { getSessionId: () => options.session ?? "session-test" },
     } as unknown as ExtensionContext;
     return { ctx, log: screen.log };

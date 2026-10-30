@@ -1,5 +1,6 @@
 // One line of a record file, as the values of one row. A line that is not a record in the format of jig-core's
 // records.ts has no row: the importer skips it and counts it, and it never stops the import.
+import { isObject } from "../../jig-core/src/kit/values.ts";
 import { CALL, TURN } from "./fields.ts";
 import type { Field } from "./fields.ts";
 
@@ -10,9 +11,6 @@ export interface Row {
     /** In the order of the table's fields. */
     values: SqlValue[];
 }
-
-const isObject = (value: unknown): value is Record<string, unknown> =>
-    typeof value === "object" && value !== null && !Array.isArray(value);
 
 /** The column value for a field, null when an optional field is absent, or undefined when the value cannot be used. */
 function convert(field: Field, value: unknown): SqlValue | undefined {

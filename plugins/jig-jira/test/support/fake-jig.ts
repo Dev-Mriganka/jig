@@ -2,6 +2,7 @@
 // jig-core. Only what jig-jira uses is real: the section of jig.json, secrets, sign-in services, transports, the approved
 // preview and the facts. Everything the plugin tells jig-core or asks of it is recorded for the tests.
 import { publishJig, withdrawJig } from "../../../jig-core/src/client.ts";
+import { createHttp } from "../../../jig-core/src/kit/http.ts";
 import type {
     Facts,
     JigApi,
@@ -30,6 +31,8 @@ export interface FakeJig {
     /** Transports by name. Every request sent through one is recorded, as the transport received it. */
     transports: Map<string, Transport>;
     transportCalls: Array<{ name: string; request: TransportRequest }>;
+    /** The network that `http.request` uses for a direct request. Default: the global `fetch`. */
+    setFetch(fetchImpl: typeof fetch | undefined): void;
     /** What `config.section(name)` returns once the section passes its check, as at jig-core's session start. */
     setSection(name: string, value: unknown): void;
     /** Makes this the jig-core that plugins reach. Only one can be: a test with two fakes calls this before it uses either. */
@@ -59,6 +62,7 @@ export function installFakeJig(): FakeJig {
     const signInCalls: FakeJig["signInCalls"] = [];
     const transports = new Map<string, Transport>();
     const transportCalls: FakeJig["transportCalls"] = [];
+    let fetchImpl: typeof fetch | undefined;
 
     const api: JigApi = {
         version: 1,
@@ -113,6 +117,9 @@ export function installFakeJig(): FakeJig {
                 }
             },
         },
+        // The real request logic over this fake's secrets, sign-in services, transports and network.
+        http: { request: (request, signal) => http.request(request, signal) },
+
         mask: { text: (input) => input, value: (input) => input },
         watches: {
             registerKind: () => {},
@@ -126,6 +133,8 @@ export function installFakeJig(): FakeJig {
             addEnvironments: () => {},
             addRules: () => {},
             addClassifyRules: () => {},
+            addProtectedPaths: () => {},
+            addSecretCommands: () => {},
             addMaskFields: () => {},
             addSectionDefaults: () => {},
             registerSection: (name, validate) => void sections.set(name, validate),
@@ -148,6 +157,13 @@ export function installFakeJig(): FakeJig {
         },
     };
 
+    const http = createHttp({
+        fetch: (input, init) => (fetchImpl ?? fetch)(input, init),
+        secrets: { resolve: (reference, signal) => api.secrets.resolve(reference, signal) },
+        signIn: { headers: (name, request, signal) => api.signIn.headers(name, request, signal) },
+        transports: { request: (name, request, signal) => api.transports.request(name, request, signal) },
+    });
+
     publishJig(api);
     return {
         api,
@@ -161,6 +177,9 @@ export function installFakeJig(): FakeJig {
         signInCalls,
         transports,
         transportCalls,
+        setFetch: (replacement) => {
+            fetchImpl = replacement;
+        },
         setSection: (name, value) => void values.set(name, value),
         publish: () => void publishJig(api),
         reset() {
@@ -173,6 +192,7 @@ export function installFakeJig(): FakeJig {
             signInCalls.length = 0;
             transports.clear();
             transportCalls.length = 0;
+            fetchImpl = undefined;
         },
         remove: () => withdrawJig(api),
     };

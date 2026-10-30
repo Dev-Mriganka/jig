@@ -2,6 +2,7 @@
 // jig-core. Only what jig-api uses is real: the section of jig.json, secrets, sign-in services, transports, the kind of an
 // environment, the approved preview and the facts. Everything the plugin tells jig-core or asks of it is recorded for the tests.
 import { publishJig, withdrawJig } from "../../../jig-core/src/client.ts";
+import { createHttp } from "../../../jig-core/src/kit/http.ts";
 import type {
     EnvironmentKind,
     Facts,
@@ -33,6 +34,10 @@ export interface FakeJig {
     /** Transports by name. Every request sent through one is recorded, as the transport received it. */
     transports: Map<string, Transport>;
     transportCalls: Array<{ name: string; request: TransportRequest }>;
+    /** The network that `http.request` uses for a direct request. Default: the global `fetch`. */
+    setFetch(fetchImpl: typeof fetch | undefined): void;
+    /** The clock of the OAuth token cache, in milliseconds. Default `Date.now`. */
+    setNow(now: (() => number) | undefined): void;
     /** The kind of each environment jig-core knows. A name that is not here counts as production, as in jig-core. */
     kinds: Map<string, EnvironmentKind>;
     /** What `config.section(name)` returns once the section passes its check, as at jig-core's session start. */
@@ -72,6 +77,8 @@ export function installFakeJig(): FakeJig {
             ["dev", "test"],
         ]);
     const kinds = defaultKinds();
+    let fetchImpl: typeof fetch | undefined;
+    let nowImpl: (() => number) | undefined;
 
     const api: JigApi = {
         version: 1,
@@ -127,6 +134,10 @@ export function installFakeJig(): FakeJig {
                 }
             },
         },
+        // The real request logic over this fake's secrets, sign-in services, transports and network. Its token cache is
+        // new after `reset()`, as the plugin's own was when the plugin was loaded again.
+        http: { request: (request, signal) => http.request(request, signal) },
+
         mask: { text: (input) => input, value: (input) => input },
         watches: {
             registerKind: () => {},
@@ -140,6 +151,8 @@ export function installFakeJig(): FakeJig {
             addEnvironments: () => {},
             addRules: () => {},
             addClassifyRules: () => {},
+            addProtectedPaths: () => {},
+            addSecretCommands: () => {},
             addMaskFields: () => {},
             addSectionDefaults: () => {},
             registerSection: (name, validate) => void sections.set(name, validate),
@@ -162,6 +175,16 @@ export function installFakeJig(): FakeJig {
         },
     };
 
+    const makeHttp = () =>
+        createHttp({
+            fetch: (input, init) => (fetchImpl ?? fetch)(input, init),
+            secrets: { resolve: (reference, signal) => api.secrets.resolve(reference, signal) },
+            signIn: { headers: (name, request, signal) => api.signIn.headers(name, request, signal) },
+            transports: { request: (name, request, signal) => api.transports.request(name, request, signal) },
+            now: () => (nowImpl ?? Date.now)(),
+        });
+    let http = makeHttp();
+
     publishJig(api);
     return {
         api,
@@ -176,6 +199,12 @@ export function installFakeJig(): FakeJig {
         transports,
         transportCalls,
         kinds,
+        setFetch: (replacement) => {
+            fetchImpl = replacement;
+        },
+        setNow: (replacement) => {
+            nowImpl = replacement;
+        },
         setSection: (name, value) => void values.set(name, value),
         publish: () => void publishJig(api),
         reset() {
@@ -190,6 +219,8 @@ export function installFakeJig(): FakeJig {
             transportCalls.length = 0;
             kinds.clear();
             for (const [name, kind] of defaultKinds()) kinds.set(name, kind);
+            http = makeHttp();
+            fetchImpl = undefined;
         },
         remove: () => withdrawJig(api),
     };

@@ -6,7 +6,8 @@
 //   2. the tool's own `atLeast`, which can only make the call stricter;
 //   3. the first rule in configuration that matches, which can make it stricter or looser;
 //   4. a session allow, which turns an ask into an allow;
-//   5. the floor, last, which configuration can never lower.
+//   5. the floor, last, which configuration can never lower: production writes, an unknown tool allowed by a wildcard,
+//      a call that needs a screen when there is none, and a file tool aimed at a protected path.
 import { matchesName } from "./classify.ts";
 import type {
     ApprovalKind,
@@ -42,6 +43,9 @@ export interface DecideInput {
     sessionAllows: ReadonlySet<string>;
     /** False when there is no screen to ask on. */
     hasUI: boolean;
+    /** Set when the call is to one of Pi's file tools and touches a protected path (see protected-paths.ts): the line
+     *  that says so. The floor denies the call, whatever the rules say. */
+    protectedRefusal?: string | undefined;
 }
 
 export interface Verdict {
@@ -50,7 +54,7 @@ export interface Verdict {
     /** The screen a rule or the tool chose for asking. */
     approval?: ApprovalKind;
     /** What the floor changed, when it did. */
-    floor?: "production-write" | "unknown-tool" | "no-screen";
+    floor?: "production-write" | "unknown-tool" | "no-screen" | "protected-path";
     /** A plain sentence for the model, set when the decision is deny. */
     reason?: string;
 }
@@ -127,17 +131,24 @@ export function decide(input: DecideInput): Verdict {
         source = "floor";
         floor = "no-screen";
     }
+    // Last: a protected path is refused whatever else was decided, and its reason is the one the model reads.
+    if (input.protectedRefusal !== undefined) {
+        decision = "deny";
+        source = "floor";
+        floor = "protected-path";
+    }
 
     return {
         decision,
         source,
         ...(approval === undefined ? {} : { approval }),
         ...(floor === undefined ? {} : { floor }),
-        ...(decision === "deny" ? { reason: denyReason(source, floor) } : {}),
+        ...(decision === "deny" ? { reason: denyReason(source, floor, input.protectedRefusal) } : {}),
     };
 }
 
-function denyReason(source: DecisionSource, floor: Verdict["floor"]): string {
+function denyReason(source: DecisionSource, floor: Verdict["floor"], protectedRefusal: string | undefined): string {
+    if (floor === "protected-path" && protectedRefusal !== undefined) return protectedRefusal;
     if (floor === "production-write") return "writes to production are never allowed";
     if (floor === "no-screen") return "this call needs approval and there is no screen to ask on";
     if (source === "tool") return "the tool's own declaration denies this action";

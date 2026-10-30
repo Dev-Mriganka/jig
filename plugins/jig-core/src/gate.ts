@@ -12,6 +12,8 @@ import { decide, sessionKey } from "./decide.ts";
 import type { Verdict } from "./decide.ts";
 import { errorMessage, InvalidInputError } from "./errors.ts";
 import { buildPreview, defaultSummary, describeCall, isInvalidInput } from "./preview.ts";
+import { homedir } from "node:os";
+import { checkFileTool } from "./protected-paths.ts";
 import type { Answer, ErrorKind } from "./records.ts";
 import { rememberCall } from "./state.ts";
 import type { CallState, JigState } from "./state.ts";
@@ -97,6 +99,11 @@ async function decideCall(
         rules: policy.rules,
         sessionAllows: state.sessionAllows,
         hasUI: ctx.hasUI,
+        protectedRefusal: checkFileTool(event.toolName, input, {
+            entries: policy.protectedPaths,
+            cwd: ctx.cwd ?? process.cwd(),
+            home: homedir(),
+        })?.reason,
     });
 
     const call: CallState = {

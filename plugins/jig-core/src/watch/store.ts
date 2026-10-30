@@ -6,6 +6,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import type { WatchResult } from "../contract.ts";
+import { isObject } from "../kit/values.ts";
 import { privateDir, replacePrivateFile, stateDir } from "../paths.ts";
 import { isWatchResult } from "./clean.ts";
 
@@ -126,10 +127,6 @@ function removeIfOld(file: string): void {
     } catch {
         // Gone already, or not ours to remove: either way, nothing to do.
     }
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 const isText = (value: unknown): value is string => typeof value === "string";
