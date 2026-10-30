@@ -54,7 +54,7 @@ describe("the factory", () => {
         jigCore()(host.pi);
         const api = jig();
         assert.equal(api.version, 1);
-        for (const part of ["declareTool", "approvedPreview", "addFacts", "setTicket", "secrets", "mask", "watches", "config", "exec"]) assert.ok(part in api, part);
+        for (const part of ["declareTool", "approvedPreview", "addFacts", "setTicket", "secrets", "signIn", "mask", "watches", "config", "exec"]) assert.ok(part in api, part);
         withdrawJig(api);
     });
 

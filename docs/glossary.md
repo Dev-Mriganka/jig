@@ -15,8 +15,9 @@
 | **Classification** | Working out a call's environment and effect, from the tool's declaration, a configuration rule, the tool's hints or the default. |
 | **Approval** | Your answer to an "ask", given inside the waiting call. |
 | **Review screen** | A scrollable approval screen for long previews. `o` opens the preview rendered in the browser; `y` approves. |
-| **Masking** | Replacing customer personal data in production results with tokens that stay the same all day. Identifiers are never masked. |
+| **Masking** | Replacing customer personal data in production results with tokens that stay the same all day. Identifiers are never masked. A company plugin can name more fields that hold personal data. |
 | **Redaction** | Removing every known secret value from output. |
+| **Sign-in service** | Code from a company plugin that signs requests in to one of its systems, such as a single sign-on gateway. A tool asks for the headers of one request by the service's name, and their values are removed from output like secrets. |
 | **Spill file** | Where the full result goes when the text shown to the model is cut. The model can open it on demand. |
 | **Record** | One line per tool call or model turn, written by `jig-core` and read by `jig-lens`. It never holds tool arguments or output. |
 | **Facts** | A few named numbers or short codes that a Jig tool adds to its own record, such as tests passed or a CI run's conclusion. Never free text. |

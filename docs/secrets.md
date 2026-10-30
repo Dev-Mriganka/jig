@@ -36,3 +36,15 @@ interface.
   agent's shell by the sandbox.
 - **Your own tools only:** tools from other packages keep their own credentials.
   `jig-core` can mask and record their calls, but not manage their secrets.
+
+## Sign-in that a company provides
+
+Some systems are not signed in to with a stored password. A single sign-on
+gateway hands out a short-lived token that code has to fetch and renew. A
+company plugin supplies that code as a **sign-in service**, and a tool asks for
+the headers of one request by the service's name instead of naming a secret
+reference.
+
+The headers are treated like secrets: `jig-core` removes their values from
+every result before the model sees it. See
+[Sign-in services](../plugins/jig-core/README.md#sign-in-services).

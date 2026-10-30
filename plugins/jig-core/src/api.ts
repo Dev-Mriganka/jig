@@ -41,6 +41,11 @@ export function buildApi(state: JigState): JigApi {
             resolve: (ref, signal) => state.secrets.resolve(ref, signal),
         },
 
+        signIn: {
+            register: (name, service) => state.signIn.register(name, service),
+            headers: (name, request, signal) => state.signIn.headers(name, request, signal),
+        },
+
         mask: {
             text: (input) => state.masker().text(input),
             value: <T>(input: T): T => state.masker().value(input),
@@ -61,6 +66,7 @@ export function buildApi(state: JigState): JigApi {
                 addCompanyClassifyRules(state.company, rules);
                 state.invalidatePolicy();
             },
+            addMaskFields: (fields) => state.addMaskFields(fields),
             registerSection(name, validate) {
                 if (typeof name !== "string" || name === "") throw new TypeError("registerSection: the section needs a name");
                 if (typeof validate !== "function") throw new TypeError(`registerSection(${name}): validate must be a function`);

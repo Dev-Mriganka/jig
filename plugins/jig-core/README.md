@@ -34,7 +34,7 @@ floor: [Permissions](../../docs/permissions.md).
 
 The contract for a Jig tool is:
 - how the tool declares the environment and effect of each action;
-- how it asks for a secret;
+- how it asks for a secret, or for the sign-in a company provides;
 - how it gives a preview for the review screen;
 - how it adds facts to its record.
 
@@ -182,6 +182,29 @@ A plugin can own a section of this file too, such as `memory` for
 reports any top-level key that no plugin registered as unknown. A section with
 errors is reported with its keys named, and the plugin uses its defaults.
 
+## Sign-in services
+
+Some systems are signed in to by code, not by a stored password: a single
+sign-on gateway, for example. A company plugin supplies that code as a
+**sign-in service**.
+- **The company plugin registers it** with `signIn.register(name, service)`.
+  Registering the same name again replaces the service.
+- **A tool asks for it by name,** with `signIn.headers(name, { system, url },
+  signal)`, when its configuration names a sign-in service instead of a secret
+  reference. Tools such as `jig-jira` and `jig-logs` do this. The answer is the
+  headers that authenticate that one request. Ask again for the next request:
+  the service decides when a token has expired.
+- **The values are hidden like secrets.** Each header value is registered with
+  the redactor before it is returned, so it is removed from every later result
+  with the same encodings as a secret (see
+  [What happens to a result](#what-happens-to-a-result)). The token in an
+  `Authorization` header is hidden on its own too, in case a server repeats it
+  without the scheme. An empty value is not registered.
+- **An error never shows a value.** An unknown name is an error that lists the
+  names registered. A service that throws is an error that names the service
+  and carries its message. A header whose value is not a string is an error
+  that names the header.
+
 ## What asks, what is blocked
 
 The default table:
@@ -281,9 +304,13 @@ How it decides:
   result and every spelling (case, spacing, IPv6 notation), and a different
   token tomorrow. The key is 32 random bytes in `<state>/mask/<YYYY-MM-DD>.key`
   (file 0600, folder 0700), and keys older than two days are deleted.
-- **A company plugin adds field names** that hold personal data in its own data.
-  They are compared without case or separators, beat every built-in rule, and
-  their values become `personal#` tokens.
+- **A company plugin adds field names** that hold personal data in its own data,
+  with `config.addMaskFields(fields)`. They are compared without case or
+  separators, beat every built-in rule, and their values become `personal#`
+  tokens. They apply to the next result, and tokens do not change, because the
+  key is the day's. A name the masker refuses (one with no letters or digits)
+  is left out, and `/jig` shows it as a start-up problem. The other names still
+  apply.
 - **It fails closed.** A string whose structure cannot be parsed safely
   (malformed percent-encoding, JSON cut off mid-object, an unterminated quote)
   becomes `[removed:unparseable]`, and only that string. A result over 16 MiB,
@@ -383,8 +410,6 @@ If a line cannot be written, the call goes on, and `/jig` says so.
 - **Command rules for `bash`** that split a shell string with tree-sitter.
 - **Hiding a tool that the rules deny completely** from the model.
 - **The form screen.** The form kind uses the selector for now.
-- **Extra masking fields from a company plugin.** The backstop masks with the
-  masker's own rules.
 
 ## Layout
 
@@ -398,8 +423,9 @@ jig-core/
     config.ts, environments.ts   jig.json, and the environments it names
     approvals.ts, review.ts,
     preview.ts, preview-html.ts  asking you, and the page for the browser
-    secrets.ts, redact.ts,
-    cap.ts, records.ts           secrets, and what happens to data
+    secrets.ts, signin.ts,
+    redact.ts, cap.ts,
+    records.ts                   secrets and sign-in, and what happens to data
     exec.ts, git-config-guard.ts running programs and git safely
     commands.ts                  /jig
     paths.ts, errors.ts          the state folder and private files; messages from thrown values

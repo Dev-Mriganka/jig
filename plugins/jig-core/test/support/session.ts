@@ -32,6 +32,7 @@ const fakeParameters = Type.Object({
     effect: Type.Optional(Type.String()),
     output: Type.Optional(Type.String()),
     secretRef: Type.Optional(Type.String()),
+    signIn: Type.Optional(Type.String()),
     fail: Type.Optional(Type.Boolean()),
     facts: Type.Optional(Type.Record(Type.String(), Type.Any())),
     body: Type.Optional(Type.String()),
@@ -85,6 +86,11 @@ export function fakePlugin(log: PluginLog): ExtensionFactory {
                     const secret = await jig().secrets.resolve(params.secretRef);
                     text += ` secret=${secret}`;
                     details.echo = secret;
+                }
+                if (params.signIn !== undefined) {
+                    const headers = await jig().signIn.headers(params.signIn, { system: "fake", url: "https://fake.example/api" });
+                    text += ` headers=${JSON.stringify(headers)}`;
+                    details.headers = headers;
                 }
                 if (params.readPreview === true) details.approved = jig().approvedPreview(toolCallId);
                 return { content: [{ type: "text", text }], details, structuredContent: { text } };

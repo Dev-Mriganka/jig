@@ -168,6 +168,17 @@ export interface RunResult {
     timedOut: boolean;
 }
 
+/** One request a sign-in service authenticates. */
+export interface SignInRequest {
+    /** The system, as the tool calls it, such as `jira` or `logs`. */
+    system: string;
+    url: string;
+}
+
+export interface SignInService {
+    headers(request: SignInRequest, signal?: AbortSignal): Promise<Readonly<Record<string, string>>>;
+}
+
 /** jig-core's run-time API, reached through `jig()` in client.ts. */
 export interface JigApi {
     readonly version: 1;
@@ -188,6 +199,16 @@ export interface JigApi {
         /** Resolves a reference such as `pass:github/token` through an allowed backend. The value is
          *  redacted from every tool result until Pi exits. */
         resolve(ref: string, signal?: AbortSignal): Promise<string>;
+    };
+
+    /** Sign-in services a company plugin provides for its systems, such as a single sign-on gateway. Tools such
+     *  as jig-jira and jig-logs use one when their configuration names it instead of a secret reference. */
+    readonly signIn: {
+        /** Registering the same name again replaces the service. */
+        register(name: string, service: SignInService): void;
+        /** The headers that authenticate one request. Their values are redacted from every tool result, like
+         *  secrets. Throws when no service has this name. */
+        headers(name: string, request: SignInRequest, signal?: AbortSignal): Promise<Readonly<Record<string, string>>>;
     };
 
     /** Replaces customer personal data with tokens that stay the same all day. Throws if it cannot mask;
@@ -211,6 +232,9 @@ export interface JigApi {
         addEnvironments(environments: Readonly<Record<EnvironmentName, EnvironmentConfig>>): void;
         addRules(rules: readonly Rule[]): void;
         addClassifyRules(rules: readonly ClassifyRule[]): void;
+        /** Field names that hold personal data in a company's own systems. The masker treats them like its
+         *  built-in personal fields and turns their values into `personal#` tokens. */
+        addMaskFields(fields: readonly string[]): void;
         /** A plugin's own section of jig.json, such as `git` or `lens`. jig-core reports a top-level key that
          *  neither jig-core nor a plugin registered as an unknown field. `validate` returns error messages that
          *  name the key; with errors, `section()` returns undefined and the plugin uses its defaults. */

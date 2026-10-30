@@ -74,8 +74,9 @@ environment too, make every write ask, or deny a tool outright.
 ## Configuration file
 
 Personal settings live in `~/.pi/agent/jig.json`. A company plugin adds its
-environments and classification rules at start-up. The schema is defined in
-`plugins/jig-core/README.md`. The example below is illustrative:
+environments and classification rules at start-up, and the field names its data
+uses for personal data. The schema is defined in `plugins/jig-core/README.md`.
+The example below is illustrative:
 
 ```json
 {

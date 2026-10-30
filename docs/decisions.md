@@ -51,6 +51,21 @@ its own safety pipeline.
 - **Who starts and who stops.** A plugin starts a watch from its own tool, such
   as `checks watch`. The `watch` tool in `jig-core` lists and stops every watch.
 
+## 2026-10-30: a company's sign-in is a service, and its field names reach the masker
+
+- **Sign-in is code, so `jig-core` holds it as a service.** A company plugin
+  registers it by name. A tool asks for the headers of one request and never
+  sees how the sign-in works.
+- **Not a secret reference.** A reference names a stored value. A single
+  sign-on gateway gives a short-lived token that code must fetch and renew.
+- **Hidden like a secret.** `jig-core` registers every returned header value
+  with the redactor, so no tool needs a redaction of its own.
+- **Company field names come in through the API,** like environments and
+  rules, not through `jig.json`: they describe a company's data, not a
+  person's preference. A name the masker refuses is a start-up problem shown by
+  `/jig`. The alternative, a masker that fails on every production result, would
+  hide the cause.
+
 ## 2026-10-30: the lens reads a copy of the records
 
 - **The records stay JSON lines,** written only by `jig-core`. Appending a line
