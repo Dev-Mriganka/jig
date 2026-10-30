@@ -41,8 +41,8 @@ Pi's own tools:
 
 | Tool | Environment | Effect | Default decision |
 |---|---|---|---|
-| `read`, `ls`, `find`, `grep` | local | read | allow |
-| `write`, `edit` | local | write | allow |
+| `read`, `ls`, `find`, `grep` | local | read | allow, except a protected path (see the floor) |
+| `write`, `edit` | local | write | allow, except a protected path (see the floor) |
 | `bash` | local, inside the sandbox | write | allow (the sandbox is the protection, see Architecture) |
 | `powershell` | local | write | allow |
 | question tools: `ask_user_question`, `ask_questions` | local | read | allow, so a question never asks first |
@@ -71,9 +71,35 @@ example:
 | With no screen to ask on (headless runs, child agents without a dialog), "ask" becomes "deny" | Nobody can approve, so nothing that needs approval runs |
 | An unknown tool cannot be allowed by default; it needs a rule naming it | A new package must not get unchecked writes |
 | Credentials stay hidden from `bash` | That is the sandbox's job, and configuration does not reach into it |
+| Pi's file tools (`read`, `write`, `edit`, `grep`, `find`, `ls`) refuse **protected paths**: a *secret* path (credential files such as `~/.ssh`, `~/.config/gh` and Pi's `auth.json`) is neither read nor written, a *guarded* path (Pi's whole agent folder, where `jig.json`, settings, extensions and Jig's state live) can be read but not written | A credential file the agent can read leaks a login, and an agent folder it can write could load code, loosen a rule or register its own passkey |
 
 Configuration can always add strictness. For example, it can mask a test
-environment too, make every write ask, or deny a tool outright.
+environment too, make every write ask, deny a tool outright, or protect more
+paths.
+
+### Protected paths
+
+- **The defaults.** *Secret:* in Pi's agent folder `auth.json` and
+  `mcp-auth.json`; in the home folder `.ssh`, `.gnupg`, `.password-store`,
+  `.aws`, `.kube`, `.azure`, `.config/gcloud`, `.config/gh`,
+  `.config/glab-cli`, `.postman`, `.docker/config.json`, `.netrc`,
+  `.git-credentials`, `.npmrc` and `.pypirc`; and `gh`, `glab` and `gcloud`
+  inside `$XDG_CONFIG_HOME` when it is set. *Guarded:* the whole agent folder
+  (`~/.pi/agent`, or where `PI_CODING_AGENT_DIR` points).
+- **How a path is matched.** `~` is expanded, a relative path starts from Pi's
+  working folder, `..` is folded away, and symlinks are followed (also a link
+  that points nowhere yet), so a link in a project that points into `~/.ssh` is
+  caught. A path equal to a protected path, or inside one, matches. On Windows
+  and macOS case is ignored.
+- **Per tool.** `read` and `grep` are refused inside a secret path. `grep` is
+  also refused when the folder it searches *contains* one: searching `~` would
+  read `~/.ssh`, so it says to search a narrower folder. `find` and `ls` show
+  names only, so they are refused only inside a secret path. `write` and
+  `edit` are refused inside a secret or a guarded path.
+- **Only additions.** Your `jig.json` (`protectedPaths`) and company plugins
+  (`config.addProtectedPaths`) can add paths. Nothing removes a default.
+- **Where it stops.** It covers Pi's file tools. `bash` is the sandbox's job:
+  until the sandbox runs, a shell command can still reach these paths.
 
 ## Configuration file
 

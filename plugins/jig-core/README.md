@@ -29,7 +29,8 @@ This tool lists and stops the watches of every plugin.
 
 - **The floor holds.** Whatever the configuration says, production writes are
   denied, production results are masked, credentials are hidden from `bash`,
-  and nothing that needs approval runs without a screen.
+  nothing that needs approval runs without a screen, and Pi's file tools
+  refuse protected paths: credential files, and writes to Pi's agent folder.
 - **Unknown tools ask.** A tool that nothing classifies counts as a write
   outside the machine, and asks until a rule or its own hints say otherwise.
 - **Approvals happen only inside the waiting call.** There is no web endpoint
@@ -48,7 +49,7 @@ This tool lists and stops the watches of every plugin.
 | Command | What it does |
 |---|---|
 | `/jig` | Status: the tools governed and the plugins loaded, tools still on the unknown default, open watches (and how many are paused or wait for their plugin), the configuration file with the state of each plugin section, configuration errors, a failed records write, and problems with saved watches |
-| `/jig rules [tool]` | The effective decision per tool and action, with where each came from: declaration, rule, hint or default. A tool whose schema lists its actions gets a line for each. A declared tool that classifies from the call itself says so |
+| `/jig rules [tool]` | The effective decision per tool and action, with where each came from: declaration, rule, hint or default. A tool whose schema lists its actions gets a line for each. A declared tool that classifies from the call itself says so. The protected paths of the file tools follow, each with its source: default, your `jig.json` or a company plugin |
 | `/jig records` | Where today's records are, and a one-line summary: calls (with errors and blocked ones), questions asked, time waited for you, and model turns |
 
 ## Configure
@@ -62,6 +63,7 @@ All fields are optional.
 | `environments` | `local`, `external`, `production` built in | Add environments with a `kind`: `test` or `production`. A test environment can be set to `mask: true`; production masking cannot be turned off. The built-in names cannot be redefined, and an environment a company plugin made production cannot be lowered |
 | `rules` | the default table in [Permissions](../../docs/permissions.md) | A list of rules, most specific first. Each one names a `tool`, optionally an `action`, `environment` or `effect`, and gives a `decision` (`allow`, `ask`, `deny`) and optionally an `approval` kind (`dialog`, `review`, `form`). Rules that would lower the floor are refused at load, with the file and the key named |
 | `classify` | none | How to classify tools Jig did not write: `tool`, optionally `action`, a `param` and `value` (or `pattern`), and the resulting `environment` and `effect` |
+| `protectedPaths` | the defaults in [Permissions](../../docs/permissions.md#protected-paths) | `{ "secret": [...], "guarded": [...] }`: paths to protect from Pi's file tools **in addition** to the defaults, each absolute or starting with `~/`. A `secret` path is neither read nor written, a `guarded` one can be read but not written. Nothing here removes a default |
 | `secrets.backends` | `["pass"]` | Which backends may resolve references: `pass`, `env`, `keychain`, `op` |
 | `records.retentionDays` | 90 | How long record files are kept, as a whole number of days from 1 to 3650 |
 | `spill.retentionDays` | 7 | How long spill files and rendered previews are kept, in the same range |
@@ -110,6 +112,7 @@ jig-core/
     contract.ts, client.ts, index.ts, api.ts, state.ts   what other plugins import; the extension, its API, its state
     gate.ts, results.ts, classify.ts, decide.ts          the hooks, and the rules as pure functions
     config.ts, environments.ts, paths.ts, errors.ts      jig.json, its environments, the state folder
+    protected-paths.ts                                   the paths Pi's file tools may not touch
     approvals.ts, review.ts, preview.ts, preview-html.ts asking you, and the page for the browser
     secrets.ts, signin.ts, transports.ts, redact.ts,
     cap.ts, records.ts                                   secrets, sign-in, and what happens to data

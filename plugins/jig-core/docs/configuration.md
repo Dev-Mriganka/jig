@@ -33,6 +33,59 @@ environment variables.
 - **The first matching rule wins,** yours before a company plugin's. A rule
   beats Pi's built-in defaults, so a rule on `bash` can reclassify a command.
 
+## Protected paths
+
+Pi's own file tools (`read`, `write`, `edit`, `grep`, `find`, `ls`) refuse some
+paths. This is part of the floor: `protectedPaths` in `jig.json` and
+`config.addProtectedPaths` in a company plugin can **add** paths, and nothing
+removes one. `/jig rules` lists them all, each with where it came from
+(default, your `jig.json`, a company plugin).
+
+```json
+{
+  "protectedPaths": {
+    "secret": ["~/.config/other-cli", "/srv/keys"],
+    "guarded": ["~/dotfiles"]
+  }
+}
+```
+
+- **Two kinds.** `secret`: no reading and no writing. `guarded`: reading is
+  allowed, writing is not.
+- **Each entry** is an absolute path or starts with `~/`. A relative entry is an
+  error that names the key. A path listed as `guarded` that is already `secret`
+  stays `secret`, and one listed as `secret` that is guarded becomes `secret`.
+- **Built in.** Secret: `auth.json` and `mcp-auth.json` in Pi's agent folder;
+  in the home folder `.ssh`, `.gnupg`, `.password-store`, `.aws`, `.kube`,
+  `.azure`, `.config/gcloud`, `.config/gh`, `.config/glab-cli`, `.postman`,
+  `.docker/config.json`, `.netrc`, `.git-credentials`, `.npmrc`, `.pypirc`;
+  `gh`, `glab-cli` and `gcloud` in `$XDG_CONFIG_HOME` when it is set (and in
+  `%APPDATA%` on Windows). Guarded: the whole agent folder, which is
+  `~/.pi/agent` or where `PI_CODING_AGENT_DIR` points.
+- **Matching.** `~` is expanded and a relative path starts from Pi's working
+  folder. `..` is folded away, as Pi does before it opens a file, and also read
+  from a link's target, as the system does. Symlinks are followed through the
+  longest existing part, and a link that points at nothing yet is followed too,
+  because a write through it creates its target. A path equal to a protected
+  path or inside one matches; a protected path that is itself a link matches by
+  its real place too. On Windows and macOS case is ignored; on Linux it counts.
+- **Per tool.**
+
+  | Tool | Refused |
+  |---|---|
+  | `read` | inside a secret path |
+  | `grep` | inside a secret path, and when the folder it searches contains one (searching `~` would read `~/.ssh`; the message says to search a narrower folder). Without a `path`, the working folder is the one searched |
+  | `find`, `ls` | inside a secret path. They list names only, so a folder that contains one is fine |
+  | `write`, `edit` | inside a secret or a guarded path |
+
+- **A refusal** is a deny with one line that names the protected path and never
+  shows content. The record says `decisionSource: "floor"`.
+- **Not covered.** `bash` and `powershell` are the sandbox's job: until the
+  sandbox runs, a shell command can still read and write these paths. Variables
+  that move a tool's folder (`GH_CONFIG_DIR`, `CLOUDSDK_CONFIG`) are not read:
+  list that folder yourself. The check is made when the call starts, so a link
+  swapped afterwards by a shell command is not seen.
+
 ## Secret references
 
 | Reference | Backend | What it reads |

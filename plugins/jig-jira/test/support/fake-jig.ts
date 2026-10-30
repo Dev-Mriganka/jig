@@ -126,6 +126,7 @@ export function installFakeJig(): FakeJig {
             addEnvironments: () => {},
             addRules: () => {},
             addClassifyRules: () => {},
+            addProtectedPaths: () => {},
             addMaskFields: () => {},
             addSectionDefaults: () => {},
             registerSection: (name, validate) => void sections.set(name, validate),

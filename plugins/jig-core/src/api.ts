@@ -1,7 +1,13 @@
 // The API other plugins reach through `jig()` (see client.ts and contract.ts). Each function is a thin step onto the
 // state the hooks work on.
 import { layered } from "./section-defaults.ts";
-import { addCompanyClassifyRules, addCompanyEnvironments, addCompanyRules, OWN_SECTIONS } from "./config.ts";
+import {
+    addCompanyClassifyRules,
+    addCompanyEnvironments,
+    addCompanyProtectedPaths,
+    addCompanyRules,
+    OWN_SECTIONS,
+} from "./config.ts";
 import type { Facts, JigApi } from "./contract.ts";
 import { git, run } from "./exec.ts";
 import { ensureConfigLoaded, loadPersonalConfig } from "./state.ts";
@@ -85,6 +91,10 @@ export function buildApi(state: JigState): JigApi {
             },
             addClassifyRules(rules) {
                 addCompanyClassifyRules(state.company, rules);
+                state.invalidatePolicy();
+            },
+            addProtectedPaths(paths) {
+                addCompanyProtectedPaths(state.company, paths);
                 state.invalidatePolicy();
             },
             addMaskFields: (fields) => state.addMaskFields(fields),

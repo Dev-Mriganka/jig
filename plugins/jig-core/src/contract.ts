@@ -300,6 +300,10 @@ export interface JigApi {
         addEnvironments(environments: Readonly<Record<EnvironmentName, EnvironmentConfig>>): void;
         addRules(rules: readonly Rule[]): void;
         addClassifyRules(rules: readonly ClassifyRule[]): void;
+        /** Paths Pi's own file tools must not touch, on top of the built-in ones: `secret` paths are neither read nor
+         *  written, `guarded` paths can be read but not written. Each path is absolute or starts with `~/`. This can only
+         *  add: the built-in paths and the user's own cannot be removed. */
+        addProtectedPaths(paths: { secret?: readonly string[]; guarded?: readonly string[] }): void;
         /** Field names that hold personal data in a company's own systems. The masker treats them like its
          *  built-in personal fields and turns their values into `personal#` tokens. */
         addMaskFields(fields: readonly string[]): void;

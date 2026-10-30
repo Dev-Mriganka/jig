@@ -102,6 +102,11 @@ What closes those gaps:
   protection; command rules for `bash` are a convenience on top. While Jig is
   tried beside the existing harness, it borrows that harness's sandbox (see
   Decisions).
+- **Pi's file tools refuse protected paths.** `read`, `write`, `edit`, `grep`,
+  `find` and `ls` cannot read credential files (`~/.ssh`, `gh`'s token file,
+  Pi's `auth.json`) or write Pi's agent folder, where `jig.json` and Jig's state
+  live. This is a floor rule. Until the sandbox runs, `bash` can still reach
+  those paths (see Permissions).
 - **Remote actions go through tools,** not through `bash`. Jig's tools hold the
   credentials, so the tool manager sees, decides and records every remote
   action.

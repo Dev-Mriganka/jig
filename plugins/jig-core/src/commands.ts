@@ -8,6 +8,8 @@ import type { Classification, ClassSource } from "./classify.ts";
 import { describeProblem } from "./config.ts";
 import { decide } from "./decide.ts";
 import { errorMessage } from "./errors.ts";
+import { FILE_TOOLS } from "./protected-paths.ts";
+import type { ProtectedKind, ProtectedSource } from "./protected-paths.ts";
 import { formatDuration, summarize } from "./records.ts";
 import type { JigState } from "./state.ts";
 
@@ -170,9 +172,37 @@ export function ruleLines(state: JigState, only: string | undefined, hasUI: bool
         }
     }
     if (lines.length === 0) return [only === undefined ? "No tools are registered." : `No tool named ${only}.`];
-    return lines.length > MAX_RULE_LINES
-        ? [...lines.slice(0, MAX_RULE_LINES), `... and ${lines.length - MAX_RULE_LINES} more`]
-        : lines;
+    const shown =
+        lines.length > MAX_RULE_LINES
+            ? [...lines.slice(0, MAX_RULE_LINES), `... and ${lines.length - MAX_RULE_LINES} more`]
+            : lines;
+    return only === undefined || FILE_TOOLS.has(only) ? [...shown, ...protectedLines(state)] : shown;
+}
+
+const PROTECTED_KIND: Record<ProtectedKind, string> = {
+    secret: "secret (the file tools neither read nor write these)",
+    guarded: "guarded (the file tools can read these, not write them)",
+};
+const PROTECTED_SOURCE: Record<ProtectedSource, string> = {
+    default: "default",
+    personal: "your jig.json",
+    company: "a company plugin",
+};
+
+/** The protected paths of Pi's file tools, and where each one came from. A floor rule: configuration only adds. */
+function protectedLines(state: JigState): string[] {
+    const entries = state.policy().protectedPaths;
+    const lines = [
+        "Protected paths for read, write, edit, grep, find and ls (a floor rule: configuration can only add):",
+    ];
+    for (const kind of ["secret", "guarded"] as const) {
+        const of = entries.filter((entry) => entry.kind === kind);
+        if (of.length === 0) continue;
+        lines.push(`  ${PROTECTED_KIND[kind]}:`);
+        for (const entry of of) lines.push(`    ${entry.shown}  (${PROTECTED_SOURCE[entry.source]})`);
+    }
+    if (entries.length === 0) lines.push("  none: the agent folder is not known yet");
+    return lines;
 }
 
 // ---- /jig records ------------------------------------------------------------------------------------------------------

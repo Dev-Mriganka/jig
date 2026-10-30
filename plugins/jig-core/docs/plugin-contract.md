@@ -40,8 +40,18 @@ closed instead of running ungoverned.
 | `watches` | `registerKind`, `start`, `list` and `stop` (see [Watches](watches.md)) |
 | `environments` | `kindOf(name)`: the kind of an environment (`local`, `external`, `test` or `production`), built in, configured or added by a company plugin. A name nobody defined counts as production. A tool uses it to refuse an action by kind, such as never in production, whatever a company names its environments |
 | `tunnels` | `register(name, provider)` and `open(name, { host, port })`: a company plugin's network route for tools that need a port of their own, such as a database behind a jump host or a cloud port forward. The tool connects to `127.0.0.1` on the port it gets, and closes the tunnel when done |
-| `config` | What a company plugin adds at start-up (`addEnvironments`, `addRules`, `addClassifyRules`, `addMaskFields`), a plugin's own section (`registerSection`, `section`), and a company's defaults for any plugin's section (`addSectionDefaults`), which your own section is laid over: objects merge key by key, anything else of yours replaces theirs, and the plugin's check still applies |
+| `config` | What a company plugin adds at start-up (`addEnvironments`, `addRules`, `addClassifyRules`, `addProtectedPaths`, `addMaskFields`), a plugin's own section (`registerSection`, `section`), and a company's defaults for any plugin's section (`addSectionDefaults`), which your own section is laid over: objects merge key by key, anything else of yours replaces theirs, and the plugin's check still applies |
 | `exec` | `run` and `git`, which start programs without a shell (see [Running programs](running-programs.md)) |
+
+## Protected paths
+
+`config.addProtectedPaths({ secret?, guarded? })` adds paths that Pi's own file
+tools must not touch, such as the folder a company's own command-line tool keeps
+its login in. `secret` paths are neither read nor written, `guarded` paths can
+be read but not written. Each path is absolute or starts with `~/`; a wrong one
+is a configuration problem named `company`, and the rest still applies. It can
+only add: the built-in paths and the user's cannot be removed (see
+[Protected paths](configuration.md#protected-paths)).
 
 ## Events
 

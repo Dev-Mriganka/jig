@@ -72,6 +72,8 @@ export interface StartOptions {
     masker?: Masker;
     session?: string;
     signal?: AbortSignal;
+    /** Pi's working folder, where a relative path starts. Default: this process's. */
+    cwd?: string;
     /** Runs after jig-core is published and before the session starts, as a plugin's start-up would. */
     plugins?: (api: JigApi) => void;
     openPreview?: (preview: never, header: string) => Promise<string>;
@@ -99,6 +101,7 @@ export async function start(options: StartOptions = {}): Promise<Harness> {
         ...(options.mode === undefined ? {} : { mode: options.mode }),
         ...(options.session === undefined ? {} : { session: options.session }),
         ...(options.signal === undefined ? {} : { signal: options.signal }),
+        ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
     });
     await host.fire("session_start", { reason: "startup" }, ctx);
 

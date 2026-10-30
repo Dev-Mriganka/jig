@@ -3,6 +3,7 @@
 //
 // A new object is made every time Pi loads the extension (start-up, reload, a new session), so nothing here outlives
 // its runtime.
+import { homedir } from "node:os";
 import type { ExtensionAPI, ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 import { createApprovals } from "./approvals.ts";
 import type { Approvals } from "./approvals.ts";
@@ -16,6 +17,7 @@ import { errorMessage } from "./errors.ts";
 import { createMasker, dailyMaskKey } from "./mask/index.ts";
 import type { Masker } from "./mask/index.ts";
 import { stateDir } from "./paths.ts";
+import { defaultProtectedPaths } from "./protected-paths.ts";
 import { openInBrowser, writePreviewPage } from "./preview-html.ts";
 import { createRedactor } from "./redact.ts";
 import type { Redactor } from "./redact.ts";
@@ -87,6 +89,9 @@ export interface JigState {
     sectionDefaultProblems: Set<string>;
     /** Where jig.json is. The extension sets it, because only it knows Pi's agent folder. Empty until then. */
     configPath: () => string;
+    /** Pi's agent folder, which holds jig.json and is protected from Pi's file tools. The extension sets it. Empty until
+     *  then, and the paths inside it are left out of the protected ones. */
+    agentDir: () => string;
     /** True once jig.json has been read in this runtime. */
     configLoaded: boolean;
     sessionId: string | undefined;
@@ -160,6 +165,7 @@ export function createState(pi: ExtensionAPI, options: JigCoreOptions = {}): Jig
         sectionDefaults: new Map(),
         sectionDefaultProblems: new Set(),
         configPath: () => "",
+        agentDir: () => "",
         configLoaded: false,
         sessionId: undefined,
         screen: undefined,
@@ -223,7 +229,11 @@ export function createState(pi: ExtensionAPI, options: JigCoreOptions = {}): Jig
             maskerToday = undefined;
         },
         policy() {
-            policy ??= buildPolicy(state.personal, state.company);
+            if (policy === undefined) {
+                const home = homedir();
+                const entries = defaultProtectedPaths({ agentDir: state.agentDir(), home, env: process.env });
+                policy = buildPolicy(state.personal, state.company, { entries, home });
+            }
             return policy;
         },
         invalidatePolicy() {
