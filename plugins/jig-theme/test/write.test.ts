@@ -1,13 +1,13 @@
 // Your palettes on disk: written, rewritten, removed, and left alone when they are not provably this plugin's.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, symlinkSync, unlinkSync, utimesSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { build, derive, themeText } from "../src/build.ts";
 import type { PaletteSpec } from "../src/config.ts";
 import { PALETTES } from "../src/palettes.ts";
-import { syncPalettes } from "../src/write.ts";
+import { rewriteOwned, syncPalettes } from "../src/write.ts";
 import type { KnownTheme } from "../src/write.ts";
 import { tempAgentDir } from "./support.ts";
 
@@ -216,4 +216,23 @@ test("a palette whose base is not one of the six is skipped, not written", (t) =
     const result = sync(dir, { sea: { base: "nope", vars: {}, colors: {} } });
     assert.deepEqual(result.written, []);
     assert.equal(existsSync(themeFile(dir, "sea")), false);
+});
+
+test("a palette's own file can be written again as it is, and nothing else can", (t) => {
+    const dir = tempAgentDir(t);
+    sync(dir, { sea });
+    const before = readFileSync(themeFile(dir, "sea"), "utf8");
+    utimesSync(themeFile(dir, "sea"), new Date(2020, 0, 1), new Date(2020, 0, 1));
+    assert.equal(rewriteOwned(dir, "sea"), true);
+    assert.equal(readFileSync(themeFile(dir, "sea"), "utf8"), before);
+    assert.ok(statSync(themeFile(dir, "sea")).mtimeMs > Date.now() - 5000);
+    assert.deepEqual(manifest(dir), { sea: sha(before) }, "the record is as it was");
+    assert.deepEqual(readdirSync(path.join(dir, "themes")), ["sea.json"]);
+    // A file you changed, one that is not in the record, a name that is not a name, and a file that is not there.
+    writeFileSync(themeFile(dir, "sea"), `${before}\n`);
+    assert.equal(rewriteOwned(dir, "sea"), false);
+    assert.equal(readFileSync(themeFile(dir, "sea"), "utf8"), `${before}\n`);
+    assert.equal(rewriteOwned(dir, "nobody"), false);
+    assert.equal(rewriteOwned(dir, "../sea"), false);
+    assert.equal(rewriteOwned(tempAgentDir(t), "sea"), false);
 });

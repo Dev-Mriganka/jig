@@ -6,12 +6,16 @@ import { DEFAULT_SETTINGS } from "./config.ts";
 import { installFooter } from "./footer.ts";
 import type { FooterHandle } from "./footer.ts";
 import { PluginSegments } from "./segments.ts";
+import { rewriteOwned } from "./write.ts";
 
 export class Session {
     readonly plugins = new PluginSegments();
     private footer: FooterHandle | undefined;
     private switchedOff = false;
     private settings: ThemeSettings = DEFAULT_SETTINGS;
+    /** Palettes whose file changed this session, and that Pi may still know by their old colours. */
+    private readonly stale = new Set<string>();
+    private readonly timers = new Set<ReturnType<typeof setTimeout>>();
     private readonly pi: ExtensionAPI;
     private readonly env: NodeJS.ProcessEnv;
 
@@ -33,6 +37,7 @@ export class Session {
         this.settings = settings;
         this.switchedOff = false;
         this.stop();
+        this.clearTimers();
         if (settings.footer.enabled && this.blocked(ctx) === undefined) this.show(ctx);
     }
 
@@ -65,9 +70,39 @@ export class Session {
         this.footer?.refresh();
     }
 
+    /** These palettes were rewritten with new colours, and Pi has not read them since. */
+    markStale(names: readonly string[]): void {
+        this.stale.clear();
+        for (const name of names) this.stale.add(name);
+    }
+
+    /**
+     * Has Pi read a palette anew, if it changed this session: its file is written again as it is, after `delayMs` so that
+     * Pi, which watches the theme in use, has started watching. Done once per change, and never for a file that is not ours.
+     */
+    reread(agentDir: string, name: string, delayMs: number): void {
+        if (this.stale.delete(name)) this.later(() => rewriteOwned(agentDir, name), delayMs);
+    }
+
+    /** Runs `action` after a delay, unless the session ends first. */
+    later(action: () => void, delayMs: number): void {
+        const timer = setTimeout(() => {
+            this.timers.delete(timer);
+            action();
+        }, delayMs);
+        timer.unref();
+        this.timers.add(timer);
+    }
+
     shutdown(): void {
         this.stop();
+        this.clearTimers();
         this.plugins.clear();
+    }
+
+    private clearTimers(): void {
+        for (const timer of this.timers) clearTimeout(timer);
+        this.timers.clear();
     }
 
     private show(ctx: ExtensionContext): void {

@@ -77,8 +77,8 @@ export const DEFAULT_SETTINGS: ThemeSettings = { palettes: {}, footer: DEFAULT_F
 /** The names of palettes you write: file names too, so nothing that could leave the themes folder. */
 export const PALETTE_NAME = /^[a-z0-9][a-z0-9-]{0,39}$/;
 
-/** Themes Pi ships, and the six of this plugin: a palette of yours cannot take their names. */
-export const RESERVED_NAMES: readonly string[] = ["system", "dark", "light", ...PALETTE_NAMES];
+/** Themes Pi ships, the six of this plugin, and the words of `/theme`: a palette of yours cannot take these names. */
+export const RESERVED_NAMES: readonly string[] = ["system", "dark", "light", ...PALETTE_NAMES, "reload", "footer"];
 
 export const MAX_PALETTES = 20;
 export const SEPARATOR_CELLS = 5;
@@ -190,7 +190,7 @@ function validatePalette(name: string, raw: unknown, errors: string[]): void {
     if (!PALETTE_NAME.test(name)) {
         errors.push(`${where}: a palette name is lower-case letters, digits and hyphens, up to 40, starting with a letter or digit`);
     } else if (RESERVED_NAMES.includes(name)) {
-        errors.push(`${where}: that name belongs to a theme Pi or this plugin ships`);
+        errors.push(`${where}: that name is reserved: a theme Pi or this plugin ships, or a word of /theme`);
     }
     if (!isObject(raw)) {
         errors.push(`${where}: must be an object with base, and optionally vars and colors`);

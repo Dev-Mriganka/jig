@@ -1,11 +1,11 @@
 // The plugin as Pi loads it: the entry, what it registers, what it is allowed to import, and where it is listed.
 import assert from "node:assert/strict";
-import { appendFileSync, existsSync, readdirSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, readdirSync, readFileSync, statSync, utimesSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import factory, { theme } from "../src/index.ts";
 import type { PaletteSpec } from "../src/config.ts";
-import { FakePi, rig, tempAgentDir, useJig } from "./support.ts";
+import { FakePi, FakeTheme, rig, settle, tempAgentDir, useJig } from "./support.ts";
 
 const ROOT = path.resolve(import.meta.dirname, "../../..");
 const SRC = path.resolve(import.meta.dirname, "../src");
@@ -15,8 +15,13 @@ test("the default export is the factory Pi loads, and it only registers", (t) =>
     assert.equal(typeof factory, "function");
     const pi = new FakePi({ agentDir: tempAgentDir(t) });
     factory(pi.api);
-    assert.ok(pi.handlers.has("session_start"));
+    assert.deepEqual([...pi.commands.keys()], ["theme"]);
+    for (const event of ["session_start", "session_shutdown", "message_end", "thinking_level_select", "agent_settled", "session_compact", "session_tree", "model_select"]) {
+        assert.ok(pi.handlers.has(event), event);
+    }
     assert.deepEqual(pi.notices, []);
+    assert.deepEqual(pi.footers, [], "nothing is shown until a session starts");
+    assert.equal(painter(), undefined);
 });
 
 test("the extension is listed in the package, last, after jig-core, and every listed file exists", () => {
@@ -113,12 +118,66 @@ test("a palette that changed and is not the theme in use is a note to run /reloa
     const idle = rig(t, { agentDir: first.agentDir, current: "dark", settings: { palettes: { sea: changed } } });
     await idle.pi.fire("session_start", { reason: "startup" });
     assert.deepEqual(idle.pi.notices, [
-        { text: 'jig-theme: "sea" changed on disk; run /reload to use it from /settings and /theme', level: "info" },
+        { text: 'jig-theme: "sea" changed; /theme shows it anew, and /reload does so in /settings too', level: "info" },
     ]);
     const another: PaletteSpec = { ...sea, vars: { accent: "#334455" } };
     const active = rig(t, { agentDir: first.agentDir, current: "sea", settings: { palettes: { sea: another } } });
     await active.pi.fire("session_start", { reason: "startup" });
     assert.deepEqual(active.pi.notices, [], "Pi reloads the theme in use by itself");
+});
+
+/** Sets a file's times far in the past, so that a later write shows. */
+const age = (file: string) => utimesSync(file, new Date(2020, 0, 1), new Date(2020, 0, 1));
+
+test("a changed palette that is the theme in use is written again once Pi is watching it, so Pi reads it anew", async (t) => {
+    const first = rig(t, { settings: { palettes: { sea } } });
+    await first.pi.fire("session_start", { reason: "startup" });
+    const file = path.join(first.agentDir, "themes", "sea.json");
+    age(file);
+    const changed: PaletteSpec = { ...sea, vars: { accent: "#112233" } };
+    const second = rig(t, { agentDir: first.agentDir, current: "sea", settings: { palettes: { sea: changed } } });
+    await second.pi.fire("session_start", { reason: "reload" });
+    const written = readFileSync(file, "utf8");
+    age(file);
+    await settle();
+    assert.ok(statSync(file).mtimeMs > Date.now() - 5000, "the file was written again");
+    assert.equal(readFileSync(file, "utf8"), written, "with the same text");
+});
+
+test("a palette that did not change is not written again, and neither is one nobody is using", async (t) => {
+    const first = rig(t, { settings: { palettes: { sea } } });
+    await first.pi.fire("session_start", { reason: "startup" });
+    const file = path.join(first.agentDir, "themes", "sea.json");
+    age(file);
+    const same = rig(t, { agentDir: first.agentDir, current: "sea", settings: { palettes: { sea } } });
+    await same.pi.fire("session_start", { reason: "reload" });
+    const idle = rig(t, { agentDir: first.agentDir, current: "dark", settings: { palettes: { sea: { ...sea, vars: { accent: "#223344" } } } } });
+    await idle.pi.fire("session_start", { reason: "startup" });
+    age(file);
+    await settle();
+    assert.ok(statSync(file).mtimeMs < Date.now() - 86_400_000, "untouched");
+});
+
+test("a notice made while Pi reloads waits, so Pi's own line does not replace it; at a start it does not", async (t) => {
+    const reloading = rig(t, { settings: { palettes: { sea } } });
+    reloading.pi.ctx.ui.getTheme = () => undefined;
+    await reloading.pi.fire("session_start", { reason: "reload" });
+    assert.deepEqual(reloading.pi.notices, []);
+    await settle();
+    assert.deepEqual(reloading.pi.texts("warning"), ['jig-theme: Pi cannot load the theme "sea"; check its base, vars and colors']);
+    const starting = rig(t, { settings: { palettes: { sea } } });
+    starting.pi.ctx.ui.getTheme = () => undefined;
+    await starting.pi.fire("session_start", { reason: "startup" });
+    assert.equal(starting.pi.notices.length, 1);
+});
+
+test("a delayed notice is dropped when the session ends first", async (t) => {
+    const { pi } = rig(t, { settings: { palettes: { sea } } });
+    pi.ctx.ui.getTheme = () => undefined;
+    await pi.fire("session_start", { reason: "reload" });
+    await pi.fire("session_shutdown", { reason: "quit" });
+    await settle();
+    assert.deepEqual(pi.notices, []);
 });
 
 test("a failure while writing never reaches Pi", async (t) => {
@@ -128,6 +187,44 @@ test("a failure while writing never reaches Pi", async (t) => {
     };
     await assert.doesNotReject(pi.fire("session_start", { reason: "startup" }));
     assert.deepEqual(pi.notices, [{ text: "jig-theme: your palettes could not be written; the themes folder was left as it was", level: "warning" }]);
+});
+
+// ---- the answer colour -------------------------------------------------------------------------------------------------
+
+const PAINTER = Symbol.for("jig-theme.answer-text.painter");
+const painter = () => (globalThis as unknown as Record<symbol, (() => ((text: string) => string) | undefined) | undefined>)[PAINTER];
+
+test("answers are drawn in the colour you name, read from the theme in use each time", async (t) => {
+    const { pi } = rig(t, { settings: { answerColor: "accent" } });
+    await pi.fire("session_start", { reason: "startup" });
+    const paint = painter()?.();
+    assert.equal(paint?.("answer"), "<accent>answer</>");
+    pi.current = Object.assign(new FakeTheme("other"), { fg: (role: string, text: string) => `[${role}]${text}` });
+    assert.equal(painter()?.()?.("answer"), "[accent]answer", "the painter asks the current theme, so a switch applies");
+    await pi.fire("session_shutdown", { reason: "quit" });
+    assert.equal(painter(), undefined, "and stops when the session ends");
+});
+
+test("the answer colour is text unless you say otherwise, and false leaves Pi's own", async (t) => {
+    const standard = rig(t);
+    await standard.pi.fire("session_start", { reason: "startup" });
+    assert.equal(painter()?.()?.("x"), "<text>x</>");
+    const off = rig(t, { settings: { answerColor: false } });
+    await off.pi.fire("session_start", { reason: "startup" });
+    assert.equal(painter(), undefined);
+    await off.pi.fire("session_shutdown", { reason: "quit" });
+});
+
+test("answers are coloured in a terminal only, in a child as well as the main session", async (t) => {
+    for (const mode of ["rpc", "json", "print"] as const) {
+        const { pi } = rig(t, { mode });
+        await pi.fire("session_start", { reason: "startup" });
+        assert.equal(painter(), undefined, mode);
+    }
+    const child = rig(t, { env: { PI_SUBAGENT_ID: "child-1" } });
+    await child.pi.fire("session_start", { reason: "startup" });
+    assert.ok(painter(), "a child in a terminal has coloured answers too");
+    await child.pi.fire("session_shutdown", { reason: "quit" });
 });
 
 // ---- the footer in a session --------------------------------------------------------------------------------------------

@@ -40,8 +40,8 @@ test("a palette name is lower case letters, digits and hyphens, and never one th
         assert.equal(errors.length, 1, name);
         assert.match(errors[0] ?? "", /a palette name is lower-case letters/, name);
     }
-    for (const name of ["system", "dark", "light", "jig-lime", "jig-signal", "jig-ember", "jig-orchid", "jig-mono", "jig-paper"]) {
-        assert.match(validateTheme({ palettes: { [name]: sea } })[0] ?? "", /belongs to a theme Pi or this plugin ships/, name);
+    for (const name of ["system", "dark", "light", "jig-lime", "jig-signal", "jig-ember", "jig-orchid", "jig-mono", "jig-paper", "reload", "footer"]) {
+        assert.match(validateTheme({ palettes: { [name]: sea } })[0] ?? "", /that name is reserved: a theme Pi or this plugin ships, or a word of \/theme/, name);
     }
     assert.deepEqual(validateTheme({ palettes: { "a-1": sea, x: sea, ["y".repeat(40)]: sea } }), []);
 });

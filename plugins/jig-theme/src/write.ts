@@ -101,6 +101,25 @@ function readManifest(file: string): Manifest {
 }
 
 /**
+ * Writes a palette's own file again with the text it already has, which Pi's watcher takes as a change and reads the theme
+ * anew. Pi reads the themes folder when it starts and when it reloads, and a palette changed since then is only known to
+ * it by its old colours until its file changes once more. Only a file this plugin wrote and nobody has changed is touched.
+ */
+export function rewriteOwned(agentDir: string, name: string): boolean {
+    if (!PALETTE_NAME.test(name)) return false;
+    const recorded = readManifest(path.join(agentDir, "jig-theme", "written.json")).entries[name];
+    const file = path.join(agentDir, "themes", `${name}.json`);
+    const found = look(file);
+    if (recorded === undefined || found.kind !== "file" || found.hash !== recorded) return false;
+    try {
+        writeAtomic(file, readFileSync(file, "utf8"), 0o644);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
  * Makes the themes folder hold your palettes: writes new ones, rewrites ones whose colours changed, deletes the files of
  * palettes you removed, and leaves alone every file it cannot prove is its own. Nothing is created on disk when there are
  * no palettes and nothing was written before.
