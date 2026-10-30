@@ -98,11 +98,12 @@ export function iso(ms: number): string {
 /**
  * The buckets a window is searched in, oldest first. Over 2 days it is searched in day buckets, over 6 hours in hour
  * buckets, otherwise in one. A day of logs in one request is where a busy backend starts to time out, and a bucket
- * that does is halved and tried again (see `halve`).
+ * that does is halved and tried again (see `halve`). A backend that refuses a request over some length passes it as
+ * `longest`, and no bucket is longer.
  */
-export function planBuckets(range: Range): Bucket[] {
+export function planBuckets(range: Range, longest: number = Number.POSITIVE_INFINITY): Bucket[] {
     const span = range.to - range.from;
-    const step = span > 2 * DAY_MS ? DAY_MS : span > 6 * HOUR_MS ? HOUR_MS : span;
+    const step = Math.min(span > 2 * DAY_MS ? DAY_MS : span > 6 * HOUR_MS ? HOUR_MS : span, longest);
     const buckets: Bucket[] = [];
     for (let start = range.from; start < range.to; start += step) {
         buckets.push({ from: start, to: Math.min(start + step, range.to), depth: 0 });

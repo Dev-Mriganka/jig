@@ -22,7 +22,7 @@ Hits 1-2 of 2 matching hits, none after these:
 |---|---|---|
 | The header | Always | The environment, the window, the [status](windows-and-buckets.md#the-status), how many hits the window holds (`at least 412 hits` is a lower bound), how many were fetched and how many are shown, and how many buckets were searched, with how many were split after a timeout. With no hit fetched it stops after the hit count and the buckets. When no window could be searched it reads `failed, no window could be searched` |
 | `Gaps:` and `Next:` | A window was not fully searched | The parts that were not searched, why, and what to change. Neighbouring gaps with the same reason read as one. Up to 5 are listed, then `(+N more)`; there is a `Next:` line for each of up to 3 reasons (see [Failures](failures.md#gaps-and-their-reasons)) |
-| `Availability:` | Nothing was found | Whether the window holds any documents at all: `the window holds 8123 documents in this environment without your phrase or query`, `no documents at all in this environment and window`, or `unknown` with the reason. It always adds that this proves nothing about retention |
+| `Availability:` | Nothing was found | Whether the window holds any documents at all: `the window holds 8123 documents in this environment without your phrase or query` (for Loki, which cannot count: `the window holds documents in this environment ...`), `no documents at all in this environment and window`, or `unknown` with the reason. It always adds that this proves nothing about retention |
 | The cut notice | A hit on this page shows `{…}` or `[…]` | That a body was cut for length, not hidden (see [Cutting a line](#cutting-a-line)) |
 | The filter line | `match` or `exclude` was given | How many of the fetched hits passed, as in the sample. When the window holds more hits than were fetched, it says that more may exist |
 | The page line | A filter is given, or the page does not show every fetched hit | Which hits are on the page and which `offset` comes next, such as `Hits 21-40 of 45 fetched hits, 5 more: call again with offset 40:`, or `Hit 25 of 25 matching hits, none after these:` for one hit |
@@ -33,14 +33,18 @@ called `matching` and not `fetched`.
 
 ## Choosing and paging hits
 
-`match`, `exclude`, `around`, `chars` and `offset` are applied after the search
-and are never sent to it. The same search with another view costs the same.
+`match`, `exclude`, `around`, `chars` and `offset` are applied after the search,
+to the hits fetched. Elasticsearch is never sent them, so the same search with
+another view costs the same. Loki is also sent `match` and `exclude` as line
+filters (see [Loki](loki.md#what-loki-cannot-give)), so the hits it fetches
+already pass them, case-sensitively, and the view applies them again, ignoring
+case. `around`, `chars` and `offset` are never sent.
 
 - **`match` and `exclude` read the whole message,** ignoring case, and not only
   the characters a line keeps, so a term near the end of a long message still
-  finds it. They choose among the hits already fetched and do not look at the
-  rest of the window. To search a whole window for an identifier, put it in
-  `phrase`.
+  finds it. They choose among the hits already fetched; on Elasticsearch they do
+  not look at the rest of the window. To search a whole window for an identifier,
+  put it in `phrase`.
 - **Their texts are never repeated** in the result, nor is the text of `around`.
   The filter line counts them (`1 match term`, `2 exclude terms`): a text that
   opens a JSON body would make `jig-core`'s masker replace the line that repeats
@@ -57,7 +61,8 @@ and are never sent to it. The same search with another view costs the same.
 A line is the hit's time, a space, and its message.
 - **The time** is the hit's time field as the backend gives it, cut to 64
   characters. A date field stored as epoch milliseconds is shown as an instant. A
-  hit without a time is its message alone.
+  Loki line has its time as an instant with the digits Loki gave: 3, 6 or 9 after
+  the second. A hit without a time is its message alone.
 - **The message** is the message field as one line: control characters, line
   breaks and tabs become one space. A hostile message cannot carry a terminal
   escape sequence, a line break or a separator into a line. A hit that lacks the
