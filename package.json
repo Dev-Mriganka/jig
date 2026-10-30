@@ -41,6 +41,9 @@
     ],
     "skills": [
       "./plugins/*/skills"
+    ],
+    "themes": [
+      "./plugins/jig-theme/themes/*.json"
     ]
   },
   "devDependencies": {
