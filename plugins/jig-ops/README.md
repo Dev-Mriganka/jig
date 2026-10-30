@@ -6,10 +6,11 @@ tried against a real CI system, cluster or address yet ([Not verified yet](docs/
 `jig-ops` covers what happens after the code is written: did CI pass, can it go to a
 test environment, is it healthy, and what do the logs say. You describe each service
 once, in a **service catalog**, and the agent uses the same verbs whatever your CI,
-deploy method and platform are. For example, "push, wait for CI, deploy 1.4.3 of
-`orders-api` to staging and check it": a watch reports when CI ends, `ci log` says why
-if it failed, `deploy run` asks you with the exact command, and `runtime` checks it.
-`jig-core` governs every call.
+deploy method and platform are. `jig-core` governs every call.
+
+For example, "push, wait for CI, deploy 1.4.3 of `orders-api` to staging and check
+it": a watch reports when CI ends, `ci log` says why if it failed, `deploy run` asks
+you with the exact command, and `runtime` checks it.
 
 ## The service catalog
 
@@ -27,8 +28,7 @@ In `~/.pi/agent/jig.json`, under `ops`:
             "deploy":  { "method": "helm", "release": "orders-api", "chart": "deploy/chart" },
             "runtime": { "kubernetes": { "context": "staging", "namespace": "orders", "selector": "app=orders-api" } },
             "health":  "https://api.staging.example.com/orders/health"
-          },
-          "production": { "runtime": { "kubernetes": { "context": "prod", "namespace": "orders", "selector": "app=orders-api" } } }
+          }
         }
       }
     }
@@ -40,13 +40,16 @@ In `~/.pi/agent/jig.json`, under `ops`:
 |---|---|
 | `repo` | Where the code lives, for finding the CI run of a commit |
 | `ci` | The CI system and where it is: GitHub Actions, GitLab CI or Jenkins, with its address and sign-in |
-| `environments` | Per environment: how to `deploy` there (`helm` or `kubectl-image`), where it runs (`runtime.kubernetes`) and its `health` address. Without `deploy`, the agent cannot deploy there |
+| `environments` | Per environment: its `deploy` method, where it runs (`runtime`) and its `health` address |
 
-`production` has no `deploy` on purpose. An unknown field is an error, and the tools
-then do nothing until it is fixed (`/jig` lists the problems). **An environment's name
-is also the name `jig-core` knows it by,** and an unknown name counts as production, so
-define your test environments in `jig.json`. All fields (and how CI watches poll):
-[The catalog](docs/catalog.md).
+- **`production` has no `deploy` on purpose.** Without `deploy`, the agent cannot
+  deploy to an environment.
+- **An unknown field is an error,** and the tools then do nothing until it is fixed
+  (`/jig` lists the problems).
+- **An environment's name is also the name `jig-core` knows it by,** and an unknown
+  name counts as production, so define your test environments in `jig.json`.
+
+All fields (and how CI watches poll): [The catalog](docs/catalog.md).
 
 ## Tools
 
@@ -55,7 +58,7 @@ define your test environments in `jig.json`. All fields (and how CI watches poll
 | Action | Kind | What it does |
 |---|---|---|
 | `pods` | read | A service's pods: ready, status, restarts, age, version |
-| `rollout` | read | The workload behind them and a verdict: `Running`, `Still rolling`, `Failing`. `waitFor` waits for a version |
+| `rollout` | read | The workload and a verdict: `Running`, `Still rolling`, `Failing`; `waitFor` waits for a version |
 | `logs` | read | The last lines of one pod's log, or of its previous run |
 | `events` | read | Recent events about the service's objects, such as failed scheduling |
 | `health` | read | A `GET` on the health address, or curl in a pod where the catalog says so; never a production pod |
@@ -68,13 +71,13 @@ define your test environments in `jig.json`. All fields (and how CI watches poll
 | `run` | write in the environment | Deploys a version with the environment's method. Asks you, with the plan as the preview |
 | `status` | read | The last deploy run from here, and the rollout |
 | `rollback` | write in the environment | Back one revision, in a test environment only. Asks you |
-| `watch` | local write | Waits in the background until every pod is ready on the version, one cannot come up, or time runs out |
+| `watch` | local write | Waits until every pod is ready on the version, one cannot come up, or time runs out |
 
 ### `ci`
 
 | Action | Kind | What it does |
 |---|---|---|
-| `status` | read | The checks, jobs or stages of a pull request, branch, commit or run, counted as pass, fail, pending and skipped |
+| `status` | read | The checks or jobs of a pull request, branch, commit or run, counted as pass, fail, pending, skipped |
 | `runs` | read | Recent workflow runs, pipelines or builds, by branch, commit or state |
 | `run` | read | One run's jobs and steps (GitHub also its artifacts), a pipeline's jobs, or a build's stages |
 | `log` | read | A failed job's log: the tail, or the lines matching a search; capped at 400 lines and scrubbed |
@@ -106,20 +109,18 @@ An action or parameter the CI system of the service lacks is refused, naming the
 - **Never production.** A deploy, a rollback or curl in a pod there is blocked before
   anyone is asked.
 - **A preview is tied to the run.** If what runs now differs from what you approved,
-  nothing is run: "changed since the preview". **No resend:** a command or request cut
-  short, with an unknown outcome, is never sent again; the state is read once.
+  nothing is run: "changed since the preview". A command or request cut short, with an
+  unknown outcome, is never sent again; the state is read once.
 - **Credentials stay with you.** `gh`, `kubectl` and `helm` use their own sign-in. A
-  GitLab or Jenkins token is a secret reference, a sign-in service or a transport, and a
-  redirect is never followed.
+  GitLab or Jenkins token is a secret reference, a sign-in service or a transport.
 - **A watch has an explicit finish line,** never "all checks"; one message wakes the agent.
 
 ## Events
 
-- **`jig-git:pushed`** (listened to): `{ repo, branch, sha, pr? }`, after a push and a new pull
-  request. A service with that `repo` and a `ci` entry gets a watch on the pushed commit
-  (`ops.watch.auto`). The payload is checked.
-- **`jig-ops:artifact-ready`** (published when `ops.artifacts` finds a build, tag or release
-  for a passed watch): `{ repo, pr?, sha, kind, ref, source }`. It was `jig-git:artifact-ready`.
+- **`jig-git:pushed`** (listened to) starts a watch on the pushed commit of a service with
+  that `repo` and a `ci` entry (`ops.watch.auto`). The payload is checked.
+- **`jig-ops:artifact-ready`** (published) says a build, tag or release exists for a passed
+  watch: `{ repo, pr?, sha, kind, ref, source }`. It was `jig-git:artifact-ready`.
 
 ## Company part (in the company plugin)
 
@@ -128,9 +129,10 @@ An action or parameter the CI system of the service lacks is refused, naming the
 
 ## Later
 
-- More CI systems (Buildkite, CircleCI), one file each; artifact rules per service; a GitOps
-  pull request, Argo CD, Flux, ECS, Cloud Run and Docker Compose (Docker access is root, so
-  with care); Terraform plan, as a read; one shared catalog for `jig-logs`, `jig-api` and `jig-mongo` too.
+- More CI systems (Buildkite, CircleCI), one file each, and artifact rules per service.
+- A GitOps pull request, Argo CD, Flux, ECS, Cloud Run and Docker Compose (Docker access
+  is root, so with care), and a Terraform plan, as a read.
+- One shared catalog for `jig-logs`, `jig-api` and `jig-mongo` too.
 
 ## Layout
 

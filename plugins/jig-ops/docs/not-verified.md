@@ -16,10 +16,10 @@ GitHub, GitLab or Jenkins.
   version under `image.tag`). A rollback's "going back to" line relies on both.
 - **`helm upgrade --install ... --wait=false` with hooks.** Helm waits for
   hooks, such as a pre-upgrade migration job, for up to five minutes even without
-  `--wait`. The tool allows six, so that it is helm that gives up and not this
-  plugin that stops it. A helm that is stopped part way can leave a release in
-  `pending-upgrade`; the tool treats that as an unknown outcome and says that a
-  locked release is the user's to look at.
+  `--wait`.
+  - The tool allows six, so that it is helm that gives up and not this plugin that stops it.
+  - A helm that is stopped part way can leave a release in `pending-upgrade`; the tool treats that as an unknown outcome and says
+    that a locked release is the user's to look at.
 - **helm's own words** for an expired sign-in, an unreachable cluster, a locked
   release (`another operation (install/upgrade/rollback) is in progress`), a
   release or a chart that is not found. Another version may word them
@@ -99,11 +99,12 @@ are listed so that a change in them can be found.
   - `GET /projects/:id/jobs/:job_id/trace` is the job's log: `200`, or `404` when
     the job or its log is not there.
 - **Sign-in and addressing** ([authentication](https://docs.gitlab.com/api/rest/authentication/),
-  [REST](https://docs.gitlab.com/api/rest/)): a personal, project or group token goes
-  in the `PRIVATE-TOKEN` header; a missing or wrong one is `401` with
-  `{"message": "401 Unauthorized"}`. The base path is `/api/v4`. A project is its id
-  or its namespaced path with `/` written `%2F`. Lists default to 20 items, at most
-  100, and a path that is not encoded matches nothing and is `404`.
+  [REST](https://docs.gitlab.com/api/rest/)):
+  - a personal, project or group token goes in the `PRIVATE-TOKEN` header; a missing or wrong one is `401` with
+    `{"message": "401 Unauthorized"}`;
+  - the base path is `/api/v4`;
+  - a project is its id or its namespaced path with `/` written `%2F`;
+  - lists default to 20 items, at most 100, and a path that is not encoded matches nothing and is `404`.
 
 What the tests could not settle:
 
@@ -127,16 +128,13 @@ What the tests could not settle:
 ### Jenkins
 
 - **Remote access API** ([page](https://www.jenkins.io/doc/book/using/remote-access-api/)):
-  an object's data is at its address plus `/api/` (XML or JSON), with `depth` and
-  `xpath`; a build is started by a POST to `/job/<name>/build` or
-  `/job/<name>/buildWithParameters` (parameters as form data); on a secured server
-  the requests use HTTP basic authentication with a user and an API token, "preferred
-  instead of crumbs".
+  - an object's data is at its address plus `/api/` (XML or JSON), with `depth` and `xpath`;
+  - a build is started by a POST to `/job/<name>/build` or `/job/<name>/buildWithParameters` (parameters as form data);
+  - on a secured server the requests use HTTP basic authentication with a user and an API token, "preferred instead of crumbs".
 - **Scripted clients** ([page](https://www.jenkins.io/doc/book/system-administration/authenticating-scripted-clients/)):
-  Jenkins does not negotiate, so it answers `403`, not `401`, to missing credentials,
-  and the first request must carry them. A crumb is requested from
-  `/crumbIssuer/api/json` and sent in the header named by `crumbRequestField`, with
-  the value of `crumb`.
+  - Jenkins does not negotiate, so it answers `403`, not `401`, to missing credentials, and the first request must carry them;
+  - a crumb is requested from `/crumbIssuer/api/json` and sent in the header named by `crumbRequestField`, with the value of
+    `crumb`.
 - **CSRF protection** ([page](https://www.jenkins.io/doc/book/security/csrf-protection/)):
   requests that authenticate with an API token are exempt. A crumb is tied to the web
   session it was issued in, so a client sends back the session cookie with it. The
@@ -144,27 +142,26 @@ What the tests could not settle:
   is used.
 - **Builds** ([Run](https://javadoc.jenkins.io/hudson/model/Run.html),
   [Result](https://javadoc.jenkins.io/hudson/model/Result.html),
-  [Job](https://javadoc.jenkins.io/hudson/model/Job.html)): a build's result "may be
-  null if the build is ongoing", `isBuilding` is true until it is completed, and the
-  timestamp is when it was scheduled. The results are `SUCCESS`, `UNSTABLE`,
-  `FAILURE`, `NOT_BUILT` and `ABORTED`.
+  [Job](https://javadoc.jenkins.io/hudson/model/Job.html)):
+  - a build's result "may be null if the build is ongoing";
+  - `isBuilding` is true until it is completed, and the timestamp is when it was scheduled;
+  - the results are `SUCCESS`, `UNSTABLE`, `FAILURE`, `NOT_BUILT` and `ABORTED`.
 - **The API help page every Jenkins server serves** at `.../api/` (read on a public
-  server, [example](https://hub.spigotmc.org/jenkins/job/BuildTools/6/api)): `tree=`
-  limits the fields of a reply, with `jobs[name]{0,10}` for a range, and the console
-  of a running build is read in pieces with `start` and the `X-Text-Size` and
-  `X-More-Data` headers (not used: the tool reads a finished build's console whole).
+  server, [example](https://hub.spigotmc.org/jenkins/job/BuildTools/6/api)):
+  - `tree=` limits the fields of a reply, with `jobs[name]{0,10}` for a range;
+  - the console of a running build is read in pieces with `start` and the `X-Text-Size` and `X-More-Data` headers (not used: the
+    tool reads a finished build's console whole).
 - **Stages** ([Pipeline REST API plugin](https://plugins.jenkins.io/pipeline-rest-api/)):
   `/job/<name>/<run>/wfapi/describe` has `stages`, each with `id`, `name`, `status`,
   `startTimeMillis` and `durationMillis`.
 
 What the tests could not settle:
 
-- **The field names the tool asks for with `tree=`** (`number`, `result`,
-  `building`, `timestamp`, `duration`, `url`; on a job `buildable`, `inQueue` and
-  `nextBuildNumber`), **the permalinks** `lastBuild` and `lastFailedBuild`, and
-  `consoleText` are Jenkins' own, and are written from how Jenkins answers; the
-  pages above do not list them. The Javadoc lists the permalink constants but not
-  their spelling.
+- **Names that the pages above do not list:** they are Jenkins' own, and are written from how Jenkins answers.
+  - The field names the tool asks for with `tree=`: `number`, `result`, `building`, `timestamp`, `duration`, `url`; on a job
+    `buildable`, `inQueue` and `nextBuildNumber`.
+  - The permalinks `lastBuild` and `lastFailedBuild`, and `consoleText`.
+  - The Javadoc lists the permalink constants but not their spelling.
 - **The status words of a stage.** The plugin page shows `SUCCESS`, `FAILED` and
   `PAUSED_PENDING_INPUT`; `IN_PROGRESS`, `NOT_EXECUTED`, `ABORTED` and `UNSTABLE`
   are from memory. A word nobody knows counts as a failure.
@@ -184,10 +181,10 @@ What the tests could not settle:
 ### GitHub Actions, as `jig-git`'s `checks` tool left it
 
 - **GitHub itself.** `gh api` prints a `304` as the status line and headers, then
-  `gh: HTTP 304` on standard error, and exits with 1. That was checked with gh 2.92
-  against a local server, and the tests rely on it. Rate limits, `X-Poll-Interval`
-  on these endpoints, and polling with a single sign-on login have not been tried.
-  `gh run watch` does not support fine-grained tokens.
+  `gh: HTTP 304` on standard error, and exits with 1.
+  - That was checked with gh 2.92 against a local server, and the tests rely on it.
+  - Rate limits, `X-Poll-Interval` on these endpoints, and polling with a single sign-on login have not been tried.
+  - `gh run watch` does not support fine-grained tokens.
 - **Which checks are required** is read from the protection and the rulesets of the
   base branch, which was not tried on a real repository. A repository that hides them
   from read access has every check counted. For a pull request, `required_only` relies
