@@ -65,8 +65,9 @@ test("it reaches jig-core only through its client and contract, the way plugins 
 });
 
 test("it needs nothing that is not in Node or Pi: no package of its own", () => {
-    const manifest = JSON.parse(readFileSync(path.join(ROOT, "package.json"), "utf8")) as { dependencies?: unknown };
-    assert.equal(manifest.dependencies, undefined);
+    const manifest = JSON.parse(readFileSync(path.join(ROOT, "package.json"), "utf8")) as { dependencies?: Record<string, string> };
+    // The one package of the repository is jig-api's `yaml`, which no other plugin imports (checked below).
+    assert.deepEqual(Object.keys(manifest.dependencies ?? {}), ["yaml"]);
     for (const name of readdirSync(SRC)) {
         for (const match of readFileSync(path.join(SRC, name), "utf8").matchAll(
             /^import (?:type )?(?:[^"]+ from )?"([^"]+)"/gm,

@@ -2,6 +2,36 @@
 
 Dated so the reasons stay attached.
 
+## 2026-10-30: jig-api part 2: Bruno, OpenAPI and the Postman cloud, and the first dependency
+
+- **`yaml` is the repository's first runtime dependency (2.9.1, pinned exactly).** Bruno's default format is YAML and OpenAPI specs
+  are mostly YAML, and a YAML parser is not something to write: anchors, block scalars, flow styles and several ways to quote.
+  `yaml` (eemeli/yaml) was chosen over writing one, and over a parser that comes with a larger tree, because:
+  - it is ISC-licensed and has no dependencies of its own, so the lock file gains one package;
+  - it parses and never evaluates: no custom tag runs code, aliases are capped, duplicate keys are an error;
+  - it reports a code and a position for a mistake, so a message can name the line and never quote it (a line of an environment
+    may hold a secret);
+  - it ships its own types.
+  It is used only to parse. Nothing is `eval`ed.
+- **Bruno's `.bru` language is read by a small reader of our own.** Its parser comes with a grammar library and a utility library, which
+  is more than a line format of a few block kinds needs, and the reader has to keep a secret's value out of every message anyway.
+  The format is documented in Bruno's pages and its own readers, which `docs/not-verified.md` lists.
+- **No `.env` file is ever read.** Bruno reads `{{process.env.NAME}}` from one. Here it is a secret named `process.env.NAME`, filled
+  from `api.secrets` like any other, so the file that is easiest to commit by mistake is never opened.
+- **OpenAPI is opt-in, per environment, and its hosts are configured.** A spec lists what an API can do, not what a team chose to
+  run, and its servers rarely match environment names. So it runs only in the environments listed in its own configuration, against
+  the servers that configuration maps to them, and in production only for reads and only with `allowProductionReads`. Writes in
+  production stay denied by the floor.
+- **A credential in a spec is a slot, never a value.** Each security scheme becomes secret variables named for it, filled from
+  `api.secrets` or by the company's sign-in. A token address on a host that is not one of the spec's servers is refused, so a client's
+  secret is not sent to a host the environment does not have.
+- **Optional parameters are left out, not blanked.** A parameter or body property the spec does not require is sent only when the
+  agent gives it, so a missing filter does not become an empty one.
+- **Postman's cloud is fetched by a command the person types.** `/api refresh` fetches to a local copy, and reading stays
+  synchronous, because a call is classified before it runs. The fetch is an ordinary request of the sending engine, so a transport
+  carries it and the key is read by `jig-core` when it is sent. The copy omits the values of secret variables and is private to the
+  user. A collection access key, which goes in the address, is not used.
+
 ## 2026-10-30: jig-ops runtime and deploy, as built
 
 - **The Kubernetes reads are the first runtime adapter,** and `jig-k8s` was never a

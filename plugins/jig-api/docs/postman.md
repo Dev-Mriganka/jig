@@ -8,7 +8,8 @@ How a Postman collection (format v2.1; v2.0 reads alike) and its environment fil
   "environments": { "Staging": "~/work/billing-staging.postman_environment.json" } }
 ```
 
-The environment's name is the one given here, not the `name` inside the file. The folder the collection file is in is the
+A collection kept in a Postman workspace is read the same way, from a local copy that `/api refresh` fetches
+([Postman cloud](postman-cloud.md)). The environment's name is the one given here, not the `name` inside the file. The folder the collection file is in is the
 **collection folder**: a file a request uploads must sit inside it (see [Safety](safety.md#files)). Nothing is read until a
 call needs it, and the files are read again for every call, so an export that is replaced shows at once.
 

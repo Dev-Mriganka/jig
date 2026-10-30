@@ -9,16 +9,21 @@ Use the `api` tool for every API call. The team's requests are saved in collecti
 
 ## Find the request
 
-1. `api list` shows the saved requests: the collection and folder, the method, the address, whether it reads or writes, and the variables it needs. Narrow it with `collection`, `folder` or `text`.
-2. `api show` with `request` shows one request in full: its headers, body and variables, where each variable gets its value, and whether it is refused. Give `environment` to see the values in that environment.
+1. `api list` shows the saved requests: the collection and folder, the method, the address, whether it reads or writes, the variables it `needs` and those that are `optional`. Narrow it with `collection`, `folder` or `text`.
+2. `api show` with `request` shows one request in full: its headers, body and variables, where each variable gets its value, what each parameter is, the asserts the collection declares (they are not run), and whether it is refused. Give `environment` to see the values in that environment.
 3. Use only requests that exist. A wrong name is refused with the names that are close; ask the user when none fits.
+4. List, then show, then run. Do not guess a variable's name: copy it from `show`, such as `orderId`, `address.city` or `filter[customer]`.
 
 ## Run it
 
-- `api run` with `request`, `environment` and `variables`. Give a value for each variable the request needs (`orderId`, a search text) and nothing else.
+- `api run` with `request`, `environment` and `variables`. Give a value for each variable the request needs (`orderId`, a search text). Give an optional one only when the task calls for it: one you leave out is left out of the request.
 - A variable that is a secret, or that signs the request in, comes from the environment and the user's secret store. Never put a token, a password or a key in `variables`, and never try to set the host or the method: they are refused.
 - `api run-folder` with `folder` and `environment` runs a folder in order and stops at the first failure. Use it for a smoke test after a deploy.
 - `api call` is an ad-hoc request for an endpoint nobody has saved. It works only in the test environments the user allowed, never in production, and it signs in only if the environment sets a sign-in. Prefer a saved request.
+
+## Specs (OpenAPI)
+
+A request named by an `operationId` comes from a service's spec. A spec runs only where the user listed its environments, against the server they mapped to each, and in production only for reads and only if they allowed it. An operation shown as `GET /path` has no `operationId` and is refused. Do not try to run a spec's operation in another environment, and never look for another host.
 
 ## Read first, write once
 
@@ -42,7 +47,9 @@ The reason names what to change. The common ones:
 - `has a pre-request script`: the request needs a script from the user's API client, and scripts never run here. Tell the user; do not rebuild the request by hand.
 - `cannot be sent: ...`: the request uses a protocol or sign-in this tool does not send (WebSocket, gRPC, Digest, a browser sign-in). Tell the user.
 - `is not a host of Staging`: the request's address goes outside the environment's own hosts. It is the collection that needs fixing, not the call.
-- `is a secret but api.secrets has no reference`: the user has to add the secret to the configuration.
+- `is a secret but api.secrets has no reference`: the user has to add the secret to the configuration. This includes a Bruno `process.env.NAME` and the sign-in of an OpenAPI spec.
+- `does not run in Prod ... allowProductionReads`, `no server is mapped to it`, `no environment named`: the spec is not set up for that environment. Tell the user what to add; do not run it elsewhere.
+- `has not been fetched yet: run /api refresh`: a Postman cloud collection has no local copy. Only the user can run `/api refresh`; ask them.
 
 ## When a write gets no answer
 
