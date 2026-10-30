@@ -239,7 +239,9 @@ describe("the package", () => {
         const core = manifest.pi.extensions.indexOf("./plugins/jig-core/src/index.ts");
         const ops = manifest.pi.extensions.indexOf("./plugins/jig-ops/src/index.ts");
         assert.ok(core === 0 && ops > core, "jig-ops comes after jig-core");
-        assert.equal(manifest.pi.extensions.slice(ops).join(","), "./plugins/jig-ops/src/index.ts,./plugins/jig-review/src/index.ts", "only jig-review comes after it");
+        for (const earlier of ["memory", "git", "lens", "jira", "logs", "api"]) {
+            assert.ok(manifest.pi.extensions.indexOf(`./plugins/jig-${earlier}/src/index.ts`) < ops, `after jig-${earlier}`);
+        }
         assert.equal(manifest.pi.extensions.some((entry) => entry.includes("jig-k8s")), false, "jig-k8s is not a plugin of its own");
         assert.deepEqual(manifest.pi.skills, ["./plugins/*/skills"]);
         assert.ok(fs.existsSync(path.join(ROOT, manifest.pi.extensions[ops] as string)));
@@ -247,8 +249,9 @@ describe("the package", () => {
 
     test("the plugin adds no run-time dependency", () => {
         const all = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")) as { dependencies?: Record<string, string> };
-        // The packages of the repository are jig-api's `yaml` and jig-review's `hono`, `@hono/node-server` and `ignore`.
-        assert.deepEqual(Object.keys(all.dependencies ?? {}).sort(), ["@hono/node-server", "hono", "ignore", "yaml"]);
+        // The packages of the repository are jig-api's `yaml`, jig-review's `hono`, `@hono/node-server` and `ignore`, and
+        // jig-mongo's driver.
+        assert.deepEqual(Object.keys(all.dependencies ?? {}).sort(), ["@hono/node-server", "hono", "ignore", "mongodb", "yaml"]);
     });
 
     test("the skill has a name that is its folder and a description that says when to use it, and teaches the order of work", () => {

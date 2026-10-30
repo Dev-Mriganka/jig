@@ -197,8 +197,9 @@ test("imports: relative ones end in .ts, and bare ones are built-ins or host pac
 
 test("the plugin adds no run-time dependency", () => {
     const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")) as { dependencies?: Record<string, string> };
-    // The packages of the repository are jig-api's `yaml` and jig-review's `hono`, `@hono/node-server` and `ignore`.
-    assert.deepEqual(Object.keys(manifest.dependencies ?? {}).sort(), ["@hono/node-server", "hono", "ignore", "yaml"]);
+    // The packages of the repository are jig-api's `yaml`, jig-review's `hono`, `@hono/node-server` and `ignore`, and
+    // jig-mongo's driver.
+    assert.deepEqual(Object.keys(manifest.dependencies ?? {}).sort(), ["@hono/node-server", "hono", "ignore", "mongodb", "yaml"]);
 });
 
 test("type-erasable TypeScript only: no enums, namespaces, import = or parameter properties", () => {

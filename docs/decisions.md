@@ -63,6 +63,34 @@ Dated so the reasons stay attached.
 - **Approval is bound to the diff.** The challenge names the review and its diff as
   you saw it; if a new round arrived since, the approval is refused.
 
+## 2026-10-30: jig-mongo is built on the official driver, with the walk of a pipeline as one of two locks
+
+- **The driver is `mongodb` 7.7.0, pinned exactly (Apache-2.0).** It is the supported way to speak to MongoDB: its wire protocol,
+  authentication, TLS and server selection are not worth rewriting, and `mongosh` would add a second language that runs code. It is the
+  only runtime dependency besides `yaml`, it is loaded on the first call, so a session that never reads MongoDB does not pay for it, and
+  only `driver.ts` imports it. Its own dependencies are `bson`, `@mongodb-js/saslprep` and `mongodb-connection-string-url`.
+- **The tool talks to a seam, not to the driver.** `Backend` is what the tool asks of a database, and `adaptClient` turns it into driver
+  calls. The tool is tested with a fake of the seam, the adapter with a fake client, and one optional test uses a real server when
+  `JIG_TEST_MONGO_URI` is set.
+- **Results are relaxed Extended JSON.** A plain string for an id would not match an ObjectId in the next filter, so the model would
+  waste calls on it. Binary data and code are shown as a note. A 64-bit integer that JSON cannot hold keeps its type: the driver's own
+  relaxed form loses digits there.
+- **A pipeline is walked, and with an allow list it is also reshaped.** The walk refuses a reference to a denied or unlisted field in
+  every stage and sub-pipeline. It is a static check of a language with many corners, so with an allow list a projection of the allowed
+  fields is put in front of every stage and sub-pipeline: a corner the walk missed then reads nothing that is not listed.
+  `$objectToArray` is refused because it turns field names into values; `$graphLookup` is refused with an allow list because it cannot
+  be limited. A name that looks denied is refused even as the name of a new field, which is a small cost for a rule that is easy to state.
+- **A write reports counts, so a write names no denied field.** `modifiedCount` of `{"$set": {"password": "x"}}` would tell the agent
+  whether the value equals "x". Filters, updates and documents are checked like reads.
+- **The preview's count is the guard.** The count is read just before the preview and again when the call runs, and the fingerprint
+  covers it. `limit` is the cap of a write of many (1000 by default, at most 2000), so one parameter keeps the meaning "how many".
+  Upserts and array filters are not supported yet: an upsert is a write whose count is zero.
+- **A write is sent once.** The driver's `retryWrites` is off, and a lost reply is answered by one read, never by sending again.
+- **The SSH route is arguments only.** `-F /dev/null` leaves out ssh configuration that the agent's shell could have written, the host
+  and user are checked to be plain words, and the key lives in a private file only until ssh has signed in. A forward reaches one host,
+  so the address must be one `host:port`; the certificate is still checked against the database's own name.
+- **A connection is never named `local` or `external`.** Writes to those are not asked about as writes to a test environment are.
+
 ## 2026-10-30: jig-mongo is a complete MongoDB tool; no SQL tool for now
 
 - **Complete:** exploring, indexes, query plans, the full aggregation pipeline,

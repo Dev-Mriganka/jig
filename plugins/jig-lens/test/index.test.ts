@@ -66,9 +66,9 @@ test("it reaches jig-core only through its client and contract, the way plugins 
 
 test("it needs nothing that is not in Node or Pi: no package of its own", () => {
     const manifest = JSON.parse(readFileSync(path.join(ROOT, "package.json"), "utf8")) as { dependencies?: Record<string, string> };
-    // The packages of the repository are jig-api's `yaml` and jig-review's `hono`, `@hono/node-server` and `ignore`; no other
-    // plugin imports them (checked below).
-    assert.deepEqual(Object.keys(manifest.dependencies ?? {}).sort(), ["@hono/node-server", "hono", "ignore", "yaml"]);
+    // The packages of the repository are jig-api's `yaml`, jig-review's `hono`, `@hono/node-server` and `ignore`, and
+    // jig-mongo's driver; no other plugin imports them (checked below).
+    assert.deepEqual(Object.keys(manifest.dependencies ?? {}).sort(), ["@hono/node-server", "hono", "ignore", "mongodb", "yaml"]);
     for (const name of readdirSync(SRC)) {
         for (const match of readFileSync(path.join(SRC, name), "utf8").matchAll(
             /^import (?:type )?(?:[^"]+ from )?"([^"]+)"/gm,

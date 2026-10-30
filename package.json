@@ -19,6 +19,7 @@
     "@hono/node-server": "2.1.3",
     "hono": "4.13.11",
     "ignore": "7.0.10",
+    "mongodb": "7.7.0",
     "yaml": "2.9.1"
   },
   "peerDependencies": {
@@ -37,7 +38,8 @@
       "./plugins/jig-logs/src/index.ts",
       "./plugins/jig-api/src/index.ts",
       "./plugins/jig-ops/src/index.ts",
-      "./plugins/jig-review/src/index.ts"
+      "./plugins/jig-review/src/index.ts",
+      "./plugins/jig-mongo/src/index.ts"
     ],
     "skills": [
       "./plugins/*/skills"

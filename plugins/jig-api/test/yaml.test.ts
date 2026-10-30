@@ -67,9 +67,9 @@ describe("the dependency", () => {
         assert.deepEqual(importers, [path.join("sources", "yaml.ts")]);
     });
 
-    test("the manifest pins it exactly, beside jig-review's three run-time dependencies", () => {
+    test("the manifest pins it exactly, beside jig-review's three run-time dependencies and jig-mongo's driver", () => {
         const manifest = JSON.parse(fs.readFileSync(path.join(SRC, "..", "..", "..", "package.json"), "utf8")) as { dependencies: Record<string, string> };
-        assert.deepEqual(Object.keys(manifest.dependencies).sort(), ["@hono/node-server", "hono", "ignore", "yaml"]);
+        assert.deepEqual(Object.keys(manifest.dependencies).sort(), ["@hono/node-server", "hono", "ignore", "mongodb", "yaml"]);
         assert.match(manifest.dependencies.yaml ?? "", /^\d+\.\d+\.\d+$/);
     });
 });

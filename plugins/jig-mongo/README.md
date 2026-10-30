@@ -1,15 +1,15 @@
 # jig-mongo: MongoDB, with reads, writes, indexes and aggregation
 
-**Status: design.**
+**Status: built.** Every action below, tested against a fake of the driver's seam and a fake of the driver's client, and an
+SSH route tested with a fake `ssh`. An optional test runs every action against a real MongoDB when `JIG_TEST_MONGO_URI` is
+set, and passed once against MongoDB 8.0 on one machine. Not yet tried in everyday use, or against a managed service (see
+[Not verified yet](docs/not-verified.md)).
 
-`jig-mongo` gives the agent a complete MongoDB tool: exploring, querying,
-indexes, query plans, aggregation and writes. `jig-core` decides each call by
-environment: reads run, a write to `staging` asks you with a preview, and every
-write to production is denied. What the agent may see is set by an allow list
-or a deny list. For example, to debug a stuck order the agent runs `count`, then
-`find` on `orders.orders` in `staging`. It then runs `explain` to see whether
-the query used an index, and `update` to fix the test document, after you
-approve the preview.
+`jig-mongo` gives the agent a complete MongoDB tool: exploring, querying, indexes, query plans, aggregation and writes.
+`jig-core` decides each call by environment: reads run, a write to `staging` asks you with a preview, and every write to
+production is denied. What the agent may see is set by an allow list or a deny list. For example, to debug a stuck order the
+agent runs `count`, then `find` on `orders.orders` in `staging`. It then runs `explain` to see whether the query used an
+index, and `update` to fix the test document, after you approve the preview.
 
 ## Tool: `mongo`
 
@@ -26,9 +26,9 @@ approve the preview.
 | Write | `insert`, `update`, `replace`, `delete`, `bulk` | write | Changes documents. `update` and `delete` take `one` or `many` |
 | Index changes | `create-index`, `drop-index` | write | Changes indexes |
 
-Filters, documents and pipelines are Extended JSON, such as `{"$oid": "..."}`.
-A result that reaches its limit (1 to 2000, default 20) is marked "possibly
-partial".
+Filters, documents and pipelines are Extended JSON, such as `{"$oid": "..."}`, and so are the results, so an `_id` from one
+call can be used in the next. A result that reaches its limit (1 to 2000, default 20) is marked "possibly partial".
+Parameters and results: [Results](docs/results.md).
 
 ## Access: an allow list or a deny list
 
@@ -37,35 +37,31 @@ partial".
 | Default | **Deny list:** everything is readable except what you list | **Allow list:** nothing is readable until you list it |
 | Why | Test data is there to be explored | A new sensitive collection is never shown by accident |
 
-- **Always denied, in every environment:** the system databases (`admin`,
-  `local`, `config`), and fields whose names look like credentials
-  (`*password*`, `*secret*`, `*token*`, `*apiKey*`). You can add to these, never
-  remove them.
+- **Always denied, in every environment:** the databases `admin`, `local` and `config`, `system.*` collections, and fields whose
+  names look like credentials (`*password*`, `*secret*`, `*token*`, `*apiKey*`, in any case). You can add to these, never remove them.
 - **Lists reach fields, not only collections.**
-  - `find` strips denied fields from every result. In production it returns
-    only allowed fields, as a forced projection.
-  - `aggregate` is refused before it runs when it names a denied field anywhere.
-    That includes a rename such as `{ x: "$password" }`, a `$lookup` into a
-    denied collection, and `$replaceRoot`.
+  - `find` and `sample` strip denied fields from every result, at any depth. In production they return only allowed fields, as a
+    forced projection.
+  - `aggregate` is refused before it runs when it names a denied field anywhere: a rename such as `{ x: "$password" }`,
+    `$getField`, a `$lookup`, `$graphLookup` or `$unionWith` into a denied collection, `$replaceRoot`, a `$facet` branch. With an
+    allow list a projection of the allowed fields is also put in front of every stage ([Access](docs/access.md)).
 - **A denied collection cannot be written either.**
 
 ## Rules
 
-- **Writes are previewed with a count.** The preview shows the filter, the
-  change, and how many documents it touches, counted just before. If that count
-  changes before the write runs, the write is refused as "changed since the
-  preview".
-- **Guards on writes:**
-  - an `update` or `delete` with an empty filter is refused;
-  - `many` above 1000 documents needs a `limit` you raise on purpose.
-- **Server-side JavaScript is refused** (`$where`, `$function`,
-  `$accumulator`), unless you allow it for a test environment.
+- **Writes are previewed with a count.** The preview shows the filter, the change, and how many documents it touches, counted just
+  before. If that count changes before the write runs, it is refused as "changed since the preview".
+- **Guards on writes:** an `update` or `delete` with an empty filter is refused; `many` above 1000 documents needs a `limit` you
+  raise on purpose ([Writes](docs/writes.md)).
+- **Server-side JavaScript is refused** (`$where`, `$function`, `$accumulator`), unless you allow it for a test environment.
 - **A lost reply is never resent.** One read checks what happened.
-- **Production is read-only and masked,** whatever the configuration says.
+- **Production is read-only and masked,** whatever the configuration says: writes and index changes are refused when the call is
+  classified, and `jig-core` masks every production result.
 
 ## Configure
 
-In `~/.pi/agent/jig.json`, under `mongo`:
+In `~/.pi/agent/jig.json`, under `mongo`. An unknown field is an error, and the tool then does nothing until the file is fixed
+(`/jig` lists the problems).
 
 ```json
 {
@@ -85,11 +81,11 @@ In `~/.pi/agent/jig.json`, under `mongo`:
 
 | Field | Meaning |
 |---|---|
-| `connections` | Per environment: a URI with no credentials in it, the user, the password as a secret reference, and an optional route (`via`): an SSH bastion, or a company tunnel |
-| `access` | Per environment: `deny` (a list of `db.collection` or `*.field` patterns) or `allow` (collections with their fields). Production must use `allow` |
+| `connections` | Per environment, named as `jig-core` names it: `uri` (no credentials in it; one that has them is refused), `user`, `password` (a secret reference), optional `authSource` and `tls`, and an optional route `via` |
+| `via` | `{ "ssh": { host, user, key, port? } }`: an SSH forward through a bastion host, `key` a secret reference. Or `{ "tunnel": "<name>" }` for a company tunnel ([Connections](docs/connections.md)) |
+| `access` | Per environment: `deny` (a list of `db.collection`, `db.*`, `*.field` or `db.collection.field`) or `allow` (collections with their fields). Production must use `allow`; anything else is an error. `javascript: true` allows server-side JavaScript in a test environment |
 
-Use a read-only database user for production. The floor denies writes anyway,
-but the user is the second lock.
+Use a read-only database user for production. The floor denies writes anyway, but the user is the second lock.
 
 ## Company part (in the company plugin)
 
@@ -101,12 +97,23 @@ but the user is the second lock.
 
 - **Saved queries,** run by name, for queries a team wants to share.
 - **Change streams,** watching a collection for a while.
+- **Upserts and array filters** in `update`.
 
-## Layout (planned)
+## Layout
 
 ```text
 jig-mongo/
-  src/      the tool, access lists, pipeline checks, write previews, connections and routes
-  skills/   mongo/SKILL.md: count, then find; explain before blaming the database; preview every write
-  test/     against a local MongoDB
+  src/      the tool (index, tool, params, plan), access lists (access, expr, filter, pipeline), reads, writes (write-check,
+            writes), results (render, explain, bson, ejson), the driver seam (backend, driver), connections (config, session, route)
+  skills/   mongo/SKILL.md: count, then find; explain before blaming the database; preview every write; never production writes
+  test/     fakes of jig-core, the database and ssh; one test file per area; an optional one against a real MongoDB
+  docs/     the detail pages below
 ```
+
+## More detail
+
+- [Access](docs/access.md): the lists, the always-denied names, how a pipeline is walked, what is refused and why
+- [Writes](docs/writes.md): previews, the count, the cap, "changed since the preview", a lost reply
+- [Connections](docs/connections.md): the configuration, the SSH route and its key file, the tunnel, how connections are kept
+- [Results](docs/results.md): Extended JSON in and out, partial results, schema and explain output, the record
+- [Not verified yet](docs/not-verified.md): what needs a real MongoDB
