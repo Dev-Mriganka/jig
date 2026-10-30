@@ -2,7 +2,7 @@
 // A session starts, the agent's bash tool runs commands in the sandbox, the session ends, and the broker is gone.
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir, userInfo } from "node:os";
 import path from "node:path";
 import { after, before, describe, test } from "node:test";
 import { DEFAULT_SETTINGS } from "../src/config.ts";
@@ -10,6 +10,7 @@ import { sandbox } from "../src/index.ts";
 import { fakeContext, fakePi } from "./support/fake-pi.ts";
 import type { FakeContext, FakePi } from "./support/fake-pi.ts";
 import { skipUnlessRealSandbox, testPrograms } from "./support/programs.ts";
+import { REAL_HOME_CREDENTIALS } from "./support/world.ts";
 
 const skip = skipUnlessRealSandbox();
 const SIGNALS = [
@@ -67,6 +68,8 @@ describe("a session with the real sandbox", { skip }, () => {
             agentDir: () => path.join(home, ".pi", "agent"),
             settings: () => ({
                 ...DEFAULT_SETTINGS,
+                // The real home's credential places are hidden here as in every real-sandbox test.
+                hide: REAL_HOME_CREDENTIALS.map((name) => path.join(userInfo().homedir, name)),
                 programs: {
                     ...(programs.bwrap === undefined ? {} : { bwrap: programs.bwrap }),
                     ...(programs.socat === undefined ? {} : { socat: programs.socat }),
