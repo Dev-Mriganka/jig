@@ -36,21 +36,28 @@ options)` and never through a shell.
 - **A repository whose own configuration would run a command is refused.** The
   agent's shell can write `.git/config`, and git runs here with your
   credentials, so a command or a redirect planted there would run on the next
-  fetch or push. Before git runs in a repository, its local and per-worktree
-  configuration is read, and the call is refused in one line that names the
-  file and the key. Your global and system configuration are not checked, and
-  neither is `git clone`, which makes a new repository.
+  fetch or push.
+  - Before git runs in a repository, its local and per-worktree configuration
+    is read, and the call is refused in one line that names the file and the
+    key.
+  - Your global and system configuration are not checked, and neither is
+    `git clone`, which makes a new repository.
 - **`gh` gets the same checks.** `exec.run("git", ...)` and `exec.run("gh",
   ...)` are checked like `exec.git`, because both start git.
 
 ### What the git check refuses
 
-| Kind | Keys |
-|---|---|
-| A program git would run | `core.sshCommand`, `core.pager`, `core.editor`, `core.askPass`, `core.hooksPath`, `core.gitProxy`, `core.fsmonitor` (unless it is false), `credential.helper`, `diff.external`, `uploadpack.packObjectsHook`, `gpg.program`, `sequence.editor`, `protocol.allow` |
-| A program git would run, under any subsection | `credential.<name>.helper`, `filter.<name>.clean`, `smudge` and `process`, `diff.<name>.textconv` and `command`, `merge.<name>.driver`, `gpg.<name>.program`, `protocol.<name>.allow` |
-| A redirect of a remote | `url.<base>.insteadOf` and `pushInsteadOf` |
-| A file that adds more configuration | `include.path`, `includeIf.<condition>.path` |
+- **A program git would run:** `core.sshCommand`, `core.pager`, `core.editor`,
+  `core.askPass`, `core.hooksPath`, `core.gitProxy`, `core.fsmonitor` (unless it
+  is false), `credential.helper`, `diff.external`, `uploadpack.packObjectsHook`,
+  `gpg.program`, `sequence.editor` and `protocol.allow`.
+- **A program git would run, under any subsection:** `credential.<name>.helper`,
+  `filter.<name>.clean`, `smudge` and `process`, `diff.<name>.textconv` and
+  `command`, `merge.<name>.driver`, `gpg.<name>.program` and
+  `protocol.<name>.allow`.
+- **A redirect of a remote:** `url.<base>.insteadOf` and `pushInsteadOf`.
+- **A file that adds more configuration:** `include.path` and
+  `includeIf.<condition>.path`.
 
 Names are compared without regard to case, as git does. Normal settings, such as
 `remote.*`, `branch.*`, `user.*` and `core.bare`, pass. The check is read-only,

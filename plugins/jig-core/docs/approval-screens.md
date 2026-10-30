@@ -28,10 +28,11 @@ before it gave:
   this session, or Decline.
 - **Review screen:** for a preview with a body, or when a rule or the tool asks
   for it, in the terminal interface. A scrollable preview (up and down, PgUp
-  and PgDn, Home and End); `y` allows, `s` allows for the session, `n` or Esc
-  declines, `o` opens the rendered preview in the browser. The browser only
-  shows: the page is a local file with no script and no form, and the answer is
-  always given in Pi.
+  and PgDn, Home and End).
+  - `y` allows, `s` allows for the session, `n` or Esc declines, `o` opens the
+    rendered preview in the browser.
+  - The browser only shows: the page is a local file with no script and no
+    form, and the answer is always given in Pi.
 - **Form:** shown with Pi's selector in this version.
 - **Hosts without the terminal interface (RPC)** use the selector for every
   kind. A review question then shows the first 20 lines of the body in it, and
@@ -47,8 +48,8 @@ before it gave:
 - **Invalid input is not asked about.** A tool's `classify` or preview that
   throws a `TypeError` says the input is invalid: the call is blocked with the
   tool's message, recorded with the error kind `invalid`, and nobody is asked.
-  `classify` matters for reads, which never ask and so never build a preview.
-  Any other error from either is a fault in the tool.
+  - `classify` matters for reads, which never ask and so never build a preview.
+  - Any other error from either is a fault in the tool.
 - **A tool's own page.** A tool can render its preview itself, such as Jira
   wiki markup turned into HTML. `o` then opens that page. Tags that could run,
   load or navigate are removed from it, and the page's policy blocks scripts
