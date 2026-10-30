@@ -128,8 +128,8 @@ describe("the API that plugins get", () => {
 
     test("mask throws when it cannot mask, as the contract says, so the caller drops the result", () => {
         const { api } = load();
-        assert.throws(() => api.mask.text("anything"), /masking is not built yet/);
-        assert.throws(() => api.mask.value({}), /masking is not built yet/);
+        assert.throws(() => api.mask.value({ when: new Map() }), /not JSON-like/);
+        assert.throws(() => api.mask.value({ run: () => 1 }), /not JSON-like/);
         withdrawJig(api);
     });
 

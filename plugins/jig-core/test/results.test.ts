@@ -168,11 +168,11 @@ describe("the mask backstop", () => {
         assert.ok(!rawRecords(state.dir).includes("PERSONAL"));
     });
 
-    test("the stub masker that ships before the mask port is built withholds production results", async () => {
+    test("the masker that ships turns an email in a production result into a token", async () => {
         const { createMasker } = await import("../src/mask/index.ts");
-        const harness = await begin({ config: CONFIG, masker: { text: () => { createMasker(new Uint8Array(32)); return ""; }, value: () => { createMasker(new Uint8Array(32)); return {} as never; } }, plugins: (api) => declare(api) });
-        assert.equal(textOf((await run(harness, "prod", personal("PERSONAL-G"))).final), "result withheld: it could not be masked");
-        assert.equal(textOf((await run(harness, "local", personal("PERSONAL-G"))).final), "customer: PERSONAL-G", "local results do not need it");
+        const harness = await begin({ config: CONFIG, masker: createMasker(new Uint8Array(32).fill(7)), plugins: (api) => declare(api) });
+        assert.match(textOf((await run(harness, "prod", personal("jane.doe@example.com"))).final), /^customer: email#[0-9a-f]{6}$/);
+        assert.equal(textOf((await run(harness, "local", personal("jane.doe@example.com"))).final), "customer: jane.doe@example.com", "local results do not need it");
     });
 
     test("an image cannot be masked, so it does not pass", async () => {

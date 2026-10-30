@@ -207,14 +207,15 @@ describe("results", () => {
         assert.deepEqual(w.callRecords().map((r) => [r.outcome, r.errorKind]), [["error", "withheld"]]);
     });
 
-    test("the masker that ships before the mask port is built withholds production results and nothing else", async () => {
-        const w = await begin({ config: CONFIG, stubMasker: true });
-        const production = await w.call("fake_tool", { env: "prod", output: "customer PERSONAL-JANE" });
-        assert.equal(production.isError, true);
-        assert.equal(production.text, "result withheld: it could not be masked");
-        const local = await w.call("fake_tool", { env: "local", output: "fine" });
+    test("the masker that ships turns personal data in a production result into tokens, and leaves local results alone", async () => {
+        const w = await begin({ config: CONFIG, realMasker: true });
+        const production = await w.call("fake_tool", { env: "prod", output: "customer jane.doe@example.com" });
+        assert.equal(production.isError, false);
+        assert.match(production.text, /^customer email#[0-9a-f]{6}/);
+        assert.ok(!production.text.includes("jane.doe@example.com"));
+        const local = await w.call("fake_tool", { env: "local", output: "customer jane.doe@example.com" });
         assert.equal(local.isError, false);
-        assert.match(local.text, /^fine/);
+        assert.match(local.text, /^customer jane\.doe@example\.com/);
     });
 
     test("a secret value that a tool puts in its result is removed, with its encodings", async () => {

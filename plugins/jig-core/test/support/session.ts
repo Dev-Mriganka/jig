@@ -172,7 +172,8 @@ export interface WorldOptions {
     mode?: Mode;
     masker?: Masker;
     /** Use the masker jig-core ships with, which is the stub until the mask port is built. */
-    stubMasker?: boolean;
+    /** Use the masker that ships instead of the fake one. */
+    realMasker?: boolean;
     /** Put the fake plugin before jig-core, so its `withJig` waits for jig-core to load. */
     pluginFirst?: boolean;
     env?: Record<string, string>;
@@ -221,7 +222,7 @@ export async function startWorld(options: WorldOptions = {}): Promise<World> {
     modelRuntime.registerNativeProvider(faux.provider);
 
     const log: PluginLog = { executed: [], decisions: [], section: undefined };
-    const jigFactory = options.stubMasker === true ? jigCore() : jigCore({ createMasker: () => options.masker ?? fakeMasker });
+    const jigFactory = options.realMasker === true ? jigCore() : jigCore({ createMasker: () => options.masker ?? fakeMasker });
     const plugin = fakePlugin(log);
     const resourceLoader = new DefaultResourceLoader({
         cwd, agentDir,
