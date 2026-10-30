@@ -67,7 +67,7 @@ is not configured instead of running half set up.
 | Field | Default | Meaning |
 |---|---|---|
 | `backend` | required | Exactly one of two shapes: `{ "url", "auth" }` for a direct request, or `{ "transport", "url" }` for one through a company transport. `url` is where the backend is, without the index. A direct `url` must be `https://`; a transport's may be `http://` or `https://`. It may hold a path, and must not hold a user name, a password, a query string or a fragment |
-| `backend.auth` | required with a direct `url` | One of four kinds (see [Backends](docs/backends.md)): a user name with a password, an `apiKey`, a `token`, or a `signIn` service. A password, key or token is always a secret reference, such as `pass:logs/api-key` or `env:LOGS_KEY` (see [Secrets](../../docs/secrets.md)), never the secret |
+| `backend.auth` | required with a direct `url` | One of four kinds (see [Connecting](docs/connecting.md)): a user name with a password, an `apiKey`, a `token`, or a `signIn` service. A password, key or token is always a secret reference, such as `pass:logs/api-key` or `env:LOGS_KEY` (see [Secrets](../../docs/secrets.md)), never the secret |
 | `environments` | required | A map from the name the tool uses to that environment's settings, at least one |
 | `environments.<name>.index` | required | The index name or pattern, such as `app-logs-*`. Several can be listed with commas |
 | `environments.<name>.timeField` | `@timestamp` | The date field that windows and sorting use |
@@ -107,7 +107,8 @@ is not configured instead of running half set up.
 ```text
 jig-logs/
   src/      the tool and its checks (index, tool, params, config), the search (search, time, query, request, response,
-            failure), what the model reads (summary, line, clip), small helpers (values)
+            failure), what the model reads (summary, line, clip), small helpers (values), and backends/: the interface
+            and one file for each store (elasticsearch)
   skills/   logs/SKILL.md: how to search (an identifier first, a narrow window, then wider)
   test/     against a fake search server, a fake transport and a fake jig-core; golden request bodies in test/golden
   docs/     the detail pages below
@@ -119,5 +120,6 @@ jig-logs/
 - [Windows and buckets](docs/windows-and-buckets.md): windows, halving, budgets
 - [Hit lines](docs/hit-lines.md): the result, paging, how a line is cut
 - [Failures](docs/failures.md): refusals, errors, and the reasons behind a gap
-- [Backends](docs/backends.md): direct or through a transport, sign-in, time
+- [Backends](docs/backends.md): what an adapter does, and how to write one
+- [Connecting](docs/connecting.md): direct or through a transport, sign-in, time
 - [Not verified yet](docs/not-verified.md): what needs a real backend

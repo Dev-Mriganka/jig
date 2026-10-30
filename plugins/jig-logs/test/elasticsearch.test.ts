@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { probeBody, SEARCH_TIMEOUT, searchBody } from "../src/backends/elasticsearch.ts";
 import type { Target } from "../src/config.ts";
-import { probeBody, SEARCH_TIMEOUT, searchBody } from "../src/query.ts";
 import type { LogQuery } from "../src/query.ts";
 import { HOUR_MS } from "../src/time.ts";
 import { problemsWith } from "./support/grammar.ts";

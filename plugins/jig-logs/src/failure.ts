@@ -3,7 +3,7 @@
 // A problem with one window becomes a gap in the result, and the rest of the search goes on. A problem that every
 // window would have, such as a refused credential or an address nobody answers, is thrown, because a result made of
 // nothing but gaps would only hide it.
-import { errorType } from "./response.ts";
+import type { LogBackend } from "./backends/backend.ts";
 
 export type FailureReason =
     | "timeout"
@@ -38,11 +38,13 @@ export class RequestError extends Error {
     }
 }
 
-function transient(reason: FailureReason): Failure {
+/** A failure a smaller request may get past. */
+export function transient(reason: FailureReason): Failure {
     return { reason, split: true, fatal: false };
 }
 
-function final(reason: FailureReason, fatal = false): Failure {
+/** A failure that halving does not help. `fatal` when every other window would fail the same way. */
+export function final(reason: FailureReason, fatal = false): Failure {
     return { reason, split: false, fatal };
 }
 
@@ -50,19 +52,20 @@ const NOT_ACCEPTED = "The backend did not accept the sign-in";
 
 /**
  * The failure a reply's status stands for, or undefined for a success. Throws when the problem is the sign-in or the
- * address: neither is about one window. The messages never hold a credential, and never the reply's body.
+ * address: neither is about one window. The backend reads the replies that need its own words first; the HTTP rules
+ * cover the rest. The messages never hold a credential, and never the reply's body.
  */
-export function failureFromStatus(status: number, body: string): Failure | undefined {
+export function failureFromStatus(status: number, body: string, backend: LogBackend): Failure | undefined {
     if (status >= 200 && status < 300) return undefined;
     if (status === 401) {
         throw new Error(
-            `${NOT_ACCEPTED} (HTTP 401): sign in again, or check backend.auth in the logs section of jig.json`,
+            `${NOT_ACCEPTED} (HTTP 401): sign in again, or check ${backend.words.signIn} in the logs section of jig.json`,
         );
     }
     if (status === 403) {
         throw new Error(
-            "The backend denied this sign-in access to the index (HTTP 403): signing in again will not help, " +
-                "so ask for access to it",
+            `The backend denied this sign-in access to ${backend.words.resource} (HTTP 403): signing in again will ` +
+                "not help, so ask for access to it",
         );
     }
     if (status >= 300 && status < 400) {
@@ -70,7 +73,9 @@ export function failureFromStatus(status: number, body: string): Failure | undef
             `The backend answered with a redirect (HTTP ${status}): set backend.url to the address it redirects to`,
         );
     }
-    if (status === 404 || errorType(body) === "index_not_found_exception") return final("index_not_found", true);
+    const own = backend.classify(status, body);
+    if (own !== undefined) return own;
+    if (status === 404) return final("index_not_found", true);
     if (status === 408 || status === 504) return transient("timeout");
     if (status === 429) return final("rate_limited");
     if (status >= 500) return transient("upstream_unavailable");
@@ -96,7 +101,7 @@ export function failureFromError(error: unknown): Failure {
 }
 
 /** One line per reason for the model: what to change before searching again. */
-export function nextStep(reason: FailureReason): string {
+export function nextStep(reason: FailureReason, backend: LogBackend): string {
     switch (reason) {
         case "timeout":
         case "search_timeout":
@@ -111,12 +116,9 @@ export function nextStep(reason: FailureReason): string {
         case "invalid_response":
             return "The backend sent a reply that is not a search result; retry once, then report the gap.";
         case "query_rejected":
-            return (
-                "The backend rejected the query; for query check the Lucene syntax " +
-                "(AND, OR and NOT in capitals, quotes around phrases), otherwise use phrase."
-            );
+            return backend.words.queryRejected;
         case "index_not_found":
-            return "The index was not found: the environment's index in the logs section of jig.json may be wrong.";
+            return backend.words.notFound;
         case "request_budget":
         case "time_budget":
             return "Too much for one call; narrow the window, or search the missing windows separately.";

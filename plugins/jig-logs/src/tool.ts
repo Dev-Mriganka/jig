@@ -6,6 +6,7 @@
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { jig } from "../../jig-core/src/client.ts";
 import type { CallClass, ToolDeclaration } from "../../jig-core/src/contract.ts";
+import { backendOf } from "./backends/index.ts";
 import { requireSettings, targetFor } from "./config.ts";
 import { checkParams, logsParameters, resolveQuery, resolveView } from "./params.ts";
 import { sender } from "./request.ts";
@@ -53,7 +54,7 @@ export function createLogsTool(deps: LogsDeps = {}): JigTool {
             const query = resolveQuery(input, input.environment as string, target, now());
             const view = resolveView(input);
 
-            const send = sender(settings.backend, target.index, {
+            const send = sender(settings.backend, backendOf(target).wire(target, settings.backend), {
                 signal,
                 timeoutMs: deps.timeoutMs,
                 fetch: deps.fetch,

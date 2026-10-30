@@ -14,11 +14,17 @@ export const CONTROL = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
 export const CONTROL_RUNS = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g;
 
 /**
+ * A mistake in a call's input. jig-core takes a `TypeError` from a declaration or a preview to mean "invalid input" and
+ * blocks the call without asking. Its name stays `TypeError`, so a message and a test treat it as one.
+ */
+export class InputError extends TypeError {}
+
+/**
  * Refuses a call whose parameters are wrong. The message says how to put it right. A `TypeError` is how jig-core's
- * contract says "invalid input" (see `ToolDeclaration.preview`), so every refusal of a parameter is one.
+ * contract says "invalid input" (see `ToolDeclaration.preview`), so every refusal of a parameter is an InputError.
  */
 export function refuse(message: string): never {
-    throw new TypeError(message);
+    throw new InputError(message);
 }
 
 /** A value from a call, shortened and quoted for an error message. Text is quoted, so an empty value shows. */

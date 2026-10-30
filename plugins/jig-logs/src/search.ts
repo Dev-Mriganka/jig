@@ -3,12 +3,15 @@
 // The window is cut into buckets (see `planBuckets`) and searched one after the other. A bucket that times out or loses
 // shards is halved and searched again, a few times over. What still cannot be searched becomes a gap in the result
 // instead of silently missing: the answer says what it covers.
+//
+// Nothing here knows which kind of backend answers. The backend of the query's environment builds each request, reads
+// each reply and says what an error means (see backends/); this file decides what to ask next.
+import { backendOf } from "./backends/index.ts";
+import type { LogBackend } from "./backends/index.ts";
 import { failureFromError, failureFromStatus } from "./failure.ts";
 import type { Failure, FailureReason } from "./failure.ts";
-import { probeBody, searchBody } from "./query.ts";
-import type { LogQuery, SearchBody } from "./query.ts";
+import type { LogQuery } from "./query.ts";
 import type { Send } from "./request.ts";
-import { parseSearch } from "./response.ts";
 import type { SearchPage, Source } from "./response.ts";
 import { halve, iso, planBuckets } from "./time.ts";
 import type { Bucket } from "./time.ts";
@@ -55,12 +58,14 @@ export interface SearchOutcome {
 
 export interface SearchEnvironment {
     send: Send;
+    /** The backend that built the query's environment. Left out, it is found from the environment itself. */
+    backend?: LogBackend;
     signal?: AbortSignal | undefined;
     now?: () => number;
     progress?: (text: string) => void;
 }
 
-type Answer = { ok: true; body: string } | { ok: false; failure: Failure };
+type Answer = { ok: true; request: object; body: string } | { ok: false; failure: Failure };
 
 function report(bucket: Bucket, state: WindowReport["state"], rest: Partial<WindowReport> = {}): WindowReport {
     return { from: iso(bucket.from), to: iso(bucket.to), state, ...rest };
@@ -68,9 +73,10 @@ function report(bucket: Bucket, state: WindowReport["state"], rest: Partial<Wind
 
 export async function runSearch(query: LogQuery, environment: SearchEnvironment): Promise<SearchOutcome> {
     const { send, signal, progress } = environment;
+    const backend = environment.backend ?? backendOf(query.target);
     const now = environment.now ?? Date.now;
     const deadline = now() + TIME_BUDGET_MS;
-    const queue = planBuckets(query.range);
+    const queue = planBuckets(query.range, backend.limits.maxWindowMs);
     // The hits wanted come from the end of the window that the order names, so that end is searched first.
     const newestFirst = query.order === "desc";
     if (newestFirst) queue.reverse();
@@ -83,13 +89,13 @@ export async function runSearch(query: LogQuery, environment: SearchEnvironment)
     let halted: FailureReason | undefined;
 
     /** One request. A problem with its window comes back as a failure; anything else is thrown. */
-    async function call(body: SearchBody): Promise<Answer> {
+    async function call(request: object): Promise<Answer> {
         requests += 1;
         progress?.(`searching ${query.environment} logs, request ${requests}`);
         try {
-            const reply = await send(body);
-            const failure = failureFromStatus(reply.status, reply.body);
-            return failure === undefined ? { ok: true, body: reply.body } : { ok: false, failure };
+            const reply = await send(request);
+            const failure = failureFromStatus(reply.status, reply.body, backend);
+            return failure === undefined ? { ok: true, request, body: reply.body } : { ok: false, failure };
         } catch (error) {
             return { ok: false, failure: failureFromError(error) };
         }
@@ -107,11 +113,11 @@ export async function runSearch(query: LogQuery, environment: SearchEnvironment)
         }
 
         const wanted = Math.max(0, query.size - hits.length);
-        const answer = await call(searchBody(query, bucket, wanted));
+        const answer = await call(backend.search(query, bucket, wanted));
         let page: SearchPage | undefined;
         let failure: Failure | undefined;
         if (answer.ok) {
-            page = parseSearch(answer.body);
+            page = backend.parse(answer.body, answer.request);
             if (page === undefined) failure = { reason: "invalid_response", split: false, fatal: false };
             else if (page.incomplete !== undefined) failure = { reason: page.incomplete, split: true, fatal: false };
         } else {
@@ -150,9 +156,9 @@ export async function runSearch(query: LogQuery, environment: SearchEnvironment)
     // One count without the phrase or query. It shows whether the window holds data at all, and says nothing about how
     // long logs are kept.
     async function probeAvailability(): Promise<Availability> {
-        const answer = await call(probeBody(query, query.range));
+        const answer = await call(backend.probe(query, query.range));
         if (!answer.ok) return { state: "unknown", reason: answer.failure.reason };
-        const page = parseSearch(answer.body);
+        const page = backend.parse(answer.body, answer.request);
         if (page === undefined) return { state: "unknown", reason: "invalid_response" };
         if (page.total > 0) return { state: "documents", count: page.total };
         if (page.incomplete !== undefined) return { state: "unknown", reason: page.incomplete };
