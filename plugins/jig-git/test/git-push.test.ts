@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { after, before, beforeEach, test } from "node:test";
+import { setAnnouncer } from "../src/events.ts";
 import { ok, setupHarness } from "./support/harness.ts";
 import type { Harness } from "./support/harness.ts";
 import { commitFile, git, makeRepo } from "./support/repos.ts";
@@ -244,35 +245,27 @@ test("push, a refusal that is not a lost reply is reported as failed, with no ch
     assert.equal(h.jig.started_processes.filter((p) => p.args[0] === "ls-remote").length, 0);
 });
 
-// ---- the watch that starts after a push ---------------------------------------------------------------------------
+// ---- the announcement after a push --------------------------------------------------------------------------------
 
-test("push starts a watch on the required checks of the pushed head, titled by branch and commit", async () => {
+/** What the plugin published on the event bus as `jig-git:pushed`. */
+const pushedEvents = () => h.announced.filter((entry) => entry.event === "jig-git:pushed").map((entry) => entry.payload);
+
+test("push announces jig-git:pushed with the repository, the branch and the full head, and nothing about CI", async () => {
     const r = unpushed("feature/w1", 1, "acme");
     h.gh.on("pr list", { json: [] });
     const text = ok(await h.call("git", { action: "push", repo: r.name }));
     const head = git(r.dir, "rev-parse", "HEAD");
-    assert.equal(h.jig.started.length, 1);
-    const started = h.jig.started[0];
-    assert.equal(started?.kind, "github");
-    assert.equal(started?.title, `checks of branch feature/w1 at ${head.slice(0, 7)}`);
-    assert.deepEqual(started?.spec, {
-        repo: "acme/" + r.name,
-        branch: "feature/w1",
-        sha: head,
-        finish: { kind: "required" },
-    });
-    assert.equal(started?.timeoutMinutes, 60);
-    assert.equal(started?.stallMinutes, 30);
-    assert.match(text, new RegExp(`Watching checks of branch feature/w1 at ${head.slice(0, 7)} as w1\\.$`));
+    assert.deepEqual(pushedEvents(), [{ repo: "acme/" + r.name, branch: "feature/w1", sha: head }]);
+    assert.equal(h.jig.started.length, 0, "jig-git starts no watch: whoever listens does");
+    assert.doesNotMatch(text, /Watching/);
+    assert.match(text, /^Pushed feature\/w1 \(/);
 });
 
-test("push starts the watch on the pull request when one is open for the branch", async () => {
+test("push says which pull request is open for the branch, when one is", async () => {
     const r = unpushed("feature/w2", 1, "acme");
     h.gh.on("pr list", { json: [{ number: 42 }] });
-    const text = ok(await h.call("git", { action: "push", repo: r.name }));
-    assert.equal(h.jig.started[0]?.title, "checks of pull request 42");
-    assert.equal((h.jig.started[0]?.spec as { pr?: number }).pr, 42);
-    assert.match(text, /Watching checks of pull request 42 as w1\.$/);
+    ok(await h.call("git", { action: "push", repo: r.name }));
+    assert.equal((pushedEvents()[0] as { pr?: number }).pr, 42);
     assert.deepEqual(h.gh.callsOf("pr list")[0]?.args.slice(0, 8), [
         "pr",
         "list",
@@ -285,29 +278,46 @@ test("push starts the watch on the pull request when one is open for the branch"
     ]);
 });
 
-test("a later push to the same branch replaces the watch of the earlier commit", async () => {
+test("every push is announced, with its own head", async () => {
     const r = unpushed("feature/w3", 1, "acme");
     h.gh.on("pr list", { json: [] });
     ok(await h.call("git", { action: "push", repo: r.name }));
+    const first = git(r.dir, "rev-parse", "HEAD");
     commitFile(r.dir, "more.ts", "m\n", "More");
     ok(await h.call("git", { action: "push", repo: r.name }));
-    assert.equal(h.jig.started.length, 2);
-    assert.deepEqual(h.jig.stopped, ["w1"]);
+    assert.deepEqual(
+        pushedEvents().map((payload) => (payload as { sha: string }).sha),
+        [first, git(r.dir, "rev-parse", "HEAD")],
+    );
 });
 
-test("no watch starts when git.watch.auto is off, or when origin is not on GitHub", async () => {
-    const r = unpushed("feature/w4", 1, "acme");
-    h.jig.setSection("git", { watch: { auto: false } });
-    assert.doesNotMatch(ok(await h.call("git", { action: "push", repo: r.name })), /Watching/);
+test("nothing is announced when origin is not on GitHub: there is no owner/name to say", async () => {
     const local = unpushed("feature/w5");
     assert.doesNotMatch(ok(await h.call("git", { action: "push", repo: local.name })), /Watching/);
-    assert.equal(h.jig.started.length, 0);
+    assert.deepEqual(pushedEvents(), []);
 });
 
-test("git.watch carries its limits into the watch", async () => {
+test("a push that did not land is not announced, and one whose reply was lost but landed is, once", async () => {
     const r = unpushed("feature/w6", 1, "acme");
     h.gh.on("pr list", { json: [] });
-    h.jig.setSection("git", { watch: { timeoutMinutes: 15, stallMinutes: 5 } });
+    h.jig.loseGitReply((args) => args[0] === "push", { code: 128, stderr: "connection reset by peer" }, true);
     ok(await h.call("git", { action: "push", repo: r.name }));
-    assert.deepEqual([h.jig.started[0]?.timeoutMinutes, h.jig.started[0]?.stallMinutes], [15, 5]);
+    assert.equal(pushedEvents().length, 1);
+    const refused = unpushed("feature/w7", 1, "acme");
+    h.jig.loseGitReply((args) => args[0] === "push", { code: 1, stderr: "remote: Permission denied" }, false);
+    assert.ok((await h.call("git", { action: "push", repo: refused.name })).error);
+    assert.equal(pushedEvents().length, 1, "the refused push announced nothing");
+});
+
+test("a listener that throws does not undo the push or lose its result", async () => {
+    const r = unpushed("feature/w8", 1, "acme");
+    h.gh.on("pr list", { json: [] });
+    setAnnouncer(() => {
+        throw new Error("a listener failed");
+    });
+    try {
+        assert.match(ok(await h.call("git", { action: "push", repo: r.name })), /^Pushed feature\/w8/);
+    } finally {
+        setAnnouncer((event, payload) => void h.announced.push({ event, payload }));
+    }
 });

@@ -158,10 +158,10 @@ export function sampleRecords(): RecordLine[] {
             "c10",
             "2026-10-29T08:02:00Z",
             "s3",
-            "checks",
+            "ci",
             {
                 action: "watch",
-                plugin: "jig-git",
+                plugin: "jig-ops",
                 environment: "external",
                 environmentKind: "external",
                 durationMs: 60_000,
@@ -358,7 +358,7 @@ export function exampleRecords(): RecordLine[] {
         call(id("c"), at(90), "demo", "git", { ...asked, durationMs: 2400, answer: "allow-session", waitedMs: 12_000 }),
     );
     const facts = { conclusion: "success", passed: 412, failed: 0 };
-    records.push(call(id("c"), at(92), "demo", "checks", { ...who, action: "watch", durationMs: 250_000, facts }));
+    records.push(call(id("c"), at(92), "demo", "ci", { ...who, action: "watch", durationMs: 250_000, facts }));
     const stopped = { ...who, outcome: "blocked", errorKind: "denied", decisionSource: "rule", decision: "deny" } as const;
     records.push(call(id("c"), at(80), "demo", "http", stopped), call(id("c"), at(81), "demo", "http", stopped));
     return records;

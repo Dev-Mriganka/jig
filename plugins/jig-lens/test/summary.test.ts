@@ -71,14 +71,14 @@ const DAYS7: string[] = [
     "             by agent  main      $0.43",
     "                       reviewer  $0.03",
     "  Tools      14 calls, 3 failed, 3 blocked",
-    "             failing  bash            1 of 4  tool 1",
-    "                      flow test       1 of 1  tool 1",
-    "                      mystery         1 of 1  not-run 1",
-    "             slowest  checks watch    p95 1m  1 call",
-    "                      flow test      p95 45s  1 call",
-    "                      git push      p95 2.1s  2 calls",
-    "                      bash          p95 1.2s  2 calls",
-    "                      git status    p95 90ms  1 call",
+    "             failing  bash          1 of 4  tool 1",
+    "                      flow test     1 of 1  tool 1",
+    "                      mystery       1 of 1  not-run 1",
+    "             slowest  ci watch      p95 1m  1 call",
+    "                      flow test    p95 45s  1 call",
+    "                      git push    p95 2.1s  2 calls",
+    "                      bash        p95 1.2s  2 calls",
+    "                      git status  p95 90ms  1 call",
     "  Your time  4 questions: 1 allowed, 1 allowed for the session, 1 declined, 1 dismissed",
     "             waited 14s in total, median 2.3s",
     "             by tool  bash       11s  2 questions",
@@ -87,8 +87,8 @@ const DAYS7: string[] = [
     "             floor    denied     1  http 1",
     "             unknown  declined   1  bash 1",
     "             unknown  dismissed  1  bash 1",
-    "  Checks     flow test     failed 2, ok false, passed 10            2h ago",
-    "             checks watch  conclusion success, failed 0, passed 12  27h ago",
+    "  Checks     flow test  failed 2, ok false, passed 10            2h ago",
+    "             ci watch   conclusion success, failed 0, passed 12  27h ago",
 ];
 
 const OTHER_SESSION: string[] = [
@@ -97,9 +97,9 @@ const OTHER_SESSION: string[] = [
     "             by model  model-b   $0.03",
     "             by agent  reviewer  $0.03",
     "  Tools      2 calls, none failed",
-    "             slowest  checks watch   p95 1m  1 call",
-    "                      read          p95 6ms  1 call",
-    "  Checks     checks watch  conclusion success, failed 0, passed 12  27h ago",
+    "             slowest  ci watch   p95 1m  1 call",
+    "                      read      p95 6ms  1 call",
+    "  Checks     ci watch  conclusion success, failed 0, passed 12  27h ago",
 ];
 
 const TURN_ONLY: string[] = [

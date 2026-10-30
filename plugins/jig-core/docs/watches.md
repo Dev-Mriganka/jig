@@ -14,7 +14,7 @@ The actions are in the overview. Their details:
   one, such as `k3m9x2ab | checks of pull request 42 | open | 12 min`. The age
   is the time since the watch started.
 - **A watch whose plugin is not loaded** shows `waiting for its plugin
-  (jig-git)` in place of its status.
+  (jig-ops)` in place of its status.
 - **The structured result** also carries, for each watch, the one line its
   kind gives for what it watches (`describe`).
 - **`stop` sends no message to the agent,** because the agent or you asked for

@@ -13,17 +13,19 @@ The tool list comes from two sources:
   run about 225 of these calls. It is ported, not redesigned.
 - **What was missing is the wait.** Nothing watched GitHub CI, so you were the
   signal: about 15 "is it done?" nudges in one month. One build was ready 7
-  minutes after the push and reached the agent 2 hours 16 minutes later.
+  minutes after the push and reached the agent 2 hours 16 minutes later. The
+  wait is the CI watch, which started here and moved to `jig-ops` with the rest of
+  CI; this plugin announces the push that starts it.
 - **"All checks done" is the wrong finish line.** Six background
   `gh pr checks --watch` runs never finished. In one pull request, two of ten
   checks were still pending 20 hours after the build the next step needed had
-  passed.
+  passed. The finish lines are in [Watching CI](../../jig-ops/docs/ci.md#watching-ci).
 - **The agent stops using `bash` for a job once a tool covers it.** `gh` calls
   through `bash` fell from 148 to 3 after the `pr` tool arrived.
 - **Tags and releases were barely used:** one `git tag` and no `gh release`. The
   `release` actions rest on standard practice.
 
-`git`, `pr` and `checks` are always loaded, and so is `jig-core`'s `watch`.
+`git`, `pr` and `release` are always loaded, and so is `jig-core`'s `watch`.
 In the sessions, a "tool not found" cost the agent extra calls.
 
 ## Ported from the existing harness
@@ -43,5 +45,6 @@ In the sessions, a "tool not found" cost the agent extra calls.
   https URL of `github.com` or the clone host. The URL git receives is built
   from `cloneHost`; the model never names a host or a transport. git clones
   into a temporary folder and renames it into place only when it finished.
-- **Check states mapped to pass, fail, pending and skipped.**
+- **Check states mapped to pass, fail, pending and skipped.** The map moved to
+  `jig-ops`; `pr view` keeps the part that counts a pull request's roll-up.
 - **Pull request comments assembled with their line comments and threads.**

@@ -6,7 +6,6 @@ import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Check } from "typebox/value";
 import { withdrawJig } from "../../jig-core/src/client.ts";
-import { CHECKS_ACTIONS } from "../src/checks.ts";
 import { GIT_ACTIONS } from "../src/git.ts";
 import plugin from "../src/index.ts";
 import { parameterNames } from "../src/params.ts";
@@ -26,15 +25,14 @@ after(() => h.cleanup());
 const TABLES: Record<string, ActionTable> = {
     git: GIT_ACTIONS,
     pr: PR_ACTIONS,
-    checks: CHECKS_ACTIONS,
     release: RELEASE_ACTIONS,
 };
 
-test("the plugin registers git, pr, checks and release, and declares each to jig-core", () => {
-    assert.deepEqual([...h.tools.keys()], ["git", "pr", "checks", "release"]);
-    assert.deepEqual([...h.jig.declared.keys()], ["git", "pr", "checks", "release"]);
+test("the plugin registers git, pr and release, and declares each to jig-core; it watches nothing and has no checks tool", () => {
+    assert.deepEqual([...h.tools.keys()], ["git", "pr", "release"]);
+    assert.deepEqual([...h.jig.declared.keys()], ["git", "pr", "release"]);
     assert.ok(h.jig.sections.has("git"), "the git section");
-    assert.ok(h.jig.kinds.has("github"), "the github watch kind");
+    assert.equal(h.jig.kinds.size, 0, "CI watches are jig-ops's: no watch kind is registered here");
 });
 
 test("every tool has a short description, a prompt line, and runs one call at a time", () => {
@@ -91,7 +89,7 @@ test("the schemas have no way to force-push, approve, delete a tag, or reset", (
     assert.equal(Check(pr, { action: "approve", number: 1 }), false);
     assert.equal(Check(pr, { action: "review", number: 1, event: "approve", body: "x" }), false);
     assert.equal(Check(h.tools.get("release")?.parameters as never, { action: "tag_delete", tag: "v1" }), false);
-    assert.equal(Check(h.tools.get("checks")?.parameters as never, { action: "dispatch" }), false);
+    assert.equal(h.tools.has("checks"), false, "CI is the ci tool of jig-ops");
 });
 
 test("a wrong call is refused with the usage line before anything runs", async () => {
@@ -159,10 +157,10 @@ test("when jig-core loads after the plugin, the declarations wait for it; and a 
     const late = installFakeJig();
     assert.deepEqual(
         [...late.declared.keys()],
-        ["git", "pr", "checks", "release"],
+        ["git", "pr", "release"],
         "the queued declarations ran when jig-core loaded",
     );
-    assert.ok(late.sections.has("git") && late.kinds.has("github"));
+    assert.ok(late.sections.has("git"));
     withdrawJig(late.api);
     // the harness's own fake is published again for the tests that follow
     installFakeJig();
@@ -182,14 +180,15 @@ test("the package manifest loads the plugin after jig-core and the skills of eve
     assert.deepEqual(manifest.pi.skills, ["./plugins/*/skills"]);
 });
 
-test("the skill has a name and a description that says what it is for, and mentions all four tools", () => {
+test("the skill has a name and a description that says what it is for, and mentions its three tools and the ci tool of jig-ops", () => {
     const file = path.join(ROOT, "plugins", "jig-git", "skills", "git", "SKILL.md");
     const text = fs.readFileSync(file, "utf8");
     const front = /^---\nname: ([a-z0-9-]+)\ndescription: (.+)\n---\n/.exec(text);
     assert.ok(front, "frontmatter with a name and a description");
     assert.equal(front?.[1], "git");
     assert.ok((front?.[2] ?? "").length > 80 && (front?.[2] ?? "").length <= 1024);
-    for (const tool of ["`git`", "`pr`", "`checks`", "`release`"]) assert.ok(text.includes(tool), tool);
+    for (const tool of ["`git`", "`pr`", "`release`", "`ci`"]) assert.ok(text.includes(tool), tool);
+    assert.ok(!text.includes("`checks`"), "the checks tool is gone");
     assert.match(text, /status/i);
-    assert.match(text, /do not poll/i);
+    assert.match(text, /jig-git:pushed/);
 });

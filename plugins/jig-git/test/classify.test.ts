@@ -4,7 +4,6 @@ import path from "node:path";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import type { CallClass } from "../../jig-core/src/contract.ts";
-import { CHECKS_ACTIONS } from "../src/checks.ts";
 import { GIT_ACTIONS } from "../src/git.ts";
 import { PR_ACTIONS } from "../src/pr.ts";
 import { RELEASE_ACTIONS } from "../src/release.ts";
@@ -56,15 +55,6 @@ const EXPECTED: Record<string, Row[]> = {
         ["review", "external", "write", { approval: "review" }],
         ["merge", "external", "write"],
     ],
-    checks: [
-        ["status", "external", "read"],
-        ["runs", "external", "read"],
-        ["run", "external", "read"],
-        ["artifacts", "external", "read"],
-        ["log", "external", "read"],
-        ["rerun", "external", "write"],
-        ["watch", "local", "write"],
-    ],
     release: [
         ["tags", "local", "read"],
         ["releases", "external", "read"],
@@ -91,7 +81,6 @@ test("the actions in the expectations are exactly the actions of the tools' tabl
     const tables: Record<string, object> = {
         git: GIT_ACTIONS,
         pr: PR_ACTIONS,
-        checks: CHECKS_ACTIONS,
         release: RELEASE_ACTIONS,
     };
     for (const [tool, rows] of Object.entries(EXPECTED)) {
@@ -134,7 +123,7 @@ test("the classification does not depend on anything but the action (and the wor
 });
 
 test("every tool is declared to jig-core as a jig-git tool, with a preview for the actions that can ask", () => {
-    for (const tool of ["git", "pr", "checks", "release"]) {
+    for (const tool of ["git", "pr", "release"]) {
         const declaration = h.jig.declared.get(tool);
         assert.equal(declaration?.plugin, "jig-git");
         assert.equal(declaration?.tool, tool);

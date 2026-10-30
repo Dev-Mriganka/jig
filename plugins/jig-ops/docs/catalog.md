@@ -16,8 +16,11 @@ set up` and do nothing; `/jig` lists the problems.
 |---|---|
 | `services` | A map from a service name to its entry: 1 to 100 services. A name has 1 to 40 letters, digits, `.`, `_` and `-`, and starts with a letter or a digit |
 | `repo` | Where the code lives, such as `acme/orders-api`: text of up to 200 characters with no white space |
-| `ci` | The CI system and what to look at in it. An object with a `system` (a lower-case name such as `github-actions`) and other text fields, such as `workflow`. It is read and kept, and nothing uses it until the `ci` tool exists |
+| `ci` | The CI system and where it is. An object with a `system` and the fields of that system: see [`ci`](#ci) below |
 | `environments` | A map from an environment name to its entry: 1 to 20 per service. A name has letters, digits, `_` and `-`, starts with a letter, and has up to 40 characters |
+
+A section may also have `watch` and `artifacts`, which are not about one service: see
+[Watching CI](#watching-ci).
 
 An environment has `deploy`, `runtime` and `health`, and at least one of them.
 
@@ -33,6 +36,62 @@ environments in `jig.json`:
 A name `jig-core` does not know counts as production. Deploys and rollbacks
 there are refused, a health check in a pod is refused, and results are masked.
 If a test environment is refused as production, this is the setting to add.
+
+## `ci`
+
+An object with a `system`, one of `github-actions`, `gitlab` and `jenkins`, and the
+fields of that system. An unknown system or field is an error that names it. What
+the tool does with them is in [CI](ci.md).
+
+| System | Field | Meaning |
+|---|---|---|
+| any | `environment` | Optional. The `jig-core` environment the CI server is in. Without it, the CI host is `external`. A name `jig-core` does not know counts as production |
+| `github-actions` | `workflow` | Optional. The workflow file whose runs `runs` lists, such as `build.yml` |
+| | | The service needs `repo`, of the form `owner/name`: the run is found by repository |
+| `gitlab` | `url` | The address of the server, `https`, with no user name, query or fragment. It may have a path (`https://host/gitlab`) |
+| | `project` | A project id, or the path with its namespace, such as `acme/orders-api` |
+| | `auth` | One of `{ "token": "<secret reference>" }`, `{ "signIn": "<service>" }` and `{ "transport": "<name>" }` |
+| | `required` | Optional. Up to 20 job names that a `required` watch waits for |
+| `jenkins` | `url` | As for GitLab |
+| | `job` | The job with its folders, such as `orders/build`. A name may hold a space |
+| | `auth` | One of `{ "user": "<name>", "token": "<secret reference>" }`, `{ "signIn": "<service>" }` and `{ "transport": "<name>" }` |
+| | `required` | Optional. Up to 20 pipeline stage names that a `required` watch waits for |
+
+A token is a secret reference such as `pass:ci/gitlab`; one pasted by hand is an
+error that never repeats it. With a transport, the address may be plain `http`:
+the transport signs in, so no credential travels.
+
+## Watching CI
+
+The `watch` and `artifacts` parts of the section were `git.watch` and
+`git.artifacts` while `jig-git` ran the watch. All fields are optional.
+
+| Field | Default | Meaning |
+|---|---|---|
+| `watch.auto` | `true` | Start a watch after a push and after a pull request is created |
+| `watch.pollSeconds` | 30 | Poll every 5 to 3600 seconds, at least; a CI system can ask for longer |
+| `watch.stallMinutes` | 30 | A "still waiting" notice after 1 to 1440 minutes |
+| `watch.timeoutMinutes` | 60 | Give up after 1 to 1440 minutes |
+| `artifacts` | none | The "artifact ready" rules. Each has a `kind` (`image`, `tag` or `release`) and exactly one place to look: `check` (a job name, with an optional `log` pattern), `comment` (a pattern, with an optional `bot` login) or `tag` (a name pattern) |
+
+```json
+{
+  "ops": {
+    "services": {
+      "orders-api": {
+        "repo": "acme/orders-api",
+        "ci": {
+          "system": "gitlab", "url": "https://gitlab.example.com", "project": "acme/orders-api",
+          "auth": { "token": "pass:ci/gitlab" }, "required": ["build", "test"]
+        },
+        "environments": { "staging": { "health": "https://api.staging.example.com/orders/health" } }
+      }
+    },
+    "watch": { "pollSeconds": 20 },
+    "artifacts": [{ "kind": "image", "check": "build-image", "log": "image: (\\S+)" }]
+  }
+}
+```
 
 ## `deploy`
 

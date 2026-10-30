@@ -11,7 +11,6 @@ is lost. Back to the [jig-git overview](../README.md).
 | `git restore` | The paths, and a diff stat of what would be lost |
 | `pr create`, `edit`, `comment`, `reply`, `review` | The text, rendered, on the review screen |
 | `pr merge` | The title, the method and the head commit |
-| `checks rerun` | The run, and whether all jobs or only the failed ones run again |
 | `release` `tag_push`, `release_create` | The tag and what it points at, and the notes |
 
 Each preview carries a digest of what it shows. When the call runs, the tool
@@ -33,5 +32,5 @@ cancelled with Esc after the request left. Then the tool:
 
 The one read is `pr list` for a new pull request, `pr view` for an edit, a
 merge, a draft or a review, the thread itself for a reply or a resolve,
-`ls-remote` for a push or a tag, the run's attempt number for a rerun, and
-`release view` for a release.
+`ls-remote` for a push or a tag, and `release view` for a release. (A rerun of a CI
+run is the `ci` tool's, with its own check.)

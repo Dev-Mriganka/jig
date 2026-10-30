@@ -5,7 +5,7 @@ description: How to try a change on a test environment and check it with the run
 
 # Deploying and checking a service
 
-Two tools share one catalog. `runtime` only reads. `deploy` changes an environment, and asks the user first. A call names a `service` and an `environment` from the catalog; the tools add the cluster, the namespace, the release and the address. You never type them. A wrong name is refused with the names there are.
+Two tools share one catalog. `runtime` only reads. `deploy` changes an environment, and asks the user first. CI is the `ci` tool, with a skill of its own: read it before you wait for a build or read why one failed. A call names a `service` and an `environment` from the catalog; the tools add the cluster, the namespace, the release and the address. You never type them. A wrong name is refused with the names there are.
 
 ## The order of work
 

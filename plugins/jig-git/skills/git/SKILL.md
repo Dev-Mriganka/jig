@@ -1,11 +1,11 @@
 ---
 name: git
-description: How to work with the git, pr, checks and release tools - branch, commit, push, open and review pull requests, and wait for CI without polling. Use for any change that ends in a pull request, and whenever you would reach for git, gh or a CI page.
+description: How to work with the git, pr and release tools - branch, commit, push, open and review pull requests, and hand CI to the ci tool. Use for any change that ends in a pull request, and whenever you would reach for git or gh.
 ---
 
 # Git, pull requests and CI
 
-Use the `git`, `pr`, `checks` and `release` tools instead of `bash` for git and GitHub. The shell has no GitHub
+Use the `git`, `pr` and `release` tools instead of `bash` for git and GitHub. The shell has no GitHub
 sign-in and cannot push. Reads and local changes run at once. Anything that changes GitHub asks the user first, and the
 user sees what it will send.
 
@@ -25,19 +25,12 @@ user sees what it will send.
    template; fill it in and call again. If a pull request is open for the branch, you get it back and nothing is
    created.
 
-## After a push, do not poll
+## After a push, CI is the ci tool's
 
-A push and a new pull request each start a background watch on the required checks of the pushed commit. It reports
-once: when they all pass, or at the first required failure with the failing checks, their links and the lines around
-the error in the log. The message starts your next turn. Do not call `checks status` in a loop.
-
-Start a watch yourself with `checks watch` when the finish line is something else. Name it, never "all checks":
-`check` for one job (the one that builds the image), `run_id` for a run, `finish: approved` or `merged` for a pull
-request, `finish: comment` for a bot comment matching `pattern`, `finish: tag` or `release` for a new one matching
-`pattern`. The `watch` tool lists and stops watches.
-
-When a check fails and you need more, `checks log` gives the failed job's log: the tail, or only the lines matching
-`grep`, at most 400 lines. `checks rerun` runs the failed jobs again and asks first.
+A push and a new pull request each announce themselves (`jig-git:pushed`). When the repository belongs to a service in the
+ops catalog, `jig-ops` starts a watch on the CI of the pushed commit, and one message starts your next turn when it ends. Do
+not poll. To look at CI yourself, or to start another watch, use the `ci` tool and read its skill: this plugin has no checks
+tool. `pr view` shows a one-line roll-up of a pull request's checks, which is enough to know whether to look further.
 
 ## Review
 
@@ -60,4 +53,4 @@ work or decide for a person. If one is truly needed, ask the user to run it.
 ## Tags and releases
 
 `release tag_create` makes an annotated tag locally. `tag_push` and `release_create` ask. A tag that is already on the
-remote is never forced. Deploying is not done here: a tag or a build being ready is announced for other tools to act on.
+remote is never forced. Deploying is not done here: a tag or a build being ready is announced by `jig-ops` for other tools to act on.

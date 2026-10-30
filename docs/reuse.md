@@ -87,7 +87,8 @@ week. It offers:
 
 No package covers the list in [`jig-git`](../plugins/jig-git/README.md), and
 none watches CI in the background until a finish line. `jig-git` ports the
-existing harness's tools and borrows these patterns:
+existing harness's tools, and the CI half of that list is now the `ci` tool of
+[`jig-ops`](../plugins/jig-ops/README.md). Between them they borrow these patterns:
 
 | Package | Pattern |
 |---|---|

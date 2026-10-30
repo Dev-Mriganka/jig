@@ -393,7 +393,7 @@ test("checks are the facts of each tool's latest call that has any, the most rec
                 ],
             ],
             [
-                "checks",
+                "ci",
                 "watch",
                 second("2026-10-29T08:02:00Z"),
                 [
@@ -408,11 +408,11 @@ test("checks are the facts of each tool's latest call that has any, the most rec
 
 test("only the latest call's facts count, and they keep their types: numbers, flags and words", async (t) => {
     const records = [
-        call("old", "2026-10-30T08:00:00Z", "s1", "checks", {
+        call("old", "2026-10-30T08:00:00Z", "s1", "ci", {
             action: "watch",
             facts: { conclusion: "failure", passed: 1 },
         }),
-        call("new", "2026-10-30T09:00:00Z", "s1", "checks", {
+        call("new", "2026-10-30T09:00:00Z", "s1", "ci", {
             action: "watch",
             facts: { conclusion: "success", flaky: true, ratio: 0.5 },
         }),
@@ -421,7 +421,7 @@ test("only the latest call's facts count, and they keep their types: numbers, fl
     const checks = checksOf(await indexOf(t, records), ALL);
     assert.deepEqual(
         checks.map((check) => check.tool),
-        ["checks", "release"],
+        ["ci", "release"],
     );
     assert.deepEqual(checks[0]?.facts, [
         { name: "conclusion", value: "success" },
