@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="500" viewBox="0 0 920 500" role="img" aria-label="How a palette becomes a Pi theme. A palette names seventeen colours, shown as swatches with their names: bg, panel, selected, errorBg, text, soft, muted, dim, border, borderMuted, accent, link, heading, info, success, warning and error. One role map, which says for example that heading colours mdHeading and syntaxKeyword, turns them into a Pi theme with all fifty-six roles filled, which Pi's /settings, the /theme command and the HTML export use. Your own palette in jig.json names one of the six as its base, changes a few colours (vars) and a few roles (colors), and is written to the themes folder of Pi's agent folder as a theme file, in the same format as the six." font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">
+  <rect x="0.5" y="0.5" width="919" height="499" rx="10" fill="#FAFBFA" stroke="#D2D9D3"/>
+  <defs>
+    <marker id="themepal-head-1d3b4d-11" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#1D3B4D"/></marker>
+    <marker id="themepal-head-5c9cab-11" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#5C9CAB"/></marker>
+    <marker id="themepal-head-8c979d-11" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8C979D"/></marker>
+    <marker id="themepal-head-c08326-11" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#C08326"/></marker>
+  </defs>
+  <!-- a palette: 17 named colours, jig-signal's -->
+  <text x="32" y="34" font-size="14.5" font-weight="700" fill="#1A1F1D">a palette: 17 named colours</text>
+  <text x="32" y="52" font-size="13" fill="#3A4440">jig-signal's here; each of the six has its own</text>
+  <rect x="32" y="72" width="24" height="24" rx="5" fill="#0E1520" stroke="#1A1F1D" stroke-opacity="0.22"/>
+  <text x="63" y="89" font-size="12" fill="#1A1F1D">bg</text>
+  <rect x="136" y="72" width="24" height="24" rx="5" fill="#111C2A" stroke="#1A1F1D" stroke-opacity="0.22"/>
+  <text x="167" y="89" font-size="12" fill="#1A1F1D">panel</text>
+  <rect x="240" y="72" width="24" height="24" rx="5" fill="#1B2A3D" stroke="#1A1F1D" stroke-opacity="0.22"/>
+  <text x="271" y="89" font-size="12" fill="#1A1F1D">selected</text>
+  <rect x="32" y="106" width="24" height="24" rx="5" fill="#241820" stroke="#1A1F1D" stroke-opacity="0.22"/>
+  <text x="63" y="123" font-size="12" fill="#1A1F1D">errorBg</text>
+  <rect x="136" y="106" width="24" height="24" rx="5" fill="#FFFFFF" stroke="#1A1F1D" stroke-opacity="0.22"/>
+  <text x="167" y="123" font-size="12" fill="#1A1F1D">text</text>
+  <rect x="240" y="106" width="24" height="24" rx="5" fill="#D8E1EA" stroke="#1A1F1D" stroke-opacity="0.22"/>
+  <text x="271" y="123" font-size="12" fill="#1A1F1D">soft</text>
+  <rect x="32" y="140" width="24" height="24" rx="5" fill="#8292A6" stroke="#1A1F1D" stroke-opacity="0.22"/>
+  <text x="63" y="157" font-size="12" fill="#1A1F1D">muted</text>
+  <rect x="136" y="140" width="24" height="24" rx="5" fill="#586779" stroke="#1A1F1D" stroke-opacity="0.22"/>
+  <text x="167" y="157" font-size="12" fill="#1A1F1D">dim</text>
+  <rect x="240" y="140" width="24" height="24" rx="5" fill="#273344" stroke="#1A1F1D" stroke-opacity="0.22"/>
+  <text x="271" y="157" font-size="12" fill="#1A1F1D">border</text>
+  <rect x="32" y="174" width="24" height="24" rx="5" fill="#1D2734" stroke="#1A1F1D" stroke-opacity="0.22"/>
+  <text x="63" y="191" font-size="12" fill="#1A1F1D">borderMuted</text>
+  <rect x="136" y="174" width="24" height="24" rx="5" fill="#55DDE0" stroke="#1A1F1D" stroke-opacity="0.22"/>
+  <text x="167" y="191" font-size="12" fill="#1A1F1D">accent</text>
+  <rect x="240" y="174" width="24" height="24" rx="5" fill="#55DDE0" stroke="#1A1F1D" stroke-opacity="0.22"/>
+  <text x="271" y="191" font-size="12" fill="#1A1F1D">link</text>
+  <rect x="32" y="208" width="24" height="24" rx="5" fill="#C099FF" stroke="#1A1F1D" stroke-opacity="0.22"/>
+  <text x="63" y="225" font-size="12" fill="#1A1F1D">heading</text>
+  <rect x="136" y="208" width="24" height="24" rx="5" fill="#78A9FF" stroke="#1A1F1D" stroke-opacity="0.22"/>
+  <text x="167" y="225" font-size="12" fill="#1A1F1D">info</text>
+  <rect x="240" y="208" width="24" height="24" rx="5" fill="#7BD88F" stroke="#1A1F1D" stroke-opacity="0.22"/>
+  <text x="271" y="225" font-size="12" fill="#1A1F1D">success</text>
+  <rect x="32" y="242" width="24" height="24" rx="5" fill="#FFB454" stroke="#1A1F1D" stroke-opacity="0.22"/>
+  <text x="63" y="259" font-size="12" fill="#1A1F1D">warning</text>
+  <rect x="136" y="242" width="24" height="24" rx="5" fill="#FF6B7A" stroke="#1A1F1D" stroke-opacity="0.22"/>
+  <text x="167" y="259" font-size="12" fill="#1A1F1D">error</text>
+  <!-- one role map -->
+  <rect x="388" y="98" width="212" height="150" rx="6" fill="#1D3B4D"/>
+  <text x="494" y="126" font-size="16" fill="#FFFFFF" font-weight="700" text-anchor="middle">one role map</text>
+  <text x="402" y="152" font-size="11.5" fill="#FFFFFF" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">heading → mdHeading</text>
+  <text x="402" y="169" font-size="11.5" fill="#FFFFFF" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">link → mdLink, syntaxType</text>
+  <text x="402" y="186" font-size="11.5" fill="#FFFFFF" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">success → toolDiffAdded</text>
+  <text x="402" y="203" font-size="11.5" fill="#FFFFFF" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">error → toolDiffRemoved</text>
+  <text x="402" y="220" font-size="11.5" fill="#FFFFFF" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">muted → mdLinkUrl</text>
+  <text x="494" y="238" font-size="12.5" fill="#FFFFFF" text-anchor="middle">and so on, for all 56 roles</text>
+  <path d="M342 173 H384" fill="none" stroke="#1D3B4D" stroke-width="2.6" marker-end="url(#themepal-head-1d3b4d-11)"/>
+  <path d="M604 173 H640" fill="none" stroke="#1D3B4D" stroke-width="2.6" marker-end="url(#themepal-head-1d3b4d-11)"/>
+  <!-- a Pi theme with every role filled -->
+  <text x="648" y="34" font-size="14.5" font-weight="700" fill="#1A1F1D">a Pi theme: every role filled</text>
+  <text x="648" y="52" font-size="13" fill="#3A4440">drawn in the palette's own colours</text>
+  <rect x="648" y="64" width="248" height="184" rx="6" fill="#0E1520" stroke="#1A1F1D" stroke-opacity="0.3"/>
+  <rect x="656" y="72" width="232" height="30" rx="4" fill="#111C2A"/>
+  <text x="666" y="92" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#D8E1EA">you: explain the footer</text>
+  <text x="666" y="124" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" font-weight="700" fill="#C099FF">## Heading</text>
+  <text x="666" y="143" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#FFFFFF">Answers in the text colour</text>
+  <text x="666" y="161" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#FFB454">inline code</text>
+  <text x="666" y="179" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#55DDE0">a link</text>
+  <text x="666" y="197" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#7BD88F">+ added line</text>
+  <text x="666" y="215" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#FF6B7A">- removed line</text>
+  <text x="780" y="197" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#586779">// comment</text>
+  <text x="780" y="215" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#78A9FF">tool title</text>
+  <rect x="666" y="228" width="12" height="5" rx="2" fill="#273344"/>
+  <rect x="682" y="228" width="12" height="5" rx="2" fill="#78A9FF"/>
+  <rect x="698" y="228" width="12" height="5" rx="2" fill="#55DDE0"/>
+  <rect x="714" y="228" width="12" height="5" rx="2" fill="#7BD88F"/>
+  <rect x="730" y="228" width="12" height="5" rx="2" fill="#FFB454"/>
+  <rect x="746" y="228" width="12" height="5" rx="2" fill="#C099FF"/>
+  <rect x="762" y="228" width="12" height="5" rx="2" fill="#FF6B7A"/>
+  <text x="780" y="233" font-size="11" fill="#8292A6">thinking levels</text>
+  <text x="648" y="272" font-size="13" fill="#3A4440">used by</text>
+  <rect x="700" y="258" width="62" height="20" rx="10" fill="#5C9CAB"/>
+  <text x="731" y="272" font-size="11.5" fill="#FFFFFF" font-weight="700" text-anchor="middle">/settings</text>
+  <rect x="768" y="258" width="48" height="20" rx="10" fill="#8C979D"/>
+  <text x="792" y="272" font-size="11.5" fill="#FFFFFF" font-weight="700" text-anchor="middle">/theme</text>
+  <rect x="822" y="258" width="74" height="20" rx="10" fill="#C08326"/>
+  <text x="859" y="272" font-size="11" fill="#FFFFFF" font-weight="700" text-anchor="middle">HTML export</text>
+  <!-- your palette in jig.json -->
+  <text x="32" y="338" font-size="14.5" font-weight="700" fill="#1A1F1D">your palette in jig.json: base + vars + colors</text>
+  <text x="32" y="356" font-size="13" fill="#3A4440">one of the six as its base, then only what you change</text>
+  <rect x="32" y="368" width="372" height="108" rx="6" fill="#FFFFFF" stroke="#1D3B4D" stroke-width="2"/>
+  <text x="48" y="392" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#1A1F1D">&quot;sea&quot;: {</text>
+  <text x="48" y="410" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#1A1F1D">&#160;&#160;&quot;base&quot;: &quot;jig-signal&quot;,</text>
+  <text x="48" y="428" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#1A1F1D">&#160;&#160;&quot;vars&quot;: { &quot;accent&quot;: &quot;#4FD6BE&quot; },</text>
+  <text x="48" y="446" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#1A1F1D">&#160;&#160;&quot;colors&quot;: { &quot;mdCode&quot;: &quot;#FFB454&quot; }</text>
+  <text x="48" y="464" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#1A1F1D">}</text>
+  <text x="414" y="414" font-size="12.5" fill="#3A4440">written when a</text>
+  <text x="414" y="431" font-size="12.5" fill="#3A4440">session starts</text>
+  <path d="M408 440 H540" fill="none" stroke="#5C9CAB" stroke-width="2.6" marker-end="url(#themepal-head-5c9cab-11)"/>
+  <rect x="544" y="368" width="352" height="108" rx="6" fill="#5C9CAB"/>
+  <text x="720" y="398" font-size="14.5" fill="#FFFFFF" font-weight="700" text-anchor="middle">&lt;agentDir&gt;/themes/&lt;name&gt;.json</text>
+  <text x="720" y="424" font-size="12.5" fill="#FFFFFF" text-anchor="middle">a Pi theme file, like the six</text>
+  <text x="720" y="446" font-size="12.5" fill="#FFFFFF" text-anchor="middle">Pi finds it by name, and reloads the</text>
+  <text x="720" y="462" font-size="12.5" fill="#FFFFFF" text-anchor="middle">one in use when its file changes</text>
+  <path d="M860 364 V292" fill="none" stroke="#8C979D" stroke-width="2.6" stroke-dasharray="6 5" marker-end="url(#themepal-head-8c979d-11)"/>
+  <text x="848" y="322" font-size="13" fill="#3A4440" text-anchor="end">the same format as the six</text>
+</svg>

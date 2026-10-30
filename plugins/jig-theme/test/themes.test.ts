@@ -72,3 +72,29 @@ test("Pi's validator refuses what the builder must never write: an unknown role 
     const { accent: _accent, ...fewer } = theme.colors;
     assert.throws(() => validateThemeJson("probe", { ...theme, colors: fewer }));
 });
+
+test("Pi's own resource loader loads the six themes from the folder, and from the package's manifest, without a diagnostic", async (t) => {
+    const sdk = (await import(pathToFileURL(path.join(piHostDir, "dist/index.js")).href)) as {
+        DefaultResourceLoader: new (options: Record<string, unknown>) => {
+            reload(): Promise<void>;
+            getThemes(): { themes: Array<{ name?: string }>; diagnostics: unknown[] };
+        };
+    };
+    const { mkdtempSync, rmSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const dir = mkdtempSync(path.join(tmpdir(), "jig-theme-loader-"));
+    t.after(() => rmSync(dir, { recursive: true, force: true }));
+    const load = async (extra: Record<string, unknown>) => {
+        const loader = new sdk.DefaultResourceLoader({
+            cwd: dir, agentDir: dir, noExtensions: true, noSkills: true, noPromptTemplates: true, noContextFiles: true, noThemes: true, ...extra,
+        });
+        await loader.reload();
+        return loader.getThemes();
+    };
+    const fromFolder = await load({ additionalThemePaths: [THEMES] });
+    assert.deepEqual(fromFolder.diagnostics, []);
+    assert.deepEqual(fromFolder.themes.map((theme) => theme.name).sort(), [...PALETTE_NAMES].sort());
+    // The package's own manifest lists the folder, so installing the package brings them.
+    const manifest = JSON.parse(readFileSync(path.resolve(THEMES, "../../../package.json"), "utf8")) as { pi: { themes: string[] } };
+    assert.deepEqual(manifest.pi.themes, ["./plugins/jig-theme/themes/*.json"]);
+});
