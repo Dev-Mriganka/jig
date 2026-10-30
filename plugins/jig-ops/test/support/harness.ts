@@ -116,6 +116,8 @@ export function setupHarness(options: OpsOptions = {}): Harness {
         },
     };
 
+    // The network of a CI request is the fake jig's; health checks take theirs from the plugin's options.
+    jig.setFetch(options.fetch ?? NO_NETWORK);
     jigOps({ now: clock.now, sleep: clock.deps.sleep, fetch: NO_NETWORK, ...options })(pi as unknown as ExtensionAPI);
 
     const configure = (raw: Raw = section()): void => jig.setSection("ops", raw);

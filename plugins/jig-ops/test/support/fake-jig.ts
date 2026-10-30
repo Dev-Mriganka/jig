@@ -12,6 +12,7 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { publishJig, withdrawJig } from "../../../jig-core/src/client.ts";
+import { createHttp } from "../../../jig-core/src/kit/http.ts";
 import type {
     EnvironmentKind,
     Facts,
@@ -72,6 +73,8 @@ export interface FakeJig {
     /** The transports a test registers, and the requests that were sent through them. */
     transports: Map<string, Transport>;
     sent: TransportRequest[];
+    /** The network that `http.request` uses for a direct request. Default: the global `fetch`. */
+    setFetch(fetchImpl: typeof fetch | undefined): void;
     /** Every credential value handed out: secrets and sign-in headers. A test checks that none reaches a result. */
     issued: Set<string>;
     /** Answers a program instead of starting it, when it returns a result. For cases a real process cannot make. */
@@ -243,11 +246,7 @@ export function installFakeJig(): FakeJig {
                 return headers;
             },
         },
-        http: {
-            request: async () => {
-                throw new Error("this fake has no http");
-            },
-        },
+        http: { request: (request, signal) => http.request(request, signal) },
 
         mask: { text: (input) => input, value: (input) => input },
         watches: {
@@ -305,6 +304,15 @@ export function installFakeJig(): FakeJig {
         },
     };
 
+    // The real request logic over this fake's secrets, sign-in services, transports and network.
+    let fetchImpl: typeof fetch | undefined;
+    const http = createHttp({
+        fetch: (input, init) => (fetchImpl ?? fetch)(input, init),
+        secrets: { resolve: (reference, signal) => api.secrets.resolve(reference, signal) },
+        signIn: { headers: (name, request, signal) => api.signIn.headers(name, request, signal) },
+        transports: { request: (name, request, signal) => api.transports.request(name, request, signal) },
+    });
+
     publishJig(api);
     return {
         api,
@@ -320,6 +328,9 @@ export function installFakeJig(): FakeJig {
         signedIn,
         transports,
         sent,
+        setFetch: (replacement) => {
+            fetchImpl = replacement;
+        },
         issued,
         setSection: (name, value) => void values.set(name, value),
         setKinds(more) {
@@ -349,6 +360,7 @@ export function installFakeJig(): FakeJig {
             approved.clear();
             environments = { ...DEFAULT_KINDS };
             fake.script = undefined;
+            fetchImpl = undefined;
         },
         remove: () => withdrawJig(api),
     };

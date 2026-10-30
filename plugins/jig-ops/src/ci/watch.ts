@@ -31,8 +31,6 @@ export type CiState = GithubState | PlainState;
 export interface CiWatchOptions {
     /** The clock. Default: the real one. */
     now?: () => number;
-    /** The network, for GitLab and Jenkins. Default: the global `fetch`. */
-    fetch?: typeof fetch;
     /** How long one request may take. Default: thirty seconds. */
     timeoutMs?: number;
 }
@@ -54,7 +52,6 @@ export function contextFor(signal: AbortSignal | undefined, announce: Announce, 
     if (catalog === undefined) throw notSetUp();
     return {
         signal,
-        ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
         ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
         now: options.now ?? Date.now,
         announce,
