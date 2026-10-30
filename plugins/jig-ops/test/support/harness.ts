@@ -51,6 +51,7 @@ export interface Harness {
     jig: FakeJig;
     clock: FakeClock;
     runtime: ToolHarness;
+    deploy: ToolHarness;
     /** Sets the `ops` section as jig.json holds it. */
     configure(raw?: Raw): void;
     close(): void;
@@ -144,6 +145,7 @@ export function setupHarness(options: OpsOptions = {}): Harness {
         jig,
         clock,
         runtime: harnessOf("runtime"),
+        deploy: harnessOf("deploy"),
         configure,
         close() {
             jig.remove();

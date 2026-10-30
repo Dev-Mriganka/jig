@@ -105,14 +105,17 @@ async function change(plan: Plan, kube: Kube, toolCallId: string, ctx: Context):
     }
 
     remember("started");
-    const what = plan.action === "run" ? `the deploy of ${plan.to} to ${where}` : `the rollback of ${where} to ${plan.to}`;
+    const what =
+        plan.action === "run"
+            ? `the deploy of ${plan.to} to ${where} with ${plan.method}`
+            : `the rollback of ${where} with ${plan.method} to ${plan.to}`;
     const next =
         plan.version === undefined
             ? "Nothing waits for the rollout: runtime rollout shows how it goes."
             : `Nothing waits for the rollout: deploy watch with version ${plan.version} reports when it ends, or runtime rollout with waitFor.`;
     const printed = outputOf(ended.result.stdout);
     return {
-        text: [`Started ${what} with ${plan.method} (it was running ${plan.from}). ${next}`, ...(printed === "" ? [] : [printed])].join("\n"),
+        text: [`Started ${what} (it was running ${plan.from}). ${next}`, ...(printed === "" ? [] : [printed])].join("\n"),
         facts: { method: plan.method, outcome: "started" },
         details: { method: plan.method, action: plan.action, from: plan.from, to: plan.to },
     };
@@ -133,13 +136,13 @@ export async function rollbackAction(call: Extract<Call, { action: "rollback" }>
 /** The last deploy or rollback run from here, as a sentence. */
 function recordLine(last: DeployRecord | undefined, now: number): string {
     if (last === undefined) return "No deploy or rollback was run from here in this session. The rollout is as the cluster shows it now.";
-    const what = last.action === "run" ? `the deploy of ${last.to}` : `the rollback to ${last.to}`;
+    const what = last.action === "run" ? `the deploy of ${last.to} with ${last.method}` : `the rollback with ${last.method} to ${last.to}`;
     const how = {
         started: "started",
         failed: "failed",
         unknown: "cut short, so whether it took effect is unknown, and it was not run again",
     }[last.outcome];
-    return `Last run from here: ${what} with ${last.method}, ${age(last.at, now)} ago, while ${last.from} was running: ${how}.`;
+    return `Last run from here: ${what}, ${age(last.at, now)} ago, while ${last.from} was running: ${how}.`;
 }
 
 /** `status`: the last deploy run from here, and the rollout. */

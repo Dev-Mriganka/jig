@@ -95,13 +95,14 @@ function build(inputs: PlanInputs): Plan {
     const line = lineOfCommand(command, kube.target);
     const from = runningText(rollout);
     const same = action === "run" && rollout.tags.length === 1 && rollout.tags[0] === version;
+    const row = (label: string, value: string): string => `${label}:`.padEnd(15) + value;
     const body = [
-        `Service:      ${env.service}`,
-        `Environment:  ${env.name} (${kind})`,
-        `Method:       ${method}`,
-        `Running now:  ${from}`,
-        `${action === "run" ? "Deploying:   " : "Going back to:"} ${to}`,
-        `Command:      ${line}`,
+        row("Service", env.service),
+        row("Environment", `${env.name} (${kind})`),
+        row("Method", method),
+        row("Running now", from),
+        row(action === "run" ? "Deploying" : "Going back to", to),
+        row("Command", line),
         "",
         "The command runs once, without a shell. If it is cut short, whether it took effect is unknown, and it is not run again.",
         ...(same ? ["", `Note: ${version} is already running, so this changes the release and not the version.`] : []),

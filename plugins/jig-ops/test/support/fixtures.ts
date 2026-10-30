@@ -208,3 +208,20 @@ export function controllerRevision(name: string, options: ControllerRevisionOpti
         data: { spec: { template: { spec: { containers: [{ name: service, image: IMAGE(options.tag ?? "1.4.2", service) }] } } } },
     };
 }
+
+/** What `helm history -o json` prints: the latest revisions, oldest first. */
+export const history = (...revisions: Array<{ revision: number; status?: string; description?: string }>): Reply => ({
+    stdout: revisions.map((entry) => ({
+        revision: entry.revision,
+        updated: "2026-10-15T08:00:00.000000000Z",
+        status: entry.status ?? "superseded",
+        chart: "orders-api-0.3.1",
+        app_version: "1.4.2",
+        description: entry.description ?? "Upgrade complete",
+    })),
+});
+
+/** What `helm get values --all -o json` prints for a revision that ran `tag`, or for a chart that takes no image tag. */
+export const values = (tag?: string | number): Reply => ({
+    stdout: tag === undefined ? { replicaCount: 2 } : { replicaCount: 2, image: { repository: "registry.example.test/shop/orders-api", tag } },
+});
