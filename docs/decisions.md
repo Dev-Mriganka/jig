@@ -2,6 +2,28 @@
 
 Dated so the reasons stay attached.
 
+## 2026-10-30: jig-theme, the look, built on Pi's own themes
+
+- **One plugin for how Pi looks:** palettes, the footer, and the answer colour.
+  It has no tools, so the model never sees it.
+- **Palettes are Pi theme files,** not colours painted by an extension. Pi's
+  `/settings`, its HTML export and its hot reload then work with them, and they
+  work without the rest of Jig.
+- **A palette is about fifteen named colours and one shared role map.** Adding a
+  palette, or your own, means choosing those colours, not filling every role.
+  A palette can still set single roles where the map is not right for it.
+- **Your palettes are written into Pi's themes folder.** Pi finds a theme there
+  by name, even one written after it started, and reloads the one in use when
+  its file changes. `jig-theme` records a hash of each file it writes, and
+  writes or deletes only a file whose hash still matches, so a file you changed
+  by hand is never overwritten.
+- **Other plugins add footer parts on Pi's event bus,** `jig-theme:segment`. A
+  plugin then does not depend on `jig-theme`, and nothing breaks without it.
+- **The usage history goes to `jig-lens`** as `/lens usage`, because it is about
+  cost, which is what `jig-lens` shows.
+- **Company parts stay in the company plugin:** a model spend in the footer, and
+  names for the models its provider records.
+
 ## 2026-10-30: reviews are approved in their page, and a passkey makes that unforgeable
 
 - **You chose to approve a review in its page.** A review is long, it waits for
