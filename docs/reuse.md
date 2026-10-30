@@ -19,8 +19,8 @@ Download counts are per week, from npm.
 | Tool manager | build `jig-core`, borrowing the patterns | `@gotgenes/pi-permission-system` |
 | Question and approval forms | use as is, on trial | `@adeildo/pi-ask-questions` |
 | Git, GitHub and CI | port the existing harness's tools, borrowing patterns | several, below |
-| Observability, today | use as is | `@twkrash/pi-session-inspector` |
-| Observability viewer | use as is | Grafana with a SQLite data source; Datasette as the fallback |
+| Cost, tokens and sessions | use as is, with its telemetry off | TokenTelemetry |
+| Jig's own records | build, small | `/lens` summary inside Pi; Grafana as an optional deep dive |
 | Secret backends | build a small backend seam, borrowing the patterns | `@ian-pascoe/pi-secret` and others |
 
 ## Tool manager
@@ -87,13 +87,27 @@ existing harness's tools and borrows these patterns:
 
 ## Observability
 
-**Today: `@twkrash/pi-session-inspector`, as is** (version 1.6.0, MIT).
-- **What it shows:** it reads Pi's own session files, with cost and tokens per
-  session and tool calls with their duration and errors, in Pi or on a local
-  page.
-- **What it lacks:** tickets and rule decisions. `jig-lens` adds those.
-- **Before leaving its local page running,** check how the page is protected,
-  because the agent's shell can reach `127.0.0.1`.
+**Cost, tokens and sessions: TokenTelemetry, as is** (MIT, actively
+maintained).
+- **What it shows:** it reads Pi's own session logs, and those of other coding
+  agents. It shows cost per session and project, tool-call waterfalls,
+  per-model analytics, and budgets with alerts.
+- **How to run it:** from a `git clone`, after reading `start.sh`. Set
+  `TT_NO_TELEMETRY=1` and `TT_NO_UPDATE_CHECK=1`: anonymous usage telemetry and
+  an hourly update check are on by default. It listens on `127.0.0.1`.
+- **Leave "Plan Limits" off until checked:** it reads other agents' logins on
+  the machine to ask their providers about quota.
+- **What it lacks:** Jig's own fields, such as rule decisions, approvals, time
+  waited and tickets. `jig-lens` adds those.
+
+**Also considered:**
+
+| Tool | Verdict | Why |
+|---|---|---|
+| `@twkrash/pi-session-inspector` | use as is, if preferred | Pi-only and lighter; fewer views |
+| AI Observer | skip | One binary, but it listens on every network interface with no login, and cannot group by Jig's fields. Tried in a sandbox with no network |
+| agentrecap | skip | Reads Pi sessions well, but declares no licence |
+| OpenObserve | skip | A general logs, metrics and traces platform, with telemetry on and a login |
 
 Patterns borrowed:
 
@@ -106,8 +120,8 @@ Patterns borrowed:
 Skipped: exporters that send data to a service (Braintrust, Raindrop,
 Langfuse, OpenTelemetry to a backend).
 
-The viewer for `jig-lens` is Grafana with a SQLite data source; see
-[`jig-lens`](../plugins/jig-lens/README.md).
+`jig-lens` shows Jig's own records as a summary inside Pi, with Grafana as an
+optional deep dive; see [`jig-lens`](../plugins/jig-lens/README.md).
 
 ## Secret backends
 

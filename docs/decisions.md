@@ -66,6 +66,25 @@ its own safety pipeline.
   `/jig`. The alternative, a masker that fails on every production result, would
   hide the cause.
 
+## 2026-10-30, later: the lens, lighter
+
+- **Cost, tokens and sessions come from an existing tool.** TokenTelemetry
+  (MIT) reads Pi's own session logs. It shows cost per session and project,
+  tool-call waterfalls and per-model analytics, on `127.0.0.1`. Run it with
+  `TT_NO_TELEMETRY=1` and `TT_NO_UPDATE_CHECK=1`. Jig builds nothing for this.
+- **`jig-lens` keeps what only Jig knows:** rule decisions, approvals and time
+  waited, tickets and checks. `/lens` shows them as a summary inside Pi, with no
+  server.
+- **Grafana becomes optional,** a deep dive with `/lens grafana`. It is built,
+  and it was tried on Grafana 13.3 with the SQLite plugin, but nobody needs to
+  install it.
+- **Rejected:**
+  - AI Observer: it listens on every network interface with no login, and it
+    cannot group by Jig's fields (tried in a sandbox with no network);
+  - agentrecap: it declares no licence;
+  - OpenObserve: a general logs, metrics and traces platform with telemetry
+    on and a login.
+
 ## 2026-10-30: the lens reads a copy of the records
 
 - **The records stay JSON lines,** written only by `jig-core`. Appending a line

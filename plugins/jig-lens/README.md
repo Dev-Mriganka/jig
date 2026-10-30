@@ -9,9 +9,9 @@ the code follows.
 failures, and time spent waiting for you. It never changes the records, and
 nothing leaves the machine.
 
-`@twkrash/pi-session-inspector` also shows cost, tokens and tool errors per
-session, from Pi's own session files (see [Reuse](../../docs/reuse.md)).
-`jig-lens` adds what only Jig's records hold:
+For cost, tokens and sessions, use TokenTelemetry, which reads Pi's own
+session logs (see [Reuse](../../docs/reuse.md)). `jig-lens` adds what only
+Jig's records hold:
 - rule decisions;
 - approvals and time waited;
 - tickets;
@@ -117,13 +117,17 @@ Grafana keeps its own data, such as your sign-in, in
 
 ## Viewer
 
+**The everyday view is `/lens` inside Pi:** a summary with no server and no
+install. Grafana is an optional deep dive (`/lens grafana`) for when charts
+and drill-down are wanted.
+
 Chosen on 2026-10-30 from a comparison of LLM trace platforms, OpenTelemetry
-backends and SQL dashboards. Each was judged on local-only operation, setup,
-charts, licence, and Linux and macOS support.
+backends, SQL dashboards and tools built for coding agents. Each was judged on
+local-only operation, setup, charts, licence, and Linux and macOS support.
 
 | Viewer | Verdict | Why |
 |---|---|---|
-| Grafana OSS with the SQLite data source plugin | **use** | One local process and no containers. SQL panels, a variable for the session and the ticket, and links from a summary to its detail. The data source and dashboards load from files kept in this plugin |
+| Grafana OSS with the SQLite data source plugin | **optional deep dive** | One local process and no containers. SQL panels, a variable for the session and the ticket, and links from a summary to its detail. The data source and dashboards load from files kept in this plugin |
 | Datasette | fallback | One Python process over the same index. The queries kept in this plugin show as tables; charts with `datasette-dashboards` come later |
 | MLflow, through OpenTelemetry export | later | Trace waterfalls and LLM views, if they are wanted. An export from the index, not a second record |
 | Arize Phoenix | skip | A richer trace view, but its licence (Elastic-2.0) is not an open-source one, and its dashboards are fixed |
