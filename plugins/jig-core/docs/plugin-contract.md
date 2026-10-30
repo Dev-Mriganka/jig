@@ -169,10 +169,12 @@ A sandbox plugin such as `jig-sandbox` tells `jig-core` about itself with
 
 ### Running one command outside
 
-A sandbox plugin declares `bash` with `declareTool`, and classifies a call that
-asks to run outside as `{ action: "outside", environment: "local", effect:
-"write", atLeast: "ask", approval: "dialog" }`. `jig-core` then holds the rest as
-a floor rule:
+A sandbox plugin declares `bash` with `declareTool` and `extendsDefaults: true`,
+and classifies a call that asks to run outside as `{ action: "outside",
+environment: "local", effect: "write", atLeast: "ask", approval: "dialog" }`. With
+`extendsDefaults`, a call it returns `undefined` for goes on to the user's
+classification rules and the built-in default for `bash`, instead of becoming
+unknown. `jig-core` then holds the rest as a floor rule:
 - **It asks.** The table would allow a local write; for `bash` with the action
   `outside` the decision is `ask` whatever the table, the tool and the rules
   below say, except in the next point.

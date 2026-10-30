@@ -20,6 +20,8 @@ import type { Decision } from "./bash.ts";
 import { startBroker } from "./broker-client.ts";
 import { registerSandboxCommand } from "./commands.ts";
 import { settingsFrom, validateSandbox } from "./config.ts";
+import { bashDeclaration } from "./outside.ts";
+import type { OutsideRun } from "./outside.ts";
 import type { SandboxSettings } from "./config.ts";
 import { nodeFiles } from "./files.ts";
 import type { FileView } from "./files.ts";
@@ -152,9 +154,13 @@ export function sandbox(options: SandboxOptions = {}): ExtensionFactory {
             canWrite: (place) => core.canWrite(place),
             whenReady: () => core.whenReady(),
         };
+        // Where the session's commands run, for the dialog that asks about running one outside.
+        let sessionFolder = process.cwd();
+        const outsideRuns: OutsideRun[] = [];
         withJig((api) => {
             api.config.registerSection("sandbox", validateSandbox);
             api.sandbox.register(provider);
+            api.declareTool(bashDeclaration({ folder: () => sessionFolder, home: homeOf }));
         });
 
         const refresh = (ctx: Pick<ExtensionContext, "ui">): void => {
@@ -176,16 +182,34 @@ export function sandbox(options: SandboxOptions = {}): ExtensionFactory {
                 now: options.now ?? (() => Date.now()),
                 asker: createAsker(allowed, homeOf),
             });
-        pi.registerTool(createBashTool({ sandbox: core, shell: { exec }, aftermath, decisions }) as never);
+        pi.registerTool(
+            createBashTool({
+                sandbox: core,
+                shell: { exec },
+                aftermath,
+                decisions,
+                outsideRuns,
+                now: options.now ?? (() => Date.now()),
+                jig: () => {
+                    try {
+                        return jig();
+                    } catch {
+                        return undefined;
+                    }
+                },
+            }) as never,
+        );
         registerSandboxCommand(pi, {
             sandbox: core,
             allowed,
             platform,
             refresh,
+            outsideRuns,
             ...(options.lookupName === undefined ? {} : { lookupName: options.lookupName }),
         });
 
         pi.on("session_start", (_event, ctx) => {
+            sessionFolder = ctx.cwd;
             const started = core.start(ctx.sessionManager.getSessionId(), ctx.cwd);
             refresh(ctx);
             void started.then(() => refresh(ctx));

@@ -78,9 +78,14 @@ export function classify(tool: string, input: Readonly<Record<string, unknown>>,
             if (error instanceof TypeError) throw new InvalidInputError(errorMessage(error));
             throw error;
         }
-        if (answer === undefined) return { ...UNKNOWN_CLASS, source: "unknown", plugin: declaration.plugin };
-        if (!isValidClass(answer)) throw new Error(`the declaration of ${tool} returned an invalid classification`);
-        return { ...answer, source: "declaration", plugin: declaration.plugin };
+        if (answer === undefined && declaration.extendsDefaults !== true) {
+            return { ...UNKNOWN_CLASS, source: "unknown", plugin: declaration.plugin };
+        }
+        if (answer !== undefined) {
+            if (!isValidClass(answer)) throw new Error(`the declaration of ${tool} returned an invalid classification`);
+            return { ...answer, source: "declaration", plugin: declaration.plugin };
+        }
+        // A declaration that extends the defaults left this call to them.
     }
 
     for (const rule of deps.classifyRules) {

@@ -67,6 +67,10 @@ export interface ToolDeclaration {
     preview?(input: Readonly<Record<string, unknown>>, signal: AbortSignal): Promise<Preview>;
     /** True when the tool masks its own production results, so jig-core's backstop leaves them alone. */
     masksOwnResults?: boolean;
+    /** For a tool Pi ships, such as `bash`, that a plugin classifies only in part: `classify` answers for the calls it
+     *  knows and returns undefined for the rest, which then go on to the classification rules and the built-in defaults
+     *  instead of becoming unknown. */
+    extendsDefaults?: boolean;
     /** Inputs that show `/jig rules` the actions this tool picks from its input rather than from an `action` parameter,
      *  by action name: `{ outside: { outside: true, reason: "x" } }`. Used only to display the rules. */
     examples?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;

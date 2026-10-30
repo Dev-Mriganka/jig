@@ -207,7 +207,7 @@ describe("what the plugin registers", () => {
         assert.ok(tool);
         assert.equal(tool.name, "bash");
         const properties = (tool.parameters as unknown as { properties: object }).properties;
-        assert.deepEqual(Object.keys(properties).sort(), ["command", "timeout"]);
+        assert.deepEqual(Object.keys(properties).sort(), ["command", "outside", "reason", "timeout"]);
         assert.equal(typeof tool?.renderCall, "function");
         assert.match(tool?.description ?? "", /Execute a bash command/);
         assert.match(tool?.description ?? "", /sandbox/);

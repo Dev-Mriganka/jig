@@ -9,6 +9,7 @@ import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-c
 import type { Allowed } from "./allowed.ts";
 import { formatDoctor, runDoctor } from "./doctor.ts";
 import { shown } from "./pathing.ts";
+import type { OutsideRun } from "./outside.ts";
 import type { Rule, RuleKind, RuleSet } from "./rules.ts";
 import type { Sandbox } from "./sandbox.ts";
 
@@ -21,8 +22,8 @@ export interface CommandDeps {
     platform: NodeJS.Platform;
     /** Called after `off` and `on`, to redraw the footer. */
     refresh(ctx: ExtensionCommandContext): void;
-    /** What `/sandbox` adds to its listing: the commands that ran outside the sandbox this session. */
-    extraLines?: () => string[];
+    /** The commands that ran outside the sandbox in this session, for `/sandbox` to list. */
+    outsideRuns: OutsideRun[];
     lookupName?: string;
 }
 
@@ -99,7 +100,25 @@ export function statusLines(deps: CommandDeps, cwd: string): string[] {
         for (const item of rules.reopened) lines.push(`  ${item.shown}   (${item.source})`);
     }
     lines.push("", "Everything else under those folders is writable, as it is outside the sandbox.");
-    lines.push(...(deps.extraLines?.() ?? []));
+    lines.push(...outsideLines(deps.outsideRuns, rules.home));
+    return lines;
+}
+
+/** The commands that ran outside the sandbox this session, newest last, each with how it was allowed. */
+export function outsideLines(runs: readonly OutsideRun[], home: string): string[] {
+    if (runs.length === 0) return ["", "Run outside the sandbox this session: nothing"];
+    const how = { once: "once", session: "this exact command, this session", rule: "by a rule" } as const;
+    const lines = ["", `Run outside the sandbox this session (${runs.length}):`];
+    for (const run of runs.slice(-20)) {
+        const command = run.command.replace(/\s+/g, " ");
+        lines.push(
+            `  ${run.at.toISOString().slice(11, 19)}  ${command.length > 100 ? `${command.slice(0, 99)}...` : command}`,
+        );
+        lines.push(
+            `            in ${shown(run.folder, home)}, allowed ${how[run.how]}; why: ${run.reason.replace(/\s+/g, " ").slice(0, 150)}`,
+        );
+    }
+    if (runs.length > 20) lines.push(`  and ${runs.length - 20} earlier`);
     return lines;
 }
 
