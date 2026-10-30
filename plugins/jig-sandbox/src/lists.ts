@@ -81,7 +81,7 @@ export const GROUPS = {
 
     toolchain: {
         reason: "programs installed there are on your PATH and run outside the sandbox later",
-        way: "Pi asks the user to allow writes there; once they say yes, run the command again.",
+        way: "The user is asked to allow writes there; once they say yes, run the command again.",
         floor: false,
     },
 } as const satisfies Record<string, Group>;

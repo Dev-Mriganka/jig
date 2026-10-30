@@ -1,7 +1,8 @@
 // What follows a command: the audit of what it created, and the lines after its output that say which rule stopped it.
-// The question about an ask-first folder joins here in the step that follows.
+// A write refused under an ask-first folder becomes a question.
 import path from "node:path";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { Asker } from "./ask.ts";
 import { audit, takeSnapshot } from "./audit.ts";
 import type { AuditSnapshot } from "./audit.ts";
 import { explainBlocks, explainViolations } from "./explain.ts";
@@ -30,6 +31,8 @@ export interface AftermathDeps {
     /** Pi's agent folder, where what the audit removes is kept. */
     agentDir: () => string;
     now: () => number;
+    /** Asks the user about a write to an ask-first folder. */
+    asker: Asker;
 }
 
 export function createAftermath(deps: AftermathDeps): Aftermath {
@@ -57,6 +60,17 @@ export function createAftermath(deps: AftermathDeps): Aftermath {
                 mode: input.prepared.mode,
             });
             lines.push(...explained.lines, ...explainViolations(input.violations));
+            // A refused write under a toolchain folder is a question for the user, inside this waiting call. Several refusals
+            // under one folder were already one.
+            for (const { rule, path: refused } of explained.askFirst) {
+                try {
+                    lines.push(...(await deps.asker.ask(input.ctx, rule, refused)));
+                } catch (error) {
+                    lines.push(
+                        `[sandbox] the question about ${rule.shown} failed (${(error as Error).message}); writes there stay refused.`,
+                    );
+                }
+            }
             return lines;
         },
     };

@@ -13,8 +13,8 @@ import type { NetworkMode } from "./config.ts";
 export interface Explained {
     /** One line each, ready to follow the command's output. */
     lines: string[];
-    /** The ask-first rules a refused write was under, once each. */
-    askFirst: Rule[];
+    /** The ask-first rules a refused write was under, once each, with the first path that was refused under it. */
+    askFirst: Array<{ rule: Rule; path: string }>;
 }
 
 /** How many explanations follow one command's output; the rest are counted. */
@@ -30,8 +30,14 @@ function refusalOf(line: string): Refusal | undefined {
     return undefined;
 }
 
-const QUOTED = /(['"`])((?:(?!\1).)+?)\1/g;
-const ABSOLUTE = /(?:^|[\s'"`([=,:])(\/[^\s'"`()[\]:;,]*[^\s'"`()[\]:;,.])/g;
+/** Quotes tools put round a name: plain ones, a backquote, and the curly ones GNU tools use in a UTF-8 locale. */
+const OPEN_QUOTES = "'\"`\u2018\u201c";
+const CLOSE_QUOTES = "'\"`\u2019\u201d";
+const QUOTED = new RegExp(`[${OPEN_QUOTES}]((?:(?![${CLOSE_QUOTES}]).)+?)[${CLOSE_QUOTES}]`, "g");
+const ABSOLUTE = new RegExp(
+    `(?:^|[\\s${OPEN_QUOTES}([=,:])(\\/[^\\s${OPEN_QUOTES}${CLOSE_QUOTES}()[\\]:;,]*[^\\s${OPEN_QUOTES}${CLOSE_QUOTES}()[\\]:;,.])`,
+    "g",
+);
 /** `bash: .bashrc: Read-only file system`, `cp: /a/b: Permission denied`: the path sits between two colons. */
 const BETWEEN_COLONS = /^[^:]+: (.+?): [A-Z]/;
 
@@ -55,7 +61,7 @@ function pathsIn(rawLine: string, cwd: string, home: string): string[] {
         const folded = path.posix.resolve(candidate);
         if (!found.includes(folded)) found.push(folded);
     };
-    for (const match of line.matchAll(QUOTED)) add(match[2] as string);
+    for (const match of line.matchAll(QUOTED)) add(match[1] as string);
     for (const match of line.matchAll(ABSOLUTE)) add(match[1] as string);
     const colons = BETWEEN_COLONS.exec(line);
     if (colons !== null) add(colons[1] as string);
@@ -76,7 +82,7 @@ const NO_NETWORK =
  */
 export function explainBlocks(output: string, set: RuleSet, options: ExplainOptions): Explained {
     const said = new Map<string, string>();
-    const askFirst = new Map<string, Rule>();
+    const askFirst = new Map<string, { rule: Rule; path: string }>();
     let generalWrite = false;
     let noNetwork = false;
 
@@ -114,7 +120,8 @@ export function explainBlocks(output: string, set: RuleSet, options: ExplainOpti
             } else if (refusal !== "missing") {
                 const key = `${rule.kind}\0${rule.path}`;
                 if (!said.has(key)) said.set(key, wording("write", place, rule, set));
-                if (rule.kind === "ask-first") askFirst.set(rule.path, rule);
+                if (rule.kind === "ask-first" && !askFirst.has(rule.path))
+                    askFirst.set(rule.path, { rule, path: place });
                 explained = true;
             }
         }

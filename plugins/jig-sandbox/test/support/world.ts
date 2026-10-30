@@ -14,6 +14,9 @@ import { tmpdir, userInfo } from "node:os";
 import path from "node:path";
 import { createLocalBashOperations } from "@earendil-works/pi-coding-agent";
 import { createAftermath } from "../../src/aftermath.ts";
+import { createAllowed } from "../../src/allowed.ts";
+import type { Allowed } from "../../src/allowed.ts";
+import { createAsker } from "../../src/ask.ts";
 import { startBroker } from "../../src/broker-client.ts";
 import { DEFAULT_SETTINGS } from "../../src/config.ts";
 import type { SandboxSettings } from "../../src/config.ts";
@@ -69,6 +72,8 @@ export interface World {
     /** A different marker for each fake credential: if one shows up in output, this says which file it came from. */
     markers: Record<string, string>;
     sandbox: Sandbox;
+    /** What the user allowed, as the sandbox reads it. */
+    allowed: Allowed;
     env: Record<string, string>;
     /** Runs a command in the sandbox, in the project (or `cwd`), and returns what it printed. */
     run(command: string, options?: { cwd?: string; timeout?: number }): Promise<RunResult>;
@@ -78,14 +83,25 @@ export interface World {
      */
     runAudited(
         command: string,
-        options?: { cwd?: string },
-    ): Promise<RunResult & { lines: string[]; notices: string[] }>;
+        options?: { cwd?: string; select?: (title: string, choices: string[]) => string | undefined; ui?: boolean },
+    ): Promise<
+        RunResult & {
+            lines: string[];
+            notices: string[];
+            questions: Array<{ title: string; choices: string[] }>;
+        }
+    >;
     /** Writes a file, with its folders, relative to the world's root unless absolute. */
     put(file: string, text?: string): string;
     link(target: string, linkPath: string): void;
     cleanup(): Promise<void>;
     /** The last audited run, for a test that failed on it. */
-    lastAudit?: { output: string; lines: string[]; notices: string[] };
+    lastAudit?: {
+        output: string;
+        lines: string[];
+        notices: string[];
+        questions: Array<{ title: string; choices: string[] }>;
+    };
 }
 
 function marker(kind: string): string {
@@ -158,6 +174,15 @@ export async function makeWorld(options: WorldOptions = {}): Promise<World> {
         ...options.env,
     };
     const exec = createLocalBashOperations().exec;
+    const allowed = createAllowed(() => agentDir);
+    const aftermath = createAftermath({
+        get sandbox() {
+            return sandbox;
+        },
+        agentDir: () => agentDir,
+        now: () => Date.now(),
+        asker: createAsker(allowed, () => home),
+    });
     const deps: SandboxDeps = {
         brokerScript: BROKER,
         env,
@@ -171,7 +196,7 @@ export async function makeWorld(options: WorldOptions = {}): Promise<World> {
         settings: () => settings,
         protectedPaths: () => [],
         runtimePaths: () => [],
-        approved: () => [],
+        approved: () => allowed.folders(),
         createdByAgent: new Set(),
         startBroker,
         exec,
@@ -190,6 +215,7 @@ export async function makeWorld(options: WorldOptions = {}): Promise<World> {
         agentDir,
         markers,
         sandbox,
+        allowed,
         env,
         put,
         link: (target, linkPath) => {
@@ -213,7 +239,6 @@ export async function makeWorld(options: WorldOptions = {}): Promise<World> {
         },
         async runAudited(command, runOptions = {}) {
             const cwd = runOptions.cwd ?? project;
-            const aftermath = createAftermath({ sandbox, agentDir: () => agentDir, now: () => Date.now() });
             const prepared = await sandbox.prepare(command, cwd, env);
             const snapshot = aftermath.before(prepared, cwd);
             const chunks: Buffer[] = [];
@@ -229,19 +254,32 @@ export async function makeWorld(options: WorldOptions = {}): Promise<World> {
                 const { violations } = await prepared.finish();
                 const output = Buffer.concat(chunks).toString("utf8");
                 const notices: string[] = [];
-                const ui = { notify: (message: string) => notices.push(message) };
+                const questions: Array<{ title: string; choices: string[] }> = [];
+                const ui = {
+                    notify: (message: string) => notices.push(message),
+                    select: async (title: string, choices: string[]) => {
+                        questions.push({ title, choices });
+                        return runOptions.select?.(title, choices);
+                    },
+                };
                 const lines = await aftermath.after({
                     prepared,
                     output,
                     cwd,
-                    ctx: { hasUI: true, ui } as never,
+                    ctx: { hasUI: runOptions.ui !== false, ui } as never,
                     snapshot,
                     violations,
                 });
-                world.lastAudit = { output, lines, notices };
+                world.lastAudit = { output, lines, notices, questions };
             }
-            const last = world.lastAudit as { output: string; lines: string[]; notices: string[] };
-            return { exitCode, output: last.output, lines: last.lines, notices: last.notices };
+            const last = world.lastAudit as NonNullable<World["lastAudit"]>;
+            return {
+                exitCode,
+                output: last.output,
+                lines: last.lines,
+                notices: last.notices,
+                questions: last.questions,
+            };
         },
         async cleanup() {
             await sandbox.stop();

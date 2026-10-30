@@ -43,6 +43,22 @@ describe("a write to a locked path", () => {
         assert.match(relative.lines[0] ?? "", /cannot write ~\/\.bashrc/);
     });
 
+    test("curly quotes, as GNU tools write them in a UTF-8 locale", () => {
+        assert.match(
+            explain(`mkdir: cannot create directory \u2018${HOME}/.sdkman/candidates\u2019: Read-only file system`)
+                .lines[0] ?? "",
+            /cannot write ~\/\.sdkman\/candidates/,
+        );
+        assert.match(
+            explain(`cp: cannot create regular file \u201c${HOME}/.bashrc\u201d: Read-only file system`).lines[0] ?? "",
+            /cannot write ~\/\.bashrc/,
+        );
+        assert.match(
+            explain(`ls: cannot access \u2018${HOME}/.ssh/id_rsa\u2019: No such file or directory`).lines[0] ?? "",
+            /cannot read ~\/\.ssh\/id_rsa/,
+        );
+    });
+
     test("other languages: Python, Node, Java", () => {
         for (const line of [
             `PermissionError: [Errno 13] Permission denied: '${HOME}/.bashrc'`,
@@ -118,7 +134,8 @@ describe("ask-first folders", () => {
             /^\[sandbox\] cannot write ~\/\.sdkman\/candidates: programs installed there are on your PATH/,
         );
         assert.equal(askFirst.length, 1);
-        assert.equal(askFirst[0]?.shown, "~/.sdkman");
+        assert.equal(askFirst[0]?.rule.shown, "~/.sdkman");
+        assert.equal(askFirst[0]?.path, `${HOME}/.sdkman/candidates`, "the first path that was refused");
     });
 });
 

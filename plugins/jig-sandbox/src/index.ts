@@ -14,6 +14,7 @@ import type { SandboxProvider } from "../../jig-core/src/contract.ts";
 import { createAftermath } from "./aftermath.ts";
 import type { Aftermath } from "./aftermath.ts";
 import { createAllowed } from "./allowed.ts";
+import { createAsker } from "./ask.ts";
 import { createBashTool } from "./bash.ts";
 import type { Decision } from "./bash.ts";
 import { startBroker } from "./broker-client.ts";
@@ -95,6 +96,7 @@ export function sandbox(options: SandboxOptions = {}): ExtensionFactory {
         const files = options.files ?? nodeFiles;
         const platform = options.platform ?? process.platform;
         const agentDir = options.agentDir ?? (() => getAgentDir());
+        const homeOf = options.home ?? (() => userInfo().homedir);
         const allowed = createAllowed(agentDir);
         const settings: () => SandboxSettings = options.settings ?? (() => settingsFrom(sandboxSection()));
         const exec: BashOperations["exec"] = options.exec ?? createLocalBashOperations().exec;
@@ -103,7 +105,7 @@ export function sandbox(options: SandboxOptions = {}): ExtensionFactory {
             env,
             files,
             platform,
-            home: options.home ?? (() => userInfo().homedir),
+            home: homeOf,
             uid: options.uid ?? process.getuid?.() ?? 0,
             wsl: options.wsl ?? detectWsl(env, files, platform),
             tmpRoot: options.tmpRoot ?? os.tmpdir(),
@@ -167,7 +169,13 @@ export function sandbox(options: SandboxOptions = {}): ExtensionFactory {
         };
 
         const aftermath =
-            options.aftermath ?? createAftermath({ sandbox: core, agentDir, now: options.now ?? (() => Date.now()) });
+            options.aftermath ??
+            createAftermath({
+                sandbox: core,
+                agentDir,
+                now: options.now ?? (() => Date.now()),
+                asker: createAsker(allowed, homeOf),
+            });
         pi.registerTool(createBashTool({ sandbox: core, shell: { exec }, aftermath, decisions }) as never);
         registerSandboxCommand(pi, {
             sandbox: core,
