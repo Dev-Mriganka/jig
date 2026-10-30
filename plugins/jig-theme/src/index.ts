@@ -7,6 +7,8 @@ import { applyPalettes } from "./apply.ts";
 import { settingsFrom, validateTheme } from "./config.ts";
 import type { ThemeSettings } from "./config.ts";
 import { isSubagentChild } from "./child.ts";
+import { SEGMENT_EVENT } from "./segments.ts";
+import { Session } from "./session.ts";
 
 /** The parts a test replaces. */
 export interface ThemeOptions {
@@ -34,13 +36,37 @@ export function theme(options: ThemeOptions = {}): ExtensionFactory {
         const agentDir = options.agentDir ?? (() => getAgentDir());
         const settings = options.settings ?? (() => settingsFrom(themeSection()));
         withJig((api) => api.config.registerSection("theme", validateTheme));
+        const session = new Session(pi, env);
+
+        // Other plugins add footer parts on the event bus. This is listened to from the start, so a part sent before this
+        // plugin's session starts is not lost.
+        const unlisten = pi.events.on(SEGMENT_EVENT, (payload) => {
+            if (session.plugins.accept(payload)) session.refresh();
+        });
 
         pi.on("session_start", (_event, ctx: ExtensionContext) => {
+            const now = settings();
             // Palettes are for a person at a terminal: not for print and RPC runs, and not for a child the parent started.
-            if (ctx.mode !== "tui" || isSubagentChild(env)) return;
-            const applied = applyPalettes(ctx.ui, agentDir(), settings().palettes);
-            if (applied.problems.length > 0) ctx.ui.notify(`jig-theme: ${applied.problems.join("\n")}`, "warning");
-            if (applied.notes.length > 0) ctx.ui.notify(`jig-theme: ${applied.notes.join("\n")}`, "info");
+            if (ctx.mode === "tui" && !isSubagentChild(env)) {
+                const applied = applyPalettes(ctx.ui, agentDir(), now.palettes);
+                if (applied.problems.length > 0) ctx.ui.notify(`jig-theme: ${applied.problems.join("\n")}`, "warning");
+                if (applied.notes.length > 0) ctx.ui.notify(`jig-theme: ${applied.notes.join("\n")}`, "info");
+            }
+            session.start(ctx, now);
+        });
+
+        // What the footer shows changes with these; it is drawn again, and reads everything fresh.
+        const refresh = () => session.refresh();
+        pi.on("message_end", refresh);
+        pi.on("thinking_level_select", refresh);
+        pi.on("agent_settled", refresh);
+        pi.on("session_compact", refresh);
+        pi.on("session_tree", refresh);
+        pi.on("model_select", refresh);
+
+        pi.on("session_shutdown", () => {
+            unlisten();
+            session.shutdown();
         });
     };
 }

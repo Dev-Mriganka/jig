@@ -45,6 +45,9 @@ export interface FakePiOptions {
     others?: Array<{ name: string; path: string }>;
 }
 
+/** What a footer is, as the fake keeps it: the component Pi would draw, or undefined for Pi's own footer. */
+export type FooterComponent = { render(width: number): string[]; dispose?(): void; invalidate?(): void };
+
 export class FakePi {
     readonly handlers = new Map<string, Handler[]>();
     readonly listeners = new Map<string, Array<(payload: unknown) => void>>();
@@ -52,6 +55,23 @@ export class FakePi {
     readonly ctx: ExtensionContext;
     readonly options: Required<Pick<FakePiOptions, "mode" | "agentDir">> & FakePiOptions;
     current: FakeTheme;
+    /** Every call to `setFooter`, in order: the component made, or undefined when Pi's footer was asked for back. */
+    readonly footers: Array<FooterComponent | undefined> = [];
+    /** How often the footer asked to be drawn again. */
+    renders = 0;
+    disposed = 0;
+    // What the footer reads.
+    model: { name?: string; id?: string; contextWindow?: number; promptCache?: { short?: number; long?: number } } | undefined = {
+        name: "Fixture Model",
+        id: "fixture-model",
+        contextWindow: 1_000_000,
+    };
+    thinking = "high";
+    statuses = new Map<string, string>();
+    branch: string | null = "main";
+    entries: unknown[] = [];
+    context: { tokens: number | null; contextWindow: number; percent: number | null } | undefined = { tokens: 42_000, contextWindow: 1_000_000, percent: 4.2 };
+    branchListeners = new Set<() => void>();
 
     constructor(options: FakePiOptions) {
         this.options = { mode: "tui", ...options };
@@ -61,7 +81,38 @@ export class FakePi {
             mode: this.options.mode,
             hasUI: this.options.mode === "tui" || this.options.mode === "rpc",
             cwd: "/work/orders-api",
+            get model() {
+                return self.model;
+            },
+            getContextUsage: () => self.context,
+            sessionManager: { getEntries: () => self.entries, getBranch: () => self.entries },
             ui: {
+                setFooter: (factory?: (tui: unknown, theme: unknown, data: unknown) => FooterComponent) => {
+                    // Pi disposes the footer it replaces or takes away.
+                    self.footers.at(-1)?.dispose?.();
+                    if (factory === undefined) {
+                        self.footers.push(undefined);
+                        return;
+                    }
+                    const component = factory(
+                        { requestRender: () => self.renders++ },
+                        self.current,
+                        {
+                            getExtensionStatuses: () => self.statuses,
+                            getGitBranch: () => self.branch,
+                            onBranchChange: (listener: () => void) => {
+                                self.branchListeners.add(listener);
+                                return () => self.branchListeners.delete(listener);
+                            },
+                        },
+                    );
+                    const dispose = component.dispose?.bind(component);
+                    component.dispose = () => {
+                        self.disposed++;
+                        dispose?.();
+                    };
+                    self.footers.push(component);
+                },
                 notify: (text: string, level?: string) => {
                     this.notices.push({ text, level: level ?? "info" });
                 },
@@ -76,6 +127,22 @@ export class FakePi {
 
     get api(): ExtensionAPI {
         return this as unknown as ExtensionAPI;
+    }
+
+    getThinkingLevel(): string {
+        return this.thinking;
+    }
+
+    /** The footer in use now, or undefined when Pi's own is. */
+    get footer(): FooterComponent | undefined {
+        return this.footers.at(-1);
+    }
+
+    /** The footer's one row at a width. */
+    row(width = 300): string {
+        const footer = this.footer;
+        if (footer === undefined) throw new Error("no footer");
+        return footer.render(width)[0] ?? "";
     }
 
     /** What Pi lists: its own themes, other packages', and the files in the agent folder. */

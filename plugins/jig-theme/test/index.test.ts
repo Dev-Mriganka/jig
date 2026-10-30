@@ -130,6 +130,81 @@ test("a failure while writing never reaches Pi", async (t) => {
     assert.deepEqual(pi.notices, [{ text: "jig-theme: your palettes could not be written; the themes folder was left as it was", level: "warning" }]);
 });
 
+// ---- the footer in a session --------------------------------------------------------------------------------------------
+
+const started = async (t: Parameters<typeof rig>[0], o: Parameters<typeof rig>[1] = {}) => {
+    const made = rig(t, o);
+    await made.pi.fire("session_start", { reason: "startup" });
+    return made;
+};
+const text = (row: string) => row.replace(/<[a-zA-Z]+>|<\/>/g, "");
+
+test("a session start in a terminal gives Pi the footer, and it shows the session", async (t) => {
+    const { pi } = await started(t);
+    assert.equal(pi.footers.length, 1);
+    assert.equal(text(pi.row()), "Fixture Model · high · ctx 42k · est. $0.00 · ↑0 ↓0");
+});
+
+test("there is no footer without a terminal, in a child, with JIG_THEME_FOOTER=0, or when the settings turn it off", async (t) => {
+    for (const mode of ["rpc", "json", "print"] as const) assert.equal((await started(t, { mode })).pi.footers.length, 0, mode);
+    for (const env of [{ PI_SUBAGENT_ID: "child-1" }, { PI_SUBAGENT_CHILD: "1" }, { JIG_THEME_FOOTER: "0" }]) {
+        assert.equal((await started(t, { env })).pi.footers.length, 0, JSON.stringify(env));
+    }
+    assert.equal((await started(t, { settings: { footer: { enabled: false } } })).pi.footers.length, 0);
+    assert.equal((await started(t, { env: { JIG_THEME_FOOTER: "1" } })).pi.footers.length, 1, "only 0 turns it off");
+});
+
+test("the settings choose the parts, and the footer is drawn from them", async (t) => {
+    const { pi } = await started(t, { settings: { footer: { segments: ["cost", "model", "cwd", "branch"], separator: " | " } } });
+    assert.equal(text(pi.row()), "est. $0.00 | Fixture Model | orders-api | main");
+});
+
+test("a part another plugin sends before the session starts is still shown, and one sent later redraws the footer", async (t) => {
+    const { pi } = rig(t);
+    pi.events.emit("jig-theme:segment", { id: "spend", label: "Oct $120 / $200", tone: "warning" });
+    await pi.fire("session_start", { reason: "startup" });
+    assert.ok(pi.row().includes("<warning>Oct $120 / $200</>"));
+    const before = pi.renders;
+    pi.events.emit("jig-theme:segment", { id: "spend", label: "Oct $130 / $200", tone: "error" });
+    assert.equal(pi.renders, before + 1);
+    assert.ok(pi.row().includes("<error>Oct $130 / $200</>"));
+    pi.events.emit("jig-theme:segment", { id: "spend", label: "Oct $130 / $200", tone: "error" });
+    assert.equal(pi.renders, before + 1, "an event that changes nothing does not redraw");
+    pi.events.emit("jig-theme:segment", { id: "spend", label: "" });
+    assert.ok(!pi.row().includes("Oct"));
+    pi.events.emit("jig-theme:segment", "garbage");
+    pi.events.emit("jig-theme:segment", null);
+    assert.equal(pi.renders, before + 2);
+});
+
+test("what the footer shows changes with these events, and each asks for a redraw", async (t) => {
+    const { pi } = await started(t);
+    for (const event of ["message_end", "thinking_level_select", "agent_settled", "session_compact", "session_tree", "model_select"]) {
+        const before = pi.renders;
+        await pi.fire(event);
+        assert.equal(pi.renders, before + 1, event);
+    }
+});
+
+test("starting again, as /new does, replaces the footer and does not leave the old one running", async (t) => {
+    const { pi } = await started(t);
+    await pi.fire("session_start", { reason: "new" });
+    assert.equal(pi.footers.length, 2);
+    assert.equal(pi.disposed, 1);
+});
+
+test("a session ending stops the footer's branch watch and clock, and stops listening, and a late event is harmless", async (t) => {
+    const { pi } = await started(t, { settings: { footer: { segments: ["model", "branch"] } } });
+    assert.equal(pi.branchListeners.size, 1);
+    await pi.fire("session_shutdown", { reason: "quit" });
+    assert.equal(pi.branchListeners.size, 0);
+    assert.deepEqual(pi.listeners.get("jig-theme:segment"), []);
+    assert.doesNotThrow(() => pi.events.emit("jig-theme:segment", { id: "late", label: "x" }));
+    const before = pi.renders;
+    await pi.fire("message_end");
+    assert.equal(pi.renders, before);
+});
+
 test("theme() makes a factory with the parts a test replaces", () => {
     assert.equal(typeof theme({}), "function");
 });
