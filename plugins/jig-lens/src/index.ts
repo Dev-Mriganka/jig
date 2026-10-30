@@ -6,7 +6,7 @@ import { jig, withJig } from "../../jig-core/src/client.ts";
 import { settingsFrom, validateLens } from "./config.ts";
 import type { Deps } from "./deps.ts";
 import { registerLens } from "./lens.ts";
-import { lensPaths, stateDir } from "./paths.ts";
+import { lensPaths, sessionsDir, stateDir } from "./paths.ts";
 import { browserOpener, findProgram } from "./programs.ts";
 import { homepathOf, probeViewer, spawnDetached } from "./viewer.ts";
 
@@ -36,6 +36,7 @@ export function lens(options: LensOptions = {}): ExtensionFactory {
             env,
             now: options.now ?? (() => new Date()),
             paths: options.paths ?? (() => lensPaths(stateDir(env), options.viewerDir)),
+            sessionsDir: options.sessionsDir ?? (() => sessionsDir(env)),
             settings: options.settings ?? (() => settingsFrom(lensSection())),
             find,
             homepath: options.homepath ?? homepathOf,

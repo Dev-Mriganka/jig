@@ -4,6 +4,7 @@
 //   /lens ticket KEY     the same for one ticket, over all time
 //   /lens session [id]   the same for one session (this one by default)
 //   /lens days N         the same for the last N days
+//   /lens usage          an interactive view of cost and tokens, from Pi's own session files
 //   /lens grafana        imports, starts Grafana if it is not running, and opens its dashboards
 //   /lens datasette      the same for Datasette
 //   /lens rebuild        deletes the index and imports every record file again
@@ -23,6 +24,7 @@ import { startViewer } from "./start.ts";
 import { deleteIndex, openIndex, readIndex, readStatus } from "./store.ts";
 import type { IndexStatus } from "./store.ts";
 import type { Block } from "./summary.ts";
+import { createModelNames, MODEL_NAMES_EVENT } from "./usage-names.ts";
 import { homeUrl, viewerUrl } from "./viewer.ts";
 import type { Viewer, ViewerState } from "./viewer.ts";
 
@@ -96,6 +98,35 @@ export function registerLens(pi: ExtensionAPI, deps: Deps): void {
     });
 
     registerDisplay(pi);
+
+    // Names for the models in `/lens usage`, from whichever plugin knows them. Listened to from the start, so a name sent
+    // before the command runs is kept.
+    const modelNames = createModelNames();
+    pi.events.on(MODEL_NAMES_EVENT, (payload) => modelNames.learn(payload));
+    let usageView: AbortController | undefined;
+
+    /**
+     * `/lens usage`: an interactive view that reads Pi's session files. It needs a terminal. The view is loaded only now, so
+     * the rest of the plugin never needs pi-tui, and one that is already open is closed first.
+     */
+    async function usage(ctx: ExtensionContext): Promise<void> {
+        if (ctx.mode !== "tui") {
+            tell(ctx, "/lens usage needs the terminal.", "info");
+            return;
+        }
+        usageView?.abort();
+        const controller = (usageView = new AbortController());
+        try {
+            const { showDashboard } = await import("./usage-dashboard.ts");
+            if (!controller.signal.aborted) {
+                await showDashboard(ctx, { sessionsDir: deps.sessionsDir(), now: deps.now(), signal: controller.signal, names: modelNames.names });
+            }
+        } catch (error) {
+            if (!controller.signal.aborted) tell(ctx, `Could not open the usage view: ${reason(error)}`, "warning");
+        } finally {
+            if (usageView === controller) usageView = undefined;
+        }
+    }
 
     /** `/lens`, `/lens ticket`, `/lens session` and `/lens days`: import, then show the summary. */
     async function summary(ctx: ExtensionContext, command: SummaryCommand): Promise<void> {
@@ -205,7 +236,7 @@ export function registerLens(pi: ExtensionAPI, deps: Deps): void {
 
     pi.registerCommand("lens", {
         description: "Jig summary of cost, failures and your waiting time: /lens, ticket KEY, session, days N; "
-            + "grafana or datasette for a dashboard; rebuild, status",
+            + "usage for cost and tokens by period and model; grafana or datasette for a dashboard; rebuild, status",
         getArgumentCompletions: completions,
         handler: async (args, ctx) => {
             const command = parseCommand(args);
@@ -213,6 +244,8 @@ export function registerLens(pi: ExtensionAPI, deps: Deps): void {
                 case "usage":
                     tell(ctx, command.problem === undefined ? USAGE : `${command.problem}\n${USAGE}`, "warning");
                     return;
+                case "usage-view":
+                    return usage(ctx);
                 case "viewer":
                     return openViewer(ctx, command.viewer);
                 case "rebuild":

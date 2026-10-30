@@ -425,6 +425,16 @@ export interface FakePiOptions {
 
 /** What the plugin registers with Pi, and a screen that remembers what it was told. */
 export class FakePi {
+    /** Listeners on Pi's event bus, by event name. */
+    readonly listeners = new Map<string, Array<(payload: unknown) => void>>();
+    /** What `ui.custom` was given, with the promise it returned. */
+    readonly customs: Array<{
+        component: { render(width: number): string[]; handleInput(data: string): void; dispose?(): void };
+        result: Promise<unknown>;
+        requested: { count: number };
+    }> = [];
+    /** The rows of the terminal, which a custom view sizes itself by. */
+    rows = 30;
     readonly handlers = new Map<string, Handler[]>();
     readonly commands = new Map<
         string,
@@ -451,6 +461,28 @@ export class FakePi {
                 notify: (text: string, level?: string) => {
                     this.notices.push({ text, level: level ?? "info" });
                 },
+                custom: (
+                    factory: (
+                        tui: unknown,
+                        theme: unknown,
+                        keys: unknown,
+                        done: (value?: unknown) => void,
+                    ) => { render(width: number): string[]; handleInput(data: string): void; dispose?(): void },
+                ) => {
+                    let finish: (value?: unknown) => void = () => {};
+                    const result = new Promise<unknown>((resolve) => {
+                        finish = resolve;
+                    });
+                    const requested = { count: 0 };
+                    const component = factory(
+                        { terminal: { rows: this.rows }, requestRender: () => requested.count++ },
+                        { fg: (_role: string, value: string) => value },
+                        {},
+                        (value) => finish(value),
+                    );
+                    this.customs.push({ component, result, requested });
+                    return result;
+                },
             },
             sessionManager: {
                 getSessionId: () => {
@@ -463,6 +495,20 @@ export class FakePi {
 
     get api(): ExtensionAPI {
         return this as unknown as ExtensionAPI;
+    }
+
+    get events() {
+        return {
+            on: (name: string, listener: (payload: unknown) => void) => {
+                this.listeners.set(name, [...(this.listeners.get(name) ?? []), listener]);
+                return () => {
+                    this.listeners.set(name, (this.listeners.get(name) ?? []).filter((item) => item !== listener));
+                };
+            },
+            emit: (name: string, payload: unknown) => {
+                for (const listener of this.listeners.get(name) ?? []) listener(payload);
+            },
+        };
     }
 
     on(event: string, handler: Handler): void {
@@ -565,6 +611,7 @@ export function rig(t: TestContext, o: RigOptions = {}) {
     lens({
         env: { JIG_STATE_DIR: state, PATH: "/usr/bin:/bin", HOME: "/home/me", ANTHROPIC_API_KEY: "must-not-pass-on" },
         now: () => o.now ?? NOW,
+        sessionsDir: () => path.join(state, "pi-sessions"),
         find: (names) => names.map((name) => installed[name]).find((file) => file !== undefined),
         homepath: () => undefined,
         probe: async (viewer, port) => {

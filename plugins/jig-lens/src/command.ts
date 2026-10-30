@@ -8,13 +8,15 @@ export type Command =
     /** Without an id, the session the user is in. */
     | { kind: "session"; session?: string }
     | { kind: "days"; days: number }
+    /** The interactive view of cost and tokens from Pi's own session files. */
+    | { kind: "usage-view" }
     | { kind: "viewer"; viewer: Viewer }
     | { kind: "rebuild" }
     | { kind: "status" }
     /** Something was wrong with the arguments. `problem` says what, when there is more to say than the usage. */
     | { kind: "usage"; problem?: string };
 
-export const USAGE = "Usage: /lens [ticket KEY | session [id] | days N | grafana | datasette | rebuild | status]";
+export const USAGE = "Usage: /lens [ticket KEY | session [id] | days N | usage | grafana | datasette | rebuild | status]";
 
 /** The commands that show a summary. */
 export type SummaryCommand = Extract<Command, { kind: "summary" | "ticket" | "session" | "days" }>;
@@ -27,6 +29,7 @@ export const WORDS: ReadonlyArray<readonly [word: string, what: string]> = [
     ["ticket", "one ticket, over all time"],
     ["session", "one session, this one by default"],
     ["days", `the last N days, 1 to ${MAX_DAYS}`],
+    ["usage", "cost and tokens from Pi's session files, by period and model"],
     ["grafana", "open the Grafana dashboards"],
     ["datasette", "open the Datasette tables"],
     ["rebuild", "make the index again"],
@@ -50,6 +53,8 @@ export function parseCommand(args: string): Command {
         case "rebuild":
         case "status":
             return rest.length === 0 ? { kind: word } : usage(`/lens ${word} takes no arguments.`);
+        case "usage":
+            return rest.length === 0 ? { kind: "usage-view" } : usage("/lens usage takes no arguments.");
         case "ticket": {
             const [ticket, ...extra] = rest;
             if (ticket === undefined) return usage("/lens ticket needs a ticket key.");
