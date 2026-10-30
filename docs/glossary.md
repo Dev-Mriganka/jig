@@ -1,67 +1,186 @@
 # Glossary
 
+The words these documents use, in groups. Each plugin README links a term the
+first time it uses it, where that helps.
+
+## Pi and plugins
+
 | Term | Meaning |
 |---|---|
 | **Pi** | The coding agent Jig plugs into ([pi.dev](https://pi.dev)). Its extensions are TypeScript. |
 | **Plugin** | A Pi package of Jig's, such as `jig-core` or `jig-git`, or a private company plugin. |
-| **Company plugin** | A private plugin that adds one employer's environments, sign-in, internal tools and backends. It is never part of this repository. |
-| **Overlay skill** | A company's own rules, added to the skill of a generic plugin. The tool stays the same; the agent reads both. |
+| **Company plugin** | A private plugin with one employer's environments, sign-in, tools and backends. |
+| **Overlay skill** | A company's own rules, added to a generic plugin's skill. The tool stays the same. |
 | **Tool** | Something the model can call: Pi's own `read` or `bash`, or a plugin's `git` or `pr`. |
 | **Action** | One operation of a tool with several, such as `git push` or `pr comment`. |
-| **Kind** | In a tool table, what an action does: it reads (`read`), writes on this machine (`local write`) or writes to a service outside it (`external write`), and whether it asks you first. |
+| **Kind** | In a tool table: `read`, `local write` (this machine) or `external write` (a service). |
+| **Section** | A plugin's own part of `jig.json`, such as `git` or `jira`. An error names the key. |
+| **Workspace** | The folder Pi started in, or the repository folder that holds it. |
+| **Adapter** | A small piece of a plugin that speaks one outside system, such as one CI system or one log backend. |
+
+- **A company plugin** is never part of this repository.
+- **Kind** also says whether the action asks you first, such as `external write, asks`.
+- **A section** is checked by its plugin, which starts with defaults when it is wrong.
+- **A workspace** is where `jig-git` finds repositories.
+- **An adapter** that lacks an action refuses it, naming it.
+
+## Rules and decisions
+
+| Term | Meaning |
+|---|---|
 | **Tool manager** | `jig-core`'s role: it sits over every tool call and applies the rules. |
-| **Environment** | Where a call acts: `local`, `external`, `production`, or a company's test environment such as `staging`. |
+| **Environment** | Where a call acts: `local`, `external`, `production`, or a test environment such as `staging`. |
 | **Effect** | Whether a call reads or writes. |
 | **Decision** | What the rules say for a call: allow, ask or deny. |
-| **The floor** | The rules configuration cannot lower: production writes denied, production results masked, credentials hidden from `bash`, no approval without a screen, and Pi's file tools refused on protected paths (credential files, and writes to Pi's agent folder). |
+| **The floor** | The rules configuration cannot lower, such as production writes being denied. |
 | **Declaration** | How a Jig tool tells `jig-core` the environment and effect of each of its actions. |
-| **Classification** | Working out a call's environment and effect, from the tool's declaration, a configuration rule, Pi's built-in defaults for its own tools, the tool's hints or the default. |
-| **Unknown tool** | A tool that nothing classifies. It counts as a write outside the machine, so it asks until a rule or the tool's hints say otherwise. |
+| **Classification** | Working out a call's environment and effect, from the declaration, a rule, a default or a hint. |
+| **Unknown tool** | A tool that nothing classifies. It counts as a write outside the machine, so it asks. |
+| **Protected path** | A path Pi's file tools refuse: *secret* (no read, no write) or *guarded* (read only). |
+
+- **The floor** is: production writes denied, production results masked,
+  credentials hidden from `bash`, no approval without a screen, and protected
+  paths refused. See [Permissions](permissions.md#the-floor-what-configuration-cannot-change).
+- **Classification** takes its answer from the tool's declaration, then a rule
+  in your configuration, Pi's built-in defaults, the tool's hints, and last
+  the default. See
+  [Permissions](permissions.md#how-a-call-gets-its-environment-and-effect).
+- **A protected path** is a credential file, or Pi's agent folder, where
+  `jig.json` lives. Configuration can add paths and never remove one.
+- **An unknown tool** asks until a rule or the tool's own hints say otherwise.
+
+## Approvals
+
+| Term | Meaning |
+|---|---|
 | **Approval** | Your answer to an "ask", given inside the waiting call. |
-| **Preview** | What a tool shows before a write that asks. If what the write would do changes after you looked, the call is refused and you see the new preview. |
-| **Review screen** | A scrollable approval screen for long previews. `o` opens the preview rendered in the browser; `y` approves. |
-| **Masking** | Replacing customer personal data in production results with tokens that stay the same all day. Identifiers are never masked. A company plugin can name more fields that hold personal data. |
+| **Preview** | What a tool shows before a write that asks. A call is refused if the write changed since. |
+| **Review screen** | A scrollable approval screen for long previews. `y` approves, `o` opens the browser. |
+
+See [Approvals](approvals.md). When a write changed since you looked, the call
+is refused and you see the new preview.
+
+## Secrets and data
+
+| Term | Meaning |
+|---|---|
+| **Masking** | Replacing customer personal data in production results with tokens that stay the same all day. |
 | **Redaction** | Removing every known secret value from output. |
-| **Secret reference** | The name of a stored password or token, such as `pass:work/jira-token`. A tool names it, and `jig-core` resolves it just before the tool runs. The value never reaches the model. |
-| **Sign-in service** | Code from a company plugin that signs requests in to one of its systems, such as a single sign-on gateway. A tool asks for the headers of one request by the service's name, and their values are removed from output like secrets. |
-| **Transport** | Code from a company plugin that carries a tool's requests to one of its systems, for example through a local sign-in proxy that holds the session, so the tool never sees a token. A tool sends through it by the transport's name. |
-| **Section** | A plugin's own part of `jig.json`, such as `git` or `jira`. The plugin checks it, and an error names the key. |
-| **Workspace** | The folder Pi started in, or, when Pi started inside a repository, the folder that holds it. `jig-git` finds repositories there. |
-| **Spill file** | Where the full result goes when the text shown to the model is cut. The model can open it on demand. |
-| **Record** | One line per tool call or model turn, written by `jig-core` and read by `jig-lens`. It never holds tool arguments or output. |
-| **Facts** | A few named numbers or short codes that a Jig tool adds to its own record, such as tests passed or a CI run's conclusion. Never free text. |
-| **Watch** | A background check on a pull request, a CI run or a tag, started by `ci watch` or by itself after a push. It is saved, so it survives a restart of Pi, and it tells the agent once when its finish line is reached. |
-| **Finish line** | The condition that ends a watch, named when it starts, such as a named CI check passing or a pull request being merged. |
-| **Artifact ready** | The event `jig-ops` publishes (`jig-ops:artifact-ready`) when a build, tag or release exists for the watched commit. A company plugin decides what follows; `jig-ops` never deploys from it. |
-| **Pushed** | The event `jig-git` publishes (`jig-git:pushed`) after a push and after a new pull request. `jig-ops` listens and starts a CI watch for a service of its catalog that has the repository. |
-| **Lens index** | `jig-lens`'s SQLite copy of the records, which `/lens` and the optional Grafana dashboards read. It can always be rebuilt from the records. |
-| **Sandbox** | Bubblewrap around the agent's own shell and file tools. It hides credentials and keeps the agent's own tooling read-only. Linux only. |
-| **Ticket** | A unit of work in an issue tracker, taken through a workflow by `jig-workflow` and remembered by `jig-memory`. |
-| **Workflow** | A named, ordered list of stages that you or a company plugin define in a file, such as `feature` or `bugfix`. `jig-workflow` takes a piece of work through one. |
-| **Exit condition** | What must hold before work leaves a stage, from a fixed list such as `plan-approved` or `tests-pass-at-head`. |
-| **Hold** | A tool call a workflow keeps back until a condition holds, such as `git push` until the tests pass. It only ever tightens a decision. |
-| **Ticket folder** | A folder for one ticket, outside every repository: its notes, plan, evidence and the repositories bound to it. |
-| **Card** | A short summary of a closed ticket: problem, cause, fix, repositories, identifiers and error text. Planned for `jig-memory`. |
-| **Recall** | Finding earlier tickets related to a new one by shared keys, then by keyword search, and handing the agent their cards as a short message. Planned for `jig-memory`. |
-| **Memory keeper** | Planned: it writes a ticket's card at close and proposes organizational and personal facts. You approve the exact text of every one. |
+| **Secret reference** | The name of a stored secret, such as `pass:work/jira-token`. The model never sees the value. |
+| **Sign-in service** | Company plugin code that signs requests in to one of its systems. |
+| **Transport** | Company plugin code that carries a tool's requests to one of its systems. |
+| **Signed-in request** | A request `jig-core` sends for a plugin, adding the credential, so the plugin never sees it. |
+| **Spill file** | Where the full result goes when the text shown to the model is cut. |
+| **Sandbox** | Bubblewrap around the agent's shell and file tools. It hides credentials. Linux only. |
+
+- **Masking** never touches identifiers. A company plugin can name more fields
+  that hold personal data (see [Masking](../plugins/jig-core/docs/masking.md)).
+- **A secret reference** is resolved by `jig-core` just before the tool runs
+  (see [Secrets](secrets.md)).
+- **A sign-in service** is asked for the headers of one request, as a single
+  sign-on gateway would give them. Their values are removed from output like
+  secrets.
+- **A transport** can go through a local sign-in proxy that holds the session,
+  so the tool never sees a token. A tool sends through it by name.
+- **A spill file** holds the full result, which the model can open on demand.
+
+## Records and watches
+
+| Term | Meaning |
+|---|---|
+| **Record** | One line per tool call or model turn, written by `jig-core` and read by `jig-lens`. |
+| **Facts** | A few named numbers or short codes a Jig tool adds to its record. Never free text. |
+| **Watch** | A background check on a pull request, a CI run or a tag. It is saved, so it survives a restart. |
+| **Finish line** | The condition that ends a watch, named when it starts, such as a named CI check passing. |
+| **Artifact ready** | The event `jig-ops:artifact-ready`: a build, tag or release exists for the watched commit. |
+| **Pushed** | The event `jig-git:pushed`, after a push and after a new pull request. |
+| **Lens index** | `jig-lens`'s SQLite copy of the records. It can always be rebuilt. |
+
+- **A record** never holds tool arguments or output.
+- **Facts** are, for example, tests passed or a CI run's conclusion.
+- **A watch** is started by `ci watch`, or by itself after a push, and tells
+  the agent once when its finish line is reached (see
+  [Watches](../plugins/jig-core/docs/watches.md)).
+- **Artifact ready** is for a company plugin to act on. `jig-ops` never
+  deploys from it.
+- **Pushed** makes `jig-ops` start a CI watch for a service of its catalog
+  that has the repository.
+
+## Tickets and workflows
+
+| Term | Meaning |
+|---|---|
+| **Ticket** | A unit of work in an issue tracker, such as `PROJ-123`. |
+| **Ticket folder** | A folder for one ticket, outside every repository: notes, plan, evidence and bound repositories. |
 | **Evidence** | Tool results saved in the ticket folder while the ticket is active, masked like everything else. |
-| **Stage** | A step of a workflow, such as plan or review, with a goal the agent sees and its exit conditions. |
-| **Gate** | A condition that holds a stage or an action until it is met, such as an approved plan or a passing test of the exact commit. |
-| **Acceptance scenario** | A numbered check in a ticket's plan. It is passed or failed, and a pass needs evidence. |
+| **Workflow** | A named, ordered list of stages that you or a company plugin define in a file. |
+| **Stage** | A step of a workflow, such as plan or review, with a goal the agent sees. |
+| **Exit condition** | What must hold before work leaves a stage, from a fixed list such as `plan-approved`. |
+| **Hold** | A tool call a workflow keeps back until a condition holds. It only ever tightens a decision. |
+| **Gate** | A condition that holds a stage or an action until it is met, such as an approved plan. |
+| **Acceptance scenario** | A numbered check in a ticket's plan. A pass needs evidence. |
 | **Checker agent** | A read-only agent in a fresh context that reviews a change before you do. Planned. |
-| **Passkey** | A key pair made by your device (Windows Hello, Touch ID or a security key) that proves you are present. `jig-review` stores the public half and approves a review when the device signs its challenge. The agent cannot make the signature. |
-| **Fingerprint** | The SHA-256 of a passkey's public key. Pi shows it when you register a key and the settings page lists it, so you can tell which key is which. |
-| **Review round** | One pass of a review: your comments, the agent's answers, and the new diff that shows what changed. |
-| **Approved** | `jig-review`'s `jig-review:approved` event, and the record behind it, with how it was approved: `passkey` or `page-and-pi`. |
-| **Review ledger** | Planned: every review comment, from the review page, the pull request or chat, with how it was handled. |
-| **Service catalog** | Each service described once for `jig-ops`: its repository, its CI system and where it is, and per environment how it deploys, where it runs and its health address. |
-| **Adapter** | A small piece of a plugin that speaks one outside system, such as one CI system, one log backend or one format of saved requests, behind the plugin's common verbs. An action an adapter does not have is refused, naming it. |
-| **Collection** | A team's saved API requests in one place, such as a Postman export or a folder of `.http` files, with its environments. `jig-api` reads it. |
-| **Saved request** | One request in a collection, with a name, a method, an address and variables. The agent runs it by name and fills only its variables. |
-| **Pinned host** | A host an environment's requests may reach: the ones its own addresses come to. A request that goes anywhere else is refused. |
-| **Subagent** | A child agent: a full Pi session that another session starts in its own terminal pane. |
-| **Agent file** | A file that sets a subagent's role, its tools and its model, such as a planner, a reviewer, a scout or a worker. |
-| **Pin** | A hash of a script's folder. A script whose folder changed is refused until you pin it again. |
+| **Card** | A short summary of a closed ticket: problem, cause, fix, repositories, identifiers. Planned. |
+| **Recall** | Finding earlier tickets related to a new one, and handing the agent their cards. Planned. |
+| **Memory keeper** | Planned: writes a ticket's card at close and proposes facts. You approve every one. |
+
+- **A ticket** is taken through a workflow by `jig-workflow` and remembered by
+  `jig-memory`.
+- **A workflow** is, for example, `feature` or `bugfix`.
+- **A hold** is, for example, `git push` until the tests pass.
+- **A gate** is, for example, a passing test of the exact commit.
+- **Recall** works by shared keys first, then keyword search.
+
+## Code review
+
+| Term | Meaning |
+|---|---|
+| **Passkey** | A key pair your device makes (Windows Hello, Touch ID, a security key) to prove you are present. |
+| **Fingerprint** | The SHA-256 of a passkey's public key, so you can tell which key is which. |
+| **Review round** | One pass of a review: your comments, the agent's answers, and the new diff. |
+| **Approved** | `jig-review`'s `jig-review:approved` event, with how it was approved: `passkey` or `page-and-pi`. |
+| **Review ledger** | Planned: every review comment, from any source, with how it was handled. |
+
+- **A passkey** is stored as its public half, and the agent cannot make the
+  signature (see [Approvals](approvals.md)).
+- **A fingerprint** is shown by Pi when you register a key, and on the
+  settings page.
+- **A review ledger** would take comments from the review page, the pull
+  request or chat.
+
+## Systems
+
+| Term | Meaning |
+|---|---|
+| **Service catalog** | Each service described once for `jig-ops`: its repository, its CI, and how it deploys and runs. |
+| **Collection** | A team's saved API requests in one place, such as a Postman export or a folder of `.http` files. |
+| **Saved request** | One request in a collection. The agent runs it by name and fills only its variables. |
+| **Pinned host** | A host an environment's requests may reach. Any other host is refused. |
+| **Allow list** | In `jig-mongo`: only what is listed may be seen. Production uses one. |
+| **Deny list** | In `jig-mongo`: what is listed may not be seen. Test environments use one. |
 | **Wiki markup** | Jira's text format. `jig-jira` shows it rendered before it is sent. |
-| **Palette** | The look of a theme as seventeen named colours, such as `text`, `accent` and `error`. One role map turns them into all of Pi's roles. `jig-theme` ships six, and you write your own in `jig.json` as a base, a few colours and a few roles. |
-| **Footer part** | One piece of the one-line footer, such as `model`, `context` or `cost`. You choose the parts and their order, and another plugin adds its own by emitting `jig-theme:segment`. |
+
+- **A service catalog** also says, per environment, where it runs and its
+  health address.
+- **A collection** comes with its environments, and `jig-api` reads it.
+- **A pinned host** is one that an environment's own addresses come to.
+- **Allow and deny lists** reach fields, not only databases and collections.
+
+## Subagents
+
+| Term | Meaning |
+|---|---|
+| **Subagent** | A child agent: a full Pi session that another session starts in its own terminal pane. |
+| **Agent file** | A file that sets a subagent's role, tools and model, such as a planner or a reviewer. |
+
+## The look
+
+| Term | Meaning |
+|---|---|
+| **Palette** | The look of a theme as seventeen named colours, such as `text`, `accent` and `error`. |
+| **Footer part** | One piece of the one-line footer, such as `model`, `context` or `cost`. |
+
+- **A palette** is turned into all of Pi's roles by one role map. `jig-theme`
+  ships six, and you write your own in `jig.json`.
+- **A footer part** is chosen by you, with its order. Another plugin adds its
+  own by emitting `jig-theme:segment`.

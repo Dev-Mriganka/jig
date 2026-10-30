@@ -53,6 +53,7 @@ reference.
 The headers are treated like secrets: `jig-core` removes their values from
 every result before the model sees it. See
 [Sign-in services](../plugins/jig-core/docs/sign-in-and-transports.md#sign-in-services).
+
 A request names a reference, a sign-in service or a transport in `auth`, and
-`jig-core` attaches the credential so a plugin never sees it (see
+`jig-core` attaches the credential, so a plugin never sees it (see
 [Credential sources](../plugins/jig-core/docs/sign-in-and-transports.md)).

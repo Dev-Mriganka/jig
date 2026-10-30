@@ -1,13 +1,14 @@
 # Jig agent guide
 
-Seven plugins are built (`jig-core`, `jig-git`, `jig-memory`, `jig-lens`,
-`jig-jira`, `jig-logs`, `jig-api`). `jig-ops` is built: ci, deploy and
-runtime. `jig-review` is built: the browser review, approved with a passkey.
-`jig-mongo` is built: explore, query, aggregate and write, with allow and deny
-lists. `jig-theme` is built: palettes, the footer and the answer colour. The
-rest are design. Plugin READMEs are the specifications. Code
-follows them, and when either changes, the other changes in the same commit.
-The tool tables of `jig-git` and `jig-jira` are read by their tests.
+Eleven of the thirteen plugins are built: `jig-core`, `jig-git`, `jig-memory`,
+`jig-lens`, `jig-jira`, `jig-logs`, `jig-api`, `jig-ops`, `jig-review` and
+`jig-mongo`, and `jig-theme` is built as well. `jig-workflow` and `jig-agents`
+are design.
+
+Plugin READMEs are the specifications. Code follows them, and when either
+changes, the other changes in the same commit. Tests read the tool tables of
+`jig-git`, `jig-jira` and `jig-mongo`, and the READMEs and docs of `jig-lens`
+and `jig-theme`, so change a table and its test together.
 
 - **Read first:** [docs/architecture.md](docs/architecture.md) and
   [docs/permissions.md](docs/permissions.md).
