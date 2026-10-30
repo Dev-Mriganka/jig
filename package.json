@@ -23,7 +23,11 @@
   },
   "pi": {
     "extensions": [
-      "./plugins/jig-core/src/index.ts"
+      "./plugins/jig-core/src/index.ts",
+      "./plugins/jig-git/src/index.ts"
+    ],
+    "skills": [
+      "./plugins/*/skills"
     ]
   },
   "devDependencies": {
