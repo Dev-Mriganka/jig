@@ -227,14 +227,31 @@ describe("a request that is wrong", () => {
         assert.equal(head.notSent && bytes.notSent, true);
     });
 
-    test("a header the sign-in sets cannot also be set by the request", async () => {
+    test("a header the credential also sets replaces the request's, ignoring case, unless the request says refuse", async () => {
         const t = rig();
         t.secrets.set("env:API_TOKEN", TOKEN);
+        t.replies.push(t.ok());
+        await t.http.request({
+            ...base,
+            headers: { authorization: "x", Accept: "a" },
+            auth: { bearer: "env:API_TOKEN" },
+        });
+        assert.equal(t.sent[0]?.headers.authorization, `Bearer ${TOKEN}`);
+        assert.equal(t.sent[0]?.headers.accept, "a");
         const error = await failure(
-            t.http.request({ ...base, headers: { authorization: "x" }, auth: { bearer: "env:API_TOKEN" } }),
+            t.http.request({
+                ...base,
+                headers: { authorization: "x" },
+                auth: { bearer: "env:API_TOKEN" },
+                onHeaderClash: "refuse",
+            }),
         );
         assert.equal(error.message, "header Authorization is set by the sign-in, so the request cannot have it too");
-        assert.equal(t.sent.length, 0);
+        assert.equal(t.sent.length, 1, "nothing more was sent");
+        assert.equal(
+            (await failure(t.http.request({ ...base, onHeaderClash: "maybe" as never }))).code,
+            "invalid_request",
+        );
     });
 });
 
@@ -260,6 +277,42 @@ describe("bearer", () => {
         );
         assert.equal(t.sent.length, 0);
         assert.ok(!error.message.includes("MISSING"), "the reference is not repeated");
+    });
+});
+
+describe("a secret that several requests of one call share", () => {
+    test("is read once for requests that share a signal, and again for another signal or none", async () => {
+        const t = rig();
+        t.secrets.set("env:KEY", TOKEN);
+        t.replies.push(t.ok(), t.ok(), t.ok(), t.ok(), t.ok());
+        const call = new AbortController().signal;
+        await t.http.request({ ...base, auth: { bearer: "env:KEY" } }, call);
+        await t.http.request({ ...base, auth: { bearer: "env:KEY" } }, call);
+        await t.http.request({ ...base, auth: { header: { name: "X-K", value: "env:KEY" } } }, call);
+        assert.equal(t.asked.length, 1);
+        await t.http.request({ ...base, auth: { bearer: "env:KEY" } }, new AbortController().signal);
+        await t.http.request({ ...base, auth: { bearer: "env:KEY" } });
+        assert.equal(t.asked.length, 3);
+    });
+
+    test("a failed read is not kept: the next request asks again", async () => {
+        const t = rig();
+        const call = new AbortController().signal;
+        await failure(t.http.request({ ...base, auth: { bearer: "env:KEY" } }, call));
+        t.secrets.set("env:KEY", TOKEN);
+        t.replies.push(t.ok());
+        await t.http.request({ ...base, auth: { bearer: "env:KEY" } }, call);
+        assert.equal(t.asked.length, 2);
+    });
+
+    test("a sign-in service is asked for every request", async () => {
+        const t = rig();
+        t.services.set("sso", { Authorization: `Bearer ${TOKEN}` });
+        t.replies.push(t.ok(), t.ok());
+        const call = new AbortController().signal;
+        await t.http.request({ ...base, auth: { signIn: "sso" } }, call);
+        await t.http.request({ ...base, auth: { signIn: "sso" } }, call);
+        assert.equal(t.signedIn.length, 2);
     });
 });
 

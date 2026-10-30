@@ -274,6 +274,10 @@ export interface HttpRequest {
     auth?: HttpAuth;
     /** The name of a registered transport that carries the request instead of the network. */
     transport?: string;
+    /** What happens when a header of the request has the same name (ignoring case) as one the credential sets: the
+     *  credential's `replace`s it (the default), or the request is `refuse`d with `invalid_request`, so one of the two
+     *  never silently wins. */
+    onHeaderClash?: "replace" | "refuse";
     /** From 1 ms to 10 minutes. Default 30 s. It starts after the credential is in hand: a secret store may wait for
      *  you to unlock it. */
     timeoutMs?: number;
@@ -372,7 +376,9 @@ export interface JigApi {
     /**
      * Sends one HTTP request with a credential that jig-core reads for it, so plugin code never sees the value. It never
      * follows a redirect (a 3xx comes back with its `location`), caps the reply, and throws an `HttpError` with a `code`
-     * for a request that got no reply. See `docs/plugin-contract.md` and `docs/sign-in-and-transports.md`.
+     * for a request that got no reply. Requests that share one `signal` read a secret once, so the several requests of
+     * one call may pass the same signal (`AbortSignal.any([])` makes one when the call has none). See
+     * `docs/plugin-contract.md` and `docs/sign-in-and-transports.md`.
      */
     readonly http: {
         request(request: HttpRequest, signal?: AbortSignal): Promise<HttpResponse>;

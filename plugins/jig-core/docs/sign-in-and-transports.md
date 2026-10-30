@@ -50,11 +50,18 @@ const reply = await jig().http.request(
   replaced by `[redacted]` in the body, the headers and the cookies, as it is,
   inside JSON text and URL-encoded. `jig-core` also hides it from every later
   tool result.
+- **A secret is read once for requests that share a signal.** The several
+  requests of one call pass the same `signal` (`AbortSignal.any([])` makes one
+  when the call has none), so a store that is locked asks you to unlock it once
+  and a search of many buckets does not run the backend for each. A failed read
+  is not kept, a request with no signal reads every time, and a sign-in service
+  is asked for every request, because it knows when a token has run out.
 - **A request is sent once.** Nothing is retried, except one resend after a 401
   for an OAuth token that came from the cache: the server turned it down for an
   expired token before it acted, so a write is not repeated.
-- **A header that the credential sets cannot also be set by the request.** That
-  is an error, so one of the two never silently wins.
+- **A header that the credential also sets replaces the request's** (ignoring
+  case). A request can say `onHeaderClash: "refuse"` to get an `invalid_request`
+  error instead, so that one of the two never silently wins.
 - **The time limit starts after the credential is in hand.** A secret store may
   wait for you to unlock it, and that is not the server's time. A transport or a
   fetch that ignores its signal still times out.

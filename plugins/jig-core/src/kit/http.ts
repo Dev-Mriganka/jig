@@ -10,6 +10,7 @@
 // - The reply is read as it arrives and cut at `maxBytes`, so a huge reply is dropped before it is all in memory.
 // - A failure is an `HttpError` with a `code`. Its message holds no header value, no credential and no query string.
 // - Credentials that were sent are replaced by `[redacted]` in the reply, because a server may echo what it was sent.
+// - A header that the credential also sets replaces the request's (or, when the request says `refuse`, is an error).
 // - The deadline starts after the credential is in hand: unlocking a secret store may wait for the user.
 // - A request is sent once. Nothing is retried, except one resend after a 401 for an OAuth token that came from the
 //   cache: the server turned it down for an expired token before it acted, so a write is not repeated.
@@ -254,10 +255,30 @@ export function createHttp(deps: HttpDeps): JigApi["http"] {
     const send: typeof fetch = deps.fetch ?? ((input, init) => fetch(input, init));
     const redact = deps.redact ?? (() => {});
 
+    // Requests that share one signal (the several requests of one call) read a secret once: a store that is locked
+    // asks the user to unlock it once, and a search of many buckets does not run the backend for every one. A failed
+    // read is not kept, and a request with no signal reads every time. A sign-in service is asked for every request,
+    // because it is the one that knows when a token has run out.
+    const reads = new WeakMap<AbortSignal, Map<string, Promise<string>>>();
+
     /** Reads a secret. A failure is `auth_failed` with the backend's own words, which never repeat the reference. */
     async function secret(reference: string, caller: AbortSignal | undefined): Promise<string> {
+        let kept = caller === undefined ? undefined : reads.get(caller);
+        let pending = kept?.get(reference);
+        if (pending === undefined) {
+            pending = deps.secrets.resolve(reference, caller);
+            if (caller !== undefined) {
+                if (kept === undefined) {
+                    kept = new Map();
+                    reads.set(caller, kept);
+                }
+                const map = kept;
+                map.set(reference, pending);
+                pending.catch(() => map.delete(reference));
+            }
+        }
         try {
-            return await deps.secrets.resolve(reference, caller);
+            return await pending;
         } catch (error) {
             throw credentialFailure(error, caller);
         }
@@ -386,12 +407,15 @@ export function createHttp(deps: HttpDeps): JigApi["http"] {
         const headers: Record<string, string> = {};
         for (const [name, value] of Object.entries(request.headers ?? {})) headers[name] = value;
         if (credential !== undefined) {
-            const given = new Set(Object.keys(headers).map((name) => name.toLowerCase()));
-            const clash = Object.keys(credential.headers).find((name) => given.has(name.toLowerCase()));
-            if (clash !== undefined) {
-                throw invalid(`header ${clash} is set by the sign-in, so the request cannot have it too`);
+            for (const [name, value] of Object.entries(credential.headers)) {
+                const same = Object.keys(headers).filter((given) => given.toLowerCase() === name.toLowerCase());
+                if (same.length > 0 && request.onHeaderClash === "refuse") {
+                    throw invalid(`header ${name} is set by the sign-in, so the request cannot have it too`);
+                }
+                // The credential's header replaces the request's of the same name.
+                for (const given of same) delete headers[given];
+                headers[name] = value;
             }
-            for (const [name, value] of Object.entries(credential.headers)) headers[name] = value;
         }
 
         if (request.transport !== undefined) return viaTransport(request, headers, signal, caller, deadline, maxBytes);
@@ -480,6 +504,13 @@ export function createHttp(deps: HttpDeps): JigApi["http"] {
             }
             if (request.transport !== undefined && !text(request.transport)) {
                 throw invalid("transport must name a registered transport");
+            }
+            if (
+                request.onHeaderClash !== undefined &&
+                request.onHeaderClash !== "replace" &&
+                request.onHeaderClash !== "refuse"
+            ) {
+                throw invalid("onHeaderClash must be replace or refuse");
             }
             for (const [name, value] of Object.entries(request.headers ?? {})) {
                 if (typeof value !== "string") throw invalid(`header ${name.slice(0, 40)} must be text`);
