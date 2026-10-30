@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="650" viewBox="0 0 1100 650" role="img" aria-label="Continuous sensors outside any one change. Codebase drift sensors and runtime sensors feed the coding agent. Harness sensors, built from your sessions and tickets, feed you, because changes to the harness are yours to approve." font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">
+  <rect x="0.5" y="0.5" width="1099" height="649" rx="10" fill="#FAFBFA" stroke="#D2D9D3"/>
+  <defs>
+    <marker id="harnessloop-head-5d4b7c-26" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="26" markerHeight="26" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#5D4B7C"/></marker>
+    <marker id="harnessloop-head-c08326-26" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="26" markerHeight="26" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#C08326"/></marker>
+  </defs>
+  <text x="30" y="50" font-size="26" fill="#1A1F1D" font-weight="700">Continuous sensors: codebase, runtime and the harness itself</text>
+  <!-- left: Pi, and you -->
+  <rect x="30" y="90" width="190" height="330" fill="#5D4B7C"/>
+  <text x="125" y="240" font-size="32" fill="#FFFFFF" font-weight="700" text-anchor="middle">Pi</text>
+  <text x="125" y="266" font-size="15" fill="#FFFFFF" text-anchor="middle">coding agent</text>
+  <rect x="30" y="450" width="190" height="160" fill="#C08326"/>
+  <circle cx="125" cy="492" r="20" fill="#FFFFFF"/>
+  <path d="M92.5 552 Q92.5 517 125 517 Q157.5 517 157.5 552 Z" fill="#FFFFFF"/>
+  <text x="125" y="576" font-size="14" fill="#FFFFFF" text-anchor="middle">you change</text>
+  <text x="125" y="595" font-size="14" fill="#FFFFFF" text-anchor="middle">the harness</text>
+  <!-- right: what is being sensed -->
+  <rect x="910" y="90" width="160" height="150" fill="#1D3B4D"/>
+  <text x="990" y="132" font-size="22" fill="#FFFFFF" font-weight="700" text-anchor="middle">Codebase</text>
+  <rect x="910" y="270" width="160" height="150" fill="#6F9B76"/>
+  <text x="990" y="312" font-size="22" fill="#FFFFFF" font-weight="700" text-anchor="middle">Runtime</text>
+  <text x="990" y="338" font-size="14" fill="#FFFFFF" text-anchor="middle">test and QA</text>
+  <text x="990" y="356" font-size="14" fill="#FFFFFF" text-anchor="middle">environments</text>
+  <rect x="910" y="450" width="160" height="160" fill="#6B6B6B"/>
+  <text x="990" y="492" font-size="19" fill="#FFFFFF" font-weight="700" text-anchor="middle">Your sessions</text>
+  <text x="990" y="516" font-size="19" fill="#FFFFFF" font-weight="700" text-anchor="middle">and tickets</text>
+  <!-- continuous drift detection -->
+  <polygon points="330,100 900,100 900,230 330,230 300,165" fill="#E8ECEE"/>
+  <text x="884" y="140" font-size="18" fill="#1A1F1D" font-weight="700" text-anchor="end">Continuous drift</text>
+  <text x="884" y="162" font-size="18" fill="#1A1F1D" font-weight="700" text-anchor="end">detection</text>
+  <path d="M866.72 195.5 A17 17 0 1 1 842.25 190.07" fill="none" stroke="#1D3B4D" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <polygon points="850.15,184.55 845.67,196.71 837.19,184.59" fill="#1D3B4D"/>
+  <polygon points="364,118 510,118 510,152 364,152 352,135" fill="#FFFFFF" stroke="#5C9CAB" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="435" y="139.55" font-size="13" fill="#3B7C8A" text-anchor="middle">failures on main</text>
+  <polygon points="532,118 678,118 678,152 532,152 520,135" fill="#FFFFFF" stroke="#DF6A7C" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="603" y="139.55" font-size="13" fill="#B6475A" text-anchor="middle">facts vs code</text>
+  <polygon points="364,162 510,162 510,196 364,196 352,179" fill="#FFFFFF" stroke="#5C9CAB" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="435" y="183.55" font-size="13" fill="#3B7C8A" text-anchor="middle">dependency check</text>
+  <polygon points="532,162 678,162 678,196 532,196 520,179" fill="#FFFFFF" stroke="#DF6A7C" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="603" y="183.55" font-size="13" fill="#B6475A" text-anchor="middle">dead code</text>
+  <!-- continuous runtime feedback -->
+  <polygon points="330,280 900,280 900,410 330,410 300,345" fill="#E8ECEE"/>
+  <text x="884" y="320" font-size="18" fill="#1A1F1D" font-weight="700" text-anchor="end">Continuous runtime</text>
+  <text x="884" y="342" font-size="18" fill="#1A1F1D" font-weight="700" text-anchor="end">feedback</text>
+  <path d="M866.72 375.5 A17 17 0 1 1 842.25 370.07" fill="none" stroke="#6F9B76" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <polygon points="850.15,364.55 845.67,376.71 837.19,364.59" fill="#6F9B76"/>
+  <polygon points="364,298 510,298 510,332 364,332 352,315" fill="#FFFFFF" stroke="#5C9CAB" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="435" y="319.55" font-size="13" fill="#3B7C8A" text-anchor="middle">errors after deploy</text>
+  <polygon points="532,298 678,298 678,332 532,332 520,315" fill="#FFFFFF" stroke="#DF6A7C" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="603" y="319.55" font-size="13" fill="#B6475A" text-anchor="middle">log anomalies</text>
+  <polygon points="364,342 510,342 510,376 364,376 352,359" fill="#FFFFFF" stroke="#5C9CAB" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="435" y="363.55" font-size="13" fill="#3B7C8A" text-anchor="middle">stuck jobs</text>
+  <!-- harness feedback -->
+  <polygon points="330,460 900,460 900,600 330,600 300,530" fill="#E8ECEE"/>
+  <text x="884" y="500" font-size="18" fill="#1A1F1D" font-weight="700" text-anchor="end">Harness feedback</text>
+  <text x="884" y="521" font-size="13" fill="#3A4440" text-anchor="end">weekly, and when</text>
+  <text x="884" y="538" font-size="13" fill="#3A4440" text-anchor="end">a ticket closes</text>
+  <path d="M866.72 565.5 A17 17 0 1 1 842.25 560.07" fill="none" stroke="#6B6B6B" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <polygon points="850.15,554.55 845.67,566.71 837.19,554.59" fill="#6B6B6B"/>
+  <polygon points="364,478 510,478 510,512 364,512 352,495" fill="#FFFFFF" stroke="#5C9CAB" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="435" y="499.55" font-size="13" fill="#3B7C8A" text-anchor="middle">run records</text>
+  <polygon points="532,478 678,478 678,512 532,512 520,495" fill="#FFFFFF" stroke="#DF6A7C" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="603" y="499.55" font-size="13" fill="#B6475A" text-anchor="middle">record analyst</text>
+  <polygon points="364,522 510,522 510,556 364,556 352,539" fill="#FFFFFF" stroke="#5C9CAB" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="435" y="543.55" font-size="13" fill="#3B7C8A" text-anchor="middle">repeated failures</text>
+  <polygon points="532,522 678,522 678,556 532,556 520,539" fill="#FFFFFF" stroke="#DF6A7C" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="603" y="543.55" font-size="13" fill="#B6475A" text-anchor="middle">memory keeper</text>
+  <!-- who each band feeds -->
+  <line x1="296" y1="165" x2="232" y2="165" stroke="#5D4B7C" stroke-width="12" marker-end="url(#harnessloop-head-5d4b7c-26)"/>
+  <line x1="296" y1="345" x2="232" y2="345" stroke="#5D4B7C" stroke-width="12" marker-end="url(#harnessloop-head-5d4b7c-26)"/>
+  <line x1="296" y1="530" x2="232" y2="530" stroke="#C08326" stroke-width="12" marker-end="url(#harnessloop-head-c08326-26)"/>
+  <!-- legend -->
+  <rect x="330" y="626" width="14" height="14" rx="2" fill="#DF6A7C"/>
+  <text x="354" y="637.5" font-size="13" fill="#1A1F1D">a model decides</text>
+  <rect x="477.3" y="626" width="14" height="14" rx="2" fill="#5C9CAB"/>
+  <text x="501.3" y="637.5" font-size="13" fill="#1A1F1D">a program decides</text>
+  <rect x="638.51" y="627" width="17" height="12" fill="#FFFFFF" stroke="#1D3B4D" stroke-width="1.4" stroke-dasharray="3 2"/>
+  <text x="662.51" y="637.5" font-size="13" fill="#1A1F1D">planned for later</text>
+</svg>

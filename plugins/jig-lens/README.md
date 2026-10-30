@@ -29,6 +29,13 @@ to its calls.
 
 ## How it works
 
+![jig-core appends records, jig-lens imports them into its own index, and Grafana reads that index read-only on 127.0.0.1](../../docs/img/lens-flow.svg)
+
+*How the records reach the dashboard: `jig-core` appends them, `jig-lens` keeps a copy it can rebuild, and Grafana reads that copy read-only on `127.0.0.1`, with its sign-in on.*
+
+<details>
+<summary>Text version</summary>
+
 ```text
  jig-core ── appends ──▶ records/<day>.jsonl     owned by jig-core: the source
                                │
@@ -43,6 +50,8 @@ to its calls.
                                ▼
                          your browser
 ```
+
+</details>
 
 - **The record files stay the source.** Appending a line is the cheapest write
   that cannot break a tool call, and it keeps `jig-core` free of a database.
@@ -146,6 +155,12 @@ In `~/.pi/agent/jig.json`, under `lens`. All fields are optional.
 
 - **OpenTelemetry export to MLflow,** for trace waterfalls. Each call becomes
   an `execute_tool` span and each turn a `chat` span, grouped by session.
+
+## Later: the harness watching itself
+
+![Codebase and runtime sensors feed the coding agent, and harness sensors built from your sessions and tickets feed you](../../docs/img/harness-loop.svg)
+
+*Sensors that run outside any one change, in [Böckeler's](https://martinfowler.com/articles/harness-engineering.html) layout, with a third row of our own: the harness watching itself. Codebase and runtime sensors feed the coding agent; harness sensors, built from the records and closed tickets, feed you, because changes to the harness are yours to approve.*
 
 ## Layout (planned)
 

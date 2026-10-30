@@ -9,6 +9,10 @@ For example:
   → done;
 - a support ticket: investigate → resolve → done.
 
+![What the harness regulates around a ticket: maintainability, compatibility, behaviour and data safety, each with guides and sensors](../../docs/img/what-it-regulates.svg)
+
+*What the harness regulates around a ticket, in [Böckeler's](https://martinfowler.com/articles/harness-engineering.html) layout. Behaviour stays highlighted because it is the hardest to sense: acceptance scenarios in the plan, the tests, and you in an acceptance environment together cover it.*
+
 ## Tool: `flow`
 
 | Action | Kind | What it does |
@@ -37,6 +41,10 @@ lives here, and tools never read this plugin's files.
 
 ## Later, from the design reviews
 
+![A ticket over time: guides feed forward into Pi, and feedback comes back at four points: the edit loop, the checker loop, your one approval, and after the pull request](../../docs/img/ticket-loops.svg)
+
+*A ticket over time. Guides go into Pi before it writes code, and feedback comes back at four points: the edit loop, the checker, your one approval, and after the pull request, where CI, reviews and teammates report through the review ledger.*
+
 - **Check tiers:** compile, affected tests, diff rules and a full run, each
   failure compared with the main branch by full test name. A failure that
   already exists there never blocks a stage.
@@ -45,6 +53,10 @@ lives here, and tools never read this plugin's files.
   request or chat, with how it was handled.
 - **One approval per change:** pushes need only passing tests, and you approve
   once with all the evidence before the pull request is shared.
+
+![How the full run decides: no test report fails, new tests that did not run fail, and only failures that are new compared with the main branch block](../../docs/img/check-full.svg)
+
+*How the full run decides. Each question answers a failure seen in real sessions, named in red on the right; a failure that already exists on the main branch never blocks a stage.*
 
 ## Company part (in the company plugin)
 

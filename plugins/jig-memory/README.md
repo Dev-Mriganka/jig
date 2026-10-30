@@ -5,6 +5,10 @@
 `jig-memory` keeps what the agent learns about a ticket in files that outlive
 the session. Later it finds earlier tickets related to a new one.
 
+![Three kinds of memory: ticket memory today, organizational and personal memory later, and the paths between them](../../docs/img/memory-kinds.svg)
+
+*Three kinds of memory and the paths between them. Pi writes ticket memory as it works; later, a memory keeper writes a card at close and proposes organizational and personal facts, kept only with your yes, and recall hands Pi related cards when a new ticket starts.*
+
 ## Today's scope: ticket folders
 
 Each ticket has a folder outside every repository:
@@ -37,6 +41,10 @@ this plugin captures evidence through `jig-core`'s events.
   close. You approve the exact text of every one.
 - **Files and keyword search first.** Embeddings or a graph come only after a
   recall test built from real tickets shows misses.
+
+![Memory in five steps: write, consolidate, index, retrieve and use, with bands for protecting every write, keeping it small and measuring recall](../../docs/img/memory-steps.svg)
+
+*Memory in five steps, from notes while the agent works to a short message at the start of a later ticket. Lookup is keys and keyword search over plain files; embeddings or a graph wait for a measured miss.*
 
 ## Company part (in the company plugin)
 

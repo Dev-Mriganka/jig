@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="482" viewBox="0 0 920 482" role="img" aria-label="How jig-lens works. jig-core appends one line per tool call or model turn to a daily records file. jig-lens imports the new lines into its own SQLite index, which it can rebuild. Grafana, listening only on 127.0.0.1 with its sign-in on, reads the index read-only. You open the dashboard in your browser. Everything stays on this machine." font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">
+  <rect x="0.5" y="0.5" width="919" height="481" rx="10" fill="#FAFBFA" stroke="#D2D9D3"/>
+  <defs>
+    <marker id="lensflow-head-1d3b4d-11" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#1D3B4D"/></marker>
+    <marker id="lensflow-head-5c9cab-11" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#5C9CAB"/></marker>
+    <marker id="lensflow-head-8c979d-11" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8C979D"/></marker>
+    <marker id="lensflow-head-c08326-11" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#C08326"/></marker>
+  </defs>
+  <!-- jig-core writes the records -->
+  <rect x="40" y="24" width="280" height="58" rx="6" fill="#1D3B4D"/>
+  <text x="180" y="50" font-size="16" fill="#FFFFFF" font-weight="700" text-anchor="middle">jig-core</text>
+  <text x="180" y="69" font-size="12.5" fill="#FFFFFF" text-anchor="middle">the tool manager</text>
+  <text x="356" y="48" font-size="14.5" fill="#1A1F1D" font-weight="700">owned by jig-core</text>
+  <text x="356" y="67" font-size="13" fill="#3A4440">it is the only writer of the records</text>
+  <rect x="40" y="118" width="280" height="58" rx="6" fill="#FFFFFF" stroke="#1D3B4D" stroke-width="2"/>
+  <text x="180" y="144" font-size="16" fill="#1A1F1D" font-weight="700" text-anchor="middle">records/&lt;day&gt;.jsonl</text>
+  <text x="180" y="163" font-size="12.5" fill="#1A1F1D" text-anchor="middle">one JSON line per call or turn</text>
+  <text x="356" y="142" font-size="14.5" fill="#1A1F1D" font-weight="700">the source</text>
+  <text x="356" y="161" font-size="13" fill="#3A4440">appending a line cannot break a tool call, and jig-core needs no database</text>
+  <!-- jig-lens keeps an index -->
+  <rect x="40" y="212" width="280" height="58" rx="6" fill="#5C9CAB"/>
+  <text x="180" y="238" font-size="16" fill="#FFFFFF" font-weight="700" text-anchor="middle">lens/index.sqlite</text>
+  <text x="180" y="257" font-size="12.5" fill="#FFFFFF" text-anchor="middle">a copy for querying</text>
+  <text x="356" y="236" font-size="14.5" fill="#1A1F1D" font-weight="700">owned by jig-lens</text>
+  <text x="356" y="255" font-size="13" fill="#3A4440">delete it, and /lens rebuild makes it again</text>
+  <!-- Grafana reads it -->
+  <rect x="40" y="306" width="280" height="58" rx="6" fill="#8C979D"/>
+  <text x="180" y="332" font-size="16" fill="#FFFFFF" font-weight="700" text-anchor="middle">Grafana on 127.0.0.1</text>
+  <text x="180" y="351" font-size="12.5" fill="#FFFFFF" text-anchor="middle">read-only, sign-in on</text>
+  <text x="356" y="330" font-size="14.5" fill="#1A1F1D" font-weight="700">one local process: 127.0.0.1 only, sign-in on</text>
+  <text x="356" y="349" font-size="13" fill="#3A4440">its one data source opens only the index, read-only</text>
+  <text x="356" y="366" font-size="13" fill="#3A4440">the sign-in stays on because the agent's shell can reach 127.0.0.1</text>
+  <rect x="40" y="400" width="280" height="58" rx="6" fill="#C08326"/>
+  <text x="180" y="426" font-size="16" fill="#FFFFFF" font-weight="700" text-anchor="middle">your browser</text>
+  <text x="180" y="445" font-size="12.5" fill="#FFFFFF" text-anchor="middle">the dashboard: cost, failures, waiting</text>
+  <text x="356" y="424" font-size="14.5" fill="#1A1F1D" font-weight="700">nothing leaves the machine</text>
+  <text x="356" y="443" font-size="13" fill="#3A4440">the records never hold tool arguments or output</text>
+  <!-- who does what, between the boxes -->
+  <path d="M180 83 V117" fill="none" stroke="#1D3B4D" stroke-width="2.6" marker-end="url(#lensflow-head-1d3b4d-11)"/>
+  <text x="196" y="104.5" font-size="13" fill="#3A4440">jig-core appends one line per tool call or model turn</text>
+  <path d="M180 177 V211" fill="none" stroke="#5C9CAB" stroke-width="2.6" marker-end="url(#lensflow-head-5c9cab-11)"/>
+  <text x="196" y="198.5" font-size="13" fill="#3A4440">jig-lens imports the new lines, at the end of each turn and when you open the dashboard</text>
+  <path d="M180 271 V305" fill="none" stroke="#8C979D" stroke-width="2.6" marker-end="url(#lensflow-head-8c979d-11)"/>
+  <text x="196" y="292.5" font-size="13" fill="#3A4440">read-only SQL</text>
+  <path d="M180 365 V399" fill="none" stroke="#C08326" stroke-width="2.6" marker-end="url(#lensflow-head-c08326-11)"/>
+  <text x="196" y="386.5" font-size="13" fill="#3A4440">/lens opens the dashboard</text>
+</svg>

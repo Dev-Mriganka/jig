@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="452" viewBox="0 0 1100 452" role="img" aria-label="Watching CI until it is done. A git push or pull request create starts a watch by itself, or the agent calls checks watch. The watch, on jig-core's engine, polls GitHub every 30 seconds until an explicit finish line is reached. One message then starts the agent's turn, and an artifact-ready event goes to Pi's event bus. A company plugin may deploy only through ctx.executeTool, so jig-core still decides: a write to a test environment asks unless a rule allows it, and production is denied." font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">
+  <rect x="0.5" y="0.5" width="1099" height="451" rx="10" fill="#FAFBFA" stroke="#D2D9D3"/>
+  <defs>
+    <marker id="ciwatch-head-1d3b4d-11" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#1D3B4D"/></marker>
+    <marker id="ciwatch-head-4e7a58-11" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#4E7A58"/></marker>
+  </defs>
+  <!-- how a watch starts -->
+  <rect x="30" y="50" width="190" height="46" rx="6" fill="#5C9CAB"/>
+  <text x="125" y="70" font-size="14" fill="#FFFFFF" font-weight="700" text-anchor="middle">git push, pr create</text>
+  <text x="125" y="87" font-size="12.5" fill="#FFFFFF" text-anchor="middle">starts a watch by itself</text>
+  <rect x="30" y="106" width="190" height="46" rx="6" fill="#5C9CAB"/>
+  <text x="125" y="126" font-size="14" fill="#FFFFFF" font-weight="700" text-anchor="middle">checks watch</text>
+  <text x="125" y="143" font-size="12.5" fill="#FFFFFF" text-anchor="middle">the agent starts one</text>
+  <path d="M220 73 H240 V101 H260" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#ciwatch-head-1d3b4d-11)"/>
+  <path d="M220 129 H240 V101" fill="none" stroke="#1D3B4D" stroke-width="2.4"/>
+  <!-- the watch runs on jig-core's engine -->
+  <rect x="264" y="50" width="250" height="102" rx="6" fill="#1D3B4D"/>
+  <text x="389" y="76" font-size="15" fill="#FFFFFF" font-weight="700" text-anchor="middle">the watch</text>
+  <path d="M455.79 65.5 A9 9 0 1 1 442.84 62.63" fill="none" stroke="#E7B55B" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <polygon points="448.77,58.47 445.4,68.03 438.63,58.37" fill="#E7B55B"/>
+  <text x="389" y="95" font-size="13" fill="#D9E3E8" text-anchor="middle">on jig-core's engine</text>
+  <text x="389" y="117" font-size="13" fill="#FFFFFF" text-anchor="middle">polls GitHub every 30 seconds,</text>
+  <text x="389" y="135" font-size="13" fill="#FFFFFF" text-anchor="middle">with ETags, so repeats are cheap</text>
+  <path d="M514 101 H556" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#ciwatch-head-1d3b4d-11)"/>
+  <!-- an explicit finish line -->
+  <rect x="560" y="50" width="240" height="102" rx="6" fill="#E2F1E7" stroke="#2C7A4B" stroke-width="1.8"/>
+  <text x="680" y="76" font-size="14.5" fill="#2C7A4B" font-weight="700" text-anchor="middle">a finish line is reached</text>
+  <text x="680" y="98" font-size="12.5" fill="#3A4440" text-anchor="middle">required checks, a named check,</text>
+  <text x="680" y="115" font-size="12.5" fill="#3A4440" text-anchor="middle">one run, a pull request state,</text>
+  <text x="680" y="132" font-size="12.5" fill="#3A4440" text-anchor="middle">a bot comment, a tag or release</text>
+  <path d="M800 101 H840" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#ciwatch-head-1d3b4d-11)"/>
+  <!-- one message wakes the agent -->
+  <rect x="844" y="50" width="226" height="102" rx="6" fill="#5D4B7C"/>
+  <text x="957" y="76" font-size="14.5" fill="#FFFFFF" font-weight="700" text-anchor="middle">one message</text>
+  <text x="957" y="98" font-size="13" fill="#FFFFFF" text-anchor="middle">starts the agent's turn:</text>
+  <text x="957" y="116" font-size="12.5" fill="#E9E4F2" text-anchor="middle">counts and the commit, or the</text>
+  <text x="957" y="133" font-size="12.5" fill="#E9E4F2" text-anchor="middle">failing checks and log lines</text>
+  <!-- the same finish line also publishes an event -->
+  <path d="M680 152 V196 H180 V246" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#ciwatch-head-1d3b4d-11)"/>
+  <text x="430" y="189" font-size="12.5" fill="#3A4440" text-anchor="middle">when a rule says a build or tag is ready</text>
+  <rect x="30" y="250" width="300" height="108" rx="6" fill="#5C9CAB"/>
+  <text x="180" y="276" font-size="14" fill="#FFFFFF" font-weight="700" text-anchor="middle">event: jig-git:artifact-ready</text>
+  <text x="180" y="298" font-size="13" fill="#FFFFFF" text-anchor="middle">on Pi's event bus, for other plugins</text>
+  <text x="180" y="318" font-size="13" fill="#FFFFFF" text-anchor="middle">{ repo, pr, sha, kind, ref, source }</text>
+  <text x="180" y="340" font-size="12.5" fill="#D9E3E8" text-anchor="middle">jig-git itself never deploys</text>
+  <path d="M330 304 H372" fill="none" stroke="#4E7A58" stroke-width="2.4" marker-end="url(#ciwatch-head-4e7a58-11)"/>
+  <rect x="376" y="250" width="300" height="108" rx="6" fill="#4E7A58"/>
+  <text x="526" y="276" font-size="14" fill="#FFFFFF" font-weight="700" text-anchor="middle">a company plugin (private)</text>
+  <text x="526" y="297" font-size="12.5" fill="#FFFFFF" text-anchor="middle">always tells the agent. It may deploy</text>
+  <text x="526" y="312.5" font-size="12.5" fill="#FFFFFF" text-anchor="middle">by itself only if its setting is on, you asked</text>
+  <text x="526" y="328" font-size="12.5" fill="#FFFFFF" text-anchor="middle">for the deploy, and the target is the first</text>
+  <text x="526" y="343.5" font-size="12.5" fill="#FFFFFF" text-anchor="middle">shared test environment</text>
+  <path d="M676 304 H718" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#ciwatch-head-1d3b4d-11)"/>
+  <!-- jig-core still decides -->
+  <rect x="722" y="250" width="348" height="168" rx="6" fill="#1D3B4D"/>
+  <text x="896" y="276" font-size="14" fill="#FFFFFF" font-weight="700" text-anchor="middle">through ctx.executeTool only,</text>
+  <text x="896" y="295" font-size="14" fill="#FFFFFF" font-weight="700" text-anchor="middle">so jig-core still decides</text>
+  <rect x="740" y="312" width="312" height="44" rx="5" fill="#FBF5EA" stroke="#C08326" stroke-width="1.6"/>
+  <text x="896" y="331" font-size="13" fill="#8A5A12" font-weight="700" text-anchor="middle">test environment: asks</text>
+  <text x="896" y="348" font-size="12.5" fill="#3A4440" text-anchor="middle">unless a rule of yours allows it</text>
+  <rect x="740" y="364" width="312" height="44" rx="5" fill="#F7E4DF" stroke="#A93C27" stroke-width="1.6"/>
+  <text x="896" y="383" font-size="13" fill="#A93C27" font-weight="700" text-anchor="middle">production: denied</text>
+  <text x="896" y="400" font-size="12.5" fill="#3A4440" text-anchor="middle">a floor that configuration cannot lower</text>
+</svg>

@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560" role="img" aria-label="One generic jira tool shared by two setups. Company A supplies its Jira site, sign-in through the company sign-in service, its ticket key pattern PROJ-1234 and an overlay skill with its ticket rules. Company B supplies its own site, an API token from pass, its key pattern APP-567 and its own rules skill. The agent sees one jira tool set up for each company." font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">
+  <rect x="0.5" y="0.5" width="1199" height="559" rx="10" fill="#FAFBFA" stroke="#D2D9D3"/>
+  <defs>
+    <marker id="plugsin-head-5d4b7c-11" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#5D4B7C"/></marker>
+  </defs>
+  <!-- what each company plugin supplies -->
+  <text x="40" y="48" font-size="16" fill="#4E7A58" font-weight="700">Company A: its company plugin supplies</text>
+  <polygon points="40,64 430,64 450,84 430,104 40,104" fill="#8C979D"/>
+  <text x="241" y="88.55" font-size="13" fill="#FFFFFF" text-anchor="middle">site: Company A's Jira</text>
+  <polygon points="40,114 430,114 450,134 430,154 40,154" fill="#8C979D"/>
+  <text x="241" y="138.55" font-size="13" fill="#FFFFFF" text-anchor="middle">sign-in: the company's sign-in service</text>
+  <polygon points="40,164 430,164 450,184 430,204 40,204" fill="#8C979D"/>
+  <text x="241" y="188.55" font-size="13" fill="#FFFFFF" text-anchor="middle">ticket key pattern: PROJ-1234</text>
+  <polygon points="40,214 430,214 450,234 430,254 40,254" fill="#DF6A7C"/>
+  <text x="241" y="238.55" font-size="13" fill="#FFFFFF" text-anchor="middle">overlay skill: Company A's ticket rules</text>
+  <text x="40" y="290" font-size="16" fill="#4E7A58" font-weight="700">Company B: its company plugin supplies</text>
+  <polygon points="40,306 430,306 450,326 430,346 40,346" fill="#8C979D"/>
+  <text x="241" y="330.55" font-size="13" fill="#FFFFFF" text-anchor="middle">site: Company B's Jira</text>
+  <polygon points="40,356 430,356 450,376 430,396 40,396" fill="#8C979D"/>
+  <text x="241" y="380.55" font-size="13" fill="#FFFFFF" text-anchor="middle">sign-in: an API token from pass</text>
+  <polygon points="40,406 430,406 450,426 430,446 40,446" fill="#8C979D"/>
+  <text x="241" y="430.55" font-size="13" fill="#FFFFFF" text-anchor="middle">ticket key pattern: APP-567</text>
+  <polygon points="40,456 430,456 450,476 430,496 40,496" fill="#DF6A7C"/>
+  <text x="241" y="480.55" font-size="13" fill="#FFFFFF" text-anchor="middle">overlay skill: Company B's ticket rules</text>
+  <!-- the same code for both -->
+  <rect x="480" y="56" width="280" height="444" fill="#1D3B4D"/>
+  <text x="620" y="98" font-size="24" fill="#FFFFFF" font-weight="700" text-anchor="middle">jira</text>
+  <text x="620" y="124" font-size="13" fill="#D9E3E8" text-anchor="middle">the tool from jig-jira</text>
+  <text x="620" y="142" font-size="13" fill="#D9E3E8" text-anchor="middle">the same code for every company</text>
+  <text x="620" y="196" font-size="13" fill="#FFFFFF" text-anchor="middle">reads: get, search, comments,</text>
+  <text x="620" y="216" font-size="13" fill="#FFFFFF" text-anchor="middle">transitions, changelog</text>
+  <text x="620" y="262" font-size="13" fill="#FFFFFF" text-anchor="middle">writes: create, comment,</text>
+  <text x="620" y="282" font-size="13" fill="#FFFFFF" text-anchor="middle">transition, update</text>
+  <text x="620" y="302" font-size="13" fill="#FFFFFF" text-anchor="middle">previews text before it is sent</text>
+  <text x="620" y="346" font-size="13" fill="#FFFFFF" text-anchor="middle">declares every action's effect</text>
+  <text x="620" y="366" font-size="13" fill="#FFFFFF" text-anchor="middle">to jig-core</text>
+  <text x="620" y="410" font-size="13" fill="#FFFFFF" text-anchor="middle">takes its site and sign-in</text>
+  <text x="620" y="430" font-size="13" fill="#FFFFFF" text-anchor="middle">from the company plugin</text>
+  <text x="620" y="476" font-size="13" fill="#E7B55B" text-anchor="middle">no password ever reaches the model</text>
+  <!-- what the agent sees -->
+  <path d="M762 134 H806" fill="none" stroke="#5D4B7C" stroke-width="3" marker-end="url(#plugsin-head-5d4b7c-11)"/>
+  <rect x="810" y="80" width="360" height="108" fill="#5D4B7C"/>
+  <text x="990" y="112" font-size="16" fill="#FFFFFF" font-weight="700" text-anchor="middle">the agent sees one jira tool</text>
+  <text x="990" y="136" font-size="13" fill="#FFFFFF" text-anchor="middle">set up for Company A:</text>
+  <text x="990" y="156" font-size="13" fill="#FFFFFF" text-anchor="middle">its site and sign-in, PROJ keys,</text>
+  <text x="990" y="174" font-size="13" fill="#FFFFFF" text-anchor="middle">and its own ticket rules skill</text>
+  <path d="M762 374 H806" fill="none" stroke="#5D4B7C" stroke-width="3" marker-end="url(#plugsin-head-5d4b7c-11)"/>
+  <rect x="810" y="320" width="360" height="108" fill="#5D4B7C"/>
+  <text x="990" y="352" font-size="16" fill="#FFFFFF" font-weight="700" text-anchor="middle">the agent sees one jira tool</text>
+  <text x="990" y="376" font-size="13" fill="#FFFFFF" text-anchor="middle">set up for Company B:</text>
+  <text x="990" y="396" font-size="13" fill="#FFFFFF" text-anchor="middle">its site and API token, APP keys,</text>
+  <text x="990" y="414" font-size="13" fill="#FFFFFF" text-anchor="middle">and its own ticket rules skill</text>
+  <!-- legend -->
+  <rect x="40" y="527" width="14" height="14" rx="2" fill="#8C979D"/>
+  <text x="64" y="538.5" font-size="13" fill="#1A1F1D">configuration</text>
+  <rect x="168.25" y="527" width="14" height="14" rx="2" fill="#DF6A7C"/>
+  <text x="192.25" y="538.5" font-size="13" fill="#1A1F1D">knowledge</text>
+</svg>

@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="445" viewBox="0 0 1000 445" role="img" aria-label="Four nested quarter rings: the model at the core, Pi as the harness its builders made, Jig as your harness, and a dashed outer ring for a future team harness with shared organizational memory." font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">
+  <rect x="0.5" y="0.5" width="999" height="444" rx="10" fill="#FAFBFA" stroke="#D2D9D3"/>
+  <!-- rings, outermost first -->
+  <path d="M100 370 A330 330 0 0 1 430 40 L430 370 Z" fill="#F3E6D0"/>
+  <path d="M100 370 A330 330 0 0 1 430 40" fill="none" stroke="#C08326" stroke-width="2.5" stroke-dasharray="8 6"/>
+  <path d="M160 370 A270 270 0 0 1 430 100 L430 370 Z" fill="#1D3B4D"/>
+  <path d="M255 370 A175 175 0 0 1 430 195 L430 370 Z" fill="#5D4B7C"/>
+  <path d="M335 370 A95 95 0 0 1 430 275 L430 370 Z" fill="#6B6B6B"/>
+  <!-- leader lines -->
+  <circle cx="410" cy="60" r="4" fill="#1D3B4D"/>
+  <line x1="418" y1="60" x2="500" y2="60" stroke="#56635D" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <circle cx="410" cy="154" r="4" fill="#FFFFFF"/>
+  <line x1="418" y1="154" x2="500" y2="154" stroke="#56635D" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <circle cx="410" cy="244" r="4" fill="#FFFFFF"/>
+  <line x1="418" y1="244" x2="500" y2="244" stroke="#56635D" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <circle cx="410" cy="326" r="4" fill="#FFFFFF"/>
+  <line x1="418" y1="326" x2="500" y2="326" stroke="#56635D" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <!-- labels -->
+  <text x="512" y="66" font-size="21" fill="#1A1F1D" font-weight="700">Team harness (later)</text>
+  <text x="512" y="88" font-size="13.5" fill="#3A4440">shared conventions and organizational memory,</text>
+  <text x="512" y="106" font-size="13.5" fill="#3A4440">if a team adopts Jig</text>
+  <text x="512" y="160" font-size="21" fill="#1A1F1D" font-weight="700">Jig: your harness</text>
+  <text x="512" y="182" font-size="13.5" fill="#3A4440">the tool manager over every call, guarded tools,</text>
+  <text x="512" y="200" font-size="13.5" fill="#3A4440">ticket flow and memory, a local dashboard</text>
+  <text x="512" y="250" font-size="21" fill="#1A1F1D" font-weight="700">Pi: the harness its builders made</text>
+  <text x="512" y="272" font-size="13.5" fill="#3A4440">the agent loop, built-in tools, sessions, compaction,</text>
+  <text x="512" y="290" font-size="13.5" fill="#3A4440">extension hooks</text>
+  <text x="512" y="332" font-size="21" fill="#1A1F1D" font-weight="700">Model</text>
+  <text x="512" y="354" font-size="13.5" fill="#3A4440">the language model the agent calls</text>
+  <!-- bracket: the coding agent is Pi together with its model -->
+  <path d="M258 380 Q258 396 274 396 H326 Q342 396 342 410 Q342 396 358 396 H414 Q430 396 430 380" fill="none" stroke="#5D4B7C" stroke-width="3"/>
+  <text x="342" y="432" font-size="15" fill="#1A1F1D" font-weight="700" text-anchor="middle">coding agent: Pi and its model</text>
+</svg>
