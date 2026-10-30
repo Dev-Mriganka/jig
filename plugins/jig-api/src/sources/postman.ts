@@ -265,10 +265,19 @@ function scriptOf(events: unknown, listen: string): boolean {
     });
 }
 
-/** The address as one template: the `raw` text if there is some, else the parts put together. */
+/** The address as one template. */
 function addressOf(url: unknown): string {
-    if (typeof url === "string") return url.trim();
-    if (!isObject(url)) return "";
+    let raw: string;
+    if (typeof url === "string") raw = url.trim();
+    else if (!isObject(url)) return "";
+    else raw = rawAddress(url);
+    // A fragment is never sent.
+    const hash = raw.indexOf("#");
+    return hash >= 0 ? raw.slice(0, hash) : raw;
+}
+
+/** The address of a URL object: the `raw` text if there is some, else the parts put together. */
+function rawAddress(url: Record<string, unknown>): string {
     let raw: string;
     if (typeof url.raw === "string" && url.raw.trim() !== "") {
         raw = url.raw.trim();
@@ -288,7 +297,7 @@ function addressOf(url: unknown): string {
         raw = `${protocol}${host}${port}${segments.length > 0 ? `/${segments.join("/").replace(/^\/+/, "")}` : ""}${query.length > 0 ? `?${query.join("&")}` : ""}`;
     }
     // Path variables (`/orders/:id`) take the values the URL object gives them.
-    if (isObject(url) && Array.isArray(url.variable)) {
+    if (Array.isArray(url.variable)) {
         for (const item of url.variable as unknown[]) {
             if (isObject(item) && typeof item.key === "string" && item.key !== "") {
                 const value = text(item.value);
@@ -299,9 +308,7 @@ function addressOf(url: unknown): string {
             }
         }
     }
-    // A fragment is never sent.
-    const hash = raw.indexOf("#");
-    return hash >= 0 ? raw.slice(0, hash) : raw;
+    return raw;
 }
 
 function headersOf(raw: unknown): Array<readonly [string, string]> {

@@ -239,13 +239,15 @@ export function createResolver(input: ScopeInput): Resolver {
         if (walked === undefined) return undefined;
         const { text, spans } = walked;
         const end = originEnd(text);
+        // Without a scheme the start of the text is the scheme and host, up to the first place the path could begin.
+        const stop = end >= 0 ? end : text.search(/[/?#]/) >= 0 ? text.search(/[/?#]/) : text.length;
+        const onHost = spans.find((span) => span.agent && span.start < stop);
+        if (onHost !== undefined) {
+            throw new InputError(`${onHost.name} would set the host of the request: the host comes from the environment, not from the call`);
+        }
         if (end < 0) {
             if (onlyOrigin) return undefined;
             throw new InputError(`the address must start with https:// (or http://) once its variables are filled in; it starts ${JSON.stringify(text.slice(0, 30))}`);
-        }
-        const onHost = spans.find((span) => span.agent && span.start < end);
-        if (onHost !== undefined) {
-            throw new InputError(`${onHost.name} would set the host of the request: the host comes from the environment, not from the call`);
         }
         return { url: text, origin: text.slice(0, end), fromVariables: spans.some((span) => span.start < end) };
     }

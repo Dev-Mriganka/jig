@@ -2,8 +2,9 @@
 // to say which variables a request uses; resolve.ts uses it to fill them in.
 import type { Generated } from "./engine/text.ts";
 
-/** A variable: `{{name}}`, with optional white space inside. A name has no braces and no line break. */
-const VARIABLE = /\{\{\s*([^{}\r\n]+?)\s*\}\}/g;
+/** A variable: `{{name}}`, with optional white space inside. A name starts with something that is not white space, and has no
+ *  braces and no line break. */
+const VARIABLE = /\{\{\s*([^\s{}][^{}\r\n]*?)\s*\}\}/g;
 
 /** A text cut into plain pieces and variable names, in order. */
 export function partsOf(template: string): Array<string | { variable: string }> {

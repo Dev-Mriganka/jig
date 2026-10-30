@@ -14,7 +14,7 @@ import { fingerprintOfAll, READ_METHODS } from "./engine/plan.ts";
 import type { Plan } from "./engine/plan.ts";
 import { previewOf, previewOfAll } from "./engine/preview.ts";
 import { renderResult, statusLine } from "./engine/render.ts";
-import { InputError } from "./engine/values.ts";
+import { InputError, shortList } from "./engine/values.ts";
 import { LostReplyError, NotSentError } from "./engine/wire.ts";
 import { parameters, parseCall } from "./params.ts";
 import type { Call } from "./params.ts";
@@ -94,7 +94,15 @@ function prepare(ctx: PlanContext, call: Extract<Call, { action: "run" | "run-fo
         return { plans: [plan], action: request.name, effect: readsOf(ctx.settings, request) ? "read" : "write", environment: plan.jigEnvironment };
     }
     const found = ctx.catalog.folder(call.folder, call.collection);
-    const plans = found.requests.map((request) => planRequest(ctx, request, call));
+    // The values are for the whole folder: each request gets the ones it uses, and each value must be used by one of them.
+    const given = Object.entries(call.variables ?? {});
+    const uses = [...new Set(found.requests.flatMap((request) => request.variables.filter((name) => !name.startsWith("$"))))];
+    const unused = given.find(([name]) => !uses.includes(name));
+    if (unused !== undefined) {
+        throw new InputError(`${JSON.stringify(unused[0])} is not a variable of any request in ${found.folder}; they use ${shortList(uses, ", ", 70)}`);
+    }
+    const plans = found.requests.map((request) =>
+        planRequest(ctx, request, { ...call, variables: Object.fromEntries(given.filter(([name]) => request.variables.includes(name))) }));
     const writes = found.requests.some((request) => !readsOf(ctx.settings, request));
     const first = plans[0] as Plan;
     // A folder is as strict as its strictest request: one write makes it a write.
