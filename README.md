@@ -23,7 +23,7 @@ plugin's README is the specification that its code follows.
 
 | Plugin | What it does |
 |---|---|
-| [`jig-core`](plugins/jig-core/README.md) | The tool manager. It governs every tool the agent can call: Pi's own (`read`, `write`, `edit`, `bash`), Jig's, and other packages'. It handles rules per environment, approvals, secrets, masking and records |
+| [`jig-core`](plugins/jig-core/README.md) | The tool manager. It governs every tool the agent can call: Pi's own (`read`, `write`, `edit`, `bash`), Jig's, and other packages'. It handles rules per environment, approvals, secrets, sign-in, masking, background watches and records |
 | [`jig-git`](plugins/jig-git/README.md) | Local git, GitHub pull requests and reviews, CI checks, watching CI until it finishes, and tags and releases |
 | [`jig-lens`](plugins/jig-lens/README.md) | Observability: cost, tool success and failure, and time spent waiting for you, in a local dashboard |
 | [`jig-flow`](plugins/jig-flow/README.md) | The ticket flow: stages, gates, test runs, acceptance scenarios |

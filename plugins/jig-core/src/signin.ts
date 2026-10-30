@@ -39,7 +39,8 @@ export function createSignIn(options: SignInOptions): SignIn {
         }
         return Object.entries(value).map(([header, headerValue]) => {
             if (typeof headerValue !== "string") {
-                throw new TypeError(`sign-in service "${printable(name)}" returned a header (${printable(header)}) whose value is not a string`);
+                const who = `sign-in service "${printable(name)}"`;
+                throw new TypeError(`${who} returned a header (${printable(header)}) whose value is not a string`);
             }
             return [header, headerValue];
         });
@@ -57,7 +58,9 @@ export function createSignIn(options: SignInOptions): SignIn {
     return {
         register(name, service) {
             // A service is code from another package: check its shape here, where the mistake is made.
-            if (typeof name !== "string" || name === "") throw new TypeError("signIn.register: the service needs a name");
+            if (typeof name !== "string" || name === "") {
+                throw new TypeError("signIn.register: the service needs a name");
+            }
             if (typeof service?.headers !== "function") {
                 throw new TypeError(`signIn.register(${printable(name)}): the service needs a headers function`);
             }
@@ -68,12 +71,14 @@ export function createSignIn(options: SignInOptions): SignIn {
             const service = typeof name === "string" ? services.get(name) : undefined;
             if (service === undefined) {
                 const known = [...services.keys()].slice(0, MAX_NAMES_SHOWN).map(printable);
+                const registered = known.length === 0 ? "(none are registered)" : `(registered: ${known.join(", ")})`;
                 throw new Error(
-                    `no sign-in service is named "${printable(String(name))}": a company plugin registers one with signIn.register ` +
-                        (known.length === 0 ? "(none are registered)" : `(registered: ${known.join(", ")})`),
+                    `no sign-in service is named "${printable(String(name))}": ` +
+                        `a company plugin registers one with signIn.register ${registered}`,
                 );
             }
-            if (typeof request?.system !== "string" || request.system === "" || typeof request.url !== "string" || request.url === "") {
+            const named = (text: unknown) => typeof text === "string" && text !== "";
+            if (!named(request?.system) || !named(request.url)) {
                 throw new TypeError("signIn.headers: the request needs a system and a url");
             }
 

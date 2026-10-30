@@ -40,19 +40,31 @@ function isPreview(value: unknown): value is Preview {
     if (typeof value !== "object" || value === null) return false;
     const preview = value as Record<string, unknown>;
     return typeof preview.summary === "string" && preview.summary !== ""
-        && (preview.body === undefined || typeof preview.body === "string");
+        && (preview.body === undefined || typeof preview.body === "string")
+        && (preview.html === undefined || typeof preview.html === "string");
+}
+
+/** The tool's preview found the input invalid. Asking the user about a call that cannot run would waste their time,
+ *  so the call is blocked with the tool's message instead. */
+export interface InvalidInput {
+    invalid: string;
+}
+
+export function isInvalidInput(value: Preview | InvalidInput): value is InvalidInput {
+    return "invalid" in value;
 }
 
 /**
- * Builds the preview with the tool's own function, which may take a while (it can read a diff or fetch text). If it
- * fails or takes more than 15 seconds, the user sees "preview unavailable: <reason>" and can still decide.
+ * Builds the preview with the tool's own function, which may take a while (it can read a diff or fetch text). A
+ * `TypeError` from it means the input is invalid (the contract's rule), and comes back as `InvalidInput`. Any other
+ * failure, or more than 15 seconds, gives "preview unavailable: <reason>", and the user can still decide.
  */
 export async function buildPreview(
     declaration: ToolDeclaration | undefined,
     input: Readonly<Record<string, unknown>>,
     fallbackSummary: string,
     timeoutMs: number = PREVIEW_TIMEOUT_MS,
-): Promise<Preview> {
+): Promise<Preview | InvalidInput> {
     if (declaration?.preview === undefined) return { summary: fallbackSummary };
     const controller = new AbortController();
     let timer: NodeJS.Timeout | undefined;
@@ -68,6 +80,7 @@ export async function buildPreview(
         return preview;
     } catch (error) {
         const reason = errorMessage(error).replace(/\s+/g, " ").slice(0, 200);
+        if (error instanceof TypeError) return { invalid: reason };
         return { summary: `preview unavailable: ${reason}` };
     } finally {
         if (timer !== undefined) clearTimeout(timer);

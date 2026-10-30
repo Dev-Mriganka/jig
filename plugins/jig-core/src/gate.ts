@@ -11,7 +11,7 @@ import type { DecisionEvent } from "./contract.ts";
 import { decide, sessionKey } from "./decide.ts";
 import type { Verdict } from "./decide.ts";
 import { errorMessage } from "./errors.ts";
-import { buildPreview, defaultSummary, describeCall } from "./preview.ts";
+import { buildPreview, defaultSummary, describeCall, isInvalidInput } from "./preview.ts";
 import type { Answer, ErrorKind } from "./records.ts";
 import { rememberCall } from "./state.ts";
 import type { CallState, JigState } from "./state.ts";
@@ -121,6 +121,11 @@ async function askUser(
 
     const fallback = defaultSummary({ ...described, unknown: classification.source === "unknown" }, input);
     const preview = await buildPreview(state.declarations.get(call.tool), input, fallback);
+    if (isInvalidInput(preview)) {
+        call.blocked = { kind: "invalid", line: "the tool found the input invalid" };
+        announce(state, call);
+        return { block: true, reason: `Blocked by jig-core: ${call.tool} cannot run with this input: ${preview.invalid}` };
+    }
     const kind = chooseKind(verdict.approval, preview);
     const approval = await state.approvals.ask(ctx, { header: describeCall(described), preview, kind });
 

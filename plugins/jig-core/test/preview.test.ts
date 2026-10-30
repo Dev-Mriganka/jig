@@ -60,7 +60,7 @@ describe("building a preview", () => {
     test("a preview that returns something unusable is unavailable too", async () => {
         for (const bad of [undefined, null, "text", { body: "no summary" }, { summary: "" }, { summary: "ok", body: 5 }]) {
             const result = await buildPreview(declared(async () => bad as unknown as Preview), {}, "fallback");
-            assert.match(result.summary, /^preview unavailable: the tool returned no summary$/, JSON.stringify(bad));
+            assert.match((result as Preview).summary, /^preview unavailable: the tool returned no summary$/, JSON.stringify(bad));
         }
     });
 
@@ -191,3 +191,29 @@ describe("writing the page and opening it", () => {
         assert.equal(failed, "could not open the browser: xdg-open is not installed");
     });
 });
+
+describe("a tool's own rendered page", () => {
+    test("replaces the page jig-core would build, without tags that run, load or navigate", async () => {
+        const { renderPreviewPage } = await import("../src/preview-html.ts");
+        const page = renderPreviewPage({
+            summary: "Comment on PROJ-1",
+            body: "h1. Title",
+            html: '<h1>Title</h1><meta http-equiv="refresh" content="0;url=https://example.com"><script>alert(1)</script><iframe src="https://example.com"></iframe><p>kept</p>',
+        }, "jira · comment · external · write");
+        assert.match(page, /<h1>Title<\/h1>/);
+        assert.match(page, /<p>kept<\/p>/);
+        assert.doesNotMatch(page, /http-equiv="refresh"|<script>|<iframe/);
+        assert.match(page, /Content-Security-Policy" content="default-src 'none'/);
+    });
+
+    test("a non-string html field is not a preview", async () => {
+        const result = await buildPreview(declared(async () => ({ summary: "s", html: 42 }) as unknown as Preview), {}, "fallback");
+        assert.match((result as Preview).summary, /^preview unavailable/);
+    });
+
+    test("a TypeError says the input is invalid", async () => {
+        const result = await buildPreview(declared(async () => { throw new TypeError("bad branch name"); }), {}, "fallback");
+        assert.deepEqual(result, { invalid: "bad branch name" });
+    });
+});
+

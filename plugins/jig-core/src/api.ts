@@ -41,6 +41,11 @@ export function buildApi(state: JigState): JigApi {
             resolve: (ref, signal) => state.secrets.resolve(ref, signal),
         },
 
+        transports: {
+            register: (name, transport) => state.transports.register(name, transport),
+            request: (name, request, signal) => state.transports.request(name, request, signal),
+        },
+
         signIn: {
             register: (name, service) => state.signIn.register(name, service),
             headers: (name, request, signal) => state.signIn.headers(name, request, signal),
@@ -51,7 +56,13 @@ export function buildApi(state: JigState): JigApi {
             value: <T>(input: T): T => state.masker().value(input),
         },
 
-        watches: state.watches,
+        // Only the contract's four calls: the rest of the engine belongs to jig-core.
+        watches: {
+            registerKind: (kind) => state.watches.registerKind(kind),
+            start: (watch) => state.watches.start(watch),
+            list: () => state.watches.list(),
+            stop: (id) => state.watches.stop(id),
+        },
 
         config: {
             addEnvironments(environments) {

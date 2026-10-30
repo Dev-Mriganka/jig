@@ -81,6 +81,26 @@ its own safety pipeline.
   several containers; Phoenix's licence is not open source, and its dashboards
   are fixed. An export to MLflow can come later, as a copy.
 
+## 2026-10-30: how a watch tells the agent
+
+- **One message per result, as a follow-up that starts a turn.** An idle agent
+  wakes. A busy one reads it when its turn ends, so a message never cuts a turn
+  short.
+- **Combined and spaced.** Results that end within a second share a message, and
+  messages are at least ten seconds apart. Every message costs the agent a turn,
+  and watches tend to end together.
+- **A stall is for you, not the agent.** The "still waiting" notice goes to the
+  screen only. The agent has nothing to do about it.
+- **A pause is for both.** Three failed polls in a row would otherwise leave the
+  agent waiting for a result that is not coming.
+- **A stop sends nothing,** because the agent or you asked for it.
+- **The engine cleans the text itself.** A message does not pass the hook that
+  cleans tool results, so a watch's summary and details are redacted and masked
+  when it ends, before they are saved, sent or shown. Terminal escape codes go
+  first: a hostile log can carry codes that act on the terminal.
+- **A watch belongs to its session.** Only the session that started it polls it,
+  even after a restart, so two sessions never report the same result.
+
 ## 2026-10-30: jig-git's tools, and a watch that knows when it is done
 
 - **Four tools:** `git`, `pr`, `checks` and `release`. They come from an

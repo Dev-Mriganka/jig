@@ -4,7 +4,11 @@
 //
 // This module does not import Pi: `index.ts` passes Pi's agent folder in, which keeps the unit tests of the small
 // modules from loading all of Pi.
-import { chmodSync, closeSync, fchmodSync, lstatSync, mkdirSync, openSync, readdirSync, rmdirSync, unlinkSync, writeSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import {
+    chmodSync, closeSync, fchmodSync, lstatSync, mkdirSync, openSync, readdirSync, renameSync, rmdirSync, unlinkSync,
+    writeSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 
@@ -61,6 +65,23 @@ export function createPrivateFile(file: string, data: string): void {
         writeSync(fd, data);
     } finally {
         closeSync(fd);
+    }
+}
+
+/** Writes a private file in one step. The data goes to a new temporary file next to it, which then takes the place
+ *  of the file, so a reader (or a crash) never sees half of one. For files that are written again and again. */
+export function replacePrivateFile(file: string, data: string): void {
+    const temp = `${file}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`;
+    createPrivateFile(temp, data);
+    try {
+        renameSync(temp, file);
+    } catch (error) {
+        try {
+            unlinkSync(temp);
+        } catch {
+            // Gone already.
+        }
+        throw error;
     }
 }
 

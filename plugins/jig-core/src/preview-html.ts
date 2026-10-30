@@ -78,9 +78,19 @@ table { border-collapse: collapse; } td, th { border: 1px solid var(--line); pad
 `;
 
 /** The page for a preview. `header` is the line that names the tool, the action, the environment and the effect. */
+/** Tags that could run, load or navigate. The page's policy already blocks scripts and requests; removing these is
+ *  the second lock, for a tool whose renderer lets one through: a `<meta http-equiv="refresh">`, for one, navigates. */
+const ACTIVE_TAGS = /<\/?(?:script|iframe|frame|frameset|object|embed|applet|meta|link|base|form|input|button|textarea|select|svg|math)\b[^>]*>/gi;
+
+export function withoutActiveTags(html: string): string {
+    return html.replace(ACTIVE_TAGS, "");
+}
+
 export function renderPreviewPage(preview: Preview, header: string): string {
     let body = "";
-    if (preview.body !== undefined) {
+    if (preview.html !== undefined) {
+        body = withoutActiveTags(preview.html);
+    } else if (preview.body !== undefined) {
         if (preview.format === "markdown") body = markdown.parse(preview.body, { async: false });
         else if (preview.format === "diff") body = renderDiff(preview.body);
         else body = `<pre>${escapeHtml(preview.body)}</pre>`;
