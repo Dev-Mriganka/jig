@@ -82,16 +82,23 @@ describe("a valid catalog", () => {
         assert.deepEqual(validateOps(example), []);
     });
 
-    test("a service needs no repo and no ci: those are for the ci tool, and nothing reads them yet", () => {
+    test("a service needs no repo and no ci: without them the ci tool has nothing to look at", () => {
         const read = catalog({ services: { svc: { environments: { staging: { health: "https://svc.example.test/health" } } } } });
         assert.equal(read.services.get("svc")?.repo, undefined);
         assert.equal(read.services.get("svc")?.ci, undefined);
     });
 
-    test("a ci entry is accepted with whatever fields its system uses, as text", () => {
-        for (const ci of [{ system: "jenkins", job: "orders/build" }, { system: "gitlab-ci", project: "acme/orders-api", stage: "build" }, { system: "github-actions" }]) {
+    test("a ci entry is read with the fields of its system; ci-config.test.ts has them all", () => {
+        const auth = { token: "env:CI_TOKEN" };
+        for (const ci of [
+            { system: "jenkins", url: "https://jenkins.example.test", job: "orders/build", auth: { user: "ci-bot", ...auth } },
+            { system: "gitlab", url: "https://gitlab.example.test", project: "acme/orders-api", auth },
+            { system: "github-actions" },
+        ]) {
             const raw = section();
-            ((raw.services as Record<string, Raw>)["billing"] as Raw).ci = ci;
+            const billing = (raw.services as Record<string, Raw>)["billing"] as Raw;
+            billing.ci = ci;
+            billing.repo = "acme/billing";
             assert.deepEqual(validateOps(raw), [], JSON.stringify(ci));
         }
     });
@@ -174,13 +181,11 @@ describe("a catalog that is refused", () => {
         const raw = section();
         const billing = (raw.services as Record<string, Raw>)["billing"] as Raw;
         billing.ci = { workflow: "build.yml" };
-        assert.deepEqual(validateOps(raw), ["ops.services.billing.ci.system: required, the CI system, such as github-actions"]);
+        assert.deepEqual(validateOps(raw), ["ops.services.billing.ci.system: required, the CI system: github-actions, gitlab, jenkins"]);
         billing.ci = "github-actions";
         assert.match(validateOps(raw)[0] ?? "", /^ops\.services\.billing\.ci: must be an object with a system/);
         billing.ci = { system: "Github Actions" };
-        assert.deepEqual(validateOps(raw), ["ops.services.billing.ci.system: must be the name of a CI system, such as github-actions"]);
-        billing.ci = { system: "jenkins", job: 5 };
-        assert.deepEqual(validateOps(raw), ["ops.services.billing.ci.job: must be text of 1 to 200 characters"]);
+        assert.deepEqual(validateOps(raw), ["ops.services.billing.ci.system: unknown CI system; the systems there are: github-actions, gitlab, jenkins"]);
     });
 
     test("every problem is reported, not just the first", () => {

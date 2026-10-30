@@ -21,18 +21,18 @@ Ticket PROJ-123, all time
              by model  claude-sonnet-5-5  $1.10
                        claude-opus-5      $0.31
   Tools      34 calls, 2 failed, 2 blocked
-             failing  bash              2 of 8  tool 2
-             slowest  checks watch  p95 4m 10s  1 call
-                      bash             p95 12s  8 calls
-                      git push        p95 2.4s  2 calls
-                      git status      p95 80ms  3 calls
-                      read            p95 36ms  12 calls
+             failing  bash            2 of 8  tool 2
+             slowest  ci watch    p95 4m 10s  1 call
+                      bash           p95 12s  8 calls
+                      git push      p95 2.4s  2 calls
+                      git status    p95 80ms  3 calls
+                      read          p95 36ms  12 calls
   Your time  2 questions: 1 allowed, 1 allowed for the session
              waited 53s in total, median 27s
              by tool  git push  53s  2 questions
   Blocked    2 calls
              rule  denied  2  http 2
-  Checks     checks watch  conclusion success, failed 0, passed 412  2h ago
+  Checks     ci watch  conclusion success, failed 0, passed 412  2h ago
 ```
 
 ![jig-core appends records, jig-lens imports them into its own index, the /lens summary in Pi reads it, and Grafana reads it read-only on 127.0.0.1](../../docs/img/lens-flow.svg)

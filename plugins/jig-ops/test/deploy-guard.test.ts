@@ -156,8 +156,9 @@ describe("the code", () => {
     const all = sources();
     const where = (pattern: RegExp) => all.filter(({ text }) => pattern.test(codeOf(text))).map(({ file }) => file);
 
-    test("starts programs in two files, and each builds the arguments of its own program", () => {
-        assert.deepEqual(where(/\.exec\.run\(/), ["deploy/helm.ts", "runtime/kubernetes/kubectl.ts"]);
+    test("starts programs in three files, and each builds the arguments of its own program", () => {
+        assert.deepEqual(where(/\.exec\.run\(/), ["ci/gh.ts", "deploy/helm.ts", "runtime/kubernetes/kubectl.ts"]);
+        assert.deepEqual(where(/exec\.run\(\s*"gh"/), ["ci/gh.ts"]);
         assert.deepEqual(where(/exec\.run\(\s*"helm"/), ["deploy/helm.ts"]);
         assert.deepEqual(where(/exec\.run\(\s*"kubectl"/), ["runtime/kubernetes/kubectl.ts"]);
         assert.deepEqual(where(/--kube-context/), ["deploy/helm.ts"]);

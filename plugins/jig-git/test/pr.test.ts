@@ -435,17 +435,20 @@ test("create: head and base may not be the same branch, and the title is one lin
     );
 });
 
-test("create starts a watch on the pull request's checks, replacing the one the push started", async () => {
+test("create announces the new pull request, so a watch on the pushed commit can follow it as a pull request", async () => {
     const r = featureRepo(false);
     h.gh.on("pr list", { json: [] });
     ok(await h.call("git", { action: "push", repo: r.name }));
-    assert.equal(h.jig.started[0]?.title.startsWith("checks of branch feature/one at "), true);
+    const head = git(r.dir, "rev-parse", "HEAD");
     h.gh.on("pr create", { stdout: "https://github.com/acme/svc/pull/77\n" });
     const text = ok(await h.call("pr", { action: "create", repo: r.name, title: "T", body: BODY }));
-    assert.equal(h.jig.started[1]?.title, "checks of pull request 77");
-    assert.deepEqual((h.jig.started[1]?.spec as { pr: number }).pr, 77);
-    assert.deepEqual(h.jig.stopped, ["w1"]);
-    assert.match(text, /Watching checks of pull request 77 as w2\.$/);
+    const events = h.announced.filter((entry) => entry.event === "jig-git:pushed").map((entry) => entry.payload);
+    assert.deepEqual(events, [
+        { repo: "acme/" + r.name, branch: "feature/one", sha: head },
+        { repo: "acme/" + r.name, branch: "feature/one", sha: head, pr: 77 },
+    ]);
+    assert.equal(h.jig.started.length, 0, "jig-git starts no watch");
+    assert.doesNotMatch(text, /Watching/);
 });
 
 // ---- a lost reply -------------------------------------------------------------------------------------------------
@@ -477,7 +480,9 @@ test("create, the reply was lost and the pull request exists: one pr list says s
         ["pr list", "pr list", "pr create", "pr list"],
         "the reads of the two plans, the write, then exactly one read",
     );
-    assert.match(text, /Watching checks of pull request 9/);
+    const events = h.announced.filter((entry) => entry.event === "jig-git:pushed").map((entry) => entry.payload);
+    assert.equal((events.at(-1) as { pr: number }).pr, 9, "the pull request found by the check is announced, once");
+    assert.equal(events.length, 1);
 });
 
 test("create, timed out and the pull request does not exist: one check says so and nothing is retried", async () => {
@@ -492,7 +497,7 @@ test("create, timed out and the pull request does not exist: one check says so a
         /^gh pr create: the reply was lost \(timed out after 90 s\) and one check shows it did not go through\. Nothing was sent twice; run it again if you still want it\.$/,
     );
     assert.equal(writes("create").length, 1);
-    assert.equal(h.jig.started.length, 0, "no watch for a pull request that does not exist");
+    assert.deepEqual(h.announced, [], "nothing is announced for a pull request that does not exist");
 });
 
 test("a definite refusal is a failure with gh's reason, and nothing is checked", async () => {

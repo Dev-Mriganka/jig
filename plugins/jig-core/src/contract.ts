@@ -123,7 +123,7 @@ export interface PollOutcome<State> {
 
 /** A kind of watch a plugin can start, such as GitHub checks. Registered once per load. */
 export interface WatchKind<Spec, State> {
-    /** Unique across plugins, such as `github-checks`. */
+    /** Unique across plugins, such as `ops-ci`. */
     kind: string;
     plugin: string;
     intervalMs: number;

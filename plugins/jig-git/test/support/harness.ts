@@ -3,7 +3,6 @@
 // the call asks (a write outside the machine, or a class that asks by default), keep the approved preview, and execute.
 import type { ExtensionAPI, ExtensionToolContext, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import type { CallClass, Preview } from "../../../jig-core/src/contract.ts";
-import { forgetAutoWatches } from "../../src/autowatch.ts";
 import plugin from "../../src/index.ts";
 import { forgetDefaultBranches, setWorkingDirectory } from "../../src/repo.ts";
 import { installFakeGh } from "./fake-gh.ts";
@@ -68,7 +67,6 @@ export function setupHarness(): Harness {
     plugin(pi);
     setWorkingDirectory(sb.workspace);
     forgetDefaultBranches();
-    forgetAutoWatches();
     let counter = 0;
     return {
         sb,
@@ -80,7 +78,6 @@ export function setupHarness(): Harness {
             jig.reset();
             gh.reset();
             announced.length = 0;
-            forgetAutoWatches();
             setWorkingDirectory(sb.workspace);
         },
         async call(name, input, options = {}) {

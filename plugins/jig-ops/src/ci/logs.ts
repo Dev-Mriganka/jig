@@ -1,31 +1,29 @@
-// Job logs from GitHub Actions: fetched, cleaned, cut down to what a person would look at, and scrubbed of anything that
-// looks like a credential. GitHub already masks the secrets a repository registered; the scrub here is a second net for
-// the tokens a failing step printed by accident.
-import { gh, ghFailure } from "./github.ts";
-import type { GhOptions } from "./github.ts";
-import { firstLines, lastLines } from "./text.ts";
+// Job logs from any CI system: cleaned, cut down to what a person would look at, and scrubbed of anything that looks
+// like a credential. A CI system already masks the secrets a project registered; the scrub here is a second net for the
+// tokens a failing step printed by accident.
+import { clean } from "../values.ts";
 
-const LOG_BYTES = 8 * 1024 * 1024;
+/** The first `maxLines` lines. `cut` counts the lines left out, so the caller can say how to see the rest. */
+function firstLines(text: string, maxLines: number): { text: string; cut: number } {
+    const all = text.replace(/\n$/, "").split("\n");
+    return { text: all.slice(0, maxLines).join("\n"), cut: Math.max(0, all.length - maxLines) };
+}
 
-/** The log of one job, as text. A job is a check run of GitHub Actions; its id is the check run's id. */
-export async function jobLog(slug: string, jobId: number, options: GhOptions = {}): Promise<string> {
-    const result = await gh(["api", `repos/${slug}/actions/jobs/${jobId}/logs`], { ...options, maxBytes: LOG_BYTES });
-    if (result.code !== 0 || result.timedOut) {
-        if (/HTTP 410|HTTP 404/.test(result.stderr))
-            throw new Error(
-                `the log of job ${jobId} is not available (it expired, or the job is not a GitHub Actions job)`,
-            );
-        throw ghFailure(`gh api job ${jobId} logs`, result);
-    }
-    return result.stdout;
+/** The last `maxLines` lines. `cut` counts the lines left out before them. */
+function lastLines(text: string, maxLines: number): { text: string; cut: number } {
+    const all = text.replace(/\n$/, "").split("\n");
+    return { text: all.slice(-maxLines).join("\n"), cut: Math.max(0, all.length - maxLines) };
 }
 
 const STAMP = /^(?:﻿)?\d{4}-\d{2}-\d{2}T[\d:.]+Z ?/;
 const ANSI = /\u001b\[[0-9;?]*[A-Za-z]/g;
 
-/** One log line per line: no carriage returns, no colour codes, no time stamp in front. */
+/**
+ * One log line per line: no carriage returns, no colour codes, no time stamp in front. Terminal sequences and other
+ * control characters go too: a hostile log line must not be able to act on the terminal that shows it.
+ */
 export function cleanLog(raw: string): string {
-    return raw
+    return clean(raw)
         .replace(/\r/g, "")
         .replace(ANSI, "")
         .split("\n")
@@ -55,7 +53,7 @@ export function redactLog(text: string): string {
 const ERROR_LINE = /##\[error\]|^Error:|\bFAILED\b|\bfatal:|Traceback \(most recent call last\)/;
 
 /**
- * The part of a failed log worth reading first: the lines leading up to the first error and the error itself, or the end
+ * The part of a failed log worth reading first: the lines leading up to the first error and the error itself, or the
  * of the log when nothing says "error". Cut to `maxLines` lines and `maxChars` characters.
  */
 export function failureExcerpt(log: string, maxLines = 20, maxChars = 2000): string {
@@ -66,7 +64,8 @@ export function failureExcerpt(log: string, maxLines = 20, maxChars = 2000): str
     return text.length > maxChars ? `${text.slice(0, maxChars)}...` : text;
 }
 
-const LOG_LINES = 400;
+/** The most lines a log excerpt has, whatever a call asks for. */
+export const LOG_LINES = 400;
 
 /** The end of a log, or the lines that match a search, cut to `LOG_LINES` lines. */
 export function selectLog(log: string, options: { tail?: number; grep?: string }): { text: string; note: string } {

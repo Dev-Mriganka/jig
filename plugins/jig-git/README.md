@@ -1,21 +1,18 @@
-# jig-git: git, GitHub and CI
+# jig-git: git, pull requests and releases
 
 **Status: built.** Tested against temporary repositories and recorded GitHub
 answers. Nothing has been tried against GitHub itself yet (see
 [Not verified yet](docs/not-verified.md)).
 
-`jig-git` gives the agent four tools: `git` for the local repository, `pr` for
-GitHub pull requests and reviews, `checks` for GitHub checks and Actions, and
-`release` for tags and releases. For example, after `git push` the tool starts a
-watch on the pushed commit's required checks; the agent goes on with other work,
-and one message wakes it when they pass or the first required one fails. The
-watches run on `jig-core`'s watch engine, and its `watch` tool lists and stops
-them. `checks` covers GitHub only; other CI systems belong in a company plugin
-(see [Plugins](../../docs/plugins.md)).
-
-![A push or checks watch starts a watch that polls GitHub until a finish line is reached; one message wakes the agent, and an artifact-ready event may lead a company plugin to deploy, only through jig-core](../../docs/img/ci-watch.svg)
-
-*From a push to a wake-up: the watch polls GitHub until its finish line, one message starts the agent's turn, and an artifact-ready event may lead a company plugin to deploy, but only through `ctx.executeTool`, so `jig-core` still asks for a test environment unless a rule allows it, and denies production.*
+`jig-git` gives the agent three tools: `git` for the local repository, `pr` for
+GitHub pull requests and reviews, and `release` for tags and releases. For
+example, "commit these two files, push, and open a pull request": `git commit`
+takes exact paths, `git push` shows the commits it will send and waits for you,
+and `pr create` shows the body on a review screen. CI is not here: checks, runs,
+logs and watches are the `ci` tool of [`jig-ops`](../jig-ops/README.md). The two
+meet in one event: after a push and after a new pull request, `jig-git`
+announces `jig-git:pushed`, and `jig-ops` starts a watch if it knows the
+repository (see [Events](#events)).
 
 ## Tool: `git`
 
@@ -43,7 +40,7 @@ them. `checks` covers GitHub only; other CI systems belong in a company plugin
 
 | Action | Kind | What it does |
 |---|---|---|
-| `view`, `list` | read | State, draft, mergeable, review decision, checks and body; a list by state, author or branch |
+| `view`, `list` | read | State, draft, mergeable, review decision, a one-line roll-up of the checks, and body; a list by state, author or branch. For the checks themselves, use `ci` |
 | `comments` | read | The conversation, reviews and line comments, with full bodies and thread ids; filter by author or unresolved |
 | `create` | external write, asks on the review screen | A pull request from a pushed branch. Without a body it shows the body template to fill in. Returns the existing one if there is one |
 | `edit` | external write, asks on the review screen | Title, body, base, labels, reviewers. The new text goes on the review screen |
@@ -52,16 +49,6 @@ them. `checks` covers GitHub only; other CI systems belong in a company plugin
 | `resolve` | external write, asks | Resolves a review thread |
 | `review` | external write, asks on the review screen | Comment, or request changes. **Never approve:** approval stays human |
 | `merge` | external write, asks | Merge, squash or rebase, only while the head is still the commit you saw; or turn on auto-merge |
-
-## Tool: `checks`
-
-| Action | Kind | What it does |
-|---|---|---|
-| `status` | read | The checks of a pull request, branch or commit; only the required ones if asked (`required_only`) |
-| `runs`, `run`, `artifacts` | read | Workflow runs by branch, commit or state; one run's jobs and steps; its artifacts |
-| `log` | read | A failed job's log: the tail, or the lines matching a search; capped at 400 lines and redacted |
-| `rerun` | external write, asks | The failed jobs, or the whole run |
-| `watch` | local write | Starts a background watch on a pull request, branch, run, tag or release, with a finish line. Returns its id at once |
 
 ## Tool: `release`
 
@@ -86,11 +73,11 @@ them. `checks` covers GitHub only; other CI systems belong in a company plugin
   the tool reads GitHub once and reports what it found; it never sends the
   request again. A call with the wrong parameters is refused with the usage line
   before it asks anything.
-- **A watch has an explicit finish line,** never "all checks". It starts by
-  itself after `git push` and `pr create`, and one message wakes the agent when
-  it ends.
-- **`jig-git` never deploys.** It announces "artifact ready"; a company plugin
-  decides what follows, and any deploy still goes through `jig-core`.
+- **A push is announced, and nothing more.** After `git push` and `pr create`
+  the plugin publishes `jig-git:pushed` and goes on. It watches no CI, reads no
+  catalog and starts no watch: that is `jig-ops`, if it is installed.
+- **`jig-git` never deploys,** and never starts a workflow. Deploys have their
+  own tool and their own rules.
 
 ## Configure
 
@@ -105,9 +92,6 @@ invalid field, and the defaults apply instead.
 | `commitMessage`, `branchName` | none | Regular expressions that commit messages and new branch names must match. A message is tested whole, so anchor with `^` |
 | `prTemplate` | the repository's own template | The pull request body template: the path of a Markdown file, absolute or relative to the repository |
 | `cloneHost` | `github.com` | The ssh host `clone` connects to: `github.com`, or a `Host` alias from `~/.ssh/config`. The only host other than `github.com` that a clone request may name |
-| `watch.auto` | `true` | Start a watch after `git push` and `pr create` |
-| `watch.pollSeconds`, `watch.stallMinutes`, `watch.timeoutMinutes` | 30, 30, 60 | Polling every 5 to 3600 seconds; a "still waiting" notice after 1 to 1440 minutes; giving up after 1 to 1440 minutes |
-| `artifacts` | none | The "artifact ready" rules. Each has a `kind` (`image`, `tag` or `release`) and one place to look: `check` (a job name, with an optional `log` pattern), `comment` (a pattern, with an optional `bot` login), or `tag` (a name pattern) |
 
 ```json
 {
@@ -115,44 +99,51 @@ invalid field, and the defaults apply instead.
     "base": "main",
     "protected": ["main", "release/*"],
     "branchName": "^(feature|fix)/PROJ-\\d+",
-    "commitMessage": "^PROJ-\\d+: ",
-    "artifacts": [
-      { "kind": "image", "check": "build-image", "log": "image: (\\S+)" }
-    ]
+    "commitMessage": "^PROJ-\\d+: "
   }
 }
 ```
+
+`git.watch` and `git.artifacts` moved to `ops.watch` and `ops.artifacts` with the
+watch. `jig-core` reports them with where they are now.
 
 ## Company part (in the company plugin)
 
 - the `git` settings for its repositories: base and protected branches, branch
   and commit message patterns, the pull request template, the clone host;
-- the "artifact ready" rules, and what follows them, such as a deploy to
-  `staging`, within the policy for automatic deploys;
-- other CI systems and deploy tools.
+- later, the sign-in for a git host that is not `github.com`.
+
+## Events
+
+On Pi's event bus, for other plugins:
+
+- **`jig-git:pushed`,** published after a push has landed and after a pull
+  request is created: `{ repo, branch, sha, pr? }`. `repo` is `owner/name` as
+  origin names it, `sha` is the full id of the pushed head, and `pr` is the open
+  pull request of the branch, when there is one. Nothing is published when
+  origin is not on GitHub. `jig-ops` listens and starts a CI watch for a service
+  of its catalog that has this repository. A listener that fails never undoes the
+  push.
 
 ## Layout
 
 ```text
 jig-git/
   src/
-    index.ts                              the plugin: the tools, their declarations, the git section, the watch kind
-    git.ts, pr.ts, checks.ts, release.ts  the four tools: schema, table of actions, classification
+    index.ts                              the plugin: the tools, their declarations, the git section, the event bus
+    git.ts, pr.ts, release.ts             the three tools: schema, table of actions, classification
     git-read.ts, git-local.ts, git-remote.ts, clone.ts   the git actions
-    pr-read.ts, pr-write.ts, checks-read.ts              the pull request actions, and the checks that only read
-    github.ts, repo.ts, ci.ts, logs.ts    gh (argument lists, JSON, ETags, lost replies); which repository; check states; job logs
-    watch.ts, artifacts.ts, autowatch.ts  the GitHub watch kind, the artifact rules, the watch after a push
+    pr-read.ts, pr-write.ts               the pull request actions
+    github.ts, repo.ts, ci.ts, events.ts  gh (argument lists, JSON, lost replies); which repository; the check roll-up; jig-git:pushed
     config.ts, previews.ts, tool.ts, params.ts, names.ts, text.ts, run.ts   settings, plan and preview, tool builder, input checks
-  skills/   git/SKILL.md: how to use the tools (status before commit, watch after push)
+  skills/   git/SKILL.md: how to use the tools (status before commit, what a push announces)
   test/     against temporary local repositories, a fake gh and a fake jig-core
   docs/     the detail pages below
 ```
 
 ## More detail
 
-- [Watching CI](docs/watching-ci.md): the watch, its finish lines, polling, events
-- [Artifacts and deploys](docs/artifacts-and-deploys.md): "artifact ready", and
-  why `jig-git` never deploys
+- [Events](docs/events.md): `jig-git:pushed`, who publishes it, and what a listener can rely on
 - [Writes](docs/writes.md): what you see before a write asks, and lost replies
 - [Scope](docs/scope.md): what is left out on purpose, and what belongs elsewhere
 - [Background](docs/background.md): the sessions the tool list comes from, and

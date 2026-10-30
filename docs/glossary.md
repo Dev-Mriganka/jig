@@ -30,9 +30,10 @@
 | **Spill file** | Where the full result goes when the text shown to the model is cut. The model can open it on demand. |
 | **Record** | One line per tool call or model turn, written by `jig-core` and read by `jig-lens`. It never holds tool arguments or output. |
 | **Facts** | A few named numbers or short codes that a Jig tool adds to its own record, such as tests passed or a CI run's conclusion. Never free text. |
-| **Watch** | A background check on a pull request, a CI run or a tag. It is saved, so it survives a restart of Pi, and it tells the agent once when its finish line is reached. |
+| **Watch** | A background check on a pull request, a CI run or a tag, started by `ci watch` or by itself after a push. It is saved, so it survives a restart of Pi, and it tells the agent once when its finish line is reached. |
 | **Finish line** | The condition that ends a watch, named when it starts, such as a named CI check passing or a pull request being merged. |
-| **Artifact ready** | The event `jig-git` publishes when a build, tag or release exists for the watched commit. A company plugin decides what follows; `jig-git` never deploys. |
+| **Artifact ready** | The event `jig-ops` publishes (`jig-ops:artifact-ready`) when a build, tag or release exists for the watched commit. A company plugin decides what follows; `jig-ops` never deploys from it. |
+| **Pushed** | The event `jig-git` publishes (`jig-git:pushed`) after a push and after a new pull request. `jig-ops` listens and starts a CI watch for a service of its catalog that has the repository. |
 | **Lens index** | `jig-lens`'s SQLite copy of the records, which `/lens` and the optional Grafana dashboards read. It can always be rebuilt from the records. |
 | **Sandbox** | Bubblewrap around the agent's own shell and file tools. It hides credentials and keeps the agent's own tooling read-only. Linux only. |
 | **Ticket** | A unit of work in an issue tracker, taken through a workflow by `jig-workflow` and remembered by `jig-memory`. |
@@ -49,8 +50,8 @@
 | **Acceptance scenario** | A numbered check in a ticket's plan. It is passed or failed, and a pass needs evidence. |
 | **Checker agent** | A read-only agent in a fresh context that reviews a change before you do. Planned. |
 | **Review ledger** | Planned: every review comment, from the review page, the pull request or chat, with how it was handled. |
-| **Service catalog** | Each service described once for `jig-ops`: its repository, its CI, and per environment how it deploys, where it runs and its health address. |
-| **Adapter** | A small piece of a plugin that speaks one outside system, such as one CI system, one log backend or one format of saved requests, behind the plugin's common verbs. |
+| **Service catalog** | Each service described once for `jig-ops`: its repository, its CI system and where it is, and per environment how it deploys, where it runs and its health address. |
+| **Adapter** | A small piece of a plugin that speaks one outside system, such as one CI system, one log backend or one format of saved requests, behind the plugin's common verbs. An action an adapter does not have is refused, naming it. |
 | **Collection** | A team's saved API requests in one place, such as a Postman export or a folder of `.http` files, with its environments. `jig-api` reads it. |
 | **Saved request** | One request in a collection, with a name, a method, an address and variables. The agent runs it by name and fills only its variables. |
 | **Pinned host** | A host an environment's requests may reach: the ones its own addresses come to. A request that goes anywhere else is refused. |

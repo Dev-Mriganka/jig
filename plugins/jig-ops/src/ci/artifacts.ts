@@ -1,14 +1,17 @@
-// "The artifact is ready": the rules in `git.artifacts`, tested when a watch has passed. A rule says where to look: the
+// "The artifact is ready": the rules in `ops.artifacts`, tested when a watch has passed. A rule says where to look: the
 // log of a named job, a comment by a bot, or a new tag or release. What it finds is announced on Pi's event bus as
-// `jig-git:artifact-ready`. jig-git announces and does nothing more: whether to deploy is not its decision.
+// `jig-ops:artifact-ready`. The watch announces and does nothing more: whether to deploy is not its decision.
 //
 // Every rule is tied to the commit that was watched. A version read from a log or a comment that does not contain the
 // commit's short id belongs to some other build and is ignored.
-import type { ArtifactRule } from "./config.ts";
-import type { Check } from "./ci.ts";
+import type { WatchResult } from "../../../jig-core/src/contract.ts";
 import { cleanLog } from "./logs.ts";
+import type { Check } from "./model.ts";
+import type { ArtifactRule } from "./settings.ts";
 
-export const ARTIFACT_EVENT = "jig-git:artifact-ready";
+// The name was `jig-git:artifact-ready` while jig-git ran the watch. The plugin that publishes an event owns its name,
+// and jig-git no longer publishes this one.
+export const ARTIFACT_EVENT = "jig-ops:artifact-ready";
 
 /** What the event carries. */
 export interface ArtifactReady {
@@ -53,7 +56,7 @@ export interface ArtifactSources {
     releases(): Promise<readonly Release[]>;
 }
 
-interface ArtifactTest {
+export interface ArtifactTest {
     repo: string;
     pr?: number;
     /** The commit that was watched. */
@@ -88,7 +91,14 @@ export async function testArtifacts(test: ArtifactTest): Promise<ArtifactReady[]
     const found: ArtifactReady[] = [];
     const add = (rule: ArtifactRule, ref: string, source: ArtifactReady["source"]) => {
         if (!found.some((artifact) => artifact.kind === rule.kind && artifact.ref === ref))
-            found.push({ repo: test.repo, pr: test.pr, sha, kind: rule.kind, ref, source });
+            found.push({
+                repo: test.repo,
+                ...(test.pr === undefined ? {} : { pr: test.pr }),
+                sha,
+                kind: rule.kind,
+                ref,
+                source,
+            });
     };
     for (const rule of rules) {
         if (rule.check !== undefined) {
@@ -126,4 +136,29 @@ export async function testArtifacts(test: ArtifactTest): Promise<ArtifactReady[]
     }
     for (const artifact of found) test.announce(ARTIFACT_EVENT, artifact);
     return found;
+}
+
+/**
+ * Tests the artifact rules when a watch has passed, and adds what they found to the result. A rule that cannot be
+ * tested (the log has expired, say) does not lose the watch's result: the message says so.
+ */
+export async function addArtifacts(result: WatchResult, test: ArtifactTest): Promise<WatchResult> {
+    if (test.rules.length === 0) return result;
+    try {
+        const found = await testArtifacts(test);
+        if (found.length === 0) return result;
+        const line = `Ready: ${found.map((artifact) => `${artifact.kind} ${artifact.ref}`).join(", ")}`;
+        return {
+            ...result,
+            details: [result.details, line].filter(Boolean).join("\n"),
+            facts: { ...(result.facts ?? {}), artifacts: found.length },
+        };
+    } catch (error) {
+        return {
+            ...result,
+            details: [result.details, `The artifact rules could not be tested: ${(error as Error).message}`]
+                .filter(Boolean)
+                .join("\n"),
+        };
+    }
 }

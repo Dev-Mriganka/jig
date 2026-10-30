@@ -8,6 +8,8 @@ import { jigOps } from "../../src/index.ts";
 import type { OpsOptions } from "../../src/index.ts";
 import { fakeClock } from "./clock.ts";
 import type { FakeClock } from "./clock.ts";
+import { installFakeGh } from "./fake-gh.ts";
+import type { FakeGh } from "./fake-gh.ts";
 import { installFakeJig } from "./fake-jig.ts";
 import type { FakeJig } from "./fake-jig.ts";
 import { installFakePrograms } from "./fake-programs.ts";
@@ -46,12 +48,26 @@ export interface ToolHarness {
     call(input: Record<string, unknown>, options?: CallOptions): Promise<CallResult>;
 }
 
+/** Pi's event bus, as far as the plugin uses it: it listens, and it publishes. A test publishes as another plugin would. */
+export interface FakeBus {
+    /** What the plugin published, in order. */
+    emitted: Array<{ event: string; payload: unknown }>;
+    /** The channels the plugin listens to. */
+    listening: string[];
+    /** Publishes on a channel, as jig-git does: every listener gets the payload. */
+    publish(event: string, payload: unknown): void;
+}
+
 export interface Harness {
     cluster: FakePrograms;
+    /** The fake `gh` the GitHub Actions adapter starts. */
+    gh: FakeGh;
     jig: FakeJig;
     clock: FakeClock;
+    bus: FakeBus;
     runtime: ToolHarness;
     deploy: ToolHarness;
+    ci: ToolHarness;
     /** Sets the `ops` section as jig.json holds it. */
     configure(raw?: Raw): void;
     close(): void;
@@ -72,12 +88,29 @@ const NO_NETWORK = async (): Promise<Response> => {
 export function setupHarness(options: OpsOptions = {}): Harness {
     const jig = installFakeJig();
     const cluster = installFakePrograms();
-    jig.useProgramsIn(cluster.bin, cluster.env);
+    const gh = installFakeGh();
+    jig.useProgramsIn([cluster.bin, gh.bin], cluster.env);
     const clock = fakeClock();
 
-    // A Pi that keeps what the plugin registers.
+    // A Pi that keeps what the plugin registers, and an event bus.
     const tools = new Map<string, ToolDefinition>();
-    const pi = { registerTool: (tool: ToolDefinition) => void tools.set(tool.name, tool) };
+    const listeners = new Map<string, Array<(payload: unknown) => void>>();
+    const bus: FakeBus = {
+        emitted: [],
+        listening: [],
+        publish: (event, payload) => void listeners.get(event)?.forEach((listener) => listener(payload)),
+    };
+    const pi = {
+        registerTool: (tool: ToolDefinition) => void tools.set(tool.name, tool),
+        events: {
+            on(channel: string, handler: (payload: unknown) => void) {
+                bus.listening.push(channel);
+                listeners.set(channel, [...(listeners.get(channel) ?? []), handler]);
+                return () => {};
+            },
+            emit: (channel: string, payload: unknown) => void bus.emitted.push({ event: channel, payload }),
+        },
+    };
 
     jigOps({ now: clock.now, sleep: clock.deps.sleep, fetch: NO_NETWORK, ...options })(pi as unknown as ExtensionAPI);
 
@@ -142,14 +175,18 @@ export function setupHarness(options: OpsOptions = {}): Harness {
 
     return {
         cluster,
+        gh,
         jig,
         clock,
+        bus,
         runtime: harnessOf("runtime"),
         deploy: harnessOf("deploy"),
+        ci: harnessOf("ci"),
         configure,
         close() {
             jig.remove();
             cluster.remove();
+            gh.remove();
         },
     };
 }

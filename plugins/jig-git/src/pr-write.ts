@@ -4,8 +4,8 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { startChecksWatch } from "./autowatch.ts";
 import { count, describeCounts } from "./ci.ts";
+import { announcePushed } from "./events.ts";
 import { afterLostReply, gh, ghJson, ghWrite, graphql, lastLine, prNumberFromUrl, repoFlags } from "./github.ts";
 import type { GhOptions } from "./github.ts";
 import { checkBody, checkBranch, checkNumber, checkTitle, checkWords } from "./names.ts";
@@ -199,19 +199,9 @@ async function finishCreate(
     sha: string,
     text: string,
 ) {
-    const watch = await startChecksWatch({
-        repo,
-        settings: call.settings,
-        branch,
-        sha,
-        pr: number,
-        signal: call.signal,
-    });
-    return {
-        text: `${text}${watch ? ` Watching ${watch.title} as ${watch.id}.` : ""}`,
-        facts: { pr: number },
-        details: { number, created: true, base, watch: watch?.id },
-    };
+    // The pull request now exists, so anyone watching the pushed commit can watch it as a pull request.
+    await announcePushed({ repo, settings: call.settings, branch, sha, pr: number, signal: call.signal });
+    return { text, facts: { pr: number }, details: { number, created: true, base } };
 }
 
 // ---- edit and ready -----------------------------------------------------------------------------------------------

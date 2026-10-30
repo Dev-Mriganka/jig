@@ -11,12 +11,6 @@ export function firstLines(text: string, maxLines: number): { text: string; cut:
     return { text: all.slice(0, maxLines).join("\n"), cut: Math.max(0, all.length - maxLines) };
 }
 
-/** The last `maxLines` lines. `cut` counts the lines left out before them. */
-export function lastLines(text: string, maxLines: number): { text: string; cut: number } {
-    const all = text.replace(/\n$/, "").split("\n");
-    return { text: all.slice(-maxLines).join("\n"), cut: Math.max(0, all.length - maxLines) };
-}
-
 export function plural(count: number, noun: string): string {
     return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }

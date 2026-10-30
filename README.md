@@ -11,14 +11,14 @@ specification that its code follows.
 
 `jig-core` governs every tool call, with rules per environment, approvals,
 secret references, masking of production results and background watches.
-`jig-git` gives the agent git, GitHub pull requests, CI checks and releases, and
-watches CI until it finishes. `jig-memory` keeps a folder of notes and evidence
+`jig-git` gives the agent git, GitHub pull requests and releases. `jig-memory` keeps a folder of notes and evidence
 for each ticket. `jig-lens` shows cost, tool failures and the time spent waiting
 for you. `jig-jira` reads and changes Jira issues, with rendered previews.
 `jig-logs` searches Elasticsearch, OpenSearch or Loki logs, and `jig-api` runs a
 team's saved API requests by name, with sign-in added by the tool. `jig-ops`
-deploys a version to a test environment and reads what runs, from one service
-catalog (CI is planned). The other plugins are designs.
+looks at CI on GitHub Actions, GitLab CI or Jenkins and watches it until it
+finishes, deploys a version to a test environment and reads what runs, all from
+one service catalog. The other plugins are designs.
 
 ## Where Jig sits
 
@@ -37,7 +37,7 @@ catalog (CI is planned). The other plugins are designs.
 | Plugin | Status | What it gives you |
 |---|---|---|
 | [`jig-core`](plugins/jig-core/README.md) | built | The tool manager. It governs every tool the agent can call: Pi's own (`read`, `write`, `edit`, `bash`), Jig's, and other packages'. Rules per environment, approvals, secrets, sign-in, masking, background watches and records |
-| [`jig-git`](plugins/jig-git/README.md) | built | Local git, GitHub pull requests and reviews, CI checks, watching CI until it finishes, and tags and releases |
+| [`jig-git`](plugins/jig-git/README.md) | built | Local git, GitHub pull requests and reviews, and tags and releases |
 | [`jig-lens`](plugins/jig-lens/README.md) | built | A summary inside Pi of cost, tool failures, time spent waiting for you, blocked calls and checks; Grafana optional |
 | [`jig-workflow`](plugins/jig-workflow/README.md) | design | Named workflows you define: stages, exit conditions and holds, test runs and acceptance scenarios |
 | [`jig-memory`](plugins/jig-memory/README.md) | built | Ticket folders, notes and evidence; later, recall of related tickets |
@@ -45,7 +45,7 @@ catalog (CI is planned). The other plugins are designs.
 | [`jig-jira`](plugins/jig-jira/README.md) | built | Jira issues: reads, comments, transitions, updates, with rendered previews |
 | [`jig-logs`](plugins/jig-logs/README.md) | built | Log search over Elasticsearch, OpenSearch or Grafana Loki; another backend is one adapter |
 | [`jig-api`](plugins/jig-api/README.md) | built (part 1) | Your team's saved API requests (Postman, `.http` files), run by name with only their variables filled, and sign-in added by the tool |
-| [`jig-ops`](plugins/jig-ops/README.md) | built: runtime and deploy; ci planned | Build, deploy and run on any CI and platform, from one service catalog |
+| [`jig-ops`](plugins/jig-ops/README.md) | built | CI on GitHub Actions, GitLab CI or Jenkins and watching it until it finishes, deploy and run on a platform, from one service catalog |
 | [`jig-review`](plugins/jig-review/README.md) | design | Code review in the browser |
 | [`jig-agents`](plugins/jig-agents/README.md) | design | Subagents in terminal panes |
 

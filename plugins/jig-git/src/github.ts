@@ -1,6 +1,6 @@
 // GitHub, through the `gh` command. gh keeps its own sign-in, so this plugin never sees a token: it starts gh from an
-// argument list through jig-core, and reads what gh prints. Reads use gh's JSON output or `gh api`; a write that may have
-// reached GitHub without its answer reaching us is checked once and never sent again.
+// argument list through jig-core, and reads what gh prints. Reads use gh's JSON output; a write that may have reached
+// GitHub without its answer reaching us is checked once and never sent again.
 import type { RunResult } from "../../jig-core/src/contract.ts";
 import { jig } from "../../jig-core/src/client.ts";
 import type { GitSettings } from "./config.ts";
@@ -62,65 +62,6 @@ export async function requireSlug(repo: Repo, settings: GitSettings, signal?: Ab
     if (!remote)
         throw new Error(`origin of ${repo.name} is not a github.com repository, so GitHub cannot be asked about it`);
     return remote.slug;
-}
-
-// ---- gh api -------------------------------------------------------------------------------------------------------
-
-export interface ApiResponse {
-    /** The HTTP status, or 0 when no response came (the network failed, or gh could not start the request). */
-    status: number;
-    /** Header names in lower case. */
-    headers: Record<string, string>;
-    body: string;
-}
-
-/**
- * Reads the output of `gh api -i`: a status line, the headers, a blank line, then the body. A `304` has no body, and gh
- * then exits with 1 and says `gh: HTTP 304`; any other status from 300 up is the same. The status is therefore taken
- * from the status line, not from the exit code.
- */
-export function parseApiOutput(result: RunResult): ApiResponse {
-    const head = /^HTTP\/[\d.]+ (\d{3})[^\n]*\r?\n/.exec(result.stdout);
-    if (!head) {
-        const status = /HTTP (\d{3})/.exec(result.stderr)?.[1];
-        return { status: status ? Number(status) : result.code === 0 ? 200 : 0, headers: {}, body: result.stdout };
-    }
-    const rest = result.stdout.slice(head[0].length);
-    const split = rest.search(/\r?\n\r?\n/);
-    const headerText = split < 0 ? rest : rest.slice(0, split);
-    const body = split < 0 ? "" : rest.slice(split).replace(/^\r?\n\r?\n/, "");
-    const headers: Record<string, string> = {};
-    for (const line of headerText.split(/\r?\n/)) {
-        const colon = line.indexOf(":");
-        if (colon > 0) headers[line.slice(0, colon).trim().toLowerCase()] = line.slice(colon + 1).trim();
-    }
-    return { status: Number(head[1]), headers, body };
-}
-
-interface ApiGet extends GhOptions {
-    /** The ETag of the answer we already hold. GitHub then answers `304` for free when nothing changed. */
-    etag?: string;
-}
-
-/** One `GET` with its status and headers. A status of 300 or more is returned, not thrown: the caller decides. */
-export async function apiGet(path: string, options: ApiGet = {}): Promise<ApiResponse> {
-    const args = ["api", "-i", ...(options.etag ? ["-H", `If-None-Match: ${options.etag}`] : []), path];
-    const result = await gh(args, options);
-    const response = parseApiOutput(result);
-    if (response.status === 0) throw ghFailure(`gh api ${path}`, result);
-    return response;
-}
-
-/** The JSON of one `GET`. A status outside 200 to 299 is an error. */
-export async function apiJson<T>(path: string, options: GhOptions = {}): Promise<T> {
-    const response = await apiGet(path, options);
-    if (response.status < 200 || response.status > 299) {
-        const message = (safeJson(response.body) as { message?: string } | undefined)?.message ?? "";
-        throw new Error(
-            `gh api ${path} failed: HTTP ${response.status}${message ? ` ${message}` : ""}${response.status === 401 ? " (gh is not signed in: run gh auth login yourself)" : ""}`,
-        );
-    }
-    return JSON.parse(response.body) as T;
 }
 
 function safeJson(text: string): unknown {

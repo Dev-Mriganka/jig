@@ -1,22 +1,33 @@
+// The GitHub half of the ops-ci watch kind, polled the way jig-core's engine polls it, against a fake `gh`. These were the tests of
+// jig-git's `github` watch kind: the ETags, X-Poll-Interval, the finish lines and the failure details are as they were. The
+// kind now takes the repository from the catalog (`acme/orders-api`), and its spec names the service.
 import assert from "node:assert/strict";
-import { after, before, beforeEach, test } from "node:test";
+import { afterEach, beforeEach, test } from "node:test";
 import type { PollOutcome } from "../../jig-core/src/contract.ts";
-import type { Finish, GithubSpec, GithubState } from "../src/watch.ts";
-import { describeSpec } from "../src/watch.ts";
+import type { GithubState } from "../src/ci/github-checks.ts";
+import { describeSpec } from "../src/ci/github-watch.ts";
+import type { Finish, GithubSpec } from "../src/ci/github-watch.ts";
+import type { GhReply } from "./support/fake-gh.ts";
 import { setupHarness } from "./support/harness.ts";
 import type { Harness } from "./support/harness.ts";
-import type { GhReply } from "./support/fake-gh.ts";
+import { section } from "./support/section.ts";
 
 let h: Harness;
 
-before(() => {
+beforeEach(() => {
     h = setupHarness();
+    h.jig.publish();
 });
-beforeEach(() => h.reset());
-after(() => h.cleanup());
+afterEach(() => h.close());
+
+/** The `ops` section with the watch settings and artifact rules a test sets. */
+function configure(more: Record<string, unknown>): void {
+    h.configure({ ...section(), ...more });
+}
 
 const SHA = "abcdef0123456789abcdef0123456789abcdef01";
-const SLUG = "acme/svc";
+const SLUG = "acme/orders-api";
+const SERVICE = "orders-api";
 const enc = encodeURIComponent;
 
 const P = {
@@ -62,14 +73,20 @@ function protect(contexts: string[], branch = "main"): void {
 }
 
 async function poll(spec: GithubSpec, state?: GithubState): Promise<PollOutcome<GithubState>> {
-    const kind = h.jig.kinds.get("github");
-    assert.ok(kind, "the github watch kind is registered");
-    return (await kind.poll(spec, state, new AbortController().signal)) as PollOutcome<GithubState>;
+    const kind = h.jig.kinds.get("ops-ci");
+    assert.ok(kind, "the ops-ci watch kind is registered");
+    const run = kind.poll as unknown as (
+        s: unknown,
+        st: unknown,
+        signal: AbortSignal,
+    ) => Promise<PollOutcome<GithubState>>;
+    return run(spec, state, new AbortController().signal);
 }
 
 const required: Finish = { kind: "required" };
 const spec = (finish: Finish = required, more: Partial<GithubSpec> = {}): GithubSpec => ({
-    repo: SLUG,
+    system: "github-actions",
+    service: SERVICE,
     branch: "feature/one",
     sha: SHA,
     finish,
@@ -78,27 +95,35 @@ const spec = (finish: Finish = required, more: Partial<GithubSpec> = {}): Github
 
 // ---- the kind -----------------------------------------------------------------------------------------------------
 
-test("the github kind is registered with a 30 second interval, and describes what it watches", () => {
-    const kind = h.jig.kinds.get("github");
-    assert.deepEqual([kind?.kind, kind?.plugin, kind?.intervalMs], ["github", "jig-git", 30_000]);
-    assert.equal(describeSpec(spec()), "acme/svc: required checks of branch feature/one at abcdef0");
-    assert.equal(describeSpec(spec(required, { pr: 42 })), "acme/svc: required checks of pull request 42 at abcdef0");
+test("the ops-ci kind is registered with a 30 second interval, and describes what it watches", () => {
+    const kind = h.jig.kinds.get("ops-ci");
+    assert.deepEqual([kind?.kind, kind?.plugin, kind?.intervalMs], ["ops-ci", "jig-ops", 30_000]);
+    assert.equal(describeSpec(spec()), "orders-api: required checks of branch feature/one at abcdef0");
+    assert.equal(describeSpec(spec(required, { pr: 42 })), "orders-api: required checks of pull request 42 at abcdef0");
     assert.equal(
         describeSpec(spec({ kind: "check", name: "build-image" })),
-        "acme/svc: check build-image of branch feature/one at abcdef0",
-    );
-    assert.equal(describeSpec({ repo: SLUG, runId: 7, finish: { kind: "run" } }), "acme/svc: run 7 of acme/svc");
-    assert.equal(
-        describeSpec({ repo: SLUG, pr: 42, finish: { kind: "pr", state: "merged" } }),
-        "acme/svc: merged state of pull request 42",
+        "orders-api: check build-image of branch feature/one at abcdef0",
     );
     assert.equal(
-        describeSpec({ repo: SLUG, pr: 42, finish: { kind: "comment", pattern: "image", since: "x" } }),
-        "acme/svc: a comment matching image of pull request 42",
+        describeSpec({ system: "github-actions", service: SERVICE, runId: 7, finish: { kind: "run" } }),
+        "orders-api: run 7 of orders-api",
     );
     assert.equal(
-        describeSpec({ repo: SLUG, finish: { kind: "tag", pattern: "^v" } }),
-        "acme/svc: a new tag matching ^v of acme/svc",
+        describeSpec({ system: "github-actions", service: SERVICE, pr: 42, finish: { kind: "pr", state: "merged" } }),
+        "orders-api: merged state of pull request 42",
+    );
+    assert.equal(
+        describeSpec({
+            system: "github-actions",
+            service: SERVICE,
+            pr: 42,
+            finish: { kind: "comment", pattern: "image", since: "x" },
+        }),
+        "orders-api: a comment matching image of pull request 42",
+    );
+    assert.equal(
+        describeSpec({ system: "github-actions", service: SERVICE, finish: { kind: "tag", pattern: "^v" } }),
+        "orders-api: a new tag matching ^v of orders-api",
     );
 });
 
@@ -154,13 +179,13 @@ test("X-Poll-Interval is followed through nextPollMs, never below the configured
     const slow = await poll(spec());
     assert.equal(slow.nextPollMs, 90_000);
     assert.equal(slow.state.pollSeconds, 90);
-    h.jig.setSection("git", { watch: { pollSeconds: 120 } });
+    configure({ watch: { pollSeconds: 120 } });
     assert.equal(
         (await poll(spec(), slow.state)).nextPollMs,
         120_000,
         "the configured interval wins when it is longer",
     );
-    h.jig.setSection("git", { watch: { pollSeconds: 10 } });
+    configure({ watch: { pollSeconds: 10 } });
     assert.equal((await poll(spec())).nextPollMs, 90_000, "GitHub's wish wins when it is longer");
 });
 
@@ -388,7 +413,7 @@ test("a named check: pending until it completes, then its own result decides, wh
 // ---- a run --------------------------------------------------------------------------------------------------------
 
 test("a run: a failed job ends the watch at once; a completed run decides", async () => {
-    const runSpec: GithubSpec = { repo: SLUG, runId: 7, finish: { kind: "run" } };
+    const runSpec: GithubSpec = { system: "github-actions", service: SERVICE, runId: 7, finish: { kind: "run" } };
     api(P.run(7), {
         json: {
             status: "in_progress",
@@ -448,7 +473,12 @@ const review = (login: string, state: string, body = "") => ({
 });
 
 test("approved: someone approved and nobody asks for changes", async () => {
-    const approval: GithubSpec = { repo: SLUG, pr: 42, finish: { kind: "pr", state: "approved" } };
+    const approval: GithubSpec = {
+        system: "github-actions",
+        service: SERVICE,
+        pr: 42,
+        finish: { kind: "pr", state: "approved" },
+    };
     api(P.pull(42), pull());
     api(P.reviews(42), { json: [review("alice", "COMMENTED", "thoughts")] });
     assert.equal((await poll(approval)).done, undefined);
@@ -471,7 +501,12 @@ test("approved: someone approved and nobody asks for changes", async () => {
 });
 
 test("merged: waits while open, passes when merged, fails when closed without a merge", async () => {
-    const merge: GithubSpec = { repo: SLUG, pr: 42, finish: { kind: "pr", state: "merged" } };
+    const merge: GithubSpec = {
+        system: "github-actions",
+        service: SERVICE,
+        pr: 42,
+        finish: { kind: "pr", state: "merged" },
+    };
     api(P.pull(42), pull());
     assert.equal((await poll(merge)).done, undefined);
     assert.equal(
@@ -496,7 +531,12 @@ const comment = (login: string, type: string, body: string, createdAt: string) =
 
 test("a bot comment that matches the pattern, made after the watch began", async () => {
     const since = "2026-10-30T10:00:00.000Z";
-    const watch: GithubSpec = { repo: SLUG, pr: 42, finish: { kind: "comment", pattern: "image: (\\S+)", since } };
+    const watch: GithubSpec = {
+        system: "github-actions",
+        service: SERVICE,
+        pr: 42,
+        finish: { kind: "comment", pattern: "image: (\\S+)", since },
+    };
     api(P.comments(42, since), {
         json: [
             comment("ci-bot", "Bot", "image: old:1.0-abc", "2026-10-30T09:00:00Z"),
@@ -524,7 +564,11 @@ test("a bot comment that matches the pattern, made after the watch began", async
 // ---- a tag or a release -------------------------------------------------------------------------------------------
 
 test("a new tag: what exists on the first poll is old news, a new one that matches ends the watch", async () => {
-    const watch: GithubSpec = { repo: SLUG, finish: { kind: "tag", pattern: "^v1\\." } };
+    const watch: GithubSpec = {
+        system: "github-actions",
+        service: SERVICE,
+        finish: { kind: "tag", pattern: "^v1\\." },
+    };
     api(P.tags, {
         json: [
             { name: "v1.0.0", commit: { sha: "1".repeat(40) } },
@@ -550,13 +594,20 @@ test("a new tag: what exists on the first poll is old news, a new one that match
         ],
         etag: 'W/"t3"',
     });
-    assert.equal((await poll(watch, first.state)).done?.summary, "A new tag v1.1.0 matches ^v1\\. in acme/svc");
+    assert.equal((await poll(watch, first.state)).done?.summary, "A new tag v1.1.0 matches ^v1\\. in acme/orders-api");
 });
 
 test("a tag on the watched commit counts at once; a new release is found by its tag", async () => {
     api(P.tags, { json: [{ name: "v1.0.0", commit: { sha: SHA } }] });
     assert.equal(
-        (await poll({ repo: SLUG, sha: SHA, finish: { kind: "tag", pattern: "^v1\\." } })).done?.outcome,
+        (
+            await poll({
+                system: "github-actions",
+                service: SERVICE,
+                sha: SHA,
+                finish: { kind: "tag", pattern: "^v1\\." },
+            })
+        ).done?.outcome,
         "passed",
     );
     api(P.tags, { json: [] });
@@ -565,13 +616,17 @@ test("a tag on the watched commit counts at once; a new release is found by its 
             {
                 tag_name: "v1.0.0",
                 name: "One",
-                html_url: "https://github.com/acme/svc/releases/tag/v1.0.0",
+                html_url: "https://github.com/acme/orders-api/releases/tag/v1.0.0",
                 draft: false,
             },
             { tag_name: "v1.1.0", name: "Draft", html_url: "d", draft: true },
         ],
     });
-    const watch: GithubSpec = { repo: SLUG, finish: { kind: "release", pattern: "^v1\\." } };
+    const watch: GithubSpec = {
+        system: "github-actions",
+        service: SERVICE,
+        finish: { kind: "release", pattern: "^v1\\." },
+    };
     const first = await poll(watch);
     assert.equal(first.done, undefined);
     api(P.releases, {
@@ -579,7 +634,7 @@ test("a tag on the watched commit counts at once; a new release is found by its 
             {
                 tag_name: "v1.2.0",
                 name: "Two",
-                html_url: "https://github.com/acme/svc/releases/tag/v1.2.0",
+                html_url: "https://github.com/acme/orders-api/releases/tag/v1.2.0",
                 draft: false,
             },
             { tag_name: "v1.0.0", name: "One", html_url: "x", draft: false },
@@ -587,8 +642,8 @@ test("a tag on the watched commit counts at once; a new release is found by its 
         etag: 'W/"r2"',
     });
     const done = (await poll(watch, first.state)).done;
-    assert.equal(done?.summary, "A new release v1.2.0 matches ^v1\\. in acme/svc");
-    assert.deepEqual(done?.links, ["https://github.com/acme/svc/releases/tag/v1.2.0"]);
+    assert.equal(done?.summary, "A new release v1.2.0 matches ^v1\\. in acme/orders-api");
+    assert.deepEqual(done?.links, ["https://github.com/acme/orders-api/releases/tag/v1.2.0"]);
 });
 
 // ---- errors -------------------------------------------------------------------------------------------------------
@@ -599,12 +654,15 @@ test("a poll that cannot be answered throws, so the engine counts it and pauses 
     api(P.runs, { status: 401, stderr: "Bad credentials", json: { message: "Bad credentials" } });
     await assert.rejects(
         poll(spec()),
-        /^Error: GitHub answered HTTP 401 for repos\/acme\/svc\/commits\/[0-9a-f]+\/check-runs\?per_page=100: Bad credentials \(gh is not signed in: run gh auth login yourself\)$/,
+        /^Error: GitHub answered HTTP 401 for repos\/acme\/orders-api\/commits\/[0-9a-f]+\/check-runs\?per_page=100: Bad credentials \(gh is not signed in: run gh auth login yourself\)$/,
     );
     api(P.runs, { status: 403, stderr: "rate limit", json: { message: "API rate limit exceeded" } });
     await assert.rejects(poll(spec()), /HTTP 403.*API rate limit exceeded/);
     api(P.pull(42), { status: 404, stderr: "Not Found", json: { message: "Not Found" } });
-    await assert.rejects(poll(spec(required, { pr: 42 })), /^Error: pull request 42 was not found in acme\/svc$/);
+    await assert.rejects(
+        poll(spec(required, { pr: 42 })),
+        /^Error: pull request 42 was not found in acme\/orders-api$/,
+    );
     h.gh.reset();
     api(P.runs, { code: 1, stderr: 'Get "https://api.github.com/x": dial tcp: lookup api.github.com: no such host' });
     await assert.rejects(poll(spec()), /dial tcp: lookup api\.github\.com: no such host/);
@@ -612,7 +670,7 @@ test("a poll that cannot be answered throws, so the engine counts it and pauses 
 
 test("a watch with no commit to look at says what it needs", async () => {
     await assert.rejects(
-        poll({ repo: SLUG, finish: required }),
-        /no commit to watch in acme\/svc: the watch needs a pull request, a branch or a sha/,
+        poll({ system: "github-actions", service: SERVICE, finish: required }),
+        /no commit to watch in acme\/orders-api: the watch needs a pull request, a branch or a sha/,
     );
 });

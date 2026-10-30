@@ -17,7 +17,7 @@ and waits for your `y` before it runs. Every other Jig plugin needs it.
 
 ## Tool: `watch`
 
-Plugins start watches from their own tools, such as `jig-git`'s `checks watch`.
+Plugins start watches from their own tools, such as `jig-ops`'s `ci watch`.
 This tool lists and stops the watches of every plugin.
 
 | Action | Kind | What it does |

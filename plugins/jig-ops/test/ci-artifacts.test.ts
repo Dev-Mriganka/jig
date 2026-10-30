@@ -1,13 +1,17 @@
+// The "artifact ready" rules and the event they publish. These were the tests of jig-git's artifact rules; the rules are now
+// `ops.artifacts`, the event is `jig-ops:artifact-ready`, and a watch of any CI system tests them when it has passed.
 import assert from "node:assert/strict";
-import { after, before, beforeEach, test } from "node:test";
-import { ARTIFACT_EVENT, testArtifacts } from "../src/artifacts.ts";
-import type { ArtifactReady, ArtifactSources } from "../src/artifacts.ts";
-import type { Check } from "../src/ci.ts";
-import type { ArtifactRule } from "../src/config.ts";
-import type { GithubSpec, GithubState } from "../src/watch.ts";
+import { afterEach, beforeEach, test } from "node:test";
 import type { PollOutcome } from "../../jig-core/src/contract.ts";
+import { ARTIFACT_EVENT, testArtifacts } from "../src/ci/artifacts.ts";
+import type { ArtifactReady, ArtifactSources } from "../src/ci/artifacts.ts";
+import type { GithubState } from "../src/ci/github-checks.ts";
+import type { GithubSpec } from "../src/ci/github-watch.ts";
+import type { Check } from "../src/ci/model.ts";
+import type { ArtifactRule } from "../src/ci/settings.ts";
 import { setupHarness } from "./support/harness.ts";
 import type { Harness } from "./support/harness.ts";
+import { section } from "./support/section.ts";
 
 const SHA = "abcdef0123456789abcdef0123456789abcdef01";
 const SHORT = "abcdef0";
@@ -60,7 +64,7 @@ test("a named job that succeeded for the head commit is an artifact; the event c
     });
     assert.deepEqual(found, [{ repo: "acme/svc", pr: 42, sha: SHA, kind: "image", ref: SHORT, source: "check" }]);
     assert.deepEqual(events, [[ARTIFACT_EVENT, found[0]]]);
-    assert.equal(ARTIFACT_EVENT, "jig-git:artifact-ready");
+    assert.equal(ARTIFACT_EVENT, "jig-ops:artifact-ready");
     assert.deepEqual(asked, ["checks"]);
     assert.equal((await test_([{ kind: "image", check: "build-image" }], { checks: [build("fail")] })).found.length, 0);
     assert.equal(
@@ -151,13 +155,18 @@ test("the same artifact is announced once, and every rule is tested", async () =
 // ---- as part of a watch -------------------------------------------------------------------------------------------
 
 let h: Harness;
-before(() => {
+beforeEach(() => {
     h = setupHarness();
+    h.jig.publish();
 });
-beforeEach(() => h.reset());
-after(() => h.cleanup());
+afterEach(() => h.close());
 
-const SLUG = "acme/svc";
+/** The `ops` section with these artifact rules (none when `rules` is undefined). */
+function rules(list: ArtifactRule[] | undefined): void {
+    h.configure({ ...section(), ...(list === undefined ? {} : { artifacts: list }) });
+}
+
+const SLUG = "acme/orders-api";
 const api = (path: string, reply: Parameters<Harness["gh"]["on"]>[1]) => h.gh.on("api", reply, [`=${path}`]);
 const run = (id: number, name: string, conclusion: string | null) => ({
     id,
@@ -168,12 +177,20 @@ const run = (id: number, name: string, conclusion: string | null) => ({
 });
 
 async function poll(spec: GithubSpec): Promise<PollOutcome<GithubState>> {
-    return (await h.jig.kinds
-        .get("github")
-        ?.poll(spec, undefined, new AbortController().signal)) as PollOutcome<GithubState>;
+    const kind = h.jig.kinds.get("ops-ci") as unknown as {
+        poll(s: unknown, st: unknown, signal: AbortSignal): Promise<unknown>;
+    };
+    return (await kind.poll(spec, undefined, new AbortController().signal)) as PollOutcome<GithubState>;
 }
 
-const spec: GithubSpec = { repo: SLUG, pr: 42, branch: "feature/one", sha: SHA, finish: { kind: "required" } };
+const spec: GithubSpec = {
+    system: "github-actions",
+    service: "orders-api",
+    pr: 42,
+    branch: "feature/one",
+    sha: SHA,
+    finish: { kind: "required" },
+};
 
 function serve(checkRuns: ReturnType<typeof run>[]): void {
     api(`repos/${SLUG}/pulls/42`, {
@@ -191,7 +208,7 @@ function serve(checkRuns: ReturnType<typeof run>[]): void {
 }
 
 test("when a watch passes, the artifact rules in git.artifacts are tested and the event is published", async () => {
-    h.jig.setSection("git", { artifacts: [{ kind: "image", check: "build-image", log: "pushed (\\S+)" }] });
+    rules([{ kind: "image", check: "build-image", log: "pushed (\\S+)" }]);
     serve([run(9, "build-image", "success")]);
     api(`repos/${SLUG}/actions/jobs/9/logs`, {
         stdout: `2026-10-30T10:00:00.0000000Z pushed registry/app:1.2-${SHORT}\n`,
@@ -200,16 +217,16 @@ test("when a watch passes, the artifact rules in git.artifacts are tested and th
     assert.equal(done?.outcome, "passed");
     assert.equal(done?.details, `Ready: image registry/app:1.2-${SHORT}`);
     assert.equal(done?.facts?.artifacts, 1);
-    assert.deepEqual(h.announced, [
+    assert.deepEqual(h.bus.emitted, [
         {
-            event: "jig-git:artifact-ready",
+            event: "jig-ops:artifact-ready",
             payload: { repo: SLUG, pr: 42, sha: SHA, kind: "image", ref: `registry/app:1.2-${SHORT}`, source: "log" },
         },
     ]);
 });
 
 test("a version of another commit in the log is ignored: no event, no mention", async () => {
-    h.jig.setSection("git", { artifacts: [{ kind: "image", check: "build-image", log: "pushed (\\S+)" }] });
+    rules([{ kind: "image", check: "build-image", log: "pushed (\\S+)" }]);
     serve([run(9, "build-image", "success")]);
     api(`repos/${SLUG}/actions/jobs/9/logs`, {
         stdout: "2026-10-30T10:00:00.0000000Z pushed registry/app:1.2-1234567\n",
@@ -217,24 +234,24 @@ test("a version of another commit in the log is ignored: no event, no mention", 
     const { done } = await poll(spec);
     assert.equal(done?.outcome, "passed");
     assert.equal(done?.details, undefined);
-    assert.deepEqual(h.announced, []);
+    assert.deepEqual(h.bus.emitted, []);
 });
 
 test("a watch that fails publishes nothing, and without rules nothing is read", async () => {
-    h.jig.setSection("git", { artifacts: [{ kind: "image", check: "build-image" }] });
+    rules([{ kind: "image", check: "build-image" }]);
     serve([run(9, "build-image", "failure")]);
     api(`repos/${SLUG}/actions/jobs/9/logs`, { stdout: "boom" });
     assert.equal((await poll(spec)).done?.outcome, "failed");
-    assert.deepEqual(h.announced, []);
-    h.jig.setSection("git", undefined);
+    assert.deepEqual(h.bus.emitted, []);
+    rules(undefined);
     h.gh.reset();
     serve([run(9, "build-image", "success")]);
     assert.equal((await poll(spec)).done?.outcome, "passed");
-    assert.deepEqual(h.announced, []);
+    assert.deepEqual(h.bus.emitted, []);
 });
 
 test("a rule that cannot be tested does not lose the result: the watch still reports, with a note", async () => {
-    h.jig.setSection("git", { artifacts: [{ kind: "image", check: "build-image", log: "pushed (\\S+)" }] });
+    rules([{ kind: "image", check: "build-image", log: "pushed (\\S+)" }]);
     serve([run(9, "build-image", "success")]);
     api(`repos/${SLUG}/actions/jobs/9/logs`, { code: 1, stderr: "gh: Gone (HTTP 410)" });
     const { done } = await poll(spec);
@@ -244,7 +261,7 @@ test("a rule that cannot be tested does not lose the result: the watch still rep
 
 test("a comment watch ends the same way: the comment is an artifact when a rule says so", async () => {
     const since = "2026-10-30T10:00:00.000Z";
-    h.jig.setSection("git", { artifacts: [{ kind: "image", comment: "image: (\\S+)", bot: "ci-bot" }] });
+    rules([{ kind: "image", comment: "image: (\\S+)", bot: "ci-bot" }]);
     const comment = {
         user: { login: "ci-bot", type: "Bot" },
         body: `image: registry/app:1.2-${SHORT}`,
@@ -254,12 +271,13 @@ test("a comment watch ends the same way: the comment is an artifact when a rule 
     api(`repos/${SLUG}/issues/42/comments?per_page=100&since=${encodeURIComponent(since)}`, { json: [comment] });
     api(`repos/${SLUG}/issues/42/comments?per_page=100`, { json: [comment] });
     const { done } = await poll({
-        repo: SLUG,
+        system: "github-actions",
+        service: "orders-api",
         pr: 42,
         sha: SHA,
         finish: { kind: "comment", pattern: "image: ", since },
     });
     assert.equal(done?.outcome, "passed");
-    assert.equal(h.announced[0]?.event, "jig-git:artifact-ready");
-    assert.equal((h.announced[0]?.payload as ArtifactReady).source, "comment");
+    assert.equal(h.bus.emitted[0]?.event, "jig-ops:artifact-ready");
+    assert.equal((h.bus.emitted[0]?.payload as ArtifactReady).source, "comment");
 });

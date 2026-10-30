@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="452" viewBox="0 0 1100 452" role="img" aria-label="Watching CI until it is done. A git push or pull request create starts a watch by itself, or the agent calls checks watch. The watch, on jig-core's engine, polls GitHub every 30 seconds until an explicit finish line is reached. One message then starts the agent's turn, and an artifact-ready event goes to Pi's event bus. A company plugin may deploy only through ctx.executeTool, so jig-core still decides: a write to a test environment asks unless a rule allows it, and production is denied." font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="452" viewBox="0 0 1100 452" role="img" aria-label="Watching CI until it is done. A git push or pull request create announces jig-git:pushed, and jig-ops starts a watch by itself; or the agent calls ci watch. The watch, on jig-core's engine, polls GitHub, GitLab or Jenkins every 30 seconds until an explicit finish line is reached. One message then starts the agent's turn, and an artifact-ready event goes to Pi's event bus. A company plugin may deploy only through ctx.executeTool, so jig-core still decides: a write to a test environment asks unless a rule allows it, and production is denied." font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">
   <rect x="0.5" y="0.5" width="1099" height="451" rx="10" fill="#FAFBFA" stroke="#D2D9D3"/>
   <defs>
     <marker id="ciwatch-head-1d3b4d-11" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#1D3B4D"/></marker>
@@ -7,9 +7,9 @@
   <!-- how a watch starts -->
   <rect x="30" y="50" width="190" height="46" rx="6" fill="#5C9CAB"/>
   <text x="125" y="70" font-size="14" fill="#FFFFFF" font-weight="700" text-anchor="middle">git push, pr create</text>
-  <text x="125" y="87" font-size="12.5" fill="#FFFFFF" text-anchor="middle">starts a watch by itself</text>
+  <text x="125" y="87" font-size="12.5" fill="#FFFFFF" text-anchor="middle">jig-ops starts a watch</text>
   <rect x="30" y="106" width="190" height="46" rx="6" fill="#5C9CAB"/>
-  <text x="125" y="126" font-size="14" fill="#FFFFFF" font-weight="700" text-anchor="middle">checks watch</text>
+  <text x="125" y="126" font-size="14" fill="#FFFFFF" font-weight="700" text-anchor="middle">ci watch</text>
   <text x="125" y="143" font-size="12.5" fill="#FFFFFF" text-anchor="middle">the agent starts one</text>
   <path d="M220 73 H240 V101 H260" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#ciwatch-head-1d3b4d-11)"/>
   <path d="M220 129 H240 V101" fill="none" stroke="#1D3B4D" stroke-width="2.4"/>
@@ -19,8 +19,8 @@
   <path d="M455.79 65.5 A9 9 0 1 1 442.84 62.63" fill="none" stroke="#E7B55B" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
   <polygon points="448.77,58.47 445.4,68.03 438.63,58.37" fill="#E7B55B"/>
   <text x="389" y="95" font-size="13" fill="#D9E3E8" text-anchor="middle">on jig-core's engine</text>
-  <text x="389" y="117" font-size="13" fill="#FFFFFF" text-anchor="middle">polls GitHub every 30 seconds,</text>
-  <text x="389" y="135" font-size="13" fill="#FFFFFF" text-anchor="middle">with ETags, so repeats are cheap</text>
+  <text x="389" y="117" font-size="13" fill="#FFFFFF" text-anchor="middle">polls GitHub, GitLab or Jenkins</text>
+  <text x="389" y="135" font-size="13" fill="#FFFFFF" text-anchor="middle">every 30 s, GitHub with ETags</text>
   <path d="M514 101 H556" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#ciwatch-head-1d3b4d-11)"/>
   <!-- an explicit finish line -->
   <rect x="560" y="50" width="240" height="102" rx="6" fill="#E2F1E7" stroke="#2C7A4B" stroke-width="1.8"/>
@@ -39,10 +39,10 @@
   <path d="M680 152 V196 H180 V246" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#ciwatch-head-1d3b4d-11)"/>
   <text x="430" y="189" font-size="12.5" fill="#3A4440" text-anchor="middle">when a rule says a build or tag is ready</text>
   <rect x="30" y="250" width="300" height="108" rx="6" fill="#5C9CAB"/>
-  <text x="180" y="276" font-size="14" fill="#FFFFFF" font-weight="700" text-anchor="middle">event: jig-git:artifact-ready</text>
+  <text x="180" y="276" font-size="14" fill="#FFFFFF" font-weight="700" text-anchor="middle">event: jig-ops:artifact-ready</text>
   <text x="180" y="298" font-size="13" fill="#FFFFFF" text-anchor="middle">on Pi's event bus, for other plugins</text>
   <text x="180" y="318" font-size="13" fill="#FFFFFF" text-anchor="middle">{ repo, pr, sha, kind, ref, source }</text>
-  <text x="180" y="340" font-size="12.5" fill="#D9E3E8" text-anchor="middle">jig-git itself never deploys</text>
+  <text x="180" y="340" font-size="12.5" fill="#D9E3E8" text-anchor="middle">jig-ops itself never deploys</text>
   <path d="M330 304 H372" fill="none" stroke="#4E7A58" stroke-width="2.4" marker-end="url(#ciwatch-head-4e7a58-11)"/>
   <rect x="376" y="250" width="300" height="108" rx="6" fill="#4E7A58"/>
   <text x="526" y="276" font-size="14" fill="#FFFFFF" font-weight="700" text-anchor="middle">a company plugin (private)</text>

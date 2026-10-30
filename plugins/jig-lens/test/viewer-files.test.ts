@@ -396,7 +396,7 @@ describe("the checks dashboard", () => {
             rows.map((row) => [row.tool, row.passed, row.failed, row.conclusion]),
             [
                 ["flow", 10, 2, null],
-                ["checks", 12, 0, "success"],
+                ["ci", 12, 0, "success"],
             ],
         );
         assert.match(panel("Calls with facts")?.targets[0]?.rawQueryText ?? "", /json_extract\(facts, '\$\.passed'\)/);
@@ -420,9 +420,9 @@ describe("the checks dashboard", () => {
         assert.deepEqual(
             rows.map((row) => `${row.tool}.${row.action}.${row.fact}:${row.lowest}-${row.highest}`),
             [
-                "checks.watch.conclusion:null-null",
-                "checks.watch.failed:0-0",
-                "checks.watch.passed:12-12",
+                "ci.watch.conclusion:null-null",
+                "ci.watch.failed:0-0",
+                "ci.watch.passed:12-12",
                 "flow.test.failed:2-2",
                 "flow.test.ok:null-null",
                 "flow.test.passed:10-10",
@@ -457,7 +457,7 @@ describe("the tools and time dashboards", () => {
         assert.deepEqual(
             slowest.slice(0, 2).map((row) => [row.tool, row.average]),
             [
-                ["checks", 60000],
+                ["ci", 60000],
                 ["flow", 45000],
             ],
         );
