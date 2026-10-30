@@ -50,7 +50,10 @@
 | **Checker agent** | A read-only agent in a fresh context that reviews a change before you do. Planned. |
 | **Review ledger** | Planned: every review comment, from the review page, the pull request or chat, with how it was handled. |
 | **Service catalog** | Each service described once for `jig-ops`: its repository, its CI, and per environment how it deploys, where it runs and its health address. |
-| **Adapter** | A small piece of a plugin that speaks one outside system, such as one CI system or one log backend, behind the plugin's common verbs. |
+| **Adapter** | A small piece of a plugin that speaks one outside system, such as one CI system, one log backend or one format of saved requests, behind the plugin's common verbs. |
+| **Collection** | A team's saved API requests in one place, such as a Postman export or a folder of `.http` files, with its environments. `jig-api` reads it. |
+| **Saved request** | One request in a collection, with a name, a method, an address and variables. The agent runs it by name and fills only its variables. |
+| **Pinned host** | A host an environment's requests may reach: the ones its own addresses come to. A request that goes anywhere else is refused. |
 | **Subagent** | A child agent: a full Pi session that another session starts in its own terminal pane. |
 | **Agent file** | A file that sets a subagent's role, its tools and its model, such as a planner, a reviewer, a scout or a worker. |
 | **Pin** | A hash of a script's folder. A script whose folder changed is refused until you pin it again. |

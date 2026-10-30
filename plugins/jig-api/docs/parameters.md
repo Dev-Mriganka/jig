@@ -1,76 +1,66 @@
 # Parameters, and the checks on them
 
-What each parameter of the `http` tool accepts, and what a call may not hold.
-Back to the [jig-http overview](../README.md).
+What each parameter of the `api` tool accepts, and what a call may not hold. Back to the [jig-api overview](../README.md).
 
-A call with a missing or an unused parameter is refused with the usage line, such
-as `http needs path. Usage: http {target, method, path, body?, headers?,
-timeoutSec?}`. A parameter given as `null` counts as unused. Every other mistake
-is refused with a one-line message that says what to change. No call is sent for
+One flat object, with `action` choosing what to do:
+
+| Action | Needs | May also have |
+|---|---|---|
+| `list` | | `collection`, `folder`, `text` |
+| `show` | `request` | `collection`, `folder`, `environment` |
+| `run` | `request`, `environment` | `collection`, `folder`, `variables`, `timeoutSec` |
+| `run-folder` | `folder`, `environment` | `collection`, `variables`, `timeoutSec` |
+| `call` | `environment`, `method`, `url` | `collection`, `body`, `headers`, `timeoutSec` |
+
+A call with a missing or an unused parameter is refused with the usage line, such as
+`api run needs environment. Usage: api run {request, environment, collection?, folder?, variables?, timeoutSec?}`. A parameter given
+as `null` counts as unused. Every other mistake is refused with a one-line message that says what to change. No call is sent for
 any of them.
 
-## Target
+## Names
 
-A name from the `http` section. A name that is not there, or no name at all, is
-refused with the names there are:
+- **`request`** is a request's name, or its path with folders (`Orders/Get order`). A name that is in two collections or folders is
+  refused with the places it is in, and `collection` or `folder` narrows it. A name that is not saved is refused with the near
+  ones, or with "use list to see them".
+- **`collection`** is a collection's name from the configuration. An unknown one is refused with the known ones.
+- **`folder`** is a folder path, `Orders` or `Orders/Smoke`, with every request below it. For a `.http` collection the last part
+  is the file: `smoke/health.http`. An unknown folder is refused with the folders there are.
+- **`environment`** is the collection's own name for it, such as `Staging`. An unknown one is refused with the ones the collection
+  has. `run-folder` runs every request of the folder in that environment.
+- **`text`** keeps the requests whose folder, name or address holds it, ignoring case.
 
-```text
-http: no target named "nope". Known targets: orders-api (staging: Orders, test copy), billing-api (production)
-```
+The reasons are cut at about 200 characters when `jig-core` shows them, so a list of choices lists the first few.
 
-Each target is shown with its environment and the first 40 characters of its
-description. The list is cut after about 120 characters, with a count of the
-rest, because `jig-core` shows the reason of a blocked call to the model cut at
-200 characters. Without an `http` section the message is `http is not set up: add
-an "http" section with "targets" to jig.json (/jig lists configuration
-problems)`.
+## `variables`
 
-## Method
+An object of name to value, for the variables the request uses. Values are text, numbers or booleans. See
+[Variables](variables.md) for what is refused and how a value is written. For `run-folder` the values are for the whole folder:
+each request gets the ones it uses, and a value that no request of the folder uses is refused.
 
-Exactly `GET`, `POST`, `PUT`, `PATCH` or `DELETE`, in capitals; anything else is
-refused. `jig-core` classifies every method that is not exactly `GET` as a write,
-so no spelling turns a write into a read.
+## `call`
 
-## Path
+An ad-hoc request. The `jig-core` environment the name maps to must be in `adHoc` and must not be production, and the host must be
+one of the environment's. Everything the agent writes is held to a narrow set:
 
-Starts with `/`, then at most 400 characters of letters, digits and ``. _ ~ / ! $
-& ' ( ) * + , ; = : @ % -``, then at most one `?query` of the same characters and
-the same length. There is no fragment.
-- **No `..`,** also when percent-encoded once or more. The path is decoded up to
-  5 times to look for it, so `%252e%252e` does not pass as a name, and text that
-  is still changing after that is refused too. One encoded dot, or encoded text
-  that is not dots, is fine.
-- **The host cannot change.** The path is added to the text of the base address,
-  so a path that looks like another host, such as `//other.example.com/x`, is only
-  a path on this host. The path of the base address stays in front of it.
-- **The refusal** quotes the path, cut short, and says what is allowed.
+- **`url`** is a whole address: `https://api.staging.example.com/v1/orders/123?expand=items`. The path and the query hold at most
+  400 characters each, from letters, digits and `` . _ ~ / ! $ & ' ( ) * + , ; = : @ % - ``, with one optional `?query`, no `#fragment`
+  and no user name or password. There is no `..`, also when percent-encoded: it is searched for after decoding up to 5 times, so
+  `%252e%252e` does not pass, and text that is still changing after that is refused too. The path is read from the text as written:
+  a parser would resolve `..` and hide it. An address that looks like another host (`//other.example.com/x` as a path) is only a path.
+- **`method`** is `GET`, `HEAD`, `OPTIONS`, `POST`, `PUT`, `PATCH` or `DELETE`, in capitals. The first three read.
+- **`body`** is any JSON value, at most 256 KiB once written out, serialised once and compactly, sent as `application/json`. `null` and
+  a missing body both mean no body. A `GET`, `HEAD` or `OPTIONS` has none: put the parameters in the `?query`.
+- **`headers`** are at most 10, names of a letter and then letters, digits and `-` (at most 41 characters), values of 1 to 1000
+  printable ASCII characters, a name given once. These are refused, in any case: `Authorization`, `Proxy-Authorization`, `Cookie`
+  (they sign in), `Host`, `Content-Length`, `Transfer-Encoding`, `Connection`, `Upgrade`, `TE`, `Expect` (they control the
+  connection), and `X-HTTP-Method-Override`, `X-HTTP-Method`, `X-Method-Override` (they ask a server to treat the request as another
+  method, which would let a read act as a write). A `Content-Type` or `Accept` the caller gives replaces the tool's.
+- **`collection`** makes the call sign in as that collection does (its own `auth`, with the environment's secrets), and limits the
+  hosts to that collection's. Without it a call is signed in only as the environment says (see [Sign-in](auth.md)).
 
-## Body
+## `timeoutSec`
 
-Serialised once and compactly. The size limit is counted in bytes and not in
-characters. `null` and a missing body both mean no body, because models often
-send `null` for a parameter they do not use. A `GET` takes no body: put the
-parameters in the path's `?query`. What is not JSON is refused.
+A whole number of seconds from 1 to 120. Without it the configured `timeoutSec` applies, 30 by default.
 
-## Headers
-
-An object of name to value, kept in the order given.
-- **Names** are a letter, then letters, digits and `-`, at most 41 characters in
-  all. A name given twice, in any case, is refused.
-- **Values** are 1 to 1000 printable ASCII characters.
-- **Refused headers** are the ones that a value from the model would break or
-  smuggle with, in any case:
-
-  | Why | Headers |
-  |---|---|
-  | They carry a sign-in | `Authorization`, `Proxy-Authorization`, `Cookie` |
-  | They control the connection or the framing of the request | `Host`, `Content-Length`, `Transfer-Encoding`, `Connection`, `Upgrade`, `TE`, `Expect` |
-  | They ask a server to treat the request as another method, which would let a `GET`, a read that nobody is asked about, act as a write | `X-HTTP-Method-Override`, `X-HTTP-Method`, `X-Method-Override` |
-
-  So is any header that the target's sign-in service sets. That is checked when
-  the call runs, before anything is sent. The message reads `header Authorization
-  is set by the tool or controls the connection, so it cannot be given`.
-
-The tool itself sends `Accept: application/json, text/plain, */*`, `User-Agent:
-jig-http` and, with a body, `Content-Type: application/json`. A caller's header
-of the same name replaces them, and so does a header of the sign-in service.
+The tool itself sends `Accept: application/json, text/plain, */*` and `User-Agent: jig-api`. A saved request's own header of the
+same name replaces them, and so does the sign-in's.

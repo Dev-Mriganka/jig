@@ -1,16 +1,17 @@
 # jig-api: your team's saved API requests, run safely
 
-**Status: design.** The sending engine is built and tested (it was `jig-http`):
-sign-in, OAuth, transports, previews and lost-reply checks. The collection
-sources are being built.
+**Status: part 1 built.** The sending engine (sign-in, OAuth, transports, previews and
+lost-reply checks) and two sources are built: **Postman** collection files (v2.1, with
+environment files) and folders of **`.http` files**. Bruno, OpenAPI and a Postman cloud
+workspace come in part 2. Tested against a fake API on this machine, not yet against a real
+service (see [Not verified yet](docs/not-verified.md)).
 
-`jig-api` lets the agent run the API requests your team already keeps, by
-name, filling only their variables. Wherever the collection lives, sign-in is
-added by the tool, and the result is governed like every other call. For
-example, after deploying a change to `staging`, the agent runs your saved
-**Get order** request with `orderId=123`. It reads, so it runs at once. Your
-saved **Create order** asks you first, showing the exact request; in
-`production` the floor denies it.
+`jig-api` lets the agent run the API requests your team already keeps, by name, filling only
+their variables. Wherever the collection lives, sign-in is added by the tool, and the result is
+governed like every other call. For example, after deploying a change to `staging`, the agent
+runs your saved **Get order** request with `orderId=123`. It reads, so it runs at once. Your
+saved **Create order** asks you first, showing the exact request; in `production` the floor
+denies it.
 
 ## What it is for
 
@@ -20,68 +21,68 @@ saved **Create order** asks you first, showing the exact request; in
 | Reproduce a ticket's bug | Run the saved write with the ticket's data in `staging`; you approve it |
 | Read production state safely | Run a saved read in `production`; the result is masked, and writes are denied |
 | Smoke-test after a deploy | Run a folder of saved requests and get one line per request |
-| Try an endpoint nobody saved yet | An ad-hoc call or an OpenAPI operation, in a test environment you allowed |
+| Try an endpoint nobody saved yet | An ad-hoc call, in a test environment you allowed |
 
 ## Where collections come from
 
-| Source | Where teams keep it | What is read |
+| Source | Where teams keep it | Status |
 |---|---|---|
-| **Bruno** | Files in git: OpenCollection YAML, or `.bru` | Requests, folders, environments, `vars:secret` and `secret: true` markers |
-| **Postman** | Collection v2.1 JSON and environment exports, or the cloud workspace by id with an API key | Requests, folders, variables, auth, environment values and `secret` types |
-| **`.http` files** | Files in git (JetBrains, VS Code, Visual Studio) | `###` requests with `# @name`, `http-client.env.json` and the private env file |
-| **OpenAPI** | The service's spec | Operations by `operationId`, for test environments you allow |
+| **Postman** | Collection v2.1 JSON and environment exports ([details](docs/postman.md)) | built |
+| **`.http` files** | Files in git: JetBrains, VS Code, Visual Studio ([details](docs/http-files.md)) | built |
+| **Bruno** | Files in git: OpenCollection YAML, or `.bru` | part 2 |
+| **OpenAPI** | The service's spec, for test environments you allow | part 2 |
+| **Postman cloud** | A workspace, by id with an API key | part 2 |
 
-Hurl, Insomnia and Postman's newer YAML layout come next. A source is a small
-adapter, so others can be added (see Later).
+A source is a small adapter, so others can be added ([how](docs/sources.md)).
 
 ## Tool: `api`
 
 | Action | Kind | What it does |
 |---|---|---|
-| `list` | read | Saved requests by collection and folder, with their method, path and the variables they need. Filter by text |
-| `show` | read | One request in full: URL template, headers (names only for secrets), body template, variables, docs |
-| `run` | depends on the request | Runs one saved request in an environment, with variables. A `GET` reads; other methods write, unless you mark the request a read |
+| `list` | read | Saved requests by collection and folder, with method, address, whether they read, and the variables they need. Filter by text |
+| `show` | read | One request in full: address, headers (a sign-in's by name only), body, where each variable gets its value, docs |
+| `run` | depends on the request | Runs one saved request in an environment, with variables. `GET`, `HEAD` and `OPTIONS` read; other methods write, unless the request is in `reads` |
 | `run-folder` | the strictest of its requests | Runs a folder in order, stopping at the first failure. One line per request |
 | `call` | depends on the method | An ad-hoc request in an environment where you allowed it. Off by default, and never production |
 
 A request's name is its action, so a rule can name one request:
 `{ "tool": "api", "action": "Create order", "environment": "staging", "decision": "allow" }`.
+Parameters and their checks: [Parameters](docs/parameters.md).
 
 ## Rules
 
-- **Saved requests first.** The agent fills variables; it cannot change a
-  request's host, method or headers. Ad-hoc calls are opt-in per environment.
-- **Requests are sent by the tool, not by your API client's CLI.** Collection
-  scripts never run: a request that needs a pre-request script is refused,
-  with its name. Most requests need none.
-- **Hosts are pinned per environment.** A request whose host is not one of its
-  environment's hosts is refused. So are link-local and cloud-metadata
-  addresses. Redirects are never followed, and no cookies are kept.
-- **Secrets never come from the model.** A variable your format marks secret
-  needs a secret reference in configuration, such as `pass:orders/token`, and
-  is bound to its environment's hosts. Plain secret values in an export are
-  refused, with a warning that names the file.
-- **Files stay in the collection.** A file a request uploads must sit inside
-  its collection folder, after following links.
-- **Only headless sign-in.** OAuth works with client credentials or a password
-  grant. Anything that needs a browser is refused.
-- **Plain HTTP only.** GraphQL is a `POST` and works. gRPC, WebSocket and MQTT
-  requests are refused as unsupported, not skipped silently.
-- **The rest is `jig-core`'s:** reads run, a write to a test environment asks
-  you with a preview, production writes are denied, production results are
-  masked, and an unknown outcome is checked once, never resent.
+- **Saved requests first.** The agent fills variables; it cannot change a request's host, method
+  or headers ([Variables](docs/variables.md)). Ad-hoc calls are opt-in per environment.
+- **Requests are sent by the tool, not by your API client.** Scripts never run: a request that a
+  pre-request script applies to is refused, with its name. Test scripts are ignored, with a note.
+- **Hosts are pinned per environment.** A request whose host is not one of its environment's
+  hosts is refused. So are link-local and cloud-metadata addresses. Redirects are never
+  followed, and no cookies are kept ([Safety](docs/safety.md)).
+- **Secrets never come from the model.** A secret variable needs a reference in `api.secrets`,
+  such as `pass:orders/token`. A plain value for it in a file is refused, with a warning that
+  names the file and the variable.
+- **Files stay in the collection.** An upload must sit inside its collection folder, after
+  following links.
+- **Only headless sign-in:** bearer, Basic, an API key in a header, OAuth with client
+  credentials or a password grant ([Sign-in](docs/auth.md)). A browser flow is refused.
+- **Plain HTTP only.** GraphQL is a `POST` and works. gRPC, WebSocket and MQTT requests are
+  listed and refused as unsupported, not skipped silently.
+- **The rest is `jig-core`'s:** reads run, a write to a test environment asks you with a
+  preview, production writes are denied, production results are masked, and an unknown outcome
+  is checked once, never resent ([Writes](docs/writes.md)).
 
 ## Configure
 
-In `~/.pi/agent/jig.json`, under `api`:
+In `~/.pi/agent/jig.json`, under `api`. An unknown field is an error, and the tool then does
+nothing until the file is fixed (`/jig` lists the problems).
 
 ```json
 {
   "api": {
     "collections": {
-      "orders": { "bruno": "~/work/orders-api/collection" },
+      "orders": { "http": "~/work/orders-api/http" },
       "billing": { "postman": "~/work/billing.postman_collection.json",
-                   "environments": { "staging": "~/work/billing-staging.postman_environment.json" } }
+                   "environments": { "Staging": "~/work/billing-staging.postman_environment.json" } }
     },
     "environments": { "Staging": "staging", "Prod": "production" },
     "secrets": { "token": "pass:orders/token" },
@@ -93,30 +94,45 @@ In `~/.pi/agent/jig.json`, under `api`:
 
 | Field | Meaning |
 |---|---|
-| `collections` | Named sources: `bruno`, `postman` (a file, or `{ "cloud": "<collection id>", "apiKey": "<secret ref>" }`), `http` (a folder of `.http` files) or `openapi` |
-| `environments` | Your collection's environment names, mapped to `jig-core`'s. A name not mapped counts as production |
-| `secrets` | Secret variables, by name, mapped to secret references |
+| `collections` | Named sources: `postman` (a file, and its `environments` as name to file) or `http` (a folder). Paths are absolute or start with `~/`. `bruno`, `openapi` and a Postman cloud id are refused as coming in part 2 |
+| `environments` | Your collections' environment names, mapped to `jig-core`'s; a name not mapped counts as production. A value may be `{ "environment": "staging", "signIn": "<service>" }` or `"transport": "<name>"` |
+| `secrets` | Secret variables, by name, mapped to secret references; or per environment: `{ "token": { "Staging": "pass:a", "Prod": "pass:b" } }` |
 | `reads` | Requests that read although their method is not `GET`, such as a search sent as `POST` |
-| `adHoc` | Test environments where `call` is allowed |
+| `adHoc` | `jig-core` test environments where `call` is allowed; each must be one that `environments` maps to |
+| `timeoutSec` | Seconds to wait for an answer when a call gives none: 1 to 120, default 30 |
+| `allowPlainLocal` | Allows `http://127.0.0.1` and `http://localhost`, for a service beside Pi and for tests. Default `false` |
 
 ## Company part (in the company plugin)
 
 - where its collections live, and their environment mapping;
-- a transport, for APIs only reachable through a bastion host, a VPN or a
-  sign-in proxy.
+- a transport or a sign-in service, for APIs only reachable through a bastion host, a VPN or a
+  sign-in proxy, named in `environments`.
 
 ## Later
 
+- **Part 2:** Bruno, OpenAPI and a Postman cloud workspace as sources.
 - **Hurl, Insomnia and Postman's YAML layout** as sources.
-- **Collections with scripts,** run by their own CLI only in a test
-  environment you opt into, with the output masked again.
+- **Collections with scripts,** run by their own CLI only in a test environment you opt into,
+  with the output masked again.
 - **Asserts,** as declared in Bruno and Hurl files, reported by `run-folder`.
 
-## Layout (planned)
+## Layout
 
 ```text
 jig-api/
-  src/      engine/ (sending, sign-in, OAuth, previews), sources/ (one adapter per format), model, tool, config
+  src/      the tool and its checks (index, tool, params, config, ad-hoc), collections (model, template, catalog,
+            sources/ with one adapter per format), a request worked out (resolve, planning, show), engine/ (sending,
+            sign-in, OAuth, previews, results)
   skills/   api/SKILL.md: list, show, then run; read before you write
-  test/     per-source fixtures, the engine's tests, safety tests
+  test/     fixtures of an example orders API in both formats, the engine's tests, the safety tests
+  docs/     the detail pages below
 ```
+
+## More detail
+
+- [Postman](docs/postman.md) and [`.http` files](docs/http-files.md): what is read, and what is refused
+- [Variables](docs/variables.md): the order values come in, and how the agent's are written
+- [Safety](docs/safety.md): pinned hosts, blocked addresses, files, scripts
+- [Parameters](docs/parameters.md), [Sign-in](docs/auth.md), [Results](docs/results.md), [Writes](docs/writes.md)
+- [Adding a source](docs/sources.md): the interface an adapter implements
+- [Not verified yet](docs/not-verified.md): what needs a real service

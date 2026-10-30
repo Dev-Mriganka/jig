@@ -1,7 +1,7 @@
 # Jig agent guide
 
 Seven plugins are built (`jig-core`, `jig-git`, `jig-memory`, `jig-lens`,
-`jig-jira`, `jig-logs`, `jig-http`), `jig-ops` is being built, and the rest are
+`jig-jira`, `jig-logs`, `jig-api`), `jig-ops` is being built, and the rest are
 design. Plugin READMEs are the specifications. Code follows them, and when
 either changes, the other changes in the same commit. The tool tables of
 `jig-git` and `jig-jira` are read by their tests.
