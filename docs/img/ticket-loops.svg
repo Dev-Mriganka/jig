@@ -26,7 +26,7 @@
   <polygon points="204,192 318,192 328,211 318,230 204,230" fill="#DF6A7C"/>
   <text x="263" y="215.38" font-size="12.5" fill="#FFFFFF" text-anchor="middle">ticket notes</text>
   <polygon points="336,192 450,192 460,211 450,230 336,230" fill="#5C9CAB"/>
-  <text x="395" y="215.38" font-size="12.5" fill="#FFFFFF" text-anchor="middle">flow gates</text>
+  <text x="395" y="215.38" font-size="12.5" fill="#FFFFFF" text-anchor="middle">workflow gates</text>
   <polygon points="72,238 186,238 196,257 186,276 72,276" fill="#FFFFFF" stroke="#DF6A7C" stroke-width="2" stroke-dasharray="6 4"/>
   <text x="131" y="261.38" font-size="12.5" fill="#B6475A" text-anchor="middle">related tickets</text>
   <polygon points="204,238 318,238 328,257 318,276 204,276" fill="#FFFFFF" stroke="#DF6A7C" stroke-width="2" stroke-dasharray="6 4"/>

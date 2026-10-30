@@ -16,7 +16,7 @@ Back to the [jig-git overview](../README.md).
 - **Other CI systems** (GitLab CI, Jenkins, Buildkite), deploy tools and
   container registry checks. They belong in a company plugin.
 - **Gates on commit and push,** such as "no push without a review". They are
-  `jig-flow` rules, not git code.
+  `jig-workflow` rules, not git code.
 - **A company's conventions,** such as branch names, protected branches and the
   pull request template. They are the settings under
   [Configure](../README.md#configure), set by the company plugin.

@@ -40,7 +40,7 @@
   <text x="535" y="149.9" font-size="14" fill="#FFFFFF" text-anchor="middle">ticket notes</text>
   <polygon points="600,124 602,129 607,131 602,133 600,138 598,133 593,131 598,129" fill="#DF6A7C"/>
   <rect x="622" y="120" width="150" height="50" rx="4" fill="#1D3B4D"/>
-  <text x="697" y="149.9" font-size="14" fill="#FFFFFF" text-anchor="middle">flow gates</text>
+  <text x="697" y="149.9" font-size="14" fill="#FFFFFF" text-anchor="middle">workflow gates</text>
   <circle cx="762" cy="131" r="6" fill="#5C9CAB"/>
   <circle cx="762" cy="131" r="2.4" fill="#FFFFFF"/>
   <rect x="298" y="182" width="150" height="50" rx="4" fill="#FFFFFF" stroke="#1D3B4D" stroke-width="1.8" stroke-dasharray="6 4"/>

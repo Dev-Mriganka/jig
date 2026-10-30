@@ -35,13 +35,16 @@
 | **Artifact ready** | The event `jig-git` publishes when a build, tag or release exists for the watched commit. A company plugin decides what follows; `jig-git` never deploys. |
 | **Lens index** | `jig-lens`'s SQLite copy of the records, which `/lens` and the optional Grafana dashboards read. It can always be rebuilt from the records. |
 | **Sandbox** | Bubblewrap around the agent's own shell and file tools. It hides credentials and keeps the agent's own tooling read-only. Linux only. |
-| **Ticket** | A unit of work in an issue tracker, followed by `jig-flow` and remembered by `jig-memory`. |
+| **Ticket** | A unit of work in an issue tracker, taken through a workflow by `jig-workflow` and remembered by `jig-memory`. |
+| **Workflow** | A named, ordered list of stages that you or a company plugin define in a file, such as `feature` or `bugfix`. `jig-workflow` takes a piece of work through one. |
+| **Exit condition** | What must hold before work leaves a stage, from a fixed list such as `plan-approved` or `tests-pass-at-head`. |
+| **Hold** | A tool call a workflow keeps back until a condition holds, such as `git push` until the tests pass. It only ever tightens a decision. |
 | **Ticket folder** | A folder for one ticket, outside every repository: its notes, plan, evidence and the repositories bound to it. |
 | **Card** | A short summary of a closed ticket: problem, cause, fix, repositories, identifiers and error text. Planned for `jig-memory`. |
 | **Recall** | Finding earlier tickets related to a new one by shared keys, then by keyword search, and handing the agent their cards as a short message. Planned for `jig-memory`. |
 | **Memory keeper** | Planned: it writes a ticket's card at close and proposes organizational and personal facts. You approve the exact text of every one. |
 | **Evidence** | Tool results saved in the ticket folder while the ticket is active, masked like everything else. |
-| **Stage** | A step of a ticket's flow, such as plan or review. A company plugin defines the stage sets. |
+| **Stage** | A step of a workflow, such as plan or review, with a goal the agent sees and its exit conditions. |
 | **Gate** | A condition that holds a stage or an action until it is met, such as an approved plan or a passing test of the exact commit. |
 | **Acceptance scenario** | A numbered check in a ticket's plan. It is passed or failed, and a pass needs evidence. |
 | **Checker agent** | A read-only agent in a fresh context that reviews a change before you do. Planned. |

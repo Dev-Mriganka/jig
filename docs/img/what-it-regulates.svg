@@ -28,7 +28,7 @@
   <polygon points="726,160 864,160 876,176 864,192 726,192" fill="#DF6A7C"/>
   <text x="798" y="180.55" font-size="13" fill="#FFFFFF" text-anchor="middle">scenarios in plan</text>
   <polygon points="726,206 864,206 876,222 864,238 726,238" fill="#5C9CAB"/>
-  <text x="798" y="226.55" font-size="13" fill="#FFFFFF" text-anchor="middle">flow gates</text>
+  <text x="798" y="226.55" font-size="13" fill="#FFFFFF" text-anchor="middle">workflow gates</text>
   <polygon points="956,160 1094,160 1106,176 1094,192 956,192" fill="#5C9CAB"/>
   <text x="1028" y="180.55" font-size="13" fill="#FFFFFF" text-anchor="middle">approved fields</text>
   <polygon points="956,206 1094,206 1106,222 1094,238 956,238" fill="#5C9CAB"/>

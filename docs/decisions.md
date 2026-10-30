@@ -2,6 +2,26 @@
 
 Dated so the reasons stay attached.
 
+## 2026-10-30: jig-flow becomes jig-workflow, and workflows are named files
+
+- **Renamed** to `jig-workflow`, with its tool `workflow`.
+- **No workflow is built in.** Each is a JSON file with a name, stages, exit
+  conditions and holds, written by you or a company plugin. You start one by
+  name, or a ticket-key pattern picks it.
+- **Conditions come from a fixed list** that the plugin checks itself, so a
+  workflow file never runs code. A custom check belongs in a repository's test
+  command.
+- **Holds reach other tools through a gate in `jig-core`,** which can only make
+  a decision stricter.
+
+## 2026-10-30: no jig-scripts in the generic set
+
+- **Dropped.** A generic user runs scripts with `bash`, in the sandbox. What a
+  script tool adds (credentials outside the sandbox, a pinned folder, masked
+  output files) matters only for scripts that need credentials or production
+  access, which are a company's own. A company plugin can offer those as its
+  own tools.
+
 ## 2026-10-30: one tool manager over every tool
 
 `jig-core` governs every tool call through Pi's hooks: Pi's own tools, Jig's,
@@ -170,7 +190,7 @@ its own safety pipeline.
 - **Two repositories.** This public, generic `jig`, and a private company
   plugin kept at the company.
 - **One approval per change** (after tests and checks, before the pull request
-  is shared) is the goal for the ticket flow. It arrives with `jig-flow`, and
+  is shared) is the goal for the ticket flow. It arrives with `jig-workflow`, and
   pushes keep their confirmation until then.
 - **Rendered previews come with the Jira tools,** together with the PR text
   previews.

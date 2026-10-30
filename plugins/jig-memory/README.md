@@ -20,7 +20,7 @@ Each ticket has a folder outside every repository:
 | File | What it holds |
 |---|---|
 | `notes.md` | A `## Now` block (status, next step, open questions) kept under 1 KB, then decisions. Old blocks move to `history/` |
-| `plan.md` | The plan `jig-flow` asks you to approve |
+| `plan.md` | The plan `jig-workflow` asks you to approve |
 | `evidence/` | Tool results captured while the ticket is active, masked like everything else, with an index |
 | `ticket.json` | The repositories bound to the ticket |
 

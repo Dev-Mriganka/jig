@@ -182,7 +182,7 @@ export function sampleRecords(): RecordLine[] {
         turn("t6", "2026-10-30T09:00:00Z", "s2", "model-a", 0.07, { cacheRead: 12_000 }),
         call("c12", "2026-10-30T09:01:00Z", "s2", "flow", {
             action: "test",
-            plugin: "jig-flow",
+            plugin: "jig-workflow",
             effect: "write",
             outcome: "error",
             errorKind: "tool",

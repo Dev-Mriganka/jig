@@ -1,5 +1,5 @@
 // The ticket folder on disk: <folder>/<KEY>/ holds notes.md (what is known, kept by the agent), plan.md (the plan that
-// jig-flow asks you to approve), evidence/ (the saved results and index.md), history/ (the older lines of ## Now) and
+// jig-workflow asks you to approve), evidence/ (the saved results and index.md), history/ (the older lines of ## Now) and
 // ticket.json (the repositories bound to the ticket). Folders are 0700 and files 0600, because the notes and the
 // evidence hold what the tools returned.
 import { randomBytes } from "node:crypto";

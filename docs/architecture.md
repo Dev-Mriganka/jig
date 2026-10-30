@@ -113,8 +113,8 @@ jig (this repository, generic)
   jig-core   tool manager: classify, rules, approvals, secrets, sign-in, transports, mask, redact, cap, record; watch engine
   jig-git    tools: local git, GitHub PRs and reviews, CI checks and watching
   jig-lens   observability: reads jig-core's records, local dashboard
-  jig-flow, jig-memory, jig-mongo, jig-jira, jig-logs, jig-http, jig-k8s,
-  jig-scripts, jig-review, jig-agents   (see Plugins)
+  jig-workflow, jig-memory, jig-mongo, jig-jira, jig-logs, jig-http, jig-k8s,
+  jig-review, jig-agents   (see Plugins)
 
 company plugin (separate, private repository)
   the company's environments, sign-in service, internal tools and backends

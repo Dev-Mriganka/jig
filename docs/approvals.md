@@ -75,7 +75,7 @@ in `jig-lens`.
 
 ![Today an approval sits on every push; with one approval per change, pushes need only passing tests and you approve once, with all the evidence](img/one-approval.svg)
 
-*The same ticket under two rules: today each push asks, because the approval must cover the exact commit; with `jig-flow`, pushes need only passing tests and you approve once, with all the evidence on one page, before teammates see the pull request. Writes to a test environment such as `staging` still ask you.*
+*The same ticket under two rules: today each push asks, because the approval must cover the exact commit; with `jig-workflow`, pushes need only passing tests and you approve once, with all the evidence on one page, before teammates see the pull request. Writes to a test environment such as `staging` still ask you.*
 
 ## Later
 

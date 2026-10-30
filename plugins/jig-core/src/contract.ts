@@ -222,7 +222,7 @@ export interface JigApi {
     /** Adds facts to this call's record. */
     addFacts(toolCallId: string, facts: Facts): void;
 
-    /** The ticket the session works on, set by jig-flow. Records carry it. */
+    /** The ticket the session works on, set by jig-workflow. Records carry it. */
     setTicket(key: string | undefined): void;
 
     readonly secrets: {

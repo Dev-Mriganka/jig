@@ -38,14 +38,13 @@ plugins are designs.
 | [`jig-core`](plugins/jig-core/README.md) | built | The tool manager. It governs every tool the agent can call: Pi's own (`read`, `write`, `edit`, `bash`), Jig's, and other packages'. Rules per environment, approvals, secrets, sign-in, masking, background watches and records |
 | [`jig-git`](plugins/jig-git/README.md) | built | Local git, GitHub pull requests and reviews, CI checks, watching CI until it finishes, and tags and releases |
 | [`jig-lens`](plugins/jig-lens/README.md) | built | A summary inside Pi of cost, tool failures, time spent waiting for you, blocked calls and checks; Grafana optional |
-| [`jig-flow`](plugins/jig-flow/README.md) | design | The ticket flow: stages, gates, test runs, acceptance scenarios |
+| [`jig-workflow`](plugins/jig-workflow/README.md) | design | Named workflows you define: stages, exit conditions and holds, test runs and acceptance scenarios |
 | [`jig-memory`](plugins/jig-memory/README.md) | built | Ticket folders, notes and evidence; later, recall of related tickets |
 | [`jig-mongo`](plugins/jig-mongo/README.md) | design | MongoDB reads, with production limited to approved fields |
 | [`jig-jira`](plugins/jig-jira/README.md) | built | Jira issues: reads, comments, transitions, updates, with rendered previews |
 | [`jig-logs`](plugins/jig-logs/README.md) | built | Log search over a backend such as Elasticsearch |
 | [`jig-http`](plugins/jig-http/README.md) | built | Calls to named APIs, with sign-in added by the tool |
 | [`jig-k8s`](plugins/jig-k8s/README.md) | design | Kubernetes reads: pods, rollout status, logs |
-| [`jig-scripts`](plugins/jig-scripts/README.md) | design | Your own scripts as tools, pinned by hash |
 | [`jig-review`](plugins/jig-review/README.md) | design | Code review in the browser |
 | [`jig-agents`](plugins/jig-agents/README.md) | design | Subagents in terminal panes |
 

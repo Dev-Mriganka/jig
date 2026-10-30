@@ -40,7 +40,7 @@ review, and the agent fixes one and answers the other.
   The link goes only to you, and requests from another host or origin are
   refused.
 - **Approve is a click in the page,** so it is protected only by the secret
-  never reaching the agent. When `jig-flow` arrives, the approval that opens a
+  never reaching the agent. When `jig-workflow` arrives, the approval that opens a
   gate becomes a `y` inside the waiting call, as everywhere else (see
   [Approvals](../../docs/approvals.md)).
 
@@ -48,7 +48,7 @@ review, and the agent fixes one and answers the other.
 
 ![A fresh-context checker reviews the change first: a pass goes to your code review, a revise goes back to the maker, and after two rounds you decide](../../docs/img/fresh-checker.svg)
 
-*A read-only checker agent in a fresh context reviews the change before this review (see [`jig-flow`](../jig-flow/README.md)): a pass goes to your code review, a revise goes back to the maker with findings, and after two rounds the decision comes to you with both reports.*
+*A read-only checker agent in a fresh context reviews the change before this review (see [`jig-workflow`](../jig-workflow/README.md)): a pass goes to your code review, a revise goes back to the maker with findings, and after two rounds the decision comes to you with both reports.*
 
 ## Origin
 
