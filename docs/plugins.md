@@ -32,7 +32,7 @@ parts live in a private company plugin kept at the company.
 | [`jig-logs`](../plugins/jig-logs/README.md) | built | `logs`: search by phrase or query, time window, filters, paging | the log backend: its type and address, indexes or selectors, environment names, sign-in | 6 |
 | [`jig-api`](../plugins/jig-api/README.md) | built | `api`: list, show, run, run-folder, call; `/api refresh` | where its collections live and how their environments map, a transport or sign-in service for APIs it reaches through one | 7 |
 | [`jig-ops`](../plugins/jig-ops/README.md) | built | `ci`: status, runs, run, log, rerun, trigger, watch · `deploy`: plan, run, status, rollback, watch · `runtime`: pods, rollout, logs, events, health | the service catalog, its CI servers and sign-in, its deploy methods, the "artifact ready" rules, transports | 7 |
-| [`jig-review`](../plugins/jig-review/README.md) | design | `start_interactive_code_review`, `record_interactive_review_resolution` | none | 8 |
+| [`jig-review`](../plugins/jig-review/README.md) | built | `start_interactive_code_review`, `record_interactive_review_resolution`; the `/code-review` command and its page | none | 8 |
 | [`jig-agents`](../plugins/jig-agents/README.md) | design | `subagent`, `subagent_message`, `subagent_status`, `subagent_interrupt`, `subagent_done`, `caller_ping` | which model each role uses | 8, unless a store package replaces it |
 
 `jig-ops` has `ci`, `deploy` and `runtime`. `ci` has one adapter per CI system (GitHub

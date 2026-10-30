@@ -2,6 +2,45 @@
 
 Dated so the reasons stay attached.
 
+## 2026-10-30: reviews are approved in their page, and a passkey makes that unforgeable
+
+- **You chose to approve a review in its page.** A review is long, it waits for
+  you across many turns, and the page is where you read it. Sending you back to Pi
+  to type `y` after reading there was friction with no extra safety, once the
+  approval itself cannot be forged.
+- **The old rule did not go.** [Approvals](approvals.md) say you approve inside the
+  waiting call, because a web endpoint is reachable from the agent's shell. That
+  reason still holds for a button. What changed is the endpoint: it checks a
+  WebAuthn signature over a fresh challenge, made by a key on your device after the
+  device checked you. The agent cannot make it, so the endpoint's address stops
+  mattering. A stolen cookie can comment as you; it cannot approve.
+- **A passkey, written on `node:crypto`.** No WebAuthn library: the checks are a
+  few hundred lines that can be read whole (a small CBOR decoder, the COSE key, the
+  challenge, origin, relying party id hash, user presence and verification, the
+  signature and the counter). Keys are ES256 and RS256, which is what Windows Hello,
+  Touch ID and security keys make. Attestation is `none`: a key is trusted because
+  you confirmed its fingerprint, not because of its make.
+- **Registering a key is an approval in Pi.** Before it is stored, Pi shows the
+  SHA-256 fingerprint and asks `y`. Removing one asks in Pi too. So a key cannot be
+  added from the page alone.
+- **The store is in Pi's agent folder.** The agent's shell does not write it; the
+  review records live beside it, so a record that says "approved" was written by
+  this plugin and not by a command. If the agent could write the folder, it could
+  register its own key, so the folder's protection is the real guard.
+- **A tampered file is not trusted, and not overwritten.** A key whose fingerprint
+  is not its key's was never confirmed and is ignored; a file that cannot be read,
+  is loose or is not ours trusts no key and is left for you to look at. Approval then
+  falls back to the page and a `y` in Pi.
+- **The fallback is the old rule.** With no passkey, or a browser without one, the
+  page marks the review "approved in page" and Pi asks `y`. The record says which
+  way it was given (`passkey` or `page-and-pi`), so a later gate can ask for the
+  stronger one.
+- **The page is opened at `localhost`.** A passkey's relying party id cannot be an
+  IP address, so the link says `localhost` while the server still listens on
+  `127.0.0.1` alone.
+- **Approval is bound to the diff.** The challenge names the review and its diff as
+  you saw it; if a new round arrived since, the approval is refused.
+
 ## 2026-10-30: jig-mongo is a complete MongoDB tool; no SQL tool for now
 
 - **Complete:** exploring, indexes, query plans, the full aggregation pipeline,

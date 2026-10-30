@@ -49,6 +49,10 @@
 | **Gate** | A condition that holds a stage or an action until it is met, such as an approved plan or a passing test of the exact commit. |
 | **Acceptance scenario** | A numbered check in a ticket's plan. It is passed or failed, and a pass needs evidence. |
 | **Checker agent** | A read-only agent in a fresh context that reviews a change before you do. Planned. |
+| **Passkey** | A key pair made by your device (Windows Hello, Touch ID or a security key) that proves you are present. `jig-review` stores the public half and approves a review when the device signs its challenge. The agent cannot make the signature. |
+| **Fingerprint** | The SHA-256 of a passkey's public key. Pi shows it when you register a key and the settings page lists it, so you can tell which key is which. |
+| **Review round** | One pass of a review: your comments, the agent's answers, and the new diff that shows what changed. |
+| **Approved** | `jig-review`'s `jig-review:approved` event, and the record behind it, with how it was approved: `passkey` or `page-and-pi`. |
 | **Review ledger** | Planned: every review comment, from the review page, the pull request or chat, with how it was handled. |
 | **Service catalog** | Each service described once for `jig-ops`: its repository, its CI system and where it is, and per environment how it deploys, where it runs and its health address. |
 | **Adapter** | A small piece of a plugin that speaks one outside system, such as one CI system, one log backend or one format of saved requests, behind the plugin's common verbs. An action an adapter does not have is refused, naming it. |

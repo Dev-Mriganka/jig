@@ -23,5 +23,6 @@
     },
     "baseUrl": "."
   },
-  "include": ["plugins/**/*.ts", "test/**/*.ts"]
+  "include": ["plugins/**/*.ts", "test/**/*.ts"],
+  "exclude": ["plugins/jig-review/web"]
 }

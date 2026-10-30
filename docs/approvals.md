@@ -15,6 +15,29 @@ code-review page had exactly that weakness: its link reached the agent.
 So the browser can render long text for you to read, and you approve with `y`
 in Pi.
 
+### The one exception: a review approved in its page with a passkey
+
+A code review is long and waits for you across many turns, and its page is where
+you read it. [`jig-review`](../plugins/jig-review/README.md) therefore lets you
+approve there, because a **passkey** proves that you are present, and the agent
+cannot make one:
+
+- Your device (Windows Hello, Touch ID or a security key) checks you and signs a
+  fresh challenge, which the server issued for this review and as it is now. The
+  server checks the signature against a key you registered. A request from the
+  page without that signature approves nothing, whatever cookie it carries.
+- A key is registered only after Pi shows its fingerprint and you answer `y`
+  there, so adding a key is itself an approval inside a waiting call.
+- The keys are in Pi's agent folder, which the agent's shell does not write.
+- With no passkey, or no browser support, the page marks the review "approved in
+  page" and Pi asks you `y`. It counts only after `y`, which is the rule above
+  with the page as the place you pressed the button.
+
+This is the only approval that does not ask in Pi, and the only web endpoint
+that approves. It holds because the endpoint checks something the agent cannot
+supply, not because its address is secret.
+([Passkeys](../plugins/jig-review/docs/passkeys.md) has the checks.)
+
 ## Three kinds of question
 
 | Kind | When | What you see | How you answer |
@@ -36,7 +59,8 @@ In the first version the form kind is shown with Pi's own selector, like a
 dialog. The dedicated form screen comes later.
 
 Browser forms are not used for approvals: they answer through a local server,
-which the agent's shell can reach.
+which the agent's shell can reach. The exception above is not a form: it needs
+a signature that only your device can make.
 
 ## Answers beyond yes and no
 

@@ -16,6 +16,9 @@
     "check": "node test/support/link-host.mjs && tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@hono/node-server": "2.1.3",
+    "hono": "4.13.11",
+    "ignore": "7.0.10",
     "yaml": "2.9.1"
   },
   "peerDependencies": {
@@ -33,7 +36,8 @@
       "./plugins/jig-jira/src/index.ts",
       "./plugins/jig-logs/src/index.ts",
       "./plugins/jig-api/src/index.ts",
-      "./plugins/jig-ops/src/index.ts"
+      "./plugins/jig-ops/src/index.ts",
+      "./plugins/jig-review/src/index.ts"
     ],
     "skills": [
       "./plugins/*/skills"
