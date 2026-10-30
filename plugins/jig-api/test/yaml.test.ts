@@ -67,9 +67,9 @@ describe("the dependency", () => {
         assert.deepEqual(importers, [path.join("sources", "yaml.ts")]);
     });
 
-    test("the manifest pins it exactly, as the repository's only run-time dependency", () => {
+    test("the manifest pins it exactly, as one of the repository's two run-time dependencies (the other is jig-mongo's driver)", () => {
         const manifest = JSON.parse(fs.readFileSync(path.join(SRC, "..", "..", "..", "package.json"), "utf8")) as { dependencies: Record<string, string> };
-        assert.deepEqual(Object.keys(manifest.dependencies), ["yaml"]);
+        assert.deepEqual(Object.keys(manifest.dependencies), ["mongodb", "yaml"]);
         assert.match(manifest.dependencies.yaml ?? "", /^\d+\.\d+\.\d+$/);
     });
 });

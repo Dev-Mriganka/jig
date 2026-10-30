@@ -16,6 +16,7 @@
     "check": "node test/support/link-host.mjs && tsc -p tsconfig.json"
   },
   "dependencies": {
+    "mongodb": "7.7.0",
     "yaml": "2.9.1"
   },
   "peerDependencies": {
