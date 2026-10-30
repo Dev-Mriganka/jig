@@ -219,6 +219,8 @@ export function computeRules(input: RulesInput): RuleSet {
         for (const item of HIDDEN_ON_MAC) add("hidden", inHome(item.path), item.group, BUILT_IN);
     if (input.agentDir !== "") {
         for (const name of HIDDEN_IN_AGENT_DIR) add("hidden", path.posix.join(input.agentDir, name), "agent", BUILT_IN);
+        // Pi's own folder: jig-core guards it from the file tools, and the sandbox locks it whether or not jig-core says so.
+        add("locked", input.agentDir, "pi", BUILT_IN);
     }
     // Hidden and locked: what jig-core keeps from Pi's file tools, company additions included. One list, so the file
     // tools and bash cannot disagree.

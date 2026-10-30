@@ -7,42 +7,8 @@ import type { RuleKind, RuleSet, RulesInput } from "../src/rules.ts";
 import { fakeMachine } from "./support/fake-files.ts";
 import type { FakeMachine, MachineSpec } from "./support/fake-files.ts";
 
-const HOME = "/home/me";
-const CWD = `${HOME}/work/orders`;
-const SESSION = "/tmp/jig-sandbox-1000/abc";
+import { CWD, HOME, SESSION, input, linux, rules } from "./support/fixture.ts";
 
-/** A Linux machine with the folders every test needs. */
-function linux(spec: MachineSpec = {}): FakeMachine {
-    return fakeMachine({
-        dirs: [HOME, CWD, "/tmp", SESSION, `${SESSION}/tmp`, `${SESSION}/broker`, ...(spec.dirs ?? [])],
-        files: spec.files ?? {},
-        links: spec.links ?? {},
-    });
-}
-
-function input(files: FakeMachine, over: Partial<RulesInput> = {}): RulesInput {
-    return {
-        platform: "linux",
-        wsl: false,
-        home: HOME,
-        uid: 1000,
-        cwd: CWD,
-        agentDir: `${HOME}/.pi/agent`,
-        tmp: ["/tmp"],
-        sessionDir: `${SESSION}/broker`,
-        sessionTmp: `${SESSION}/tmp`,
-        env: { PATH: "/usr/local/bin:/usr/bin:/bin" },
-        runtimePaths: [],
-        protectedPaths: [],
-        settings: { share: [], hide: [], lock: [] },
-        approved: [],
-        createdByAgent: new Set(),
-        files,
-        ...over,
-    };
-}
-
-const rules = (files: FakeMachine, over: Partial<RulesInput> = {}): RuleSet => computeRules(input(files, over));
 const of = (set: RuleSet, kind: RuleKind): string[] =>
     set.rules.filter((rule) => rule.kind === kind).map((rule) => rule.path);
 
@@ -110,6 +76,12 @@ describe("hidden paths", () => {
         const hidden = of(rules(files), "hidden");
         assert.ok(hidden.includes(`${HOME}/.pi/agent/auth.json`));
         assert.ok(hidden.includes(`${HOME}/.pi/agent/mcp-auth.json`));
+    });
+
+    test("Pi's agent folder is locked even when jig-core is not asked", () => {
+        const set = rules(linux({ dirs: [`${HOME}/.pi/agent`] }));
+        assert.ok(of(set, "locked").includes(`${HOME}/.pi/agent`));
+        assert.equal(canWritePath(set, `${HOME}/.pi/agent/settings.json`), false);
     });
 
     test("another agent's login is hidden", () => {

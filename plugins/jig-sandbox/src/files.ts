@@ -61,3 +61,29 @@ export const nodeFiles: FileView = {
         }
     },
 };
+
+/**
+ * The same view with `real` remembered for a while for the paths `cache` picks. Resolving a path component by component
+ * costs milliseconds on a network or Windows drive (on WSL every folder of the Windows part of PATH), and the rules
+ * resolve the same few hundred paths before every command. Folders that hold the user's work are never picked.
+ */
+export function withRealCache(
+    files: FileView,
+    cache: (path: string) => boolean,
+    ttlMs: number,
+    now: () => number = Date.now,
+): FileView {
+    const seen = new Map<string, { at: number; real: string | undefined }>();
+    return {
+        ...files,
+        real(path) {
+            if (!cache(path)) return files.real(path);
+            const hit = seen.get(path);
+            const time = now();
+            if (hit !== undefined && time - hit.at < ttlMs) return hit.real;
+            const real = files.real(path);
+            seen.set(path, { at: time, real });
+            return real;
+        },
+    };
+}
