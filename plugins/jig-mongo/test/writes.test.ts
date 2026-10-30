@@ -176,7 +176,7 @@ describe("the cap, and what matches nothing", () => {
         h.backend.answers.count = 1500;
         const result = await h.call({ ...update, limit: 2000 });
         ok(result);
-        assert.equal((h.backend.of("count")[0]?.query as any).limit, 2001);
+        assert.equal((h.backend.of("count")[0]!.query as any).limit, 2001);
         assert.match(result.preview?.summary ?? "", /1500 documents match/);
         assert.match(result.preview?.body ?? "", /Cap: at most 2000 documents\./);
         h.backend.answers.count = 2001;
@@ -233,7 +233,7 @@ describe("each write", () => {
         assert.equal(ok(result), "mongo insert staging orders.orders: inserted 2 documents");
         assert.equal(result.preview?.summary, "insert 2 documents into orders.orders in staging");
         assert.match(result.preview?.body ?? "", /Documents:\n\[\n {2}\{\n {4}"status": "new"/);
-        const sent = (h.backend.of("insert")[0]?.query as any).documents;
+        const sent = (h.backend.of("insert")[0]!.query as any).documents;
         assert.match(sent[0]._id.$oid, /^[0-9a-f]{24}$/);
         assert.deepEqual(sent[1], input.documents[1]);
         assert.deepEqual(factsOf(result.id), { inserted: 2 });
@@ -244,7 +244,7 @@ describe("each write", () => {
         const documents = Array.from({ length: 25 }, (_, n) => ({ n }));
         const result = await h.call({ action: "insert", ...target, documents });
         assert.match(result.preview?.body ?? "", /\.\.\. and 15 more documents/);
-        assert.equal((h.backend.of("insert")[0]?.query as any).documents.length, 25);
+        assert.equal((h.backend.of("insert")[0]!.query as any).documents.length, 25);
     });
 
     test("replace: one document, matched by its filter", async () => {
@@ -276,7 +276,7 @@ describe("each write", () => {
             which: "many",
         });
         ok(result);
-        assert.deepEqual((h.backend.of("update")[0]?.query as any).update, [{ $set: { total: { $add: ["$a", 1] } } }]);
+        assert.deepEqual((h.backend.of("update")[0]!.query as any).update, [{ $set: { total: { $add: ["$a", 1] } } }]);
     });
 
     test("delete: one or many, with the number deleted in the record", async () => {
@@ -294,7 +294,7 @@ describe("each write", () => {
         h.backend.answers.remove = { deleted: 1 };
         const one = await h.call({ action: "delete", ...target, filter: { status: "test" }, which: "one" });
         assert.equal(ok(one), "mongo delete staging orders.orders: deleted 1 document");
-        assert.equal((h.backend.of("remove")[1]?.query as any).many, false);
+        assert.equal((h.backend.of("remove")[1]!.query as any).many, false);
     });
 
     test("bulk: each operation is counted, and the preview lists the counts; the inserts get ids", async () => {
@@ -315,7 +315,7 @@ describe("each write", () => {
             result.preview?.body ?? "",
             /1\. insertOne\n2\. updateMany: 4 documents match\n3\. deleteOne: 2 documents match/,
         );
-        const sent = (h.backend.of("bulk")[0]?.query as any).operations;
+        const sent = (h.backend.of("bulk")[0]!.query as any).operations;
         assert.match(sent[0].insertOne.document._id.$oid, /^[0-9a-f]{24}$/);
         assert.deepEqual(sent.slice(1), operations.slice(1));
         assert.deepEqual(factsOf(result.id), { inserted: 1, matched: 6, modified: 6, deleted: 0 });
@@ -534,7 +534,7 @@ describe("a reply that is lost is never answered by sending again", () => {
     });
 
     test("when the check cannot be read either, the message says so and still does not send again", async () => {
-        h.backend.answers.count = (query: any, req: any) => {
+        h.backend.answers.count = (_query: any, req: any) => {
             if (req.maxTimeMS === 5000) throw driverError("MongoNetworkError");
             return 4;
         };

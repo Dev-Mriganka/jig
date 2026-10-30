@@ -109,7 +109,7 @@ export async function planUpdate(env: Env, call: CallOf<"update">): Promise<Plan
     }
 
     // The current values are read now: the preview shows what changes, and a change in them voids the approval.
-    let issue;
+    let issue: Awaited<ReturnType<typeof getIssue>>;
     try {
         issue = await getIssue(env, call.key, ["summary", "status", ...wanted.map((entry) => entry.id)]);
     } catch (error) {

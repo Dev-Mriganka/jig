@@ -111,7 +111,7 @@ describe("the structured content", () => {
         const token = ["gho", "_", "Z9y8".repeat(9)].join("");
         const harness = await begin({ plugins: (api) => declare(api) });
         await harness.gate({ tool: "fake", id: "d-1", input: { env: "local" } });
-        const answer = await (harness.host.handlers.get("tool_result")?.[0] as (event: never, ctx: never) => unknown)(
+        const answer = await (harness.host.handlers.get("tool_result")![0] as (event: never, ctx: never) => unknown)(
             { type: "tool_result", toolCallId: "d-1", toolName: "fake", input: {}, content: [{ type: "text", text: "clean" }], details: { leaked: token }, structuredContent: { fine: true }, isError: false } as never,
             harness.ctx as never,
         );
@@ -187,7 +187,7 @@ describe("the mask backstop", () => {
     test("secrets are removed before masking, and a result with no call on file counts as production", async () => {
         const harness = await begin({ config: CONFIG, plugins: (api) => declare(api) });
         const token = ["gho", "_", "Z9y8".repeat(9)].join("");
-        const answer = await (harness.host.handlers.get("tool_result")?.[0] as (event: never, ctx: never) => Promise<{ content?: Array<{ text: string }> } | undefined>)(
+        const answer = await (harness.host.handlers.get("tool_result")![0] as (event: never, ctx: never) => Promise<{ content?: Array<{ text: string }> } | undefined>)(
             { type: "tool_result", toolCallId: "never-decided", toolName: "fake", input: {}, content: [{ type: "text", text: `PERSONAL-H ${token}` }], details: undefined, isError: false } as never,
             harness.ctx as never,
         );

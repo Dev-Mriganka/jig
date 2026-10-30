@@ -498,7 +498,7 @@ describe("the plan of a watch", () => {
         );
         world.builds.push(build(13, null));
         ok(await g.call({ action: "watch" }));
-        assert.equal((g.h.jig.watches[1]?.spec as { build: number }).build, 13);
+        assert.equal((g.h.jig.watches[1]!.spec as { build: number }).build, 13);
         assert.equal(g.h.jig.watches[1]?.title, "build #13 of orders-api");
     });
 
@@ -509,12 +509,12 @@ describe("the plan of a watch", () => {
             /orders\/build has no build 99/,
         );
         ok(await g.call({ action: "watch", run_id: 12, check: "Test" }));
-        assert.deepEqual((g.h.jig.watches[0]?.spec as { finish: unknown }).finish, { kind: "stages", names: ["Test"] });
+        assert.deepEqual((g.h.jig.watches[0]!.spec as { finish: unknown }).finish, { kind: "stages", names: ["Test"] });
         assert.equal(g.h.jig.watches[0]?.title, "stage Test of build #12 of orders-api");
         ok(await g.call({ action: "watch", run_id: 12 }));
-        assert.deepEqual((g.h.jig.watches[1]?.spec as { finish: unknown }).finish, { kind: "build" });
+        assert.deepEqual((g.h.jig.watches[1]!.spec as { finish: unknown }).finish, { kind: "build" });
         ok(await g.call({ action: "watch", finish: "required" }));
-        assert.deepEqual((g.h.jig.watches[2]?.spec as { finish: unknown }).finish, {
+        assert.deepEqual((g.h.jig.watches[2]!.spec as { finish: unknown }).finish, {
             kind: "stages",
             names: ["Build", "Test"],
         });

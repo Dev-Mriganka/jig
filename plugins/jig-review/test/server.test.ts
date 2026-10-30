@@ -150,7 +150,7 @@ test("a wrong secret is refused and sets no cookie", async () => {
 
 test("a cookie of the right shape but another secret is refused", async () => {
     assert.equal((await request("/api/reviews", { cookie: "jig_review=wrong" })).status, 403);
-    assert.equal((await request("/api/reviews", { cookie: "other=" + new URL(link).searchParams.get("k") })).status, 403, "a different cookie name");
+    assert.equal((await request("/api/reviews", { cookie: `other=${new URL(link).searchParams.get("k")}` })).status, 403, "a different cookie name");
 });
 
 test("the printed link gives this browser a cookie; then the API answers", async () => {
@@ -162,7 +162,7 @@ test("the printed link gives this browser a cookie; then the API answers", async
 
 test("a foreign Host is refused even with the cookie (DNS rebinding)", async () => {
     const session = await cookie();
-    for (const host of ["attacker.example:80", `attacker.example:${port}`, "localhost", `localhost.attacker.example:${port}`, `127.0.0.1.attacker.example:${port}`, "[::1]:" + port]) {
+    for (const host of ["attacker.example:80", `attacker.example:${port}`, "localhost", `localhost.attacker.example:${port}`, `127.0.0.1.attacker.example:${port}`, `[::1]:${port}`]) {
         assert.equal((await request("/api/reviews", { cookie: session, host })).status, 403, host);
     }
     assert.equal((await request("/api/reviews", { cookie: session, host: `localhost:${port}` })).status, 200);

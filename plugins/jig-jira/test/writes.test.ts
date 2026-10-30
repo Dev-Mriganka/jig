@@ -361,14 +361,14 @@ describe("create", () => {
         assert.match(sub.blocked ?? "", /jira create: Sub-task in PROJ also needs Parent \(text\); pass them in fields$/);
         const given = await h.call({ action: "create", project: "PROJ", type: "Sub-task", summary: "Part one", fields: { parent: "proj-1" } });
         assert.equal(ok(given).split("\n")[0], "Created PROJ-100: Part one");
-        assert.deepEqual((writes(h)[0]?.body as { fields: Record<string, unknown> }).fields.parent, { key: "PROJ-1" });
+        assert.deepEqual((writes(h)[0]!.body as { fields: Record<string, unknown> }).fields.parent, { key: "PROJ-1" });
     });
 
     test("a person is looked up in the project, and shown by name", async () => {
         const result = await h.call({ action: "create", project: "PROJ", type: "Bug", summary: "A bug", fields: { assignee: "Sam Lee" } });
         assert.match(result.preview?.body ?? "", /\nAssignee: Sam Lee \(712020:6c21d3a0-1111-4222-8333-944455556666\)\n/);
         assert.equal(h.jira.sent("GET", "/user/assignable/search")[0]?.query.project, "PROJ");
-        assert.deepEqual((writes(h)[0]?.body as { fields: Record<string, unknown> }).fields.assignee, { accountId: "712020:6c21d3a0-1111-4222-8333-944455556666" });
+        assert.deepEqual((writes(h)[0]!.body as { fields: Record<string, unknown> }).fields.assignee, { accountId: "712020:6c21d3a0-1111-4222-8333-944455556666" });
     });
 
     test("on Data Center the create screen lists its rows as values, and a person is a user name", async () => {

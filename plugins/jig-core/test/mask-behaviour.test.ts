@@ -63,7 +63,7 @@ describe("purity", () => {
         const out = maskValue(input);
         assert.deepEqual(Object.keys(out), ["__proto__", "constructor", "email"]);
         assert.equal(Object.getPrototypeOf(out), Object.prototype);
-        assert.equal(({} as Record<string, unknown>)["polluted"], undefined);
+        assert.equal(({} as Record<string, unknown>).polluted, undefined);
     });
 });
 

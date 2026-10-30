@@ -81,8 +81,8 @@ function safeEnd(text: string, end: number): number {
         // A text that is one long word has no earlier word to stop at: cut it rather than return nothing.
         if (start > 0 && end - start <= WORD_BACKOFF) end = start;
     }
-    const escape = text.lastIndexOf("%", end - 1);
-    if (escape >= 0 && escape >= end - 2) end = escape;
+    const percent = text.lastIndexOf("%", end - 1);
+    if (percent >= 0 && percent >= end - 2) end = percent;
     // Do not cut a surrogate pair in half.
     const last = text.charCodeAt(end - 1);
     if (last >= 0xd800 && last <= 0xdbff) end -= 1;

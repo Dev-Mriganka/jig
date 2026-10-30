@@ -279,5 +279,5 @@ test("a comment watch ends the same way: the comment is an artifact when a rule 
     });
     assert.equal(done?.outcome, "passed");
     assert.equal(h.bus.emitted[0]?.event, "jig-ops:artifact-ready");
-    assert.equal((h.bus.emitted[0]?.payload as ArtifactReady).source, "comment");
+    assert.equal((h.bus.emitted[0]!.payload as ArtifactReady).source, "comment");
 });

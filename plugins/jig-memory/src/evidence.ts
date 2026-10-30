@@ -32,9 +32,10 @@ export function saveEvidence(folder: string, key: string, call: EvidenceCall, no
     const paths = ticketPaths(folder, key);
     const tool = /^[A-Za-z][A-Za-z0-9_.:-]{0,63}$/.test(call.tool) ? call.tool : "unnamed";
     const action = actionOf(call.input.action);
-    const name = [stampOf(now), slug(tool), action === undefined ? "" : slug(action), randomBytes(3).toString("hex")]
+    const stem = [stampOf(now), slug(tool), action === undefined ? "" : slug(action), randomBytes(3).toString("hex")]
         .filter((part) => part !== "")
-        .join("-") + ".txt";
+        .join("-");
+    const name = `${stem}.txt`;
     mkdirSync(paths.evidence, { recursive: true, mode: FOLDER_MODE });
     if (!createFile(path.join(paths.evidence, name), clipBytes(call.text, EVIDENCE_LIMIT, CLIP_NOTE))) {
         throw new Error(`${name} already exists`);

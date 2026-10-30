@@ -260,7 +260,7 @@ function parseBlock(block: Block, variables: Map<string, string>): Parsed | unde
     const parts = /^([A-Za-z]+)\s+(\S.*)$/.exec(requestLine);
     const hasMethod = parts !== null && parts[1] === parts[1]?.toUpperCase();
     const method = hasMethod ? (parts?.[1] as string) : "GET";
-    const url = (hasMethod ? (parts?.[2] as string) : requestLine).replace(/\s+HTTP\/[\d.]+$/i, "").trim();
+    const url = (hasMethod ? (parts![2] as string) : requestLine).replace(/\s+HTTP\/[\d.]+$/i, "").trim();
     return { name, heading: block.heading, line: block.line, method, url, headers, bodyLines, prerequest, handler, saved };
 }
 
@@ -471,7 +471,9 @@ function load(config: HttpConfig, name: string): Collection {
             // The variables a file defines with `@name = value` belong to every request in it.
             const fileVariables = new Map<string, string>();
             const parsed = splitBlocks(text).flatMap((block) => parseBlock(block, fileVariables) ?? []);
-            parsed.forEach((request, index) => requests.push(requestOf(request, relative, index + 1, fileVariables, reading)));
+            parsed.forEach((request, index) => {
+                requests.push(requestOf(request, relative, index + 1, fileVariables, reading));
+            });
         }
     }
     return { name, root, requests, environments, variables: new Map(), auth: { kind: "none" }, problems };

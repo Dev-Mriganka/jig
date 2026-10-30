@@ -51,7 +51,7 @@ test("/lens days N shows the last N days", async (t) => {
 test("a ticket or a session nobody has records for is said so, not refused", async (t) => {
     const ticket = await run(t, "ticket T-404");
     assert.deepEqual(ticket.titles, ["Ticket T-404, all time"]);
-    const block = (ticket.r.pi.entries[0]?.data as SummaryEntry).blocks[0];
+    const block = (ticket.r.pi.entries[0]!.data as SummaryEntry).blocks[0];
     assert.equal(block?.empty, "no records");
     assert.deepEqual(ticket.notices, []);
 });
@@ -59,12 +59,12 @@ test("a ticket or a session nobody has records for is said so, not refused", asy
 test("every summary imports first, so the records written since the last run are in it", async (t) => {
     const r = rig(t, { session: "s1" });
     await r.pi.lens("days 7");
-    const first = (r.pi.entries[0]?.data as SummaryEntry).blocks;
+    const first = (r.pi.entries[0]!.data as SummaryEntry).blocks;
     assert.equal(first[0]?.title, "No records yet. jig-core writes them as tools run and model turns end.");
 
     writeSample(r.state);
     await r.pi.lens("days 7");
-    const second = (r.pi.entries[1]?.data as SummaryEntry).blocks;
+    const second = (r.pi.entries[1]!.data as SummaryEntry).blocks;
     assert.equal(second[0]?.title, "Last 7 days, 2026-10-24 to 2026-10-30");
     assert.match(second[0]?.sections[0]?.lines[0] ?? "", /^\$0\.46 over 6 turns/);
 });
@@ -74,7 +74,7 @@ test("when Pi cannot say which session this is, /lens shows today, and /lens ses
     writeSample(r.state);
     assert.deepEqual(await r.pi.lens(""), []);
     assert.deepEqual(
-        (r.pi.entries[0]?.data as SummaryEntry).blocks.map((block) => block.title),
+        (r.pi.entries[0]!.data as SummaryEntry).blocks.map((block) => block.title),
         ["Today, 2026-10-30"],
     );
     const notices = await r.pi.lens("session");

@@ -27,7 +27,7 @@ describe("the extension", () => {
             assert.equal(tool?.name, "jira");
             assert.equal(tool?.label, "Jira");
             assert.equal(tool?.parameters, parameters);
-            assert.deepEqual((tool?.parameters as unknown as { properties: { action: { enum: string[] } } }).properties.action.enum, ACTION_NAMES);
+            assert.deepEqual((tool!.parameters as unknown as { properties: { action: { enum: string[] } } }).properties.action.enum, ACTION_NAMES);
             assert.equal(tool?.executionMode, "sequential", "a comment is on the issue before the transition that follows it");
             assert.equal(typeof tool?.execute, "function");
         } finally {

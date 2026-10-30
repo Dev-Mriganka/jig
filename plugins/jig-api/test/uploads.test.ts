@@ -50,7 +50,7 @@ function httpFile(include: string): void {
 }
 
 const upload = (request: string, environment = "Staging") => h.call({ action: "run", request, collection: "up", environment });
-const refusal = (name: string, src: string, why: string): string => `jig-core could not decide: the file ${JSON.stringify(src)} ${why}`;
+const refusal = (_name: string, src: string, why: string): string => `jig-core could not decide: the file ${JSON.stringify(src)} ${why}`;
 const OUTSIDE = "is outside the collection's folder (after following links), and a request may only use files inside it";
 
 describe("a file inside the collection's folder", () => {

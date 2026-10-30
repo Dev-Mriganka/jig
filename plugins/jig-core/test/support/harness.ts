@@ -30,6 +30,7 @@ export interface Call {
     /** What the tool returns, when it runs. */
     result?: Result;
     /** Where the tool does its work. It runs only if the call is not blocked. */
+    // biome-ignore lint/suspicious/noConfusingVoidType: a run may return nothing at all
     run?: () => Promise<Result | void> | Result | void;
     durationMs?: number;
 }

@@ -10,7 +10,7 @@
 import { randomBytes } from "node:crypto";
 import { filesOfDiff } from "./diff.ts";
 import { ChallengeBook, CHALLENGE_TTL_MS } from "./passkey/challenges.ts";
-import { PasskeyStore, PasskeyStoreError } from "./passkey/store.ts";
+import { type PasskeyStore, PasskeyStoreError } from "./passkey/store.ts";
 import {
     challengeOf,
     fingerprintOf,

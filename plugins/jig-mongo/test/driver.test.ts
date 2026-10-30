@@ -97,7 +97,7 @@ describe("the translation to the driver", () => {
             req,
         );
         assert.deepEqual(docs, [{ a: 1 }]);
-        const [filter, options] = seen[0]?.args as [Record<string, any>, Record<string, any>];
+        const [filter, options] = seen[0]!.args as [Record<string, any>, Record<string, any>];
         assert.ok(filter._id instanceof driver.ObjectId);
         assert.ok(filter.n.$gt instanceof driver.Long);
         assert.deepEqual(
@@ -132,7 +132,7 @@ describe("the translation to the driver", () => {
         assert.equal(first?.allowDiskUse, false);
         assert.ok(!("promoteValues" in (first ?? {})));
         assert.equal(second?.promoteValues, false);
-        assert.ok((seen[0]?.args[0] as any[])[0].$match._id instanceof driver.ObjectId);
+        assert.ok((seen[0]!.args[0] as any[])[0].$match._id instanceof driver.ObjectId);
     });
 
     test("explain: a find and an aggregation, at the verbosity asked", async () => {
@@ -175,8 +175,8 @@ describe("the translation to the driver", () => {
         assert.deepEqual(await backend.dbStats("orders", req), { collections: 3 });
         assert.deepEqual(await backend.collStats(ns, req), { storageStats: { count: 5 } });
         assert.deepEqual(await backend.indexes(ns, req), [{ name: "_id_", key: { _id: 1 } }]);
-        assert.equal((seen[0]?.args[0] as Record<string, unknown>).authorizedDatabases, true);
-        assert.equal((seen[1]?.args[1] as Record<string, unknown>).authorizedCollections, true);
+        assert.equal((seen[0]!.args[0] as Record<string, unknown>).authorizedDatabases, true);
+        assert.equal((seen[1]!.args[1] as Record<string, unknown>).authorizedCollections, true);
         assert.deepEqual(seen[2]?.args[0], { dbStats: 1, maxTimeMS: 5000 });
         assert.deepEqual(seen[3]?.args[0], [{ $collStats: { storageStats: {}, count: {} } }]);
     });
@@ -232,10 +232,10 @@ describe("the translation to the driver", () => {
             assert.equal(options.comment, "jig-mongo", call.path);
             assert.ok(!("signal" in options), call.path);
         }
-        const [documents] = seen[0]?.args as [Array<Record<string, unknown>>];
+        const [documents] = seen[0]!.args as [Array<Record<string, unknown>>];
         assert.ok(documents[0]?._id instanceof driver.ObjectId);
         assert.deepEqual(seen[2]?.args[1], [{ $set: { b: 2 } }]);
-        assert.deepEqual((seen[7]?.args[1] as Record<string, unknown>).unique, true);
+        assert.deepEqual((seen[7]!.args[1] as Record<string, unknown>).unique, true);
     });
 
     test("close closes the client", async () => {

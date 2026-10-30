@@ -228,7 +228,7 @@ function gitlab(service: CiService, ctx: CiContext): CiAdapter {
                         const after = await gitlabApi(config, { ...ctx, signal: undefined }).pipeline(id);
                         return finished(after) && after.status === pipeline.status ? undefined : done;
                     });
-                let reply;
+                let reply: Awaited<ReturnType<typeof api.post>>;
                 try {
                     reply = await api.post(`/pipelines/${id}/retry`);
                 } catch (error) {
@@ -294,7 +294,7 @@ function gitlab(service: CiService, ctx: CiContext): CiAdapter {
                         const after = (await check.pipelines({ ref, per_page: 1 }))[0];
                         return after === undefined || after.id === latest?.id ? undefined : created(after);
                     });
-                let reply;
+                let reply: Awaited<ReturnType<typeof api.post>>;
                 try {
                     reply = await api.post("/pipeline", { ref }, sentBody);
                 } catch (error) {

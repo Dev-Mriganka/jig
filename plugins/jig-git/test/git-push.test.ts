@@ -255,7 +255,7 @@ test("push announces jig-git:pushed with the repository, the branch and the full
     h.gh.on("pr list", { json: [] });
     const text = ok(await h.call("git", { action: "push", repo: r.name }));
     const head = git(r.dir, "rev-parse", "HEAD");
-    assert.deepEqual(pushedEvents(), [{ repo: "acme/" + r.name, branch: "feature/w1", sha: head }]);
+    assert.deepEqual(pushedEvents(), [{ repo: `acme/${r.name}`, branch: "feature/w1", sha: head }]);
     assert.equal(h.jig.started.length, 0, "jig-git starts no watch: whoever listens does");
     assert.doesNotMatch(text, /Watching/);
     assert.match(text, /^Pushed feature\/w1 \(/);

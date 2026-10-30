@@ -122,7 +122,7 @@ describe("a name the masker refuses", () => {
     });
 
     test("is shown as a short line whatever the name holds", async () => {
-        const harness = await start({ plugins: (api) => api.config.addMaskFields(["\u0007" + "-".repeat(100)]) });
+        const harness = await start({ plugins: (api) => api.config.addMaskFields([`\u0007${"-".repeat(100)}`]) });
         try {
             const notice = harness.notifications()[0] ?? "";
             assert.match(notice, /addMaskFields ignored/);

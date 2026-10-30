@@ -302,14 +302,23 @@ export function createWatchEngine(options: WatchEngineOptions): WatchEngine {
             saved.state = outcome.state;
             saved.failures = 0;
             entry.lastError = undefined;
-            if (outcome.done !== undefined) return finish(entry, outcome.done, ending);
+            if (outcome.done !== undefined) {
+                finish(entry, outcome.done, ending);
+                return;
+            }
         } else {
             entry.lastError = failure;
             saved.failures += 1;
         }
         // The last poll is made at the deadline. If it did not finish the watch, nothing more can be learned.
-        if (now() >= Date.parse(saved.deadlineAt)) return finish(entry, timedOut(entry), ending);
-        if (saved.failures >= PAUSE_AFTER_FAILURES) return pause(entry);
+        if (now() >= Date.parse(saved.deadlineAt)) {
+            finish(entry, timedOut(entry), ending);
+            return;
+        }
+        if (saved.failures >= PAUSE_AFTER_FAILURES) {
+            pause(entry);
+            return;
+        }
 
         checkStall(entry);
         persist(saved);

@@ -48,7 +48,7 @@ describe("limits", () => {
 
     it("refuses cyclic values instead of looping", () => {
         const cycle: Record<string, unknown> = {};
-        cycle["self"] = cycle;
+        cycle.self = cycle;
         assertFailsClosed(() => maskValue(cycle));
     });
 
@@ -58,7 +58,7 @@ describe("limits", () => {
     });
 
     it("bounds JSON nested inside strings by the same depth limit", () => {
-        const json = (levels: number): string => '{"a":'.repeat(levels) + "1" + "}".repeat(levels);
+        const json = (levels: number): string => `${'{"a":'.repeat(levels)}1${"}".repeat(levels)}`;
         assert.doesNotThrow(() => maskText(`payload=${json(30)}`));
         assertFailsClosed(() => maskText(`payload=${json(80)}`));
         // JSON inside a string inside JSON: each layer is one more level of decoding.

@@ -163,8 +163,12 @@ async function startSsh(
                 signal: stopper.signal,
             })
             .then(
-                (result) => void (ended = result),
-                (error: unknown) => void (ended = error instanceof Error ? error : new Error(String(error))),
+                (result) => {
+                    ended = result;
+                },
+                (error: unknown) => {
+                    ended = error instanceof Error ? error : new Error(String(error));
+                },
             );
         const stop = (): void => stopper.abort();
         signal?.addEventListener("abort", stop, { once: true });

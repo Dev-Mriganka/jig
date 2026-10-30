@@ -162,7 +162,7 @@ for (const format of ["yaml", "bru"] as const) {
             ok(await run("Report with a key"));
             assert.equal(last().headers["x-report-key"], REPORT_KEY.value);
             const section = h.jig.api.config.section("api") as { secrets: Record<string, unknown> };
-            const { ["process.env.ACME_REPORT_KEY"]: _removed, ...rest } = section.secrets;
+            const { "process.env.ACME_REPORT_KEY": _removed, ...rest } = section.secrets;
             h.configure({ ...section, secrets: rest });
             const refused = await run("Report with a key");
             assert.equal(refused.blocked, "jig-core could not decide: process.env.ACME_REPORT_KEY is a secret, but api.secrets has no reference for it in Staging");

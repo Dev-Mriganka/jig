@@ -101,7 +101,7 @@ describe("/jig", () => {
         // The watch tool shows the same three states in its lines.
         const tool = harness.host.registered.get("watch");
         const listed = await tool?.execute("call-1", { action: "list" } as never, undefined, undefined, harness.ctx as never);
-        const lines = (listed?.content[0] as { text: string }).text.split("\n");
+        const lines = (listed!.content[0] as { text: string }).text.split("\n");
         assert.equal(lines.length, 4);
         assert.match(lines.find((line) => line.startsWith(waiting)) ?? "", /\| from the plugin that is not loaded \| waiting for its plugin \(jig-test\) \| (?:\d+ s|\d+ min)$/);
         assert.match(lines.find((line) => line.startsWith(one)) ?? "", /\| one \| open \| 5 min$/);

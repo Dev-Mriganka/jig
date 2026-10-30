@@ -51,7 +51,7 @@ describe("the listener", () => {
     test("a pull request starts the watch on the pull request", () => {
         announce(pushed({ pr: 42 }));
         assert.equal(h.jig.watches[0]?.title, "checks of pull request 42");
-        assert.equal((h.jig.watches[0]?.spec as { pr: number }).pr, 42);
+        assert.equal((h.jig.watches[0]!.spec as { pr: number }).pr, 42);
     });
 
     test("a repository no service has starts nothing", () => {
@@ -61,7 +61,7 @@ describe("the listener", () => {
 
     test("a service with the repository but no ci entry starts nothing", () => {
         const raw = section();
-        (raw.services as Record<string, Raw>)["billing"] = {
+        (raw.services as Record<string, Raw>).billing = {
             repo: "acme/billing",
             environments: { staging: { health: "https://b.example.test/h" } },
         };
@@ -93,7 +93,7 @@ describe("the listener", () => {
             h.jig.watches.map((watch) => watch.status),
             ["done", "open", "open"],
         );
-        assert.equal((h.jig.watches[2]?.spec as { sha: string }).sha, SHA2);
+        assert.equal((h.jig.watches[2]!.spec as { sha: string }).sha, SHA2);
     });
 
     test("a pull request opened after the push replaces the push's watch", () => {
@@ -147,7 +147,7 @@ describe("the watch it starts follows the CI system of the service", () => {
         assert.equal(h.jig.watches[0]?.title, `pipeline of branch feature/one at ${SHA.slice(0, 7)}`);
         h.configure(withCi(gitlabCi({ required: ["build", "unit"] })));
         announce(pushed({ sha: SHA2 }));
-        assert.deepEqual((h.jig.watches[1]?.spec as { finish: unknown }).finish, {
+        assert.deepEqual((h.jig.watches[1]!.spec as { finish: unknown }).finish, {
             kind: "jobs",
             names: ["build", "unit"],
         });
@@ -166,7 +166,7 @@ describe("the watch it starts follows the CI system of the service", () => {
         assert.equal(h.jig.watches[0]?.title, "the next build of orders-api");
         h.configure(withCi(jenkinsCi({ required: ["Build"] })));
         announce(pushed({ sha: SHA2 }));
-        assert.deepEqual((h.jig.watches[1]?.spec as { finish: unknown }).finish, { kind: "stages", names: ["Build"] });
+        assert.deepEqual((h.jig.watches[1]!.spec as { finish: unknown }).finish, { kind: "stages", names: ["Build"] });
     });
 });
 

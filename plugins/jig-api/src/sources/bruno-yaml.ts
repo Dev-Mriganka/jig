@@ -14,11 +14,11 @@ const text = (value: unknown): string =>
 const list = (value: unknown): Array<Record<string, unknown>> => (Array.isArray(value) ? (value as unknown[]).filter(isObject) : []);
 
 /** A value that is text, or `{ type, data }`, or a list of variants of which one is selected. */
-function valueOf(value: unknown): string {
+function valueText(value: unknown): string {
     if (Array.isArray(value)) {
         const variants = list(value);
         const chosen = variants.find((variant) => variant.selected === true) ?? variants[0];
-        return chosen === undefined ? "" : valueOf(chosen.value);
+        return chosen === undefined ? "" : valueText(chosen.value);
     }
     return isObject(value) ? text(value.data) : text(value);
 }
@@ -26,7 +26,7 @@ function valueOf(value: unknown): string {
 /** The enabled `{ name, value }` entries of a list. */
 function pairsOf(entries: unknown): Pairs {
     const enabled = list(entries).filter((entry) => entry.disabled !== true && text(entry.name) !== "");
-    return enabled.map((entry) => [text(entry.name), valueOf(entry.value)] as const);
+    return enabled.map((entry) => [text(entry.name), valueText(entry.value)] as const);
 }
 
 /** The description of an item: text, or `{ content }`. */
@@ -241,7 +241,7 @@ export function readEnvironment(raw: unknown, report: Report): ParsedEnvironment
             return;
         }
         // A secret may carry a value in the file if someone typed one: it is kept here only so that it can be refused.
-        variables.push({ name, value: entry.secret === true ? text(entry.value) : valueOf(entry.value), secret: entry.secret === true });
+        variables.push({ name, value: entry.secret === true ? text(entry.value) : valueText(entry.value), secret: entry.secret === true });
     });
     const external = isObject(file.externalSecrets) ? file.externalSecrets : undefined;
     for (const entry of list(external?.variables)) {

@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
-import type { TestContext } from "node:test";
 import factory from "../src/index.ts";
 import { NOTES_MESSAGE, TICKET_ENTRY } from "../src/session.ts";
 import { ticketPaths } from "../src/store.ts";

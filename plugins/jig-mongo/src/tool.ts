@@ -149,7 +149,7 @@ export function createTool(options: MongoOptions = {}): MongoTool {
 
     /** Runs `use` on the environment's connection. Any failure comes out as one line, and a connection that failed is dropped. */
     async function withBackend<T>(c: Checked, signal: AbortSignal, use: (backend: Backend) => Promise<T>): Promise<T> {
-        let lease;
+        let lease: Awaited<ReturnType<typeof session.acquire>>;
         try {
             lease = await session.acquire(c.connection, c.production, signal);
         } catch (error) {
@@ -210,7 +210,7 @@ export function createTool(options: MongoOptions = {}): MongoTool {
 
     async function runWrite(toolCallId: string, c: Checked, run: WriteRun, signal: AbortSignal) {
         const req: Req = { maxTimeMS: c.call.maxTimeMS, signal };
-        let lease;
+        let lease: Awaited<ReturnType<typeof session.acquire>>;
         try {
             lease = await session.acquire(c.connection, c.production, signal);
         } catch (error) {

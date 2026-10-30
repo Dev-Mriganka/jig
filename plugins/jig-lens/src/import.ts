@@ -5,7 +5,7 @@
 //  - every line is inserted by its record id with INSERT OR IGNORE, so a line read twice is counted once, whether
 //    because two sessions import at once, the offset was lost, or the index was rebuilt;
 //  - a file is one transaction that also moves its offset, so the tables and the offset never disagree.
-import { closeSync, fstatSync, openSync, readdirSync, readSync } from "node:fs";
+import { closeSync, type Dirent, fstatSync, openSync, readdirSync, readSync } from "node:fs";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { CALL, TURN, insertSql } from "./fields.ts";
@@ -172,7 +172,7 @@ export function cutoffOf(now: Date, days: number): number {
 
 /** The record files from the cutoff day on, oldest first. jig-core deletes a file by the same rule, by its day. */
 function recordFiles(folder: string, cutoff: number): string[] {
-    let entries;
+    let entries: Dirent[];
     try {
         entries = readdirSync(folder, { withFileTypes: true });
     } catch (error) {

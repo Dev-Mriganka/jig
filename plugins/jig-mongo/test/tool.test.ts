@@ -53,7 +53,7 @@ describe("a read in a test environment", () => {
     test("the time limit of the call goes to the database, and the result has details and no documents in them", async () => {
         const result = await h.call(find("staging", { maxTimeMS: 2500, limit: 3 }));
         assert.equal(h.backend.calls[0]?.req.maxTimeMS, 2500);
-        assert.equal((h.backend.calls[0]?.query as any).limit, 3);
+        assert.equal((h.backend.calls[0]!.query as any).limit, 3);
         assert.deepEqual(result.details, { action: "find", environment: "staging", count: 0, partial: false });
     });
 });
@@ -66,7 +66,7 @@ describe("a read in production", () => {
             ok(result),
             'mongo find production orders.orders: 1 document\n{"_id":1,"status":"open","items":[{"sku":"a"}]}',
         );
-        assert.deepEqual((h.backend.calls[0]?.query as any).projection, { _id: 1, status: 1, items: 1, createdAt: 1 });
+        assert.deepEqual((h.backend.calls[0]!.query as any).projection, { _id: 1, status: 1, items: 1, createdAt: 1 });
         assert.deepEqual(h.connects[0], {
             environment: "production",
             uri: "mongodb://db.example.com:27017",

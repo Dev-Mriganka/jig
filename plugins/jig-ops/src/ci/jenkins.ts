@@ -185,7 +185,7 @@ function jenkins(service: CiService, ctx: CiContext): CiAdapter {
                     });
                 // The crumb is asked for before anything is sent. If that fails, nothing has changed.
                 const crumb = await api.crumb();
-                let reply;
+                let reply: Awaited<ReturnType<typeof api.start>>;
                 try {
                     reply = await api.start(parameters, crumb);
                 } catch (error) {

@@ -41,7 +41,7 @@ test("approving a branch review records the full HEAD of every reviewed reposito
     assert.equal(record?.status, "approved");
     assert.equal(record?.id, pending?.id);
     assert.deepEqual(record?.approvedHeads, REPOSITORIES.map((repo) => ({ repo, sha: git(path.join(session!.root, repo), "rev-parse", "HEAD").trim() })));
-    for (const head of record?.approvedHeads as Array<Record<string, unknown>>) {
+    for (const head of record!.approvedHeads as Array<Record<string, unknown>>) {
         assert.deepEqual(Object.keys(head).sort(), ["repo", "sha"]);
         assert.match(String(head.sha), /^[0-9a-f]{40}$/, "a full commit, not the 12 characters the page shows");
     }
@@ -260,8 +260,8 @@ test("registering a passkey through the page, then approving with it, needs no y
 
     const [record] = s.records();
     assert.equal(record?.status, "approved");
-    assert.deepEqual((record?.approval as { method: string; fingerprint: string }).method, "passkey");
-    assert.equal((record?.approval as { fingerprint: string }).fingerprint, fingerprint);
+    assert.deepEqual((record!.approval as { method: string; fingerprint: string }).method, "passkey");
+    assert.equal((record!.approval as { fingerprint: string }).fingerprint, fingerprint);
     const event = s.host.events.find((entry) => entry.channel === REVIEW_EVENTS.approved)!.data as ReviewApprovedEvent;
     assert.equal(event.method, "passkey");
     assert.equal(event.covered, true);

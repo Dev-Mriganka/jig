@@ -98,7 +98,11 @@ export function setupHarness(options: OpsOptions = {}): Harness {
     const bus: FakeBus = {
         emitted: [],
         listening: [],
-        publish: (event, payload) => void listeners.get(event)?.forEach((listener) => listener(payload)),
+        publish: (event, payload) => {
+            listeners.get(event)?.forEach((listener) => {
+                listener(payload);
+            });
+        },
     };
     const pi = {
         registerTool: (tool: ToolDefinition) => void tools.set(tool.name, tool),

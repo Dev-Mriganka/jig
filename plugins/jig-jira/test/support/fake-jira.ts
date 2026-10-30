@@ -433,7 +433,7 @@ export async function startFakeJira(flavor: Flavor = "cloud"): Promise<FakeJira>
                     return { status: 201, body: commentJson(created) };
                 }
                 const existing = issue.comments.find((comment) => comment.id === id);
-                if (id !== undefined && existing === undefined) return notFound("Can't find a comment with the id " + id);
+                if (id !== undefined && existing === undefined) return notFound(`Can't find a comment with the id ${id}`);
                 if (existing !== undefined && method === "GET") return { status: 200, body: commentJson(existing) };
                 if (existing !== undefined && method === "PUT") {
                     existing.body = String(body?.body ?? "");

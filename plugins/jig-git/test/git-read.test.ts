@@ -116,7 +116,7 @@ test("diff: names, patch and staged changes; paths limit the diff", async () => 
 });
 
 test("diff: a large patch is cut at 500 lines and says how many were left out", async () => {
-    const big = Array.from({ length: 2000 }, (_, i) => `line ${i} with some padding text`).join("\n") + "\n";
+    const big = `${Array.from({ length: 2000 }, (_, i) => `line ${i} with some padding text`).join("\n")}\n`;
     commitFile(api.dir, "big.txt", big, "Big file");
     writeFile(api.dir, "big.txt", big.replace(/line/g, "changed"));
     const text = ok(await h.call("git", { action: "diff", repo: "api", format: "patch", paths: ["big.txt"] }));

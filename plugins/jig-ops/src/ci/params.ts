@@ -211,7 +211,7 @@ function variables(action: CiAction, value: unknown): Record<string, string> {
 }
 
 /** The value of one parameter, checked by what it is. */
-function valueOf(action: CiAction, name: string, value: unknown): unknown {
+function checkedValue(action: CiAction, name: string, value: unknown): unknown {
     switch (name) {
         case "number":
         case "run_id":
@@ -269,7 +269,7 @@ function rowCheck(
     const missing = (row.required ?? []).filter((name) => !present(input[name]));
     if (missing.length > 0) throw new InputError(`ci ${action} needs ${missing.join(", ")}. ${usage(action, row)}`);
     const found: Record<string, unknown> = {};
-    for (const name of takes) if (present(input[name])) found[name] = valueOf(action, name, input[name]);
+    for (const name of takes) if (present(input[name])) found[name] = checkedValue(action, name, input[name]);
     return found as Params;
 }
 

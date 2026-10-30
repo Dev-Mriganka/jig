@@ -209,7 +209,7 @@ describe("rollout", () => {
         h.cluster.answer({ pods: list(pod("orders-api-0", { tag: "1.4.2" }), pod("orders-api-1", { tag: "1.4.2" })), workloads: list(workload("orders-api")) });
         const result = await h.runtime.call({ action: "rollout", ...POD, waitFor: "1.4.3", timeoutSec: 5 });
         assert.match(ok(result).split("\n")[0] ?? "", /Still rolling after waiting 5s: 0 of 2 pods ready on 1\.4\.3; pods run 1\.4\.2\.$/);
-        assert.equal((h.jig.facts.get(result.id)?.[0] ?? {}).timedOut, true);
+        assert.equal(h.jig.facts.get(result.id)?.[0]?.timedOut, true);
     });
 
     test("a wait the user stops is an error, and the tool call ends", async () => {

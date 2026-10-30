@@ -165,7 +165,7 @@ export function ruleLines(state: JigState, only: string | undefined, hasUI: bool
 // ---- /jig records ------------------------------------------------------------------------------------------------------
 
 export function recordsLines(state: JigState): string[] {
-    let summary;
+    let summary: ReturnType<typeof summarize>;
     try {
         summary = summarize(state.now());
     } catch (error) {

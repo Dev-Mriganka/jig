@@ -60,11 +60,11 @@ describe("starting a watch", () => {
         const [started] = h.jig.watches;
         assert.equal(started?.timeoutMinutes, 40);
         assert.equal(started?.stallMinutes, 20);
-        assert.equal((started?.spec as RolloutSpec).deadline, NOW + 40 * 60_000 - 5_000);
+        assert.equal((started!.spec as RolloutSpec).deadline, NOW + 40 * 60_000 - 5_000);
         assert.match(ok(result), /or after 40 minutes\./);
         await watch({ timeoutMinutes: 1, version: "1.4.4" });
         assert.equal(h.jig.watches[1]?.stallMinutes, 1);
-        assert.equal((h.jig.watches[1]?.spec as RolloutSpec).deadline, NOW + 55_000);
+        assert.equal((h.jig.watches[1]!.spec as RolloutSpec).deadline, NOW + 55_000);
     });
 
     test("watching what is already watched returns the watch there is, and starts no second", async () => {
@@ -90,7 +90,7 @@ describe("starting a watch", () => {
         const result = await watch({}, { service: "orders-api", environment: "production" });
         assert.equal(result.blocked, undefined);
         assert.equal(result.cls?.environment, "local");
-        assert.equal((h.jig.watches[0]?.spec as RolloutSpec).environment, "production");
+        assert.equal((h.jig.watches[0]!.spec as RolloutSpec).environment, "production");
     });
 
     test("a version that is not an image tag is blocked before a watch is started", async () => {

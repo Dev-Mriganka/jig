@@ -103,7 +103,7 @@ export async function testArtifacts(test: ArtifactTest): Promise<ArtifactReady[]
     for (const rule of rules) {
         if (rule.check !== undefined) {
             const check = (await sources.checks()).find((candidate) => candidate.name === rule.check);
-            if (!check || check.bucket !== "pass") continue;
+            if (check?.bucket !== "pass") continue;
             if (rule.log === undefined) {
                 add(rule, short, "check");
             } else if (check.id !== undefined) {

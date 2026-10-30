@@ -244,7 +244,10 @@ export function parseRules(raw: unknown, path: string, fail: Fail): Rule[] {
         const here = `${path}[${index}]`;
         let valid = true;
         const bad: Fail = (key, message) => { valid = false; fail(key, message); };
-        if (!isObject(item)) return bad(here, "must be an object");
+        if (!isObject(item)) {
+            bad(here, "must be an object");
+            return;
+        }
         knownFields(item, ["tool", "action", "environment", "effect", "decision", "approval"], here, bad);
         const tool = text(item, "tool", here, bad, true);
         const action = text(item, "action", here, bad, false);
@@ -275,7 +278,10 @@ export function parseClassifyRules(raw: unknown, path: string, fail: Fail): Clas
         const here = `${path}[${index}]`;
         let valid = true;
         const bad: Fail = (key, message) => { valid = false; fail(key, message); };
-        if (!isObject(item)) return bad(here, "must be an object");
+        if (!isObject(item)) {
+            bad(here, "must be an object");
+            return;
+        }
         knownFields(item, ["tool", "action", "param", "value", "pattern", "environment", "effect"], here, bad);
         const tool = text(item, "tool", here, bad, true);
         const action = text(item, "action", here, bad, false);

@@ -51,7 +51,7 @@ export function openIndex(file: string): DatabaseSync {
     // Created here, because SQLite gives its -wal and -shm files the mode of the main file.
     closeSync(openSync(file, "a", 0o600));
     const db = new DatabaseSync(file);
-    db.exec("PRAGMA busy_timeout = " + BUSY_MS);
+    db.exec(`PRAGMA busy_timeout = ${BUSY_MS}`);
     whileBusy(() => {
         // WAL lets Grafana read while a session writes. NORMAL is safe in WAL mode, and the index is a copy that
         // /lens rebuild can make again, so a lost last write after a power cut costs nothing.
@@ -88,7 +88,7 @@ export interface IndexStatus {
 export function openForReading(file: string): DatabaseSync | undefined {
     if (!existsSync(file)) return undefined;
     const db = new DatabaseSync(file, { readOnly: true });
-    db.exec("PRAGMA busy_timeout = " + BUSY_MS);
+    db.exec(`PRAGMA busy_timeout = ${BUSY_MS}`);
     return db;
 }
 

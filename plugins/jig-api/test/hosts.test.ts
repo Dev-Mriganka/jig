@@ -172,7 +172,7 @@ describe("addresses that are never called", () => {
         const { exchange, NotSentError } = await import("../src/engine/wire.ts");
         for (const url of ["http://169.254.169.254/latest/", "https://169.254.169.254/", "http://127.0.0.1:1/x"]) {
             await assert.rejects(
-                exchange({ system: "api", method: "GET", url, headers: {}, allowPlainLocal: url.startsWith("http://127") ? false : true }, new AbortController().signal),
+                exchange({ system: "api", method: "GET", url, headers: {}, allowPlainLocal: !url.startsWith("http://127") }, new AbortController().signal),
                 (error: unknown) => error instanceof NotSentError && /^the address is refused \(/.test(error.message),
                 url,
             );

@@ -98,7 +98,7 @@ test("a search asks for exact totals, a timeout shorter than the request's, and 
     assert.equal(body.size, 50);
     assert.equal(body.track_total_hits, true);
     assert.equal(body.timeout, SEARCH_TIMEOUT);
-    assert.ok(Number.parseInt(SEARCH_TIMEOUT) < 30, "the backend gives up before the 30 s request timeout");
+    assert.ok(Number.parseInt(SEARCH_TIMEOUT, 10) < 30, "the backend gives up before the 30 s request timeout");
     assert.deepEqual(body._source, ["@timestamp", "message"]);
     assert.equal(body.from, undefined, "paging is done on the hits fetched, never with from");
 });

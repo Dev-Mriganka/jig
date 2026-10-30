@@ -109,7 +109,7 @@ export function decide(input: DecideInput): Verdict {
         floor = "production-write";
     }
     // An unknown tool is allowed only by a rule that names it exactly. A wildcard rule cannot allow it.
-    if (call.unknown && decision === "allow" && source === "rule" && decidingRule !== undefined && decidingRule.tool.includes("*")) {
+    if (call.unknown && decision === "allow" && source === "rule" && decidingRule?.tool.includes("*")) {
         decision = "ask";
         source = "floor";
         floor = "unknown-tool";

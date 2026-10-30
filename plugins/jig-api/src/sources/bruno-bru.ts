@@ -34,10 +34,10 @@ const TEXT_BLOCKS: ReadonlySet<string> = new Set([
     "script:grpc:after-message-receive", "script:grpc:after-call-end",
 ]);
 
-const HEADER = /^([A-Za-z][\w:.\-]*)\s*([{[])\s*$/;
+const HEADER = /^([A-Za-z][\w:.-]*)\s*([{[])\s*$/;
 const SINGLE = /^(extends|color)\s*:\s*(.*)$/;
 /** An array block that opens and closes on one line: `vars:secret [token, apiKey]`. */
-const ONE_LINE_ARRAY = /^([A-Za-z][\w:.\-]*)\s*\[(.*)\]\s*$/;
+const ONE_LINE_ARRAY = /^([A-Za-z][\w:.-]*)\s*\[(.*)\]\s*$/;
 /** A pair: a key (quoted, or without spaces and colons), a colon, and the rest of the line. */
 const PAIR = /^\s*(~?"(?:[^"\\]|\\.)*"|[^\s:]+)\s*:\s?(.*)$/;
 /** `@description('''...''')` and the like, on a line of their own before a pair. A pair whose key starts with `@` has a colon. */
@@ -153,7 +153,7 @@ export function readBlocks(source: string, report: Report): Block[] {
             while (body.length > 0 && (body[0] as string).trim() === "") body = body.slice(1);
             blocks.push({ name, pairs: [], text: body.join("\n"), items: [] });
         } else if (name.startsWith("example") || name === "app") {
-            continue;
+            // Examples and the app block are not read.
         } else {
             blocks.push({ name, pairs: pairsOf(found.body), text: "", items: [] });
         }
@@ -171,7 +171,7 @@ function enabledPairs(blocks: readonly Block[], ...names: string[]): Pairs {
     return pairs.filter((pair) => pair.enabled).map((pair) => [pair.key, pair.value] as const);
 }
 
-function valueOf(block: Block | undefined, key: string): string {
+function pairValue(block: Block | undefined, key: string): string {
     return block?.pairs.find((pair) => pair.key === key)?.value ?? "";
 }
 
@@ -184,18 +184,18 @@ function authOf(blocks: readonly Block[], mode: string): AuthSetting {
         case "inherit":
             return { kind: "inherit" };
         case "bearer":
-            return { kind: "set", auth: { kind: "bearer", token: valueOf(find(blocks, "auth:bearer"), "token") } };
+            return { kind: "set", auth: { kind: "bearer", token: pairValue(find(blocks, "auth:bearer"), "token") } };
         case "basic": {
             const block = find(blocks, "auth:basic");
-            return { kind: "set", auth: { kind: "basic", username: valueOf(block, "username"), password: valueOf(block, "password") } };
+            return { kind: "set", auth: { kind: "basic", username: pairValue(block, "username"), password: pairValue(block, "password") } };
         }
         case "apikey": {
             const block = find(blocks, "auth:apikey");
-            return apiKeyAuth(valueOf(block, "key"), valueOf(block, "value"), valueOf(block, "placement").replace("queryparams", "query"));
+            return apiKeyAuth(pairValue(block, "key"), pairValue(block, "value"), pairValue(block, "placement").replace("queryparams", "query"));
         }
         case "oauth2": {
             const block = find(blocks, "auth:oauth2");
-            const get = (key: string): string => valueOf(block, key);
+            const get = (key: string): string => pairValue(block, key);
             return oauth2Auth({
                 grant: get("grant_type"),
                 accessTokenUrl: get("access_token_url"),
@@ -274,8 +274,8 @@ function bodyFrom(blocks: readonly Block[], mode: string): ParsedBody {
 const VERBS = ["get", "post", "put", "delete", "patch", "options", "head", "connect", "trace"];
 
 function seqOf(meta: Block | undefined): number | undefined {
-    const seq = Number(valueOf(meta, "seq"));
-    return valueOf(meta, "seq") !== "" && Number.isFinite(seq) ? seq : undefined;
+    const seq = Number(pairValue(meta, "seq"));
+    return pairValue(meta, "seq") !== "" && Number.isFinite(seq) ? seq : undefined;
 }
 
 /** The variables set before the request. A name that starts with `@` is local to the request; the `@` is not part of the name. */
@@ -294,8 +294,8 @@ export function readRequest(source: string, report: Report): ParsedRequest | und
         report("", "has no request: no get, post, put, delete, patch, options, head, grpc or ws block", "warning");
         return undefined;
     }
-    const type = verb.name === "grpc" ? "grpc" : verb.name === "ws" ? "websocket" : valueOf(meta, "type") === "graphql" ? "graphql" : "http";
-    const named = verb.name === "http" ? valueOf(verb, "method") : verb.name;
+    const type = verb.name === "grpc" ? "grpc" : verb.name === "ws" ? "websocket" : pairValue(meta, "type") === "graphql" ? "graphql" : "http";
+    const named = verb.name === "http" ? pairValue(verb, "method") : verb.name;
     const method = verb.name === "grpc" ? "GRPC" : verb.name === "ws" ? "WEBSOCKET" : named.toUpperCase();
 
     const pathParams = enabledPairs(blocks, "params:path");
@@ -309,23 +309,23 @@ export function readRequest(source: string, report: Report): ParsedRequest | und
     if (tokenRequest.some((name) => find(blocks, name) !== undefined)) {
         notes.push("the additional parameters of its OAuth 2.0 token request are not sent");
     }
-    if (valueOf(find(blocks, "settings"), "followRedirects") === "true") notes.push("followRedirects is ignored: redirects are never followed");
+    if (pairValue(find(blocks, "settings"), "followRedirects") === "true") notes.push("followRedirects is ignored: redirects are never followed");
 
     return {
-        name: valueOf(meta, "name") || undefined,
+        name: pairValue(meta, "name") || undefined,
         seq: seqOf(meta),
         type,
         method,
-        url: valueOf(verb, "url"),
+        url: pairValue(verb, "url"),
         headers: enabledPairs(blocks, "headers"),
         pathParams,
-        body: bodyFrom(blocks, valueOf(verb, "body")),
-        auth: authOf(blocks, valueOf(verb, "auth")),
+        body: bodyFrom(blocks, pairValue(verb, "body")),
+        auth: authOf(blocks, pairValue(verb, "auth")),
         vars: varsOf(blocks),
         prerequest: hasText(find(blocks, "script:pre-request")?.text),
         notes,
         assertions: enabledPairs(blocks, "assert").map(([expression, value]) => `${expression} ${value}`.trim()),
-        docs: hasText(find(blocks, "docs")?.text) ? (find(blocks, "docs")?.text as string).trim() : undefined,
+        docs: hasText(find(blocks, "docs")?.text) ? (find(blocks, "docs")!.text as string).trim() : undefined,
     };
 }
 
@@ -333,15 +333,15 @@ export function readRequest(source: string, report: Report): ParsedRequest | und
 export function readDefaults(source: string, report: Report): ParsedDefaults {
     const blocks = readBlocks(source, report);
     const meta = find(blocks, "meta");
-    const mode = valueOf(find(blocks, "auth"), "mode");
+    const mode = pairValue(find(blocks, "auth"), "mode");
     return {
-        name: valueOf(meta, "name") || undefined,
+        name: pairValue(meta, "name") || undefined,
         seq: seqOf(meta),
         headers: enabledPairs(blocks, "headers"),
         auth: authOf(blocks, mode),
         vars: varsOf(blocks),
         prerequest: hasText(find(blocks, "script:pre-request")?.text),
-        docs: hasText(find(blocks, "docs")?.text) ? (find(blocks, "docs")?.text as string).trim() : undefined,
+        docs: hasText(find(blocks, "docs")?.text) ? (find(blocks, "docs")!.text as string).trim() : undefined,
     };
 }
 

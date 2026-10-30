@@ -280,6 +280,6 @@ describe("the code", () => {
         const text = sources.find((source) => source.file === "runtime/kubernetes/kubectl.ts")?.text ?? "";
         assert.match(codeOf(text), /export const READS = \["get", "logs", "exec"\] as const;/);
         assert.match(codeOf(text), /\{ verb: "set", then: "image" \},\s*\{ verb: "rollout", then: "undo" \},/);
-        assert.match(codeOf(text), /if \(!allowed\(verb, args\)\) \{\s*const what[^]*throw/);
+        assert.match(codeOf(text), /if \(!allowed\(verb, args\)\) \{\s*const what[\s\S]*throw/);
     });
 });

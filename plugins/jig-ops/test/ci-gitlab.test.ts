@@ -588,7 +588,7 @@ describe("the plan of a watch", () => {
         ok(await g.call({ action: "watch", run_id: 7, finish: "run" }));
         assert.equal(g.h.jig.watches[1]?.title, "pipeline #7");
         ok(await g.call({ action: "watch", run_id: 7, check: "build" }));
-        assert.deepEqual((g.h.jig.watches[2]?.spec as { finish: unknown }).finish, { kind: "jobs", names: ["build"] });
+        assert.deepEqual((g.h.jig.watches[2]!.spec as { finish: unknown }).finish, { kind: "jobs", names: ["build"] });
         assert.equal(g.h.jig.watches[2]?.title, "job build of pipeline #7");
     });
 

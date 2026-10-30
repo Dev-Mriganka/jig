@@ -285,7 +285,7 @@ describe("finding the service of a ci call", () => {
 
     test("services of a repository are found whatever the case of its name, and only those with a ci entry", () => {
         const raw = section();
-        (raw.services as Record<string, Raw>)["billing"] = {
+        (raw.services as Record<string, Raw>).billing = {
             repo: "acme/orders-api",
             environments: { staging: { health: "https://b.example.test/h" } },
         };

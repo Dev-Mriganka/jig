@@ -30,7 +30,9 @@ export function withJig(use: (api: JigApi) => void): void {
         use(api);
         return;
     }
-    (slot[PENDING] ??= []).push(use);
+    const pending = slot[PENDING] ?? [];
+    slot[PENDING] = pending;
+    pending.push(use);
 }
 
 /** For jig-core only: publishes the API and runs what plugins queued before it loaded. One plugin's failing

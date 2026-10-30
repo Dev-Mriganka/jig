@@ -236,7 +236,7 @@ describe("explain", () => {
             ].join("\n"),
         );
         await run({ action: "explain", verbosity: "queryPlanner" });
-        assert.equal((backend.calls[1]?.query as any).verbosity, "queryPlanner");
+        assert.equal((backend.calls[1]!.query as any).verbosity, "queryPlanner");
     });
 
     test("a pipeline is explained as the pipeline that would run, and one that writes is refused", async () => {
@@ -244,7 +244,7 @@ describe("explain", () => {
             { action: "explain", pipeline: [{ $match: { status: "open" } }, { $group: { _id: "$status" } }] },
             production(),
         );
-        assert.deepEqual((backend.calls[0]?.query as any).pipeline, [
+        assert.deepEqual((backend.calls[0]!.query as any).pipeline, [
             { $match: { status: "open" } },
             { $project: { _id: 1, status: 1, items: 1, createdAt: 1 } },
             { $group: { _id: "$status" } },
@@ -257,7 +257,7 @@ describe("explain", () => {
 
     test("with an allow list the explained find has the forced projection, and the filter is checked like a find's", async () => {
         await run({ action: "explain", filter: { status: "open" } }, production());
-        assert.deepEqual((backend.calls[0]?.query as any).projection, { _id: 1, status: 1, items: 1, createdAt: 1 });
+        assert.deepEqual((backend.calls[0]!.query as any).projection, { _id: 1, status: 1, items: 1, createdAt: 1 });
         assert.throws(
             () => planRead(parseCall({ ...target, action: "explain", filter: { password: 1 } }), staging()),
             /credential/,
@@ -420,14 +420,14 @@ describe("count, find, distinct and sample", () => {
             { _id: 1, status: "open", items: [{ sku: "a", token: "t" }], createdAt: 5, internalNotes: "x" },
         ];
         const [doc] = docsOf(await run({ action: "find", filter: { status: "open" } }, production()));
-        assert.deepEqual((backend.calls[0]?.query as any).projection, { _id: 1, status: 1, items: 1, createdAt: 1 });
+        assert.deepEqual((backend.calls[0]!.query as any).projection, { _id: 1, status: 1, items: 1, createdAt: 1 });
         assert.deepEqual(
             doc,
             { _id: 1, status: "open", items: [{ sku: "a" }], createdAt: 5 },
             "the server's extra field and the credential-like one are gone",
         );
         await run({ action: "find", projection: { status: 1 } }, production());
-        assert.deepEqual((backend.calls[1]?.query as any).projection, { status: 1 });
+        assert.deepEqual((backend.calls[1]!.query as any).projection, { status: 1 });
         assert.throws(
             () => planRead(parseCall({ ...target, action: "find", projection: { internalNotes: 1 } }), production()),
             /"internalNotes" is not allowed in orders\.orders/,
@@ -450,7 +450,7 @@ describe("count, find, distinct and sample", () => {
             filter: { createdAt: { $gt: { $date: "2026-01-01T00:00:00Z" } } },
             limit: 2,
         });
-        assert.deepEqual((backend.calls[0]?.query as any).pipeline, [
+        assert.deepEqual((backend.calls[0]!.query as any).pipeline, [
             { $match: { createdAt: { $gt: { $date: "2026-01-01T00:00:00Z" } } } },
             { $unwind: "$status" },
             { $group: { _id: "$status" } },
@@ -492,7 +492,7 @@ describe("count, find, distinct and sample", () => {
     test("sample: the filter, a random sample of the size asked, then the projection", async () => {
         backend.answers.aggregate = [{ _id: 1, status: "x", notes: "n" }];
         const rendered = await run({ action: "sample", filter: { status: "x" }, limit: 5, projection: { status: 1 } });
-        assert.deepEqual((backend.calls[0]?.query as any).pipeline, [
+        assert.deepEqual((backend.calls[0]!.query as any).pipeline, [
             { $match: { status: "x" } },
             { $sample: { size: 5 } },
             { $project: { status: 1 } },
@@ -500,9 +500,9 @@ describe("count, find, distinct and sample", () => {
         assert.equal(lines(rendered)[0], "mongo sample staging orders.orders: 1 document sampled");
         assert.deepEqual(docsOf(rendered), [{ _id: 1, status: "x" }]);
         await run({ action: "sample" });
-        assert.deepEqual((backend.calls[1]?.query as any).pipeline, [{ $sample: { size: 20 } }]);
+        assert.deepEqual((backend.calls[1]!.query as any).pipeline, [{ $sample: { size: 20 } }]);
         await run({ action: "sample" }, production());
-        assert.deepEqual((backend.calls[2]?.query as any).pipeline, [
+        assert.deepEqual((backend.calls[2]!.query as any).pipeline, [
             { $sample: { size: 20 } },
             { $project: { _id: 1, status: 1, items: 1, createdAt: 1 } },
         ]);
@@ -527,8 +527,8 @@ describe("schema", () => {
             { _id: new ObjectId(OID), status: null, total: "n/a", items: [] },
         ];
         const rendered = await run({ action: "schema", limit: 50 });
-        assert.deepEqual((backend.calls[0]?.query as any).pipeline, [{ $sample: { size: 50 } }]);
-        assert.equal((backend.calls[0]?.query as any).typed, true);
+        assert.deepEqual((backend.calls[0]!.query as any).pipeline, [{ $sample: { size: 50 } }]);
+        assert.equal((backend.calls[0]!.query as any).typed, true);
         assert.equal(
             rendered.text,
             [
@@ -554,7 +554,7 @@ describe("schema", () => {
     test("with an allow list the sample is projected to the allowed fields, and only those are described", async () => {
         backend.answers.aggregate = [{ _id: 1, status: "open", items: [{ sku: "a", token: "t" }], internal: "x" }];
         const rendered = await run({ action: "schema" }, production());
-        assert.deepEqual((backend.calls[0]?.query as any).pipeline, [
+        assert.deepEqual((backend.calls[0]!.query as any).pipeline, [
             { $sample: { size: 20 } },
             { $project: { _id: 1, status: 1, items: 1, createdAt: 1 } },
         ]);
@@ -569,7 +569,7 @@ describe("schema", () => {
 
     test("a filter narrows the sample, and it is checked", async () => {
         await run({ action: "schema", filter: { status: "open" }, limit: 5 });
-        assert.deepEqual((backend.calls[0]?.query as any).pipeline, [
+        assert.deepEqual((backend.calls[0]!.query as any).pipeline, [
             { $match: { status: "open" } },
             { $sample: { size: 5 } },
         ]);
@@ -591,7 +591,7 @@ describe("aggregate", () => {
             pipeline: [{ $group: { _id: "$status", n: { $sum: 1 } } }],
             limit: 2,
         });
-        assert.deepEqual((backend.calls[0]?.query as any).pipeline, [
+        assert.deepEqual((backend.calls[0]!.query as any).pipeline, [
             { $group: { _id: "$status", n: { $sum: 1 } } },
             { $limit: 2 },
         ]);
@@ -605,7 +605,7 @@ describe("aggregate", () => {
         ]);
         const below = await run({ action: "aggregate", pipeline: [{ $limit: 100 }] });
         assert.equal(lines(below)[0], "mongo aggregate staging orders.orders: 2 documents");
-        assert.deepEqual((backend.calls[1]?.query as any).pipeline.at(-1), { $limit: 20 });
+        assert.deepEqual((backend.calls[1]!.query as any).pipeline.at(-1), { $limit: 20 });
     });
 
     test("the result is stripped of denied fields, whatever name the pipeline gave the document", async () => {
@@ -626,7 +626,7 @@ describe("aggregate", () => {
             },
             production(),
         );
-        assert.deepEqual((backend.calls[0]?.query as any).pipeline, [
+        assert.deepEqual((backend.calls[0]!.query as any).pipeline, [
             { $match: { status: "open" } },
             { $project: { _id: 1, status: 1, items: 1, createdAt: 1 } },
             { $group: { _id: "$status", total: { $sum: 1 } } },

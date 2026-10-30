@@ -96,7 +96,7 @@ describe("a valid catalog", () => {
             { system: "github-actions" },
         ]) {
             const raw = section();
-            const billing = (raw.services as Record<string, Raw>)["billing"] as Raw;
+            const billing = (raw.services as Record<string, Raw>).billing as Raw;
             billing.ci = ci;
             billing.repo = "acme/billing";
             assert.deepEqual(validateOps(raw), [], JSON.stringify(ci));
@@ -175,11 +175,11 @@ describe("a catalog that is refused", () => {
     test("repo is text without white space, and ci needs a system", () => {
         for (const repo of ["", "a b", 5, "x".repeat(201), "a\nb"]) {
             const raw = section();
-            ((raw.services as Record<string, Raw>)["billing"] as Raw).repo = repo;
+            ((raw.services as Record<string, Raw>).billing as Raw).repo = repo;
             assert.equal(validateOps(raw).length, 1, JSON.stringify(repo));
         }
         const raw = section();
-        const billing = (raw.services as Record<string, Raw>)["billing"] as Raw;
+        const billing = (raw.services as Record<string, Raw>).billing as Raw;
         billing.ci = { workflow: "build.yml" };
         assert.deepEqual(validateOps(raw), ["ops.services.billing.ci.system: required, the CI system: github-actions, gitlab, jenkins"]);
         billing.ci = "github-actions";

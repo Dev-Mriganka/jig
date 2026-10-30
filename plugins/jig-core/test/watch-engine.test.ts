@@ -1064,7 +1064,7 @@ describe("ending the session", () => {
 describe("telling the agent", () => {
     /** Starts `count` watches of a kind that ends at its first poll, each `gap` ms after the one before. */
     async function endingWatches(r: Rig, gaps: number[]) {
-        r.engine.registerKind(scripted(r.clock, "quick", (n, polled) => passed(`result ${String((polled.spec as { n: number }).n)}`)).kind);
+        r.engine.registerKind(scripted(r.clock, "quick", (_n, polled) => passed(`result ${String((polled.spec as { n: number }).n)}`)).kind);
         r.begin();
         let n = 0;
         for (const gap of gaps) {

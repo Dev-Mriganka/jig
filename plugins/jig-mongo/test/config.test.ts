@@ -81,7 +81,7 @@ describe("a valid section", () => {
         ]);
         assert.equal(staging?.uri.database, "orders");
         assert.deepEqual(settingsOf(raw)?.connections.get("dev")?.via, { kind: "tunnel", name: "corp-net" });
-        assert.equal((settingsOf(raw)?.connections.get("qa")?.via as { port: number }).port, 2222);
+        assert.equal((settingsOf(raw)!.connections.get("qa")!.via as { port: number }).port, 2222);
     });
 
     test("mongodb+srv takes one host and no port", () => {

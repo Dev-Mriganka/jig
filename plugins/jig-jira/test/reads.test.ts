@@ -95,8 +95,8 @@ describe("get", () => {
         issue(h, "PROJ-2").fields.description = `${"d".repeat(3999)}EDGE${"e".repeat(2000)}`;
         addComments(h, "PROJ-2", 1, () => `${"c".repeat(1499)}EDGE${"f".repeat(500)}`);
         const capped = ok(await h.call({ action: "get", key: "PROJ-2" }));
-        assert.match(capped, new RegExp(`d{3999}E\\n\\[\\.\\.\\. 2003 more characters; call again with full=true for all of it\\]`));
-        assert.match(capped, new RegExp(`c{1499}E\\n {2}\\[\\.\\.\\. 503 more characters; call again with full=true`));
+        assert.match(capped, /d{3999}E\n\[\.\.\. 2003 more characters; call again with full=true for all of it\]/);
+        assert.match(capped, /c{1499}E\n {2}\[\.\.\. 503 more characters; call again with full=true/);
         const full = ok(await h.call({ action: "get", key: "PROJ-2", full: true }));
         assert.match(full, /d{3999}EDGEe{2000}/);
         assert.doesNotMatch(full, /more characters/);
