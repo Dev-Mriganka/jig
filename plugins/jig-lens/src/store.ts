@@ -1,7 +1,8 @@
-// The index file: opening it for writing, deleting it for a rebuild, and reading what `/lens status` reports.
+// The index file: opening it for writing or for reading, deleting it for a rebuild, and reading what `/lens status`
+// reports.
 //
-// A connection lives only as long as one import or one status: nothing holds the file open between them, so deleting it
-// for a rebuild never pulls it out from under a session that is idle.
+// A connection lives only as long as one import, one status or one summary: nothing holds the file open between them,
+// so deleting it for a rebuild never pulls it out from under a session that is idle.
 import { chmodSync, closeSync, existsSync, mkdirSync, openSync, rmSync, statSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -80,12 +81,31 @@ export interface IndexStatus {
     skipped: Array<{ file: string; lines: number }>;
 }
 
-/** What the index holds, or undefined when there is no index yet. Opens it read only, so asking never creates it. */
-export function readStatus(file: string): IndexStatus | undefined {
+/**
+ * The index for asking questions, or undefined when there is no index yet. It is opened read only, so asking never
+ * creates the index and can never change it. The caller closes it.
+ */
+export function openForReading(file: string): DatabaseSync | undefined {
     if (!existsSync(file)) return undefined;
     const db = new DatabaseSync(file, { readOnly: true });
+    db.exec("PRAGMA busy_timeout = " + BUSY_MS);
+    return db;
+}
+
+/** Runs `read` on the index, opened for reading, and closes it. Undefined when there is no index yet. */
+export function readIndex<T>(file: string, read: (db: DatabaseSync) => T): T | undefined {
+    const db = openForReading(file);
+    if (db === undefined) return undefined;
     try {
-        db.exec("PRAGMA busy_timeout = " + BUSY_MS);
+        return read(db);
+    } finally {
+        db.close();
+    }
+}
+
+/** What the index holds, or undefined when there is no index yet. */
+export function readStatus(file: string): IndexStatus | undefined {
+    return readIndex(file, (db) => {
         const count = (table: string) => Number(db.prepare(`SELECT count(*) AS n FROM ${table}`).get()?.n ?? 0);
         const last = db.prepare("SELECT max(at) AS at FROM imported").get()?.at;
         const skipped = db.prepare("SELECT file, skipped FROM imported WHERE skipped > 0 ORDER BY file").all();
@@ -98,9 +118,7 @@ export function readStatus(file: string): IndexStatus | undefined {
             lastImport: typeof last === "number" ? last : undefined,
             skipped: skipped.map((row) => ({ file: String(row.file), lines: Number(row.skipped) })),
         };
-    } finally {
-        db.close();
-    }
+    });
 }
 
 function sizeOf(file: string): number {
