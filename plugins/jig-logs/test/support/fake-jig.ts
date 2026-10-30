@@ -131,6 +131,12 @@ export function installFakeJig(): FakeJig {
                 return headers;
             },
         },
+        http: {
+            request: async () => {
+                throw new Error("this fake has no http");
+            },
+        },
+
         mask: {
             text: (input) => (masked.push(input), input),
             value: (input) => (masked.push(input), input),
@@ -146,6 +152,7 @@ export function installFakeJig(): FakeJig {
             addRules: () => {},
             addClassifyRules: () => {},
             addProtectedPaths: () => {},
+            addSecretCommands: () => {},
             addMaskFields: () => {},
             addSectionDefaults: () => {},
             registerSection: (name, validate) => void sections.set(name, validate),

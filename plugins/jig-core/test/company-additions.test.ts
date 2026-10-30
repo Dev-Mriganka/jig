@@ -116,3 +116,48 @@ describe("tunnels", () => {
         assert.throws(() => tunnels.register("bad", {} as never), /must have an open function/);
     });
 });
+
+describe("secret commands from a company plugin", () => {
+    function setup(personal: unknown) {
+        const dir = mkdtempSync(path.join(tmpdir(), "jig-commands-"));
+        const file = path.join(dir, "jig.json");
+        writeFileSync(file, JSON.stringify(personal));
+        const state = createState({} as ExtensionAPI);
+        const api = buildApi(state);
+        loadPersonalConfig(state, file);
+        return { state, api, dir };
+    }
+
+    test("are added by name, and the user's own command of the same name replaces the company's", () => {
+        const { state, api, dir } = setup({ secrets: { backends: ["cmd"], commands: { gh: ["my-gh", "token"] } } });
+        try {
+            api.config.addSecretCommands({ gh: ["gh", "auth", "token"], corp: ["corp-login", "--print"] });
+            assert.deepEqual(state.company.secretCommands, {
+                gh: ["gh", "auth", "token"],
+                corp: ["corp-login", "--print"],
+            });
+            const merged = { ...state.company.secretCommands, ...state.personal.config.secrets.commands };
+            assert.deepEqual(merged, { gh: ["my-gh", "token"], corp: ["corp-login", "--print"] });
+        } finally {
+            rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    test("a wrong declaration is a problem named `company`, and the good ones still apply", () => {
+        const { state, api, dir } = setup({});
+        try {
+            api.config.addSecretCommands({ ok: ["a"], "bad name": ["a"], empty: [], text: "run it" } as never);
+            assert.deepEqual(Object.keys(state.company.secretCommands), ["ok"]);
+            assert.deepEqual(
+                state.company.problems.map((problem) => [problem.source, problem.key]),
+                [
+                    ["company", "secretCommands.bad name"],
+                    ["company", "secretCommands.empty"],
+                    ["company", "secretCommands.text"],
+                ],
+            );
+        } finally {
+            rmSync(dir, { recursive: true, force: true });
+        }
+    });
+});

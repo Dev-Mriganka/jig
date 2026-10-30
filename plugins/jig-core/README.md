@@ -64,7 +64,8 @@ All fields are optional.
 | `rules` | the default table in [Permissions](../../docs/permissions.md) | A list of rules, most specific first. Each one names a `tool`, optionally an `action`, `environment` or `effect`, and gives a `decision` (`allow`, `ask`, `deny`) and optionally an `approval` kind (`dialog`, `review`, `form`). Rules that would lower the floor are refused at load, with the file and the key named |
 | `classify` | none | How to classify tools Jig did not write: `tool`, optionally `action`, a `param` and `value` (or `pattern`), and the resulting `environment` and `effect` |
 | `protectedPaths` | the defaults in [Permissions](../../docs/permissions.md#protected-paths) | `{ "secret": [...], "guarded": [...] }`: paths to protect from Pi's file tools **in addition** to the defaults, each absolute or starting with `~/`. A `secret` path is neither read nor written, a `guarded` one can be read but not written. Nothing here removes a default |
-| `secrets.backends` | `["pass"]` | Which backends may resolve references: `pass`, `env`, `keychain`, `op` |
+| `secrets.backends` | `["pass"]` | Which backends may resolve references: `pass`, `env`, `keychain`, `op`, `cmd`, `file` |
+| `secrets.commands` | none | Commands that `cmd:<name>` may run, by name: `{ "gh": ["gh", "auth", "token"] }`, the program and then its arguments. Only when `cmd` is in `secrets.backends` |
 | `records.retentionDays` | 90 | How long record files are kept, as a whole number of days from 1 to 3650 |
 | `spill.retentionDays` | 7 | How long spill files and rendered previews are kept, in the same range |
 
@@ -102,7 +103,9 @@ starts with the defaults rather than guessing. So is a wrong type or value.
 - environments, rules and classification rules for its own tools, and which of
   its targets count as production;
 - field names that hold personal data in its systems, for masking;
-- sign-in services and transports for its systems.
+- sign-in services and transports for its systems;
+- secret commands (`config.addSecretCommands`) and protected paths (`config.addProtectedPaths`)
+  for its own tools.
 
 ## Layout
 
@@ -127,7 +130,7 @@ jig-core/
 ## More detail
 
 - [Watches](docs/watches.md): kinds, polling, finish lines, messages, saving
-- [Sign-in and transports](docs/sign-in-and-transports.md): how a company signs in
+- [Credential sources](docs/sign-in-and-transports.md): where a request's credential comes from, and why Jig never signs in
 - [What asks](docs/approval-screens.md): the order of a decision, and the screens
 - [Results](docs/results.md): what happens to a result: redact, mask and cap
 - [Masking](docs/masking.md): what counts as personal data, and the tokens

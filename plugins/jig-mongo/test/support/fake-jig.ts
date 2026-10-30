@@ -160,6 +160,12 @@ export function installFakeJig(): FakeJig {
                 throw new Error("no sign-in in tests");
             },
         },
+        http: {
+            request: async () => {
+                throw new Error("this fake has no http");
+            },
+        },
+
         mask: { text: (input) => input, value: (input) => input },
         watches: {
             registerKind: () => {},
@@ -174,6 +180,7 @@ export function installFakeJig(): FakeJig {
             addRules: () => {},
             addClassifyRules: () => {},
             addProtectedPaths: () => {},
+            addSecretCommands: () => {},
             addMaskFields: () => {},
             registerSection: (name, validate) => void sections.set(name, validate),
             addSectionDefaults: () => {},

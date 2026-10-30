@@ -22,6 +22,8 @@ import { openInBrowser, writePreviewPage } from "./preview-html.ts";
 import { createRedactor } from "./redact.ts";
 import type { Redactor } from "./redact.ts";
 import type { Answer, ErrorKind } from "./records.ts";
+import { createHttp } from "./kit/http.ts";
+import type { JigApi } from "./contract.ts";
 import { createSecrets } from "./secrets.ts";
 import type { Secrets } from "./secrets.ts";
 import { createSignIn } from "./signin.ts";
@@ -104,6 +106,8 @@ export interface JigState {
     calls: Map<string, CallState>;
     redactor: Redactor;
     secrets: Secrets;
+    /** `jig().http`, bound to this runtime's secrets, sign-in services and transports. */
+    http: JigApi["http"];
     signIn: SignIn;
     transports: Transports;
     tunnels: Tunnels;
@@ -173,7 +177,14 @@ export function createState(pi: ExtensionAPI, options: JigCoreOptions = {}): Jig
         sessionAllows: new Set(),
         calls: new Map(),
         redactor,
-        secrets: createSecrets({ backends: () => state.personal.config.secrets.backends, redactor }),
+        secrets: createSecrets({
+            backends: () => state.personal.config.secrets.backends,
+            // The user's own commands replace a company's of the same name.
+            commands: () => ({ ...state.company.secretCommands, ...state.personal.config.secrets.commands }),
+            agentDir: () => state.agentDir(),
+            redactor,
+        }),
+        http: undefined as unknown as JigApi["http"],
         signIn: createSignIn({ redactor }),
         transports: createTransports(),
         tunnels: createTunnels(),
@@ -242,6 +253,12 @@ export function createState(pi: ExtensionAPI, options: JigCoreOptions = {}): Jig
         recordsProblem: undefined,
         startupProblems: [],
     };
+    state.http = createHttp({
+        secrets: state.secrets,
+        signIn: state.signIn,
+        transports: state.transports,
+        redact: (value) => redactor.register(value),
+    });
     return state;
 }
 

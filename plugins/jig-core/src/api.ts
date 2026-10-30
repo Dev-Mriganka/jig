@@ -6,6 +6,7 @@ import {
     addCompanyEnvironments,
     addCompanyProtectedPaths,
     addCompanyRules,
+    addCompanySecretCommands,
     OWN_SECTIONS,
 } from "./config.ts";
 import type { Facts, JigApi } from "./contract.ts";
@@ -67,6 +68,8 @@ export function buildApi(state: JigState): JigApi {
             headers: (name, request, signal) => state.signIn.headers(name, request, signal),
         },
 
+        http: { request: (request, signal) => state.http.request(request, signal) },
+
         mask: {
             text: (input) => state.masker().text(input),
             value: <T>(input: T): T => state.masker().value(input),
@@ -96,6 +99,9 @@ export function buildApi(state: JigState): JigApi {
             addProtectedPaths(paths) {
                 addCompanyProtectedPaths(state.company, paths);
                 state.invalidatePolicy();
+            },
+            addSecretCommands(commands) {
+                addCompanySecretCommands(state.company, commands);
             },
             addMaskFields: (fields) => state.addMaskFields(fields),
             registerSection(name, validate) {

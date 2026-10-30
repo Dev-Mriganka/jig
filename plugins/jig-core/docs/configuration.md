@@ -94,10 +94,60 @@ removes one. `/jig rules` lists them all, each with where it came from
 | `env:<NAME>` | the environment of the Pi process | The variable's value |
 | `keychain:<service>/<account>` | the macOS Keychain | `security find-generic-password -s <service> -a <account> -w`. The service is the part before the first `/` |
 | `op://<vault>/<item>/<field>` | the 1Password command-line tool | `op read`, with an optional section before the field |
+| `cmd:<name>` | a command you declared by name | The trimmed standard output of the command declared as `<name>`. See below |
+| `file:<absolute path>` | a file | The first line of the file, trimmed. A leading `~/` is the home folder. See below |
 
 A reference whose backend is not in `secrets.backends` is an error that says
 so. Every backend has a timeout, 60 seconds by default, which includes the time
 you need to unlock a store. An error never repeats the reference or a value.
+
+### `cmd`: a command that owns the login
+
+`cmd:gh` runs a command that you declared by name, so the tool that owns a login
+does it and Jig stores nothing. Declare commands in `secrets.commands` of
+`jig.json` (a company plugin can add more with `config.addSecretCommands`), and
+turn the backend on:
+
+```json
+{
+  "secrets": {
+    "backends": ["pass", "cmd"],
+    "commands": { "gh": ["gh", "auth", "token"] }
+  }
+}
+```
+
+- **Off by default,** like every backend but `pass`: `cmd` must be in
+  `secrets.backends`.
+- **A name, never a command line.** A reference names a declared command. An
+  undeclared name is refused (and not repeated in the error), so a model cannot
+  slip in a command of its own through a parameter. A command is the program,
+  then its arguments, as a list; no shell is used. A name is letters, digits and
+  `. _ -`. Your own declaration of a name replaces a company's.
+- **What it uses.** The trimmed standard output, which must be non-empty and at
+  most 16 KiB. The program runs through `jig-core`'s own exec, with the same
+  timeout as the other backends and a short environment: the usual variables,
+  the ones a keyring or a pinentry needs to show its prompt, and the ones that
+  say where `gh`, `glab`, `gcloud`, `aws` and `kubectl` keep their
+  configuration. Tokens in Pi's environment are not passed on.
+- **Errors show the exit code and nothing else.** The command's error output is
+  never shown, because it may hold the very value being read.
+
+### `file`: the first line of a file
+
+`file:/home/me/.config/orders-api/token` and `file:~/.config/orders-api/token`
+read the first line of a file, for a credential that another tool keeps up to
+date.
+
+- **Off by default:** `file` must be in `secrets.backends`.
+- **A regular file,** at most 64 KiB, whose first line is not empty. The path
+  must be absolute, or start with `~/`. Permission bits are not checked: files
+  on a Windows drive seen from WSL all show 0777.
+- **Never Pi's agent folder,** not by its path and not through a link: the
+  files there are Pi's own sign-in, and a reference must not be a way to read
+  them.
+- **Errors say what is wrong** (not there, not a file, too large, empty) and
+  never show the content.
 
 ## Sections of other plugins
 

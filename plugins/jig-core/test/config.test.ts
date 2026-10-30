@@ -137,6 +137,13 @@ describe("an unknown field is an error", () => {
         bad({ rules: [{ tool: "t", decision: "ask", approval: "popup" }] }, "rules[0].approval");
         bad({ rules: [{ tool: "t", decision: "ask", effect: "delete" }] }, "rules[0].effect");
         bad({ secrets: { backends: ["pass", "vault"] } }, "secrets.backends[1]");
+        bad({ secrets: { commands: ["gh"] } }, "secrets.commands");
+        bad({ secrets: { commands: { "gh auth": ["gh"] } } }, "secrets.commands.gh auth");
+        bad({ secrets: { commands: { gh: "gh auth token" } } }, "secrets.commands.gh");
+        bad({ secrets: { commands: { gh: [] } } }, "secrets.commands.gh");
+        bad({ secrets: { commands: { gh: ["gh", ""] } } }, "secrets.commands.gh");
+        bad({ secrets: { commands: { gh: ["gh", 3] } } }, "secrets.commands.gh");
+        bad({ secrets: { commands: { gh: ["gh", "a\nb"] } } }, "secrets.commands.gh");
         bad({ records: { retentionDays: 0 } }, "records.retentionDays");
         bad({ records: { retentionDays: 1.5 } }, "records.retentionDays");
         bad({ classify: [{ tool: "t", param: "p", environment: "e", effect: "read" }] }, "classify[0]");
@@ -161,6 +168,28 @@ describe("an unknown field is an error", () => {
         assert.equal(merged.problems.length, 2);
         assert.equal(merged.environments.kindOf("production"), "production");
         assert.equal(merged.environments.kindOf("local"), "local");
+    });
+});
+
+describe("secret commands and the cmd and file backends", () => {
+    test("`secrets.commands` names a command as a program and its arguments, and the backends list has cmd and file", () => {
+        const loaded = personal({
+            secrets: {
+                backends: ["pass", "cmd", "file"],
+                commands: { gh: ["gh", "auth", "token"], "cloud-login": ["/opt/bin/token"] },
+            },
+        });
+        assert.deepEqual(loaded.problems, []);
+        assert.deepEqual(loaded.config.secrets.backends, ["pass", "cmd", "file"]);
+        assert.deepEqual(loaded.config.secrets.commands, {
+            gh: ["gh", "auth", "token"],
+            "cloud-login": ["/opt/bin/token"],
+        });
+    });
+
+    test("there are no commands by default", () => {
+        assert.deepEqual(personal({}).config.secrets.commands, {});
+        assert.deepEqual(personal({ secrets: { backends: ["env"] } }).config.secrets.commands, {});
     });
 });
 

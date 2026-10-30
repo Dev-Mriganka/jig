@@ -19,7 +19,7 @@ import { expandProtected, isListablePath, mergeProtected } from "./protected-pat
 import type { ProtectedPath, ProtectedSource } from "./protected-paths.ts";
 
 /** The secret backends jig-core can resolve. `secrets.backends` chooses which of them are allowed. */
-export const SECRET_BACKENDS = ["pass", "env", "keychain", "op"] as const;
+export const SECRET_BACKENDS = ["pass", "env", "keychain", "op", "cmd", "file"] as const;
 export type SecretBackend = (typeof SECRET_BACKENDS)[number];
 
 /** Something wrong in configuration: where it is, which key, and what is wrong. */
@@ -46,7 +46,7 @@ export interface JigConfig {
     rules: Rule[];
     classify: ClassifyRule[];
     protectedPaths: ProtectedPathLists;
-    secrets: { backends: SecretBackend[] };
+    secrets: { backends: SecretBackend[]; commands: Record<string, string[]> };
     records: { retentionDays: number };
     spill: { retentionDays: number };
 }
@@ -57,7 +57,7 @@ export function defaultConfig(): JigConfig {
         rules: [],
         classify: [],
         protectedPaths: { secret: [], guarded: [] },
-        secrets: { backends: ["pass"] },
+        secrets: { backends: ["pass"], commands: {} },
         records: { retentionDays: 90 },
         spill: { retentionDays: 7 },
     };
@@ -395,13 +395,44 @@ export function parseProtectedPaths(raw: unknown, path: string, fail: Fail): Pro
     return out;
 }
 
-function parseSecrets(raw: unknown, fail: Fail): { backends: SecretBackend[] } {
-    const out: { backends: SecretBackend[] } = { backends: ["pass"] };
+/** What a secret command is called: a word that a reference `cmd:<name>` can hold. */
+const COMMAND_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+const MAX_COMMAND_WORDS = 32;
+const MAX_COMMAND_WORD_CHARS = 1024;
+
+/** `{ "gh": ["gh", "auth", "token"] }`: each name stands for one program and its arguments, run without a shell. */
+export function parseSecretCommands(raw: unknown, path: string, fail: Fail): Record<string, string[]> {
+    const out: Record<string, string[]> = {};
+    if (!isObject(raw)) {
+        fail(path, "must be an object that maps a command name to a list: the program, then its arguments");
+        return out;
+    }
+    for (const [name, words] of Object.entries(raw)) {
+        const here = at(path, name);
+        if (!COMMAND_NAME.test(name)) {
+            fail(here, "is not a command name: use letters, digits and . _ - (up to 64)");
+        } else if (!Array.isArray(words) || words.length === 0 || words.length > MAX_COMMAND_WORDS) {
+            fail(here, `must be a list of 1 to ${MAX_COMMAND_WORDS} words: the program, then its arguments`);
+        } else if (
+            words.some((word) => typeof word !== "string" || word === "" || word.length > MAX_COMMAND_WORD_CHARS) ||
+            words.some((word) => /[\u0000-\u001f\u007f]/.test(word as string))
+        ) {
+            fail(here, "must hold only non-empty text words without control characters");
+        } else {
+            out[name] = words as string[];
+        }
+    }
+    return out;
+}
+
+function parseSecrets(raw: unknown, fail: Fail): { backends: SecretBackend[]; commands: Record<string, string[]> } {
+    const out: { backends: SecretBackend[]; commands: Record<string, string[]> } = { backends: ["pass"], commands: {} };
     if (!isObject(raw)) {
         fail("secrets", "must be an object");
         return out;
     }
-    knownFields(raw, ["backends"], "secrets", fail);
+    knownFields(raw, ["backends", "commands"], "secrets", fail);
+    if (raw.commands !== undefined) out.commands = parseSecretCommands(raw.commands, "secrets.commands", fail);
     if (raw.backends === undefined) return out;
     if (!Array.isArray(raw.backends)) {
         fail("secrets.backends", `must be a list of ${SECRET_BACKENDS.join(", ")}`);
@@ -413,7 +444,7 @@ function parseSecrets(raw: unknown, fail: Fail): { backends: SecretBackend[] } {
             backends.push(name as SecretBackend);
         else fail(`secrets.backends[${index}]`, `must be one of ${SECRET_BACKENDS.join(", ")}`);
     });
-    return { backends };
+    return { backends, commands: out.commands };
 }
 
 function parseRetention(
@@ -444,6 +475,8 @@ export interface CompanyAdditions {
     rules: Rule[];
     classify: ClassifyRule[];
     protectedPaths: ProtectedPathLists;
+    /** Commands for `cmd:<name>` secret references that company plugins declared. */
+    secretCommands: Record<string, string[]>;
     problems: Problem[];
     /** How many rules came in so far, valid or not, so a problem names a stable position. */
     received: { rules: number; classify: number };
@@ -455,6 +488,7 @@ export function emptyAdditions(): CompanyAdditions {
         rules: [],
         classify: [],
         protectedPaths: { secret: [], guarded: [] },
+        secretCommands: {},
         problems: [],
         received: { rules: 0, classify: 0 },
     };
@@ -501,6 +535,13 @@ export function addCompanyProtectedPaths(additions: CompanyAdditions, raw: unkno
     const added = parseProtectedPaths(raw, "protectedPaths", fail);
     additions.protectedPaths.secret.push(...added.secret);
     additions.protectedPaths.guarded.push(...added.guarded);
+}
+
+/** Commands a company plugin declares for `cmd:<name>` references. A later declaration of a name replaces an earlier
+ *  one; the user's own `secrets.commands` replaces both. */
+export function addCompanySecretCommands(additions: CompanyAdditions, raw: unknown): void {
+    const fail: Fail = (key, message) => additions.problems.push({ source: COMPANY, key, message });
+    Object.assign(additions.secretCommands, parseSecretCommands(raw, "secretCommands", fail));
 }
 
 /** `rules[1].tool` becomes `rules[4].tool` when three rules came before this call. */

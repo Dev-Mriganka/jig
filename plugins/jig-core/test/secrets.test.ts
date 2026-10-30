@@ -1,6 +1,6 @@
 // Secrets: references, the allowed backends, timeouts, and that no value ever leaks into an error or an output.
 import assert from "node:assert/strict";
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, afterEach, before, describe, test } from "node:test";
@@ -67,7 +67,14 @@ describe("the allowed backends", () => {
 
     test("each backend is refused unless it is listed", async () => {
         const { secrets } = setup([], { run: async () => ok("never"), platform: "darwin" });
-        for (const ref of ["pass:a/b", "env:X", "keychain:svc/acct", "op://vault/item/field"]) {
+        for (const ref of [
+            "pass:a/b",
+            "env:X",
+            "keychain:svc/acct",
+            "op://vault/item/field",
+            "cmd:gh",
+            "file:/tmp/x",
+        ]) {
             assert.equal(await code(secrets.resolve(ref)), "backend_disabled", ref);
         }
     });
@@ -364,5 +371,308 @@ describe("the op backend (1Password)", () => {
             setup(["op"], { run: slow, timeoutMs: 5000 }).secrets.resolve("op://vault/item/field"),
             (error: SecretError) => error.code === "unavailable" && /did not answer in 5 s/.test(error.message),
         );
+    });
+});
+
+describe("the cmd backend: a command declared by name", () => {
+    const commands = { gh: ["gh", "auth", "token"], cloud: ["/usr/local/bin/cloud-token", "--audience", "orders-api"] };
+    const calls: Array<{ file: string; args: readonly string[]; options: RunOptions | undefined }> = [];
+    const runs =
+        (result: Partial<RunResult> | (() => Promise<RunResult>)): FakeRun =>
+        async (file, args, options) => {
+            calls.push({ file, args, options });
+            if (typeof result === "function") return result();
+            return { code: 0, stdout: "", stderr: "", timedOut: false, ...result };
+        };
+    afterEach(() => {
+        calls.length = 0;
+    });
+
+    test("runs the declared command with its arguments and no shell, and uses the trimmed output", async () => {
+        const { secrets, redactor } = setup(["cmd"], {
+            commands: () => commands,
+            run: runs({ stdout: "  cmd-token-value\n\n" }),
+        });
+        assert.equal(await secrets.resolve("cmd:gh"), "cmd-token-value");
+        assert.deepEqual([calls[0]?.file, calls[0]?.args], ["gh", ["auth", "token"]]);
+        assert.equal(redactor.text("seen cmd-token-value"), `seen ${REDACTED}`, "hidden from output from then on");
+        await secrets.resolve("cmd:cloud");
+        assert.deepEqual(
+            [calls[1]?.file, calls[1]?.args],
+            ["/usr/local/bin/cloud-token", ["--audience", "orders-api"]],
+        );
+    });
+
+    test("is off unless `cmd` is in secrets.backends", async () => {
+        const { secrets } = setup(["pass", "env"], { commands: () => commands, run: runs({ stdout: "x" }) });
+        await assert.rejects(
+            secrets.resolve("cmd:gh"),
+            (error: SecretError) =>
+                error.code === "backend_disabled" && /add "cmd" to secrets\.backends/.test(error.message),
+        );
+        assert.equal(calls.length, 0);
+    });
+
+    test("a name that is not declared is refused, and its name is not repeated, so a model cannot slip in a command", async () => {
+        const { secrets } = setup(["cmd"], { commands: () => commands, run: runs({ stdout: "x" }) });
+        const pasted = "gh" + "p_PretendThisIsAPastedSecretValue";
+        for (const ref of [
+            "cmd:rm",
+            "cmd:gh auth token",
+            `cmd:${pasted}`,
+            "cmd:../gh",
+            "cmd:__proto__",
+            "cmd:constructor",
+            "cmd:GH",
+        ]) {
+            await assert.rejects(
+                secrets.resolve(ref),
+                (error: SecretError) =>
+                    error.code === "invalid_ref" &&
+                    /names no declared command \(declared: gh, cloud\)/.test(error.message) &&
+                    !error.message.includes(pasted) &&
+                    !error.message.includes("rm"),
+                ref,
+            );
+        }
+        assert.equal(calls.length, 0, "nothing ran");
+    });
+
+    test("with nothing declared, the error says so", async () => {
+        const { secrets } = setup(["cmd"], { run: runs({ stdout: "x" }) });
+        await assert.rejects(secrets.resolve("cmd:gh"), /none is declared/);
+    });
+
+    test("the list is read at every call", async () => {
+        let declared: Record<string, string[]> = {};
+        const { secrets } = setup(["cmd"], { commands: () => declared, run: runs({ stdout: "x-value" }) });
+        assert.equal(await code(secrets.resolve("cmd:gh")), "invalid_ref");
+        declared = { gh: ["gh", "auth", "token"] };
+        assert.equal(await secrets.resolve("cmd:gh"), "x-value");
+    });
+
+    test("a failing command is an error with its exit code only: its error output is never shown", async () => {
+        const { secrets } = setup(["cmd"], {
+            commands: () => commands,
+            run: runs({ code: 4, stdout: "partial-token-value", stderr: "error: token is cmd-leaked-value" }),
+        });
+        await assert.rejects(secrets.resolve("cmd:gh"), (error: SecretError) => {
+            assert.equal(error.code, "unavailable");
+            assert.equal(error.message, 'the command "gh" failed with exit code 4');
+            assert.ok(!/leaked|partial/.test(error.message));
+            return true;
+        });
+    });
+
+    test("an empty output, and an output over 16 KiB, are refused", async () => {
+        const empty = setup(["cmd"], { commands: () => commands, run: runs({ stdout: " \n" }) });
+        assert.equal(await code(empty.secrets.resolve("cmd:gh")), "missing");
+        const exact = setup(["cmd"], { commands: () => commands, run: runs({ stdout: `${"a".repeat(16 * 1024)}\n` }) });
+        assert.equal((await exact.secrets.resolve("cmd:gh")).length, 16 * 1024, "16 KiB, trimmed, is fine");
+        const big = setup(["cmd"], { commands: () => commands, run: runs({ stdout: "a".repeat(16 * 1024 + 1) }) });
+        await assert.rejects(big.secrets.resolve("cmd:gh"), (error: SecretError) => {
+            assert.equal(error.code, "invalid_ref");
+            assert.ok(!error.message.includes("aaaa"));
+            return true;
+        });
+    });
+
+    test("asks the runner to stop reading after 16 KiB, with the same timeout as the other backends", async () => {
+        const { secrets } = setup(["cmd"], {
+            commands: () => commands,
+            run: runs({ stdout: "token-value" }),
+            timeoutMs: 5000,
+        });
+        await secrets.resolve("cmd:gh");
+        assert.equal(calls[0]?.options?.maxOutputBytes, 16 * 1024 + 1);
+        assert.equal(calls[0]?.options?.timeoutMs, 5000);
+        const defaults = setup(["cmd"], { commands: () => commands, run: runs({ stdout: "token-value" }) });
+        await defaults.secrets.resolve("cmd:gh");
+        assert.equal(calls[1]?.options?.timeoutMs, 60_000);
+    });
+
+    test("a command that does not answer in time, and one that cannot start, are errors that name the command only", async () => {
+        const slow = setup(["cmd"], {
+            commands: () => commands,
+            run: runs({ timedOut: true, code: 124 }),
+            timeoutMs: 3000,
+        });
+        await assert.rejects(
+            slow.secrets.resolve("cmd:gh"),
+            /^SecretError: gh did not answer in 3 s$|gh did not answer in 3 s/,
+        );
+        const missing = setup(["cmd"], {
+            commands: () => commands,
+            run: async () => {
+                throw new Error("gh is not installed or not on PATH");
+            },
+        });
+        await assert.rejects(
+            missing.secrets.resolve("cmd:gh"),
+            (error: SecretError) => error.code === "unavailable" && /gh could not run/.test(error.message),
+        );
+    });
+
+    test("passes a short environment: where a keyring shows its prompt and where tools keep their configuration, not tokens", async () => {
+        const env = {
+            DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/bus",
+            GH_CONFIG_DIR: "/home/u/gh",
+            GH_TOKEN: "must-not-pass",
+            PATH: "/usr/bin",
+        };
+        const { secrets } = setup(["cmd"], { commands: () => commands, run: runs({ stdout: "token-value" }), env });
+        await secrets.resolve("cmd:gh");
+        assert.deepEqual(calls[0]?.options?.env, {
+            DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/bus",
+            GH_CONFIG_DIR: "/home/u/gh",
+        });
+    });
+
+    test("callers that ask at once share one run", async () => {
+        let release: () => void = () => {};
+        const gate = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        const { secrets } = setup(["cmd"], {
+            commands: () => commands,
+            run: runs(async () => {
+                await gate;
+                return ok("shared-value");
+            }),
+        });
+        const both = Promise.all([secrets.resolve("cmd:gh"), secrets.resolve("cmd:gh")]);
+        release();
+        assert.deepEqual(await both, ["shared-value", "shared-value"]);
+        assert.equal(calls.length, 1);
+    });
+});
+
+describe("the file backend: the first line of a file", () => {
+    let root: string;
+    let home: string;
+    let agent: string;
+    before(() => {
+        root = mkdtempSync(path.join(tmpdir(), "jig-file-secret-"));
+        home = path.join(root, "home");
+        agent = path.join(home, ".pi", "agent");
+        for (const dir of [path.join(home, ".config", "tool"), agent, path.join(root, "outside")]) {
+            mkdirSync(dir, { recursive: true });
+        }
+    });
+    after(() => rmSync(root, { recursive: true, force: true }));
+
+    const file = (name: string, content: string | Buffer, mode?: number) => {
+        const target = path.join(root, name);
+        writeFileSync(target, content);
+        if (mode !== undefined) chmodSync(target, mode);
+        return target;
+    };
+
+    test("reads the first line, trimmed, from an absolute path, and hides the value from output from then on", async () => {
+        const { secrets, redactor } = setup(["file"], { home, agentDir: () => agent });
+        const target = file("token.txt", "  file-token-value  \r\nsecond line is ignored\n");
+        assert.equal(await secrets.resolve(`file:${target}`), "file-token-value");
+        assert.equal(redactor.text("seen file-token-value"), `seen ${REDACTED}`);
+    });
+
+    test("a leading ~/ is the home folder", async () => {
+        const { secrets } = setup(["file"], { home, agentDir: () => agent });
+        writeFileSync(path.join(home, ".config", "tool", "token"), "home-file-token\n");
+        assert.equal(await secrets.resolve("file:~/.config/tool/token"), "home-file-token");
+    });
+
+    test("is off unless `file` is in secrets.backends", async () => {
+        const { secrets } = setup(["pass"], { home, agentDir: () => agent });
+        const target = file("off.txt", "off-value");
+        await assert.rejects(
+            secrets.resolve(`file:${target}`),
+            (error: SecretError) =>
+                error.code === "backend_disabled" && /add "file" to secrets\.backends/.test(error.message),
+        );
+    });
+
+    test("does not look at permission bits: a file on a Windows drive under WSL shows 0777", async () => {
+        const { secrets } = setup(["file"], { home, agentDir: () => agent });
+        assert.equal(await secrets.resolve(`file:${file("open.txt", "wide-open-value", 0o777)}`), "wide-open-value");
+        assert.equal(
+            await secrets.resolve(`file:${file("closed.txt", "owner-only-value", 0o600)}`),
+            "owner-only-value",
+        );
+    });
+
+    test("a relative path is refused, and so is a path with a control character", async () => {
+        const { secrets } = setup(["file"], { home, agentDir: () => agent });
+        for (const ref of [
+            "file:token.txt",
+            "file:./token.txt",
+            "file:~other/token",
+            "file:../x",
+            "file:/tmp/a\u0000b",
+            "file:/tmp/a\nb",
+        ]) {
+            assert.equal(await code(secrets.resolve(ref)), "invalid_ref", JSON.stringify(ref));
+        }
+    });
+
+    test("a file that is missing, a folder, an empty file and a blank first line are refused, without the content", async () => {
+        const { secrets } = setup(["file"], { home, agentDir: () => agent });
+        assert.equal(await code(secrets.resolve(`file:${path.join(root, "nothing-here")}`)), "missing");
+        assert.equal(await code(secrets.resolve(`file:${path.join(root, "outside")}`)), "invalid_ref");
+        assert.equal(await code(secrets.resolve(`file:${file("empty.txt", "")}`)), "missing");
+        await assert.rejects(
+            secrets.resolve(`file:${file("blank.txt", "\n   \nreal-value-on-line-three\n")}`),
+            (error: SecretError) => {
+                assert.equal(error.code, "missing");
+                assert.ok(!error.message.includes("real-value"));
+                return true;
+            },
+        );
+    });
+
+    test("a file larger than 64 KiB is refused", async () => {
+        const { secrets } = setup(["file"], { home, agentDir: () => agent });
+        const exact = file("exact.txt", `exact-value\n${"x".repeat(64 * 1024 - 12)}`);
+        assert.equal(await secrets.resolve(`file:${exact}`), "exact-value", "64 KiB is allowed");
+        const big = file("big.txt", `big-value\n${"x".repeat(64 * 1024)}`);
+        await assert.rejects(secrets.resolve(`file:${big}`), (error: SecretError) => {
+            assert.equal(error.code, "invalid_ref");
+            assert.ok(!error.message.includes("big-value"));
+            return true;
+        });
+    });
+
+    test("nothing in Pi's agent folder can be read, not by its name, not through ~, not through a link", async () => {
+        const { secrets } = setup(["file"], { home, agentDir: () => agent });
+        const login = path.join(agent, "auth.json");
+        writeFileSync(login, "agent-login-value\n");
+        writeFileSync(path.join(agent, "jig.json"), "agent-config-value\n");
+        mkdirSync(path.join(agent, "deeper"), { recursive: true });
+        writeFileSync(path.join(agent, "deeper", "x"), "agent-deep-value\n");
+        const link = path.join(root, "outside", "link-to-login");
+        symlinkSync(login, link);
+        const folderLink = path.join(root, "outside", "link-to-agent");
+        symlinkSync(agent, folderLink);
+        for (const ref of [
+            `file:${login}`,
+            "file:~/.pi/agent/auth.json",
+            `file:${path.join(agent, "deeper", "x")}`,
+            `file:${path.join(agent, "..", "agent", "jig.json")}`,
+            `file:${link}`,
+            `file:${folderLink}/auth.json`,
+        ]) {
+            await assert.rejects(
+                secrets.resolve(ref),
+                (error: SecretError) =>
+                    error.code === "invalid_ref" &&
+                    /agent folder/.test(error.message) &&
+                    !/agent-(login|config|deep)-value/.test(error.message),
+                ref,
+            );
+        }
+    });
+
+    test("with no agent folder known, the other checks still apply", async () => {
+        const { secrets } = setup(["file"], { home });
+        assert.equal(await secrets.resolve(`file:${file("no-agent.txt", "no-agent-value")}`), "no-agent-value");
     });
 });

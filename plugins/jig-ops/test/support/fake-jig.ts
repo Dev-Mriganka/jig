@@ -243,6 +243,12 @@ export function installFakeJig(): FakeJig {
                 return headers;
             },
         },
+        http: {
+            request: async () => {
+                throw new Error("this fake has no http");
+            },
+        },
+
         mask: { text: (input) => input, value: (input) => input },
         watches: {
             registerKind: (kind) => void kinds.set(kind.kind, kind as unknown as WatchKind<never, never>),
@@ -272,6 +278,7 @@ export function installFakeJig(): FakeJig {
             addRules: () => {},
             addClassifyRules: () => {},
             addProtectedPaths: () => {},
+            addSecretCommands: () => {},
             addMaskFields: () => {},
             addSectionDefaults: () => {},
             registerSection: (name, validate) => void sections.set(name, validate),

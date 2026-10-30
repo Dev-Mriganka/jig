@@ -230,6 +230,12 @@ export function installFakeJig(): FakeJig {
                 throw new Error("no secrets in tests");
             },
         },
+        http: {
+            request: async () => {
+                throw new Error("this fake has no http");
+            },
+        },
+
         mask: { text: (input) => input, value: (input) => input },
         watches: {
             registerKind: (kind) => void kinds.set(kind.kind, kind as WatchKind<unknown, unknown>),
@@ -258,6 +264,7 @@ export function installFakeJig(): FakeJig {
             addRules: () => {},
             addClassifyRules: () => {},
             addProtectedPaths: () => {},
+            addSecretCommands: () => {},
             addMaskFields: () => {},
             addSectionDefaults: () => {},
             registerSection: (name, validate) => void sections.set(name, validate),
