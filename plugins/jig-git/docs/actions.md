@@ -19,5 +19,7 @@ overview.
 - **`list`** filters by state, author or branch. For the checks themselves, use
   `ci`.
 - **`comments`** filters by author or unresolved, and gives full bodies.
-- **`create`** returns the existing pull request if the branch has one.
+- **`create`** returns the existing pull request if the branch has one. Its title
+  must match `git.prTitle` when that is set, and so must the title of an `edit`
+  (see [Configuration](configuration.md)).
 - **`merge`** can also turn on auto-merge.

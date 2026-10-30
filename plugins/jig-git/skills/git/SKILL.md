@@ -23,7 +23,7 @@ user sees what it will send.
    while the user is reading, the push refuses and says so; run it again to see the new preview.
 5. **Open the pull request.** `pr create` needs the branch pushed at its tip. Leave `body` out to be shown the
    template; fill it in and call again. If a pull request is open for the branch, you get it back and nothing is
-   created.
+   created. If `git.prTitle` is set, the title of `pr create` and of `pr edit` must match it; a refusal shows the pattern.
 
 ## After a push, CI is the ci tool's
 

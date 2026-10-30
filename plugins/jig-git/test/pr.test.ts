@@ -435,6 +435,36 @@ test("create: head and base may not be the same branch, and the title is one lin
     );
 });
 
+test("create: git.prTitle must match the title; the message shows the pattern and nothing is asked or sent", async () => {
+    const r = featureRepo();
+    h.jig.setSection("git", { prTitle: "^[A-Z]+-\\d+: " });
+    h.gh.on("pr list", { json: [] });
+    h.gh.on("pr create", { stdout: "https://github.com/acme/svc/pull/77\n" });
+    const refused = await h.call("pr", { action: "create", repo: r.name, title: "Add x", body: BODY });
+    assert.equal(refused.error?.message, "the pull request title does not match git.prTitle (^[A-Z]+-\\d+: )");
+    assert.equal(refused.preview, undefined, "no preview, so nobody is asked");
+    assert.equal(h.gh.calls().length, 0, "and gh is not run at all");
+    // A title that matches goes through as before.
+    const result = await h.call("pr", { action: "create", repo: r.name, title: "PROJ-12: Add x", body: BODY });
+    assert.equal(ok(result).startsWith("Created pull request #77"), true);
+    assert.equal(h.gh.callsOf("pr create")[0]?.args.includes("--title=PROJ-12: Add x"), true);
+    h.jig.setSection("git", undefined);
+});
+
+test("create: without git.prTitle any one-line title is fine, and the rule is checked before the body is asked for", async () => {
+    const r = featureRepo();
+    h.jig.setSection("git", { prTitle: "^PROJ-" });
+    assert.match(
+        (await h.call("pr", { action: "create", repo: r.name, title: "Add x" })).error?.message ?? "",
+        /^the pull request title does not match git\.prTitle \(\^PROJ-\)$/,
+    );
+    h.jig.setSection("git", undefined);
+    assert.match(
+        (await h.call("pr", { action: "create", repo: r.name, title: "Add x" })).error?.message ?? "",
+        /^pr create needs body/,
+    );
+});
+
 test("create announces the new pull request, so a watch on the pushed commit can follow it as a pull request", async () => {
     const r = featureRepo(false);
     h.gh.on("pr list", { json: [] });
@@ -561,6 +591,23 @@ test("edit: the changed fields are shown and sent; the body goes on stdin; at le
         (await h.call("pr", { action: "edit", repo: r.name, number: 42 })).error?.message ?? "",
         /pr edit needs title, body, base, labels or reviewers/,
     );
+});
+
+test("edit: git.prTitle applies to a new title and to nothing else", async () => {
+    const r = featureRepo();
+    h.jig.setSection("git", { prTitle: "^[A-Z]+-\\d+: " });
+    h.gh.on("pr edit", { stdout: "https://github.com/acme/svc/pull/42\n" });
+    const refused = await h.call("pr", { action: "edit", repo: r.name, number: 42, title: "New title" });
+    assert.equal(refused.error?.message, "the pull request title does not match git.prTitle (^[A-Z]+-\\d+: )");
+    assert.equal(refused.preview, undefined);
+    assert.equal(h.gh.calls().length, 0);
+    // A matching title goes through; so does an edit that leaves the title alone, whatever the old title was.
+    const edited = await h.call("pr", { action: "edit", repo: r.name, number: 42, title: "PROJ-7: New title" });
+    assert.match(ok(edited), /^Edited the title of pull request #42/);
+    const labelled = await h.call("pr", { action: "edit", repo: r.name, number: 42, labels: ["bug"] });
+    assert.match(ok(labelled), /^Edited the labels of pull request #42/);
+    assert.equal(h.gh.callsOf("pr edit").length, 2);
+    h.jig.setSection("git", undefined);
 });
 
 test("edit, the reply was lost: one view compares the fields", async () => {

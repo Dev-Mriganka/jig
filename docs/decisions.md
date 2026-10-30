@@ -74,6 +74,13 @@ generic fix, in its own commit.
   - **A default that does not fit** (not on this issue type's screen) is left
     out with a note, because it was meant for every create. A value the screen
     refuses stops the call and says where it came from.
+- **jig-git: a pull request title rule, `git.prTitle`.** An optional regular
+  expression that the title of `pr create` and of `pr edit` must match, as
+  `git.commitMessage` does for a commit.
+  - **Refused while the preview is built,** so nobody is asked and nothing is
+    sent. The message shows the pattern.
+  - **An `edit` that does not set a title is not checked:** the rule is about
+    what is written now, not about a title that was there before.
 
 ## 2026-10-30: Jig never signs in; it reads a credential and keeps it from the agent
 
