@@ -2,7 +2,7 @@
 // message to the agent. Most tests approve with the fallback (the page, then a y in Pi); one registers a passkey through the
 // server and approves with it. The ticket flow's push gate reads `approvedHeads` from the record.
 import assert from "node:assert/strict";
-import { appendFileSync, readFileSync } from "node:fs";
+import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, test } from "node:test";
 import { REVIEW_EVENTS } from "../src/events.ts";
@@ -170,6 +170,18 @@ test("the event says when the approval vouches for no commit, and still names wh
     assert.ok(!("ticket" in event));
 });
 
+test("a clean repository next to the reviewed ones is not named in the event", async () => {
+    session = await openReview("");
+    const clean = path.join(session.root, "clean-api");
+    git(session.root, "init", "-q", "-b", "main", clean);
+    writeFileSync(path.join(clean, "Readme.md"), "x\n");
+    git(clean, "add", ".");
+    git(clean, "commit", "-q", "-m", "init");
+    await approveInPi(session);
+    const event = session.host.events.find((entry) => entry.channel === REVIEW_EVENTS.approved)!.data as ReviewApprovedEvent;
+    assert.deepEqual(event.repos.map((repo) => repo.repo).sort(), [...REPOSITORIES].sort());
+});
+
 test("nothing is announced for a page click that Pi declined", async () => {
     session = await openReview("--branch");
     const refused = await approveInPi(session, false);
@@ -288,7 +300,8 @@ test("a page that posts an approval without a valid signature approves nothing, 
 
 test("the old route that approved because the page asked is gone", async () => {
     session = await openReview("--branch");
-    for (const method of ["POST", "PUT", "GET"]) {
+    // (A GET of that path gets the page, as every address the page's router might know does.)
+    for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
         const response = await (await import("./support/harness.ts")).request(session.base, "/api/approve", { method, cookie: session.cookie });
         assert.notEqual(response.status, 200, method);
     }

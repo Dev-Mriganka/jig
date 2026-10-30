@@ -110,6 +110,10 @@ folder's protection is the real guard.
   `ctx.ui.confirm`. If another dialog is open (a tool call asking you), the two compete. One
   approval, registration or removal runs at a time; a second is refused until the first is answered
   or its five minutes pass (counted as no).
+- **A stolen cookie can make Pi ask you.** Someone with the session cookie can press Approve in Pi's
+  name, which opens the fallback question, or ask to register a key, which shows a fingerprint. Answer
+  `n` unless you just did it yourself; nothing is stored or approved by asking. One question runs at a
+  time, so a flood of them cannot pile up, though it can keep a real approval waiting until answered.
 - **No interactive Pi, no question.** The fallback, registering and removing need Pi to ask you.
   Without it they are refused, and nothing is approved.
 - **A passkey proves you were there, not what you read.** The page shows the diff; your device only

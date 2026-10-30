@@ -185,14 +185,21 @@ export class ReviewCoordinator {
         this.currentReview = await this.reviewStore.approve(review, approval, approvedHeads);
         const approved = this.currentReview;
 
-        const repos = approvedHeads ?? (await this.workspace.getHeads({ folder: approved.folder, ticket: approved.ticket }).catch(() => []));
+        const files = filesOfDiff(approved.iterations.at(-1)?.diff ?? "");
+        // When the approval vouches for commits, those are the target's repositories. Otherwise only where each repository
+        // the diff touched stood, so a clean repository next to it is not named as reviewed.
+        const repos =
+            approvedHeads ??
+            (await this.workspace.getHeads({ folder: approved.folder, ticket: approved.ticket }).catch(() => [])).filter(
+                (head) => head.repo === "" || files.some((file) => file.startsWith(`${head.repo}/`)),
+            );
         const event: ReviewApprovedEvent = {
             reviewId: approved.id,
             scope: approved.fileScope,
             ...(approved.ticket ? { ticket: approved.ticket } : {}),
             repos: repos.map((head) => ({ repo: head.repo, head: head.sha })),
             covered: approvedHeads !== undefined && approvedHeads.length > 0,
-            files: filesOfDiff(approved.iterations.at(-1)?.diff ?? ""),
+            files,
             method,
         };
         try {
