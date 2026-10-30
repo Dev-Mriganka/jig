@@ -177,6 +177,11 @@ such as `git` or `lens`.
 | `PI_CODING_AGENT_DIR` | Pi's own setting for its agent folder, and so for where `jig.json` is |
 | `BROWSER` | The program that opens a rendered preview. A name, optionally with arguments, and `%s` for the address. Default: `xdg-open`, or `open` on macOS |
 
+A plugin can own a section of this file too, such as `memory` for
+`jig-memory`. It registers the section with a check function, and jig-core
+reports any top-level key that no plugin registered as unknown. A section with
+errors is reported with its keys named, and the plugin uses its defaults.
+
 ## What asks, what is blocked
 
 The default table:
