@@ -19,7 +19,6 @@ const SEQUENCE_SOURCE = [
     "\u009b[0-?]*[ -/]*[@-~]",
 ].join("|");
 const SEQUENCES = new RegExp(SEQUENCE_SOURCE, "g");
-const STARTS_WITH_SEQUENCE = new RegExp(`^(?:${SEQUENCE_SOURCE})`);
 /** Control characters that are not text. A tab, a line feed and a carriage return (progress bars) stay. */
 const CONTROLS = /[\u0000-\u0008\u000b\u000c\u000e-\u001a\u001c-\u001f\u007f-\u009f]/g;
 

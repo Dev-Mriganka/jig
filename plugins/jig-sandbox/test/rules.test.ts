@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { canWritePath, computeRules, ruleFor, runtimeFilesystem, secretFilesIn } from "../src/rules.ts";
-import type { RuleKind, RuleSet, RulesInput } from "../src/rules.ts";
+import type { RuleKind, RuleSet } from "../src/rules.ts";
 import { fakeMachine } from "./support/fake-files.ts";
 import type { FakeMachine, MachineSpec } from "./support/fake-files.ts";
 

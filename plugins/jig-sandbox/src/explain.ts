@@ -31,7 +31,7 @@ function refusalOf(line: string): Refusal | undefined {
 }
 
 const QUOTED = /(['"`])((?:(?!\1).)+?)\1/g;
-const ABSOLUTE = /(?:^|[\s'"`(\[=,:])(\/[^\s'"`()\[\]:;,]*[^\s'"`()\[\]:;,.])/g;
+const ABSOLUTE = /(?:^|[\s'"`([=,:])(\/[^\s'"`()[\]:;,]*[^\s'"`()[\]:;,.])/g;
 /** `bash: .bashrc: Read-only file system`, `cp: /a/b: Permission denied`: the path sits between two colons. */
 const BETWEEN_COLONS = /^[^:]+: (.+?): [A-Z]/;
 
