@@ -2,6 +2,45 @@
 
 Dated so the reasons stay attached.
 
+## 2026-10-30: checks run on every push
+
+- **Biome for formatting and linting.** One tool for both, pinned to an exact
+  version, fast (the whole repository in about two seconds), with no plugins to
+  install. A pinned version matters: a new release can change what the
+  formatter writes, so a bump is a change you review. The repository had no
+  formatter, and `jig-api` alone had 512 lines over 120 characters.
+- **Line width 120, 4-space indents, double quotes, semicolons, trailing commas
+  everywhere.** That is how most of the code was already written, so it is the
+  choice that changes the fewest lines. One commit formatted everything and
+  nothing else; `.git-blame-ignore-revs` makes `git blame` skip it.
+- **Rules turned off, where the code is deliberate.**
+  `noNonNullAssertion` (131 hits): `noUncheckedIndexedAccess` is on, and
+  `items[0]!` is how the code says "this is there". `noControlCharactersInRegex`
+  (117): the code strips and refuses control characters from untrusted text on
+  purpose. In tests only: `noExplicitAny` (77), `noAssignInExpressions` (64)
+  and `noCommaOperator` (24), where fakes capture arguments inline, and
+  `noAdjacentSpacesInRegex` (10), where a test matches an aligned table with
+  its literal spaces. Source code keeps those four rules on. Every other
+  finding was fixed, or silenced on its own line with a reason (7 places).
+- **Left outside Biome:** `plugins/jig-logs/test/golden`, which the tests
+  compare byte for byte; `package-lock.json`; and the review page
+  (`plugins/jig-review/web`), which has its own package and 2-space style, and
+  whose sources are hashed into `web/build.json`, so reformatting it means a
+  rebuilt manifest.
+- **The review page is in the checks.** `check:web` and `test:web` run its type
+  check and tests. `check:dist` builds it into a temporary folder and compares
+  with the committed `web/dist` byte for byte; the build is reproducible, so a
+  source change with no rebuilt `dist` fails instead of shipping a stale page.
+- **Actions are pinned by commit SHA,** with the version in a comment. A tag
+  can be moved to other code after you read it; a commit cannot. The job has
+  read-only permissions, no secrets, no stored credentials, and runs only on
+  pushes to `main` and on pull requests.
+- **Pi 1.4.0 is installed in CI.** The type check reads Pi's declarations
+  through `test/support/link-host.mjs`, which links the globally installed Pi.
+  Installing the version Jig is built against means the check no longer depends
+  on whichever Pi one machine happens to have. Move it when Jig moves to a newer
+  Pi.
+
 ## 2026-10-30: jig-theme, the look, built on Pi's own themes
 
 - **One plugin for how Pi looks:** palettes, the footer, and the answer colour.

@@ -27,7 +27,12 @@ The tool tables of `jig-git` and `jig-jira` are read by their tests.
   WebAuthn passkey signature the agent cannot make, or marks "approved in page"
   and waits for a `y` in Pi ([Approvals](docs/approvals.md)). Never add a second
   one, and never let that endpoint approve on a secret or a cookie alone.
-- **Checks:** `npm run check` (types) and `npm test` must pass before a commit.
+- **Checks:** `npm run check` (types, Biome), `npm test` and the review page's
+  checks (`npm run check:web`, `npm run test:web`, `npm run check:dist`) must
+  pass before a commit; CI runs all of them on every push and pull request.
+  Run `npm run format` before committing. The page's checks need `npm ci` in
+  `plugins/jig-review/web` first, and a change under its `src/` needs a rebuild
+  (`npm run build` there) or `check:dist` fails.
 - **No secret-shaped literals, even fake ones.** A test value that looks like a
   real credential (a GitHub token, a Postman key, an AWS key, a private-key
   block) is built at run time from parts, such as `["PMAK", "1a2b"].join("-")`.
