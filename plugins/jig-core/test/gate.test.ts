@@ -209,6 +209,21 @@ describe("the preview", () => {
         assert.equal(seen, undefined);
     });
 
+    test("a TypeError from the tool's classify means invalid input too, even for a read that would never ask", async () => {
+        const harness = await begin({ ui: ALLOW, plugins: (api) => declare(api, "fake", { classify: () => { throw new TypeError("unknown environment \"nowhere\"; known: staging, production"); } }) });
+        const outcome = await harness.call({ tool: "fake", input: { env: "nowhere", effect: "read" } });
+        assert.equal(outcome.blocked, true);
+        assert.match(outcome.reason ?? "", /fake cannot run with this input: unknown environment "nowhere"; known: staging, production/);
+        assert.equal(harness.ui.selects.length, 0);
+    });
+
+    test("any other error from the tool's classify is a fault, and blocks as one", async () => {
+        const harness = await begin({ ui: ALLOW, plugins: (api) => declare(api, "fake", { classify: () => { throw new Error("bug"); } }) });
+        const outcome = await harness.call({ tool: "fake", input: { env: "local", effect: "read" } });
+        assert.equal(outcome.blocked, true);
+        assert.match(outcome.reason ?? "", /jig-core could not decide: bug/);
+    });
+
     test("a TypeError from the tool's preview means invalid input: the call is blocked and nobody is asked", async () => {
         const harness = await begin({ ui: ALLOW, plugins: (api) => declare(api, "fake", { preview: async () => { throw new TypeError("no transition named Done; there are: In Review"); } }) });
         const outcome = await harness.call({ tool: "fake", input: { env: "external", effect: "write" } });

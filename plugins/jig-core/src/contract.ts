@@ -55,7 +55,8 @@ export interface ToolDeclaration {
     /** The plugin that registered it, for records and `/jig rules`. */
     plugin: string;
     /** Classifies one call from its input. Pure and fast: it runs before every call. Returning undefined makes
-     *  the call unknown, and an unknown call asks. */
+     *  the call unknown, and an unknown call asks. Throwing a `TypeError` says the input is invalid: jig-core
+     *  blocks the call with its message and does not ask. */
     classify(input: Readonly<Record<string, unknown>>): CallClass | undefined;
     /** Builds what the user sees before a call that asks. Read-only work only. Throwing a `TypeError` says the
      *  input is invalid: jig-core blocks the call with its message and does not ask. Any other failure shows

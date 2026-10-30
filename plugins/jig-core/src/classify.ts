@@ -8,6 +8,7 @@
 //   5. the unknown default: a write outside the machine, which asks.
 import type { ToolAnnotations, ToolInfo } from "@earendil-works/pi-coding-agent";
 import type { ApprovalKind, CallClass, ClassifyRule, Effect, EnvironmentName, ToolDeclaration } from "./contract.ts";
+import { errorMessage, InvalidInputError } from "./errors.ts";
 
 /** Which source gave the answer. `/jig rules` shows it. */
 export type ClassSource = "declaration" | "rule" | "builtin" | "hint" | "unknown";
@@ -65,7 +66,15 @@ export function classify(tool: string, input: Readonly<Record<string, unknown>>,
     if (declaration !== undefined) {
         // The tool speaks for itself. If it cannot classify this input it says so, and the call is unknown: a
         // user's rule or a hint must not guess for a tool that declared itself.
-        const answer = declaration.classify(input);
+        let answer: ReturnType<typeof declaration.classify>;
+        try {
+            answer = declaration.classify(input);
+        } catch (error) {
+            // A TypeError is the tool saying the input is invalid; anything else is a fault in the tool, which the
+            // gate blocks as one.
+            if (error instanceof TypeError) throw new InvalidInputError(errorMessage(error));
+            throw error;
+        }
         if (answer === undefined) return { ...UNKNOWN_CLASS, source: "unknown", plugin: declaration.plugin };
         if (!isValidClass(answer)) throw new Error(`the declaration of ${tool} returned an invalid classification`);
         return { ...answer, source: "declaration", plugin: declaration.plugin };

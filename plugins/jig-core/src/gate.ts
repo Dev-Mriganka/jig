@@ -10,7 +10,7 @@ import { JIG_EVENTS } from "./contract.ts";
 import type { DecisionEvent } from "./contract.ts";
 import { decide, sessionKey } from "./decide.ts";
 import type { Verdict } from "./decide.ts";
-import { errorMessage } from "./errors.ts";
+import { errorMessage, InvalidInputError } from "./errors.ts";
 import { buildPreview, defaultSummary, describeCall, isInvalidInput } from "./preview.ts";
 import type { Answer, ErrorKind } from "./records.ts";
 import { rememberCall } from "./state.ts";
@@ -46,16 +46,30 @@ function failedCall(state: JigState, event: ToolCallEvent): CallState {
     return call;
 }
 
+/** The tool found the input invalid while classifying it: blocked with its message, and nobody is asked. */
+function blockInvalid(state: JigState, event: ToolCallEvent, message: string): ToolCallEventResult {
+    const call = failedCall(state, event);
+    call.decisionSource = "tool";
+    call.blocked = { kind: "invalid", line: "the tool found the input invalid" };
+    return { block: true, reason: `Blocked by jig-core: ${event.toolName} cannot run with this input: ${message}` };
+}
+
 async function decideCall(state: JigState, event: ToolCallEvent, ctx: ExtensionContext): Promise<ToolCallEventResult | undefined> {
     const policy = state.policy();
     const input = (event.input ?? {}) as Record<string, unknown>;
     const toolInfo = (name: string) => state.pi.getAllTools().find((tool) => tool.name === name);
 
-    const classification = classify(event.toolName, input, {
-        declarations: state.declarations,
-        classifyRules: policy.classify,
-        toolInfo,
-    });
+    let classification: ReturnType<typeof classify>;
+    try {
+        classification = classify(event.toolName, input, {
+            declarations: state.declarations,
+            classifyRules: policy.classify,
+            toolInfo,
+        });
+    } catch (error) {
+        if (error instanceof InvalidInputError) return blockInvalid(state, event, error.message);
+        throw error;
+    }
     const environmentKind = policy.environments.kindOf(classification.environment);
     const declaration = state.declarations.get(event.toolName);
     // Only a label for the records: a tool without source information must not be blocked for lack of one.
