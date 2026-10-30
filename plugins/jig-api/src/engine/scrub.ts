@@ -13,17 +13,6 @@ function formsOf(secret: string): string[] {
     return [secret, JSON.stringify(secret).slice(1, -1), encodeURIComponent(secret)];
 }
 
-/**
- * The credentials in a set of request headers: each value, and the token inside `Scheme token`, because a server may
- * repeat the token without its scheme.
- */
-export function credentialsOf(headers: Readonly<Record<string, string>>): string[] {
-    return Object.entries(headers).flatMap(([name, value]) => {
-        const token = /^(?:proxy-)?authorization$/i.test(name) ? /^\S+\s+(\S.*)$/.exec(value)?.[1] : undefined;
-        return token === undefined ? [value] : [value, token];
-    });
-}
-
 /** The answer with every one of the secrets removed from its headers and its body. */
 export function scrubbed(answer: Answer, secrets: readonly string[]): Answer {
     // The longest first: a value that contains a shorter one is replaced as a whole.

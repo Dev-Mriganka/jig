@@ -121,6 +121,8 @@ export async function setupHarness(options: { timeoutScale?: number } = {}): Pro
     const auth = await startFakeApi();
     const jig = installFakeJig();
     const clock: Clock = { now: 1_700_000_000_000 };
+    // The token cache of jig-core's request logic reads the same clock as the plugin.
+    jig.setNow(() => clock.now);
     const issued: string[] = [];
     let dir = fs.mkdtempSync(path.join(os.tmpdir(), "jig-api-test-"));
 
@@ -302,6 +304,7 @@ export async function setupHarness(options: { timeoutScale?: number } = {}): Pro
             issued.length = 0;
             issueTokens();
             jig.reset();
+            jig.setNow(() => clock.now);
             fs.rmSync(dir, { recursive: true, force: true });
             dir = fs.mkdtempSync(path.join(os.tmpdir(), "jig-api-test-"));
             clock.now = 1_700_000_000_000;
