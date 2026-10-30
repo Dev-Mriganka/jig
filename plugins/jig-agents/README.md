@@ -5,8 +5,9 @@ instead (see [Reuse](../../docs/reuse.md)).
 
 `jig-agents` lets the agent hand work to child agents, each a full Pi session in
 its own tmux pane. A parent starts a child from an agent file and a task, can
-message or interrupt it, and the child reports its result when it finishes. For
-example, a planner starts a reviewer in a new pane with the task "review the
+message or interrupt it, and the child reports its result when it finishes.
+
+For example, a planner starts a reviewer in a new pane with the task "review the
 change on this branch", and the reviewer's report comes back to the planner when
 the reviewer is done.
 
@@ -45,10 +46,6 @@ company's model. The fields are not designed yet.
 
 - which model each role uses.
 
-## Origin
-
-Adapted from `HazAT/pi-interactive-subagents` (MIT).
-
 ## Layout (planned)
 
 ```text
@@ -57,3 +54,7 @@ jig-agents/
   agents/   planner.md, reviewer.md, scout.md, worker.md
   test/
 ```
+
+## Origin
+
+Adapted from `HazAT/pi-interactive-subagents` (MIT).
