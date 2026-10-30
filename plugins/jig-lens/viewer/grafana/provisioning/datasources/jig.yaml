@@ -1,0 +1,16 @@
+# The one data source: the lens index, opened read only. The start-up sets JIG_LENS_INDEX to the index's path, so this
+# file holds no path of any machine.
+apiVersion: 1
+datasources:
+  - name: Jig index
+    uid: jig-lens
+    type: frser-sqlite-datasource
+    access: proxy
+    isDefault: true
+    editable: false
+    jsonData:
+      # A file: address, so the options after the path reach SQLite. mode=ro opens the file read only; the plugin adds
+      # PRAGMA query_only on top, and refuses ATTACH unless its own settings allow it.
+      pathPrefix: "file:"
+      path: $JIG_LENS_INDEX
+      pathOptions: mode=ro
