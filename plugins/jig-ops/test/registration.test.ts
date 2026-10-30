@@ -7,6 +7,7 @@ import { describe, test } from "node:test";
 import type { ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Check } from "typebox/value";
 import { validateOps } from "../src/catalog.ts";
+import { ACTIONS as DEPLOY_ACTIONS, DEFAULT_WATCH_MINUTES, MAX_WATCH_MINUTES, usage as deployUsage } from "../src/deploy/params.ts";
 import plugin, { jigOps } from "../src/index.ts";
 import { ACTIONS, DEFAULT_TAIL, DEFAULT_WAIT_SECONDS, MAX_SINCE_SECONDS, MAX_TAIL, MAX_WAIT_SECONDS, usage } from "../src/runtime/params.ts";
 import { installFakeJig } from "./support/fake-jig.ts";
@@ -31,24 +32,29 @@ function fakePi() {
 }
 
 describe("the extension", () => {
-    test("registers its tools, and tells jig-core its section and how each tool is classified", () => {
+    test("registers its tools, and tells jig-core its section, how each tool is classified, and its watch kind", () => {
         const jig = installFakeJig();
         try {
             const { pi, tools } = fakePi();
             assert.equal(typeof plugin, "function");
             jigOps()(pi);
-            assert.deepEqual([...tools.keys()], ["runtime"]);
-            assert.deepEqual([...jig.declared.keys()], ["runtime"]);
-            const declaration = jig.declared.get("runtime");
-            assert.equal(declaration?.plugin, "jig-ops");
-            assert.equal(declaration?.tool, "runtime");
-            assert.equal(declaration?.masksOwnResults, undefined, "jig-core masks production results");
-            assert.equal(declaration?.preview, undefined);
+            assert.deepEqual([...tools.keys()], ["runtime", "deploy"]);
+            assert.deepEqual([...jig.declared.keys()], ["runtime", "deploy"]);
+            for (const name of ["runtime", "deploy"]) {
+                const declaration = jig.declared.get(name);
+                assert.equal(declaration?.plugin, "jig-ops");
+                assert.equal(declaration?.tool, name);
+                assert.equal(declaration?.masksOwnResults, undefined, "jig-core masks production results");
+            }
+            assert.equal(jig.declared.get("runtime")?.preview, undefined, "a read has nothing to confirm");
+            assert.equal(typeof jig.declared.get("deploy")?.preview, "function", "a deploy is confirmed on a review screen");
             const check = jig.sections.get("ops");
             assert.ok(check, "the ops section");
             assert.deepEqual(check({ nonsense: 1 }), validateOps({ nonsense: 1 }), "the same checks");
             assert.deepEqual(check(section()), []);
             assert.equal(check({ services: {} }).length, 1);
+            assert.deepEqual([...jig.kinds.keys()], ["ops-rollout"]);
+            assert.equal(jig.kinds.get("ops-rollout")?.plugin, "jig-ops");
         } finally {
             jig.remove();
         }
@@ -71,23 +77,28 @@ describe("the extension", () => {
         const { pi, tools } = fakePi();
         jigOps()(pi);
         assert.equal(first.declared.has("runtime"), false, "nothing was declared into the jig-core that went away");
+        assert.equal(first.kinds.size, 0, "and no watch kind was registered with it");
         const late = installFakeJig();
         try {
-            assert.deepEqual([...late.declared.keys()], ["runtime"], "the queued declaration ran when jig-core loaded");
+            assert.deepEqual([...late.declared.keys()], ["runtime", "deploy"], "the queued declarations ran when jig-core loaded");
             assert.ok(late.sections.has("ops"));
-            assert.ok(tools.has("runtime"));
+            assert.ok(late.kinds.has("ops-rollout"));
+            assert.ok(tools.has("runtime") && tools.has("deploy"));
         } finally {
             late.remove();
         }
     });
 
-    test("fails closed: without jig-core the tool does not run, and starts nothing", async () => {
+    test("fails closed: without jig-core no tool runs, and nothing is started", async () => {
         const { pi, tools } = fakePi();
         jigOps()(pi);
-        await assert.rejects(
-            (tools.get("runtime") as ToolDefinition).execute("c1", { action: "pods", service: "orders-api", environment: "staging" } as never, undefined, undefined, {} as never),
-            /jig-core is not loaded: enable jig-core, which governs every Jig tool/,
-        );
+        for (const [name, action] of [["runtime", "pods"], ["deploy", "status"]] as const) {
+            await assert.rejects(
+                (tools.get(name) as ToolDefinition).execute("c1", { action, service: "orders-api", environment: "staging" } as never, undefined, undefined, {} as never),
+                /jig-core is not loaded: enable jig-core, which governs every Jig tool/,
+                name,
+            );
+        }
     });
 });
 
@@ -146,6 +157,62 @@ describe("what the runtime tool says about itself", () => {
         assert.match(schema.properties.timeoutSec?.description ?? "", new RegExp(`default ${DEFAULT_WAIT_SECONDS}\\)`));
         assert.equal(Check(schema as never, { action: "rollout", service: "a", environment: "b", timeoutSec: 601 }), false);
         assert.equal(Check(schema as never, { action: "logs", service: "a", environment: "b", tail: 2001 }), false);
+    });
+
+    test("every parameter has one short line of description", () => {
+        for (const [name, property] of Object.entries(schema.properties)) {
+            const text = property.description ?? "";
+            assert.ok(text.length > 8 && text.length <= 150, `${name}: ${text.length} characters`);
+        }
+    });
+});
+
+describe("what the deploy tool says about itself", () => {
+    const { pi, tools } = fakePi();
+    jigOps()(pi);
+    const tool = tools.get("deploy") as ToolDefinition;
+    const schema = tool.parameters as unknown as {
+        properties: Record<string, { enum?: string[]; description?: string; minimum?: number; maximum?: number }>;
+        required?: string[];
+        additionalProperties: boolean;
+    };
+
+    test("it is short, and says that it asks and never deploys to production", () => {
+        assert.equal(tool.name, "deploy");
+        assert.equal(tool.label, "Deploy");
+        assert.ok(tool.description.length > 80 && tool.description.length <= 320, `${tool.description.length} characters`);
+        for (const word of ["plan", "run", "status", "rollback", "watch", "asked", "Never production"]) assert.match(tool.description, new RegExp(word));
+        assert.ok(tool.promptSnippet && tool.promptSnippet.length <= 140, String(tool.promptSnippet));
+        const guidelines = tool.promptGuidelines ?? [];
+        assert.ok(guidelines.length >= 1 && guidelines.length <= 2);
+        assert.ok(guidelines.every((line) => line.length <= 160 && !line.includes("\n") && line.startsWith("deploy: ")), guidelines.join(" | "));
+        assert.match(guidelines.join(" "), /outcome is unknown, do not run it again/);
+    });
+
+    test("calls run one at a time and in order: a deploy is done before the watch that follows it", () => {
+        assert.equal(tool.executionMode, "sequential");
+        assert.equal(tool.exposure, undefined, "the default exposure is direct");
+    });
+
+    test("the schema lists exactly the parameters the usage lines name, and refuses any other", () => {
+        const used = new Set<string>();
+        for (const action of DEPLOY_ACTIONS) {
+            const names = deployUsage(action).replace(/^Usage: deploy \w+ \{/, "").replace(/\}$/, "").split(", ");
+            for (const name of names) used.add(name.replace(/\?$/, ""));
+        }
+        assert.deepEqual([...Object.keys(schema.properties)].sort(), ["action", ...used].sort());
+        assert.deepEqual(schema.required, ["action", "service", "environment"]);
+        assert.equal(schema.additionalProperties, false);
+        assert.deepEqual(schema.properties.action?.enum, [...DEPLOY_ACTIONS]);
+        assert.equal(Check(schema as never, { action: "run", service: "a", environment: "b", version: "1", release: "other" }), false);
+        assert.equal(Check(schema as never, { action: "run", service: "a", environment: "b", version: "1" }), true);
+        assert.equal(Check(schema as never, { action: "delete", service: "a", environment: "b" }), false);
+    });
+
+    test("the limits in the schema are the limits of the checks", () => {
+        assert.deepEqual([schema.properties.timeoutMinutes?.minimum, schema.properties.timeoutMinutes?.maximum], [1, MAX_WATCH_MINUTES]);
+        assert.match(schema.properties.timeoutMinutes?.description ?? "", new RegExp(`default ${DEFAULT_WATCH_MINUTES}\\)`));
+        assert.equal(Check(schema as never, { action: "watch", service: "a", environment: "b", version: "1", timeoutMinutes: MAX_WATCH_MINUTES + 1 }), false);
     });
 
     test("every parameter has one short line of description", () => {

@@ -15,19 +15,27 @@ export class InputError extends TypeError {
     }
 }
 
-/**
- * Runs the checks of a tool's classify or preview. An InputError goes on to jig-core as it is, and jig-core blocks the
- * call without asking. Any other TypeError is a bug here, and leaves as an ordinary error, which jig-core reports as a
- * call it could not decide.
- */
+/** What leaves a tool's classify or preview: an InputError as it is, so jig-core blocks the call without asking, and any
+ *  other TypeError as an ordinary error, because it is a bug here and not the model's mistake. */
+function reported(error: unknown): unknown {
+    return error instanceof TypeError && !(error instanceof InputError) ? new Error(`internal error: ${error.message}`) : error;
+}
+
+/** Runs the checks of a tool's classify. */
 export function classifying<T>(work: () => T): T {
     try {
         return work();
     } catch (error) {
-        if (error instanceof TypeError && !(error instanceof InputError)) {
-            throw new Error(`internal error: ${error.message}`);
-        }
-        throw error;
+        throw reported(error);
+    }
+}
+
+/** Builds a tool's preview. */
+export async function previewing<T>(work: () => Promise<T>): Promise<T> {
+    try {
+        return await work();
+    } catch (error) {
+        throw reported(error);
     }
 }
 
