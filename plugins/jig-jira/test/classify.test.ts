@@ -1,4 +1,4 @@
-// How jig-core classifies a call to the tool, and that the README, which is the specification, says the same.
+// How jig-core classifies a call to the tool, and that the README and docs/parameters.md, which are the specification, say the same.
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -102,15 +102,17 @@ describe("classification", () => {
     });
 });
 
-// ---- the README is the specification --------------------------------------------------------------------------------
+// ---- the README and docs/parameters.md are the specification -----------------------------------------------------------
 
-const README = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "README.md"), "utf8");
+const PLUGIN = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
+const README = fs.readFileSync(path.join(PLUGIN, "README.md"), "utf8");
+const PARAMETERS = fs.readFileSync(path.join(PLUGIN, "docs", "parameters.md"), "utf8");
 
-/** The rows of the README's table whose header starts with `header`, as lists of cells. */
-function table(header: string): string[][] {
-    const lines = README.split("\n");
+/** The rows of the table whose header starts with `header`, in the README or in `document`, as lists of cells. */
+function table(header: string, document: string = README): string[][] {
+    const lines = document.split("\n");
     const start = lines.findIndex((line) => line.startsWith(header));
-    assert.ok(start >= 0, `README has a table that starts with ${header}`);
+    assert.ok(start >= 0, `the document has a table that starts with ${header}`);
     const rows: string[][] = [];
     for (const line of lines.slice(start + 2)) {
         if (!line.startsWith("|")) break;
@@ -129,7 +131,7 @@ describe("the README", () => {
             const action = names(row[0])[0] as string;
             const kind = (row[1] ?? "").replace(/\*\*/g, "");
             const [, effect, approval] = EXPECTED.find((expected) => expected[0] === action) as Row;
-            assert.match(kind, new RegExp(`^${effect}`), action);
+            assert.match(kind, new RegExp(`^${effect === "write" ? "external write" : "read"}`), action);
             if (effect === "write") {
                 assert.match(kind, approval === "review" ? /review screen/ : /dialog/, `${action}: ${kind}`);
             }
@@ -138,7 +140,7 @@ describe("the README", () => {
     });
 
     test("its parameter table agrees with the table of the code", () => {
-        const rows = table("| Action | Needs |");
+        const rows = table("| Action | Needs |", PARAMETERS);
         assert.deepEqual(rows.map((row) => names(row[0])[0]), ACTION_NAMES);
         for (const row of rows) {
             const action = names(row[0])[0] as keyof typeof ACTIONS;

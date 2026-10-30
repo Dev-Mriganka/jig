@@ -12,13 +12,14 @@ appears in:
 
 | Reference | Backend | Platforms | Status |
 |---|---|---|---|
-| `pass:work/jira-token` | [pass](https://www.passwordstore.org/), GPG-encrypted files | Linux, macOS (Homebrew) | first |
-| `keychain:service/account` | macOS Keychain, through the `security` command | macOS | when needed |
-| `op://vault/item/field` | 1Password CLI | Linux, macOS, Windows | when needed |
-| `env:NAME` | an environment variable of the Pi process | any | when needed |
+| `pass:work/jira-token` | [pass](https://www.passwordstore.org/), GPG-encrypted files | Linux, macOS (Homebrew) | built; on by default |
+| `keychain:service/account` | macOS Keychain, through the `security` command | macOS | built; turn on in `secrets.backends` |
+| `op://vault/item/field` | 1Password CLI | Linux, macOS, Windows | built; turn on in `secrets.backends` |
+| `env:NAME` | an environment variable of the Pi process | any | built; turn on in `secrets.backends` |
 
-Only the backends in use are built. A new machine or employer means setting a
-different reference, not changing tools.
+All four are built, and `secrets.backends` says which may resolve a reference
+(`pass` alone by default). A new machine or employer means setting a different
+reference, not changing tools.
 
 **Jig will not build its own password manager.** A homemade password store is a
 security liability, and every platform already has one with a command-line
@@ -47,4 +48,4 @@ reference.
 
 The headers are treated like secrets: `jig-core` removes their values from
 every result before the model sees it. See
-[Sign-in services](../plugins/jig-core/README.md#sign-in-services).
+[Sign-in services](../plugins/jig-core/docs/sign-in-and-transports.md#sign-in-services).

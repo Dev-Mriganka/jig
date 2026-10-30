@@ -1,14 +1,21 @@
 # Jig agent guide
 
-`jig-core` is built; the other plugins are design only for now. Plugin READMEs
-are the specifications. Code follows them, and when either changes, the other
-changes in the same commit.
+Five plugins are built (`jig-core`, `jig-git`, `jig-memory`, `jig-lens`,
+`jig-jira`), two are being built (`jig-logs`, `jig-http`), and the rest are
+design. Plugin READMEs are the specifications. Code follows them, and when
+either changes, the other changes in the same commit. The tool tables of
+`jig-git` and `jig-jira` are read by their tests.
 
 - **Read first:** [docs/architecture.md](docs/architecture.md) and
   [docs/permissions.md](docs/permissions.md).
 - **Generic only.** Nothing company-specific goes here: no company names,
   internal system names, environment names or hostnames. Those belong in a
-  private company plugin.
+  private company plugin. Examples use `staging`, `orders-api`, `PROJ-123`,
+  `api.staging.example.com` and GitHub Actions.
+- **README shape.** A plugin README follows
+  [plugins/jig-flow/README.md](plugins/jig-flow/README.md). Detail that would
+  take it past about 120 lines goes to `plugins/<name>/docs/`, linked under
+  "More detail".
 - **The existing harness is reference only.** Read it to port from; never
   modify it.
 - **The floor in [Permissions](docs/permissions.md) is not configurable.** Do

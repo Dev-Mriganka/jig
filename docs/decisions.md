@@ -33,9 +33,9 @@ its own safety pipeline.
 - **The database and dashboard inside `jig-core`.** They are a separate
   plugin, `jig-lens`: `jig-core` writes records and `jig-lens` reads them.
 - **A homemade charts interface.** `jig-lens` uses an existing local viewer.
-- **Automatic deploys after CI beyond the first shared test environment.**
-  Watching CI until it finishes is in. A deploy can follow automatically only
-  to a test environment named in policy, and only if a policy setting allows
+- **Automatic deploys after CI, beyond `staging`.** Watching CI until it
+  finishes is in. A deploy can follow automatically only to a test environment
+  named in policy (`staging`, for example), and only if a policy setting allows
   it; never to production.
 
 ## 2026-10-30: jig-core is our own code, and it runs the watches

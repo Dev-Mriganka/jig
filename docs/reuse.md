@@ -2,7 +2,8 @@
 
 Checked on 2026-10-30. About 2,200 of the 13,000 Pi packages on npm were
 sampled, and the strongest were read in source or README. Nothing has been
-installed or run yet.
+installed or run yet, apart from AI Observer (in a sandbox with no network) and
+Grafana (for `jig-lens`).
 
 Each package gets one of four verdicts:
 - **use as is;**
@@ -45,6 +46,16 @@ about 10,600 a week, MIT licence. It offers:
   October, from one maintainer.
 - **Two gates mean two dialogs** competing for Pi's single dialog slot, and Pi
   does not arbitrate between packages.
+
+What [`jig-core`](../plugins/jig-core/README.md) borrows:
+- **`bash` split with tree-sitter,** so each command in a chain or a
+  substitution is judged on its own, and anything that cannot be parsed asks;
+- **the ask flow:** an inline dialog, a select-and-input fallback for RPC
+  hosts, and deny when there is no screen;
+- **hiding a tool the rules deny completely,** so the model does not try it;
+- **decision events** on Pi's event bus.
+
+The first and third are not built yet.
 
 Also read, for patterns:
 
@@ -139,7 +150,8 @@ Credentials stay out of `bash` (see [Permissions](permissions.md)).
 
 ## Not verified
 
-- **Behaviour comes from source, docs and READMEs only.** Nothing has been run.
+- **Behaviour comes from source, docs and READMEs only.** Nothing has been run,
+  apart from the two named at the top.
 - **`pi-ask-questions`:** whether other packages can open it, and how it
   behaves on Pi 1.4.
 - **WSL2:** the Linux Secret Service has not been tried there.

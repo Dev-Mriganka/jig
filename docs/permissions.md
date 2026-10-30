@@ -14,7 +14,7 @@ Configuration can make anything stricter. It can never lower the floor.
 | `local` | This machine: files, the local git repository, local processes | yes |
 | `external` | Services outside the machine that are not one of your environments: GitHub, Jira, Slack | yes |
 | `production` | Live systems with real customer data | yes. A company profile says which of its targets count as production |
-| test environments | A company's shared test systems, such as staging or QA | added by a company plugin |
+| test environments | A company's test systems, such as `staging` or `dev` | added by a company plugin |
 
 A tool call names its target in its own terms (for example `env: "prod"`), and
 a classification rule maps that to one of these environments.
@@ -29,18 +29,22 @@ These sources are checked in order, and the first answer wins:
 2. **A classification rule in your configuration,** for tools Jig did not
    write. For example: tool `other_db`, parameter `target`, value `live`, means
    `production`.
-3. **The tool's hints,** which Pi and MCP tools can carry. `readOnlyHint` means
+3. **Pi's own tools,** which have defaults built in (the table below). A
+   classification rule comes first, so a rule on `bash` can reclassify a
+   command.
+4. **The tool's hints,** which Pi and MCP tools can carry. `readOnlyHint` means
    a read; `destructiveHint` or `openWorldHint` means a write.
-4. **The default:** an unknown tool counts as a write to `external`, so it asks
+5. **The default:** an unknown tool counts as a write to `external`, so it asks
    until you classify it.
 
-Pi's own tools have defaults built in:
+Pi's own tools:
 
 | Tool | Environment | Effect | Default decision |
 |---|---|---|---|
 | `read`, `ls`, `find`, `grep` | local | read | allow |
 | `write`, `edit` | local | write | allow |
 | `bash` | local, inside the sandbox | write | allow (the sandbox is the protection, see Architecture) |
+| `powershell` | local | write | allow |
 | question tools: `ask_user_question`, `ask_questions` | local | read | allow, so a question never asks first |
 
 ## The rules table
@@ -75,14 +79,16 @@ environment too, make every write ask, or deny a tool outright.
 
 Personal settings live in `~/.pi/agent/jig.json`. A company plugin adds its
 environments and classification rules at start-up, and the field names its data
-uses for personal data. The schema is defined in `plugins/jig-core/README.md`.
+uses for personal data. The fields are in the
+[jig-core README](../plugins/jig-core/README.md#configure), and how rules match
+is in its [configuration reference](../plugins/jig-core/docs/configuration.md).
 The example below is illustrative:
 
 ```json
 {
   "environments": {
     "staging": { "kind": "test" },
-    "qa":      { "kind": "test" },
+    "dev":     { "kind": "test" },
     "prod":    { "kind": "production" }
   },
   "rules": [

@@ -4,8 +4,18 @@ Jig is a set of plugins for the [Pi](https://pi.dev) coding agent. They decide
 what the agent may do, ask you when it matters, keep secrets out of its reach,
 and record what happened so you can see it later.
 
-**Status:** `jig-core` is built; the other plugins are still design. Each
-plugin's README is the specification that its code follows.
+**Status:** five of the thirteen plugins are built. Each plugin's README is the
+specification that its code follows.
+
+## What works today
+
+`jig-core` governs every tool call, with rules per environment, approvals,
+secret references, masking of production results and background watches.
+`jig-git` gives the agent git, GitHub pull requests, CI checks and releases, and
+watches CI until it finishes. `jig-memory` keeps a folder of notes and evidence
+for each ticket. `jig-lens` shows cost, tool failures and the time spent waiting
+for you. `jig-jira` reads and changes Jira issues, with rendered previews.
+`jig-logs` and `jig-http` are being built. The other plugins are designs.
 
 ## Where Jig sits
 
@@ -21,21 +31,21 @@ plugin's README is the specification that its code follows.
 
 ## The plugins
 
-| Plugin | What it does |
-|---|---|
-| [`jig-core`](plugins/jig-core/README.md) | The tool manager. It governs every tool the agent can call: Pi's own (`read`, `write`, `edit`, `bash`), Jig's, and other packages'. It handles rules per environment, approvals, secrets, sign-in, masking, background watches and records |
-| [`jig-git`](plugins/jig-git/README.md) | Local git, GitHub pull requests and reviews, CI checks, watching CI until it finishes, and tags and releases |
-| [`jig-lens`](plugins/jig-lens/README.md) | Observability: cost, tool success and failure, and time spent waiting for you, in a local dashboard |
-| [`jig-flow`](plugins/jig-flow/README.md) | The ticket flow: stages, gates, test runs, acceptance scenarios |
-| [`jig-memory`](plugins/jig-memory/README.md) | Ticket folders, notes and evidence; later, recall of related tickets |
-| [`jig-mongo`](plugins/jig-mongo/README.md) | MongoDB reads, with production limited to approved fields |
-| [`jig-jira`](plugins/jig-jira/README.md) | Jira issues: reads, comments, transitions, updates, with rendered previews |
-| [`jig-logs`](plugins/jig-logs/README.md) | Log search over a backend such as Elasticsearch |
-| [`jig-http`](plugins/jig-http/README.md) | Calls to named APIs, with sign-in added by the tool |
-| [`jig-k8s`](plugins/jig-k8s/README.md) | Kubernetes reads: pods, rollout status, logs |
-| [`jig-scripts`](plugins/jig-scripts/README.md) | Your own scripts as tools, pinned by hash |
-| [`jig-review`](plugins/jig-review/README.md) | Code review in the browser |
-| [`jig-agents`](plugins/jig-agents/README.md) | Subagents in terminal panes |
+| Plugin | Status | What it gives you |
+|---|---|---|
+| [`jig-core`](plugins/jig-core/README.md) | built | The tool manager. It governs every tool the agent can call: Pi's own (`read`, `write`, `edit`, `bash`), Jig's, and other packages'. Rules per environment, approvals, secrets, sign-in, masking, background watches and records |
+| [`jig-git`](plugins/jig-git/README.md) | built | Local git, GitHub pull requests and reviews, CI checks, watching CI until it finishes, and tags and releases |
+| [`jig-lens`](plugins/jig-lens/README.md) | built | Observability: cost, tool success and failure, and time spent waiting for you, in a local dashboard |
+| [`jig-flow`](plugins/jig-flow/README.md) | design | The ticket flow: stages, gates, test runs, acceptance scenarios |
+| [`jig-memory`](plugins/jig-memory/README.md) | built | Ticket folders, notes and evidence; later, recall of related tickets |
+| [`jig-mongo`](plugins/jig-mongo/README.md) | design | MongoDB reads, with production limited to approved fields |
+| [`jig-jira`](plugins/jig-jira/README.md) | built | Jira issues: reads, comments, transitions, updates, with rendered previews |
+| [`jig-logs`](plugins/jig-logs/README.md) | design | Log search over a backend such as Elasticsearch |
+| [`jig-http`](plugins/jig-http/README.md) | design | Calls to named APIs, with sign-in added by the tool |
+| [`jig-k8s`](plugins/jig-k8s/README.md) | design | Kubernetes reads: pods, rollout status, logs |
+| [`jig-scripts`](plugins/jig-scripts/README.md) | design | Your own scripts as tools, pinned by hash |
+| [`jig-review`](plugins/jig-review/README.md) | design | Code review in the browser |
+| [`jig-agents`](plugins/jig-agents/README.md) | design | Subagents in terminal panes |
 
 Every plugin needs `jig-core`; otherwise they work on their own.
 
