@@ -4,6 +4,7 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 
 ## Contents
 
+- [2026-10-31: jig-sandbox, built on Anthropic's sandbox runtime](#2026-10-31-jig-sandbox-built-on-anthropics-sandbox-runtime)
 - [2026-10-31: gaps a company plugin found in jig-core, closed](#2026-10-31-gaps-a-company-plugin-found-in-jig-core-closed)
 - [2026-10-31: filter lists, Jira links and a pull request title rule](#2026-10-31-filter-lists-jira-links-and-a-pull-request-title-rule)
 - [2026-10-30: Jig never signs in; it reads a credential and keeps it from the agent](#2026-10-30-jig-never-signs-in-it-reads-a-credential-and-keeps-it-from-the-agent)
@@ -29,6 +30,61 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 - [2026-10-30: jig-git's tools, and a watch that knows when it is done](#2026-10-30-jig-gits-tools-and-a-watch-that-knows-when-it-is-done)
 - [2026-10-30: built clean, beside the existing harness](#2026-10-30-built-clean-beside-the-existing-harness)
 - [Earlier decisions that still hold (2026-10-29)](#earlier-decisions-that-still-hold-2026-10-29)
+
+## 2026-10-31: jig-sandbox, built on Anthropic's sandbox runtime
+
+- **Why a sandbox at all.** `jig-core` keeps Pi's file tools away from credentials,
+  but a `bash` command can still read `~/.ssh` or write `~/.bashrc`. The floor's
+  "credentials stay hidden from bash" needs a sandbox to hold.
+- **Why not an existing package.** The Pi store has about a dozen. The closest,
+  `@erichll/pi-sandbox`, is well made, but:
+  - it brings a second approval system, where a reviewer model approves network
+    destinations, beside `jig-core`'s rule that you approve in the waiting call;
+  - it cannot make folders outside the project writable, so Gradle and Maven builds
+    fail;
+  - it only keeps project `.env` files from being written, not from being read.
+
+  Others leave the home folder readable, bring their own permission system, or
+  sandbox the whole Pi process (Docker, OpenShell, Gondolin), which also cuts Jig's
+  own tools off from the credentials they need.
+- **Why Anthropic's sandbox runtime.** It is the engine those packages use: bubblewrap
+  and a network namespace on Linux, Seatbelt on macOS, a proxy for every connection,
+  seccomp against local sockets and new user namespaces. Released about weekly,
+  Apache-2.0. `jig-sandbox` writes only the rules and the joins to `jig-core`. It is
+  pinned to an exact version, because the runtime is still `0.0.x`.
+- **One list of hidden paths.** The sandbox hides what `jig-core` protects, company
+  additions included, so the file tools and `bash` cannot disagree.
+- **Writable by default, with exact lists.** An allow-only sandbox breaks every tool
+  that keeps state in a folder nobody listed. The earlier harness's sandbox was
+  writable except for its lists, and in about a thousand of the owner's commands it
+  refused no write as read-only. So only hidden and locked paths are listed.
+- **Locked is about escapes.** Anything that runs later outside the sandbox is
+  locked: shell start-up files, `PATH` folders, git hooks, Pi's settings and
+  extensions, editor and agent settings that run hooks, Gradle's init scripts. The
+  October audit of the earlier harness found escapes through exactly these.
+- **Build caches are shared.** `~/.gradle/caches` and the like stay writable, so
+  builds run as outside; Gradle's `init.gradle` and `init.d` (run by every build) are
+  locked and its `gradle.properties` hidden. Tampering with a cached download stays a
+  known risk until stand-in credentials let separate caches reach private
+  repositories.
+- **No dead ends.** Each block names its rule and the way through; toolchain folders
+  ask you instead of refusing; `git config` works, and settings that would run a
+  program outside are taken back out after each command.
+- **Network: the machine's own by default.** In `open` mode the sandbox runtime leaves
+  the network alone, so servers, `localhost` and DNS work as outside, as they did in
+  the earlier harness. `filtered`, `ask` and `off` route every connection through the
+  runtime's proxy, which also keeps bash away from `localhost` tunnels to production;
+  a bridge carries background tasks' ports and listed `localhost` ports into each
+  command, because there every command has a network of its own.
+- **The runtime runs in a broker process, not in Pi.** A spike on a real machine
+  showed that its built-in protections create placeholder files in the working folder
+  of the process running it (in Pi, the project, where `git add -A` could commit
+  them), and that it installs signal handlers that keep a process alive. One broker
+  per session, with its own working folder, keeps both out of Pi and the project.
+- **Your `!` commands are not sandboxed.** They are yours, as in the earlier harness.
+- **Fails closed, but optional.** With `jig-sandbox` installed, a sandbox that cannot
+  start refuses `bash`. Without it, Jig still works and says plainly that bash is not
+  sandboxed: running inside a container is a valid setup.
 
 ## 2026-10-31: gaps a company plugin found in jig-core, closed
 
