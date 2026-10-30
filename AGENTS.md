@@ -19,6 +19,10 @@ The tool tables of `jig-git` and `jig-jira` are read by their tests.
   [plugins/jig-workflow/README.md](plugins/jig-workflow/README.md). Detail that would
   take it past about 120 lines goes to `plugins/<name>/docs/`, linked under
   "More detail".
+- **Docs.** Write them by [Writing the docs](docs/writing.md): open with what
+  it is and why, short paragraphs and table cells (about 350 and 100
+  characters), lists with bold lead-ins, generic examples, tagged code blocks.
+  A test fails on a broken link or anchor.
 - **The existing harness is reference only.** Read it to port from; never
   modify it.
 - **The floor in [Permissions](docs/permissions.md) is not configurable.** Do
