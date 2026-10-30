@@ -6,7 +6,7 @@ import type { Deps } from "./deps.ts";
 import type { Paths } from "./paths.ts";
 import { FIRST_START, missingProgram, reason } from "./report.ts";
 import { DATASETTE_PROGRAMS, datasetteCommand, GRAFANA_PROGRAMS, grafanaCommand, viewerUrl } from "./viewer.ts";
-import type { Started } from "./viewer.ts";
+import type { Started, Viewer } from "./viewer.ts";
 
 /** Grafana takes several seconds to start, and most of a minute the first time on a busy machine. These wait for it
  *  up to a minute. */
@@ -25,13 +25,14 @@ export interface StartResult {
  */
 export async function startViewer(
     deps: Pick<Deps, "env" | "find" | "homepath" | "probe" | "spawn" | "sleep">,
+    viewer: Viewer,
     settings: LensSettings,
     paths: Paths,
 ): Promise<StartResult> {
-    const grafana = settings.viewer === "grafana";
+    const grafana = viewer === "grafana";
     const name = grafana ? "Grafana" : "Datasette";
     const program = deps.find(grafana ? GRAFANA_PROGRAMS : DATASETTE_PROGRAMS);
-    if (program === undefined) return { ok: false, lines: [missingProgram(settings.viewer)] };
+    if (program === undefined) return { ok: false, lines: [missingProgram(viewer)] };
 
     const firstStart = grafana && !existsSync(join(paths.grafanaData, "grafana.db"));
     const command = grafana
@@ -48,7 +49,7 @@ export async function startViewer(
 
     const url = viewerUrl(settings);
     for (let attempt = 0; attempt < START_ATTEMPTS; attempt++) {
-        if ((await deps.probe(settings.viewer, settings.port)) === "running") {
+        if ((await deps.probe(viewer, settings.port)) === "running") {
             const pid = started.pid === undefined ? "" : ` (process ${started.pid})`;
             return { ok: true, lines: [`${name} started${pid} at ${url}.`, ...(firstStart ? FIRST_START : [])] };
         }

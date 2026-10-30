@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="920" height="482" viewBox="0 0 920 482" role="img" aria-label="How jig-lens works. jig-core appends one line per tool call or model turn to a daily records file. jig-lens imports the new lines into its own SQLite index, which it can rebuild. Grafana, listening only on 127.0.0.1 with its sign-in on, reads the index read-only. You open the dashboard in your browser. Everything stays on this machine." font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="482" viewBox="0 0 920 482" role="img" aria-label="How jig-lens works. jig-core appends one line per tool call or model turn to a daily records file. jig-lens imports the new lines into its own SQLite index, which it can rebuild. The /lens summary in Pi reads the index read-only, with no server. Optionally, Grafana, listening only on 127.0.0.1 with its sign-in on, reads the index read-only too, and you open its dashboards in your browser. Everything stays on this machine." font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">
   <rect x="0.5" y="0.5" width="919" height="481" rx="10" fill="#FAFBFA" stroke="#D2D9D3"/>
   <defs>
     <marker id="lensflow-head-1d3b4d-11" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#1D3B4D"/></marker>
@@ -23,25 +23,26 @@
   <text x="180" y="257" font-size="12.5" fill="#FFFFFF" text-anchor="middle">a copy for querying</text>
   <text x="356" y="236" font-size="14.5" fill="#1A1F1D" font-weight="700">owned by jig-lens</text>
   <text x="356" y="255" font-size="13" fill="#3A4440">delete it, and /lens rebuild makes it again</text>
+  <text x="356" y="274" font-size="13" fill="#3A4440">the /lens summary in Pi reads it, read-only, with no server</text>
   <!-- Grafana reads it -->
   <rect x="40" y="306" width="280" height="58" rx="6" fill="#8C979D"/>
   <text x="180" y="332" font-size="16" fill="#FFFFFF" font-weight="700" text-anchor="middle">Grafana on 127.0.0.1</text>
   <text x="180" y="351" font-size="12.5" fill="#FFFFFF" text-anchor="middle">read-only, sign-in on</text>
-  <text x="356" y="330" font-size="14.5" fill="#1A1F1D" font-weight="700">one local process: 127.0.0.1 only, sign-in on</text>
+  <text x="356" y="330" font-size="14.5" fill="#1A1F1D" font-weight="700">optional: one local process, 127.0.0.1 only, sign-in on</text>
   <text x="356" y="349" font-size="13" fill="#3A4440">its one data source opens only the index, read-only</text>
   <text x="356" y="366" font-size="13" fill="#3A4440">the sign-in stays on because the agent's shell can reach 127.0.0.1</text>
   <rect x="40" y="400" width="280" height="58" rx="6" fill="#C08326"/>
   <text x="180" y="426" font-size="16" fill="#FFFFFF" font-weight="700" text-anchor="middle">your browser</text>
-  <text x="180" y="445" font-size="12.5" fill="#FFFFFF" text-anchor="middle">the dashboard: cost, failures, waiting</text>
+  <text x="180" y="445" font-size="12.5" fill="#FFFFFF" text-anchor="middle">the dashboards: cost, failures, waiting</text>
   <text x="356" y="424" font-size="14.5" fill="#1A1F1D" font-weight="700">nothing leaves the machine</text>
   <text x="356" y="443" font-size="13" fill="#3A4440">the records never hold tool arguments or output</text>
   <!-- who does what, between the boxes -->
   <path d="M180 83 V117" fill="none" stroke="#1D3B4D" stroke-width="2.6" marker-end="url(#lensflow-head-1d3b4d-11)"/>
   <text x="196" y="104.5" font-size="13" fill="#3A4440">jig-core appends one line per tool call or model turn</text>
   <path d="M180 177 V211" fill="none" stroke="#5C9CAB" stroke-width="2.6" marker-end="url(#lensflow-head-5c9cab-11)"/>
-  <text x="196" y="198.5" font-size="13" fill="#3A4440">jig-lens imports the new lines, at the end of each turn and when you open the dashboard</text>
+  <text x="196" y="198.5" font-size="13" fill="#3A4440">jig-lens imports the new lines, at the end of each run and when you run /lens</text>
   <path d="M180 271 V305" fill="none" stroke="#8C979D" stroke-width="2.6" marker-end="url(#lensflow-head-8c979d-11)"/>
   <text x="196" y="292.5" font-size="13" fill="#3A4440">read-only SQL</text>
   <path d="M180 365 V399" fill="none" stroke="#C08326" stroke-width="2.6" marker-end="url(#lensflow-head-c08326-11)"/>
-  <text x="196" y="386.5" font-size="13" fill="#3A4440">/lens opens the dashboard</text>
+  <text x="196" y="386.5" font-size="13" fill="#3A4440">/lens grafana opens the dashboards</text>
 </svg>

@@ -89,11 +89,19 @@ export const SCHEMA = [
     skipped INTEGER NOT NULL,
     at REAL NOT NULL
 );`,
-    // The dashboards filter by time range and the session dashboard by session.
+    // Every summary and dashboard starts from one of three scopes: a time range, a session or a ticket. Each scope
+    // has an index on both tables, ending in `time` so that a scope's rows come out in order. `IF NOT EXISTS` is also
+    // how an index made before an index was added gets it, the next time the file is opened for writing, with no
+    // rebuild.
+    //
+    // None starts with `tool`: no query asks for one tool's rows. The per-tool figures are made from the rows of a
+    // scope, and a tool-first index only made session and ticket scopes slower (the planner chose it over their own).
     "CREATE INDEX IF NOT EXISTS call_time ON call (time);",
     "CREATE INDEX IF NOT EXISTS call_session ON call (session, time);",
+    "CREATE INDEX IF NOT EXISTS call_ticket ON call (ticket, time);",
     "CREATE INDEX IF NOT EXISTS turn_time ON turn (time);",
     "CREATE INDEX IF NOT EXISTS turn_session ON turn (session, time);",
+    "CREATE INDEX IF NOT EXISTS turn_ticket ON turn (ticket, time);",
 ].join("\n");
 
 /** `INSERT OR IGNORE INTO call (id, time, ...) VALUES (?, ?, ...)`. */

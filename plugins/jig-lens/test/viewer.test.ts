@@ -23,13 +23,12 @@ import {
 import type { ViewerCommand } from "../src/viewer.ts";
 import { tempState } from "./support.ts";
 
-const GRAFANA = { viewer: "grafana", port: 3300 } as const;
-const DATASETTE = { viewer: "datasette", port: 3300 } as const;
+const SETTINGS = { port: 3300 };
 const where = lensPaths("/state/jig", "/plugin/viewer");
 const SHELL_ENV = { PATH: "/usr/bin:/bin", HOME: "/home/me", USER: "me", LANG: "C.UTF-8" };
 
 test("Grafana is started with exactly this environment: loopback, sign-in on, nothing sent, no admin password", () => {
-    const command = grafanaCommand("/usr/bin/grafana", undefined, GRAFANA, where, SHELL_ENV);
+    const command = grafanaCommand("/usr/bin/grafana", undefined, SETTINGS, where, SHELL_ENV);
     assert.equal(command.file, "/usr/bin/grafana");
     assert.deepEqual(command.args, ["server"]);
     assert.deepEqual(command.env, {
@@ -64,7 +63,7 @@ test("Grafana is never given an admin password: the user chooses one at the firs
         GF_SECURITY_ADMIN_PASSWORD__FILE: "/secret",
         GF_SECURITY_ADMIN_USER: "root",
     };
-    const { env } = grafanaCommand("/usr/bin/grafana", undefined, GRAFANA, where, hostile);
+    const { env } = grafanaCommand("/usr/bin/grafana", undefined, SETTINGS, where, hostile);
     assert.deepEqual(
         Object.keys(env).filter((name) => /ADMIN|PASSWORD|SECRET|TOKEN|KEY/i.test(name)),
         [],
@@ -79,7 +78,7 @@ test("the sign-in cannot be turned off from the shell, and the address is always
         GF_SERVER_HTTP_ADDR: "0.0.0.0",
         GF_ANALYTICS_REPORTING_ENABLED: "true",
     };
-    const { env } = grafanaCommand("/usr/bin/grafana", undefined, { viewer: "grafana", port: 4100 }, where, shell);
+    const { env } = grafanaCommand("/usr/bin/grafana", undefined, { port: 4100 }, where, shell);
     assert.equal(env.GF_AUTH_ANONYMOUS_ENABLED, "false");
     assert.equal(env.GF_AUTH_ANONYMOUS_ORG_ROLE, undefined);
     assert.equal(env.GF_SERVER_HTTP_ADDR, "127.0.0.1");
@@ -97,8 +96,8 @@ test("a program that outlives the session is given no API keys, tokens or other 
         NODE_OPTIONS: "--require /tmp/evil.js",
     };
     for (const command of [
-        grafanaCommand("/usr/bin/grafana", undefined, GRAFANA, where, shell),
-        datasetteCommand("/usr/bin/datasette", DATASETTE, where, shell),
+        grafanaCommand("/usr/bin/grafana", undefined, SETTINGS, where, shell),
+        datasetteCommand("/usr/bin/datasette", SETTINGS, where, shell),
     ]) {
         assert.deepEqual(
             Object.keys(command.env).filter((name) => /KEY|TOKEN|SECRET|NODE_OPTIONS|JIG_STATE/.test(name)),
@@ -110,24 +109,24 @@ test("a program that outlives the session is given no API keys, tokens or other 
 });
 
 test("the old grafana-server is the server itself and takes no subcommand", () => {
-    assert.deepEqual(grafanaCommand("/usr/sbin/grafana-server", undefined, GRAFANA, where, SHELL_ENV).args, []);
-    assert.deepEqual(grafanaCommand("/opt/g/bin/grafana", undefined, GRAFANA, where, SHELL_ENV).args, ["server"]);
+    assert.deepEqual(grafanaCommand("/usr/sbin/grafana-server", undefined, SETTINGS, where, SHELL_ENV).args, []);
+    assert.deepEqual(grafanaCommand("/opt/g/bin/grafana", undefined, SETTINGS, where, SHELL_ENV).args, ["server"]);
 });
 
 test("Grafana's home folder is passed when it is known", () => {
-    assert.deepEqual(grafanaCommand("/opt/grafana/bin/grafana", "/opt/grafana", GRAFANA, where, SHELL_ENV).args, [
+    assert.deepEqual(grafanaCommand("/opt/grafana/bin/grafana", "/opt/grafana", SETTINGS, where, SHELL_ENV).args, [
         "server",
         "--homepath",
         "/opt/grafana",
     ]);
     assert.deepEqual(
-        grafanaCommand("/opt/grafana/bin/grafana-server", "/opt/grafana", GRAFANA, where, SHELL_ENV).args,
+        grafanaCommand("/opt/grafana/bin/grafana-server", "/opt/grafana", SETTINGS, where, SHELL_ENV).args,
         ["--homepath", "/opt/grafana"],
     );
 });
 
 test("Datasette is started with arbitrary SQL off in its metadata, over the index, on loopback", () => {
-    const command = datasetteCommand("/usr/bin/datasette", { viewer: "datasette", port: 4100 }, where, SHELL_ENV);
+    const command = datasetteCommand("/usr/bin/datasette", { port: 4100 }, where, SHELL_ENV);
     assert.equal(command.file, "/usr/bin/datasette");
     assert.deepEqual(command.args, [
         "/state/jig/lens/index.sqlite",
@@ -143,9 +142,9 @@ test("Datasette is started with arbitrary SQL off in its metadata, over the inde
 });
 
 test("the viewer's address is on 127.0.0.1, and the page that opens is the overview", () => {
-    assert.equal(viewerUrl(GRAFANA), "http://127.0.0.1:3300");
-    assert.equal(homeUrl(GRAFANA), "http://127.0.0.1:3300/d/jig-overview");
-    assert.equal(homeUrl({ viewer: "datasette", port: 8001 }), "http://127.0.0.1:8001/index");
+    assert.equal(viewerUrl(SETTINGS), "http://127.0.0.1:3300");
+    assert.equal(homeUrl("grafana", SETTINGS), "http://127.0.0.1:3300/d/jig-overview");
+    assert.equal(homeUrl("datasette", { port: 8001 }), "http://127.0.0.1:8001/index");
 });
 
 test("the variables the provisioning files read are named here", () => {

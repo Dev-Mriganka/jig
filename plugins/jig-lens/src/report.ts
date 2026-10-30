@@ -1,11 +1,10 @@
 // What the commands tell the user. Plain sentences, built from what the importer and the index report, so they can be
 // read and tested without starting anything.
-import type { LensSettings } from "./config.ts";
+import { plural } from "./format.ts";
 import { RETENTION_DAYS } from "./import.ts";
 import type { ImportOutcome } from "./import.ts";
 import type { IndexStatus } from "./store.ts";
-
-export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+import type { Viewer } from "./viewer.ts";
 
 /** The first line of an error's message, which is the part that says what went wrong. */
 export const reason = (error: unknown) => (error instanceof Error ? error.message : String(error)).split("\n")[0] ?? "";
@@ -63,20 +62,19 @@ export function indexLines(file: string, read: () => IndexStatus | undefined): s
 }
 
 /** What to do when the viewer's program is not on PATH. */
-export function missingProgram(viewer: LensSettings["viewer"]): string {
+export function missingProgram(viewer: Viewer): string {
     if (viewer === "datasette") {
         return [
             "Datasette is not installed: there is no datasette on PATH.",
-            `Install it with pip (pip install datasette), or set "viewer": "grafana" under "lens" in jig.json.`,
+            "Install it with pip (pip install datasette), then run /lens datasette again.",
         ].join("\n");
     }
     return [
         "Grafana is not installed: there is no grafana or grafana-server on PATH.",
         "Install Grafana OSS with your package manager (Homebrew on macOS), then add its SQLite data source:",
         "  grafana cli plugins install frser-sqlite-datasource",
-        "and run /lens again.",
-        "Datasette shows the same index. Install it with pip (pip install datasette) "
-            + `and set "viewer": "datasette" under "lens" in jig.json.`,
+        "and run /lens grafana again.",
+        "Datasette shows the same index. Install it with pip (pip install datasette) and run /lens datasette.",
     ].join("\n");
 }
 
