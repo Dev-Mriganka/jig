@@ -302,14 +302,15 @@ function piWith(t: test.TestContext, extra: (pi: FakePi) => void = () => {}) {
 test("the countdown draws again when the shown second changes while a cache is warm, and stops when it is cold or the footer goes", async (t) => {
     const pi = piWith(t, (fake) => {
         fake.model = { name: "Opus", promptCache: { short: 300 } };
-        fake.entries = [{ type: "message", message: { role: "assistant", stopReason: "stop", timestamp: Date.now() - 299_940, usage: { cacheRead: 5, cacheWrite: 0 } } }];
+        fake.entries = [{ type: "message", message: { role: "assistant", stopReason: "stop", timestamp: Date.now() - 299_600, usage: { cacheRead: 5, cacheWrite: 0 } } }];
     });
     const handle = installFooter(pi.api, pi.ctx, { settings: () => DEFAULT_FOOTER, plugins: () => [], env: {} });
+    // 400 ms are left, so the cache is warm at the first draw even when the machine is slow, and cold 500 ms later.
     assert.match(pi.row(200), /cache 0:01/);
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    await new Promise((resolve) => setTimeout(resolve, 700));
     assert.equal(pi.renders, 1, "one draw when the shown second changed");
     assert.match(pi.row(200), /cache cold/);
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    await new Promise((resolve) => setTimeout(resolve, 300));
     assert.equal(pi.renders, 1, "no timer once the cache is cold");
     (pi.entries[0] as { message: { timestamp: number } }).message.timestamp = Date.now() - 1000;
     assert.match(pi.row(200), /cache 4:5\d/);
