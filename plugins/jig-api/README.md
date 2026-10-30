@@ -18,6 +18,10 @@ For example, after deploying a change to `staging`, the agent runs your saved
 saved **Create order** asks you first, showing the exact request; in
 `production` the floor denies it.
 
+![How a jig-api request runs: collections are read into one list, the agent runs a request by name and fills only its variables, a write is previewed, jig-core sends it with the credential, and the answer comes back masked, with secrets removed, and capped](../../docs/img/api-run.svg)
+
+*How a saved request runs. Collections are read into one list; the agent runs one by name and fills only its variables. A write is previewed and asks you, `jig-core` sends it with the credential, and the answer comes back with secrets removed, masked in production, and capped.*
+
 ## What it is for
 
 - **Check a deployed change:** run a saved request against `staging`.

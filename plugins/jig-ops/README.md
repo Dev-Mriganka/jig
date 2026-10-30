@@ -12,6 +12,10 @@ For example, "push, wait for CI, deploy 1.4.3 of `orders-api` to staging and che
 it": a watch reports when CI ends, `ci log` says why if it failed, `deploy run` asks
 you with the exact command, and `runtime` checks it.
 
+![How jig-ops works: the service catalog feeds the ci, deploy and runtime tools, each with an adapter per system, and a watch waits for CI until its finish line](../../docs/img/ops-catalog.svg)
+
+*The catalog feeds three tools, each with an adapter per system. A watch waits for CI: `jig-git:pushed` starts it, and one message wakes the agent when its finish line is reached. Deploys and reruns ask you, and production is never deployed to.*
+
 ## The service catalog
 
 In `~/.pi/agent/jig.json`, under `ops`:

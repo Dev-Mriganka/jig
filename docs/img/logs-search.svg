@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="520" viewBox="0 0 940 520" role="img" aria-label="How a jig-logs search runs. The agent calls logs with a phrase or a query, an environment and a window. The search splits the window into buckets, halves one that times out, and makes at most 64 requests in 150 seconds. The adapter for Elasticsearch, OpenSearch or Loki builds one request per bucket, and the model&#x27;s text becomes one value in it. jig-core sends the request through jig().http.request, attaching the credential, or a company transport carries it. The backend answers with a page of hits. Hit lines are cut so that no JSON body or quoted value is left open, and gaps are named. jig-core masks the lines when the environment is production, and the agent reads a header with the status and counts, the gaps, then the hits." font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">
+  <rect x="0.5" y="0.5" width="939" height="519" rx="10" fill="#FAFBFA" stroke="#D2D9D3"/>
+  <defs>
+    <marker id="logssearch-head-1d3b4d-11" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#1D3B4D"/></marker>
+  </defs>
+  <!-- the search and the adapter -->
+  <rect x="30" y="40" width="200" height="96" rx="6" fill="#5D4B7C"/>
+  <text x="130.0" y="67.0" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">the agent</text>
+  <text x="130.0" y="84.0" font-size="12" fill="#FFFFFF" text-anchor="middle">logs: phrase or query,</text>
+  <text x="130.0" y="101.0" font-size="12" fill="#FFFFFF" text-anchor="middle">environment, window</text>
+  <text x="130.0" y="118.0" font-size="12" fill="#FFFFFF" text-anchor="middle">a search only reads</text>
+  <path d="M230 88 H300" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#logssearch-head-1d3b4d-11)"/>
+  <text x="265" y="78" font-size="12" fill="#3A4440" text-anchor="middle">a search</text>
+  <rect x="300" y="40" width="300" height="96" rx="6" fill="#5C9CAB"/>
+  <text x="450.0" y="67.0" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">the search</text>
+  <text x="450.0" y="84.0" font-size="12" fill="#FFFFFF" text-anchor="middle">splits the window into buckets,</text>
+  <text x="450.0" y="101.0" font-size="12" fill="#FFFFFF" text-anchor="middle">halves one that times out,</text>
+  <text x="450.0" y="118.0" font-size="12" fill="#FFFFFF" text-anchor="middle">at most 64 requests, 150 s</text>
+  <path d="M600 88 H670" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#logssearch-head-1d3b4d-11)"/>
+  <text x="635" y="78" font-size="12" fill="#3A4440" text-anchor="middle">a bucket</text>
+  <rect x="670" y="40" width="240" height="96" rx="6" fill="#5C9CAB"/>
+  <text x="790.0" y="67.0" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">the adapter</text>
+  <text x="790.0" y="84.0" font-size="12" fill="#FFFFFF" text-anchor="middle">Elasticsearch, OpenSearch or Loki</text>
+  <text x="790.0" y="101.0" font-size="12" fill="#FFFFFF" text-anchor="middle">builds one request; the model's</text>
+  <text x="790.0" y="118.0" font-size="12" fill="#FFFFFF" text-anchor="middle">text is one value in it</text>
+  <!-- jig-core sends it -->
+  <path d="M790 136 V210" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#logssearch-head-1d3b4d-11)"/>
+  <text x="806" y="178" font-size="12" fill="#3A4440">a request</text>
+  <rect x="670" y="210" width="240" height="96" rx="6" fill="#1D3B4D"/>
+  <text x="790.0" y="237.0" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">jig-core</text>
+  <text x="790.0" y="254.0" font-size="12" fill="#FFFFFF" text-anchor="middle">jig().http.request</text>
+  <text x="790.0" y="271.0" font-size="12" fill="#FFFFFF" text-anchor="middle">attaches the credential,</text>
+  <text x="790.0" y="288.0" font-size="12" fill="#FFFFFF" text-anchor="middle">never follows a redirect</text>
+  <path d="M670 258 H570" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#logssearch-head-1d3b4d-11)"/>
+  <text x="620" y="248" font-size="12" fill="#3A4440" text-anchor="middle">request</text>
+  <rect x="300" y="210" width="270" height="96" rx="6" fill="#8C979D"/>
+  <text x="435.0" y="237.0" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">the log backend</text>
+  <text x="435.0" y="254.0" font-size="12" fill="#FFFFFF" text-anchor="middle">or a company transport,</text>
+  <text x="435.0" y="271.0" font-size="12" fill="#FFFFFF" text-anchor="middle">which signs the request in</text>
+  <text x="435.0" y="288.0" font-size="12" fill="#FFFFFF" text-anchor="middle">answers with a page of hits</text>
+  <path d="M300 258 H260" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#logssearch-head-1d3b4d-11)"/>
+  <text x="280" y="248" font-size="12" fill="#3A4440" text-anchor="middle">reply</text>
+  <rect x="30" y="210" width="230" height="96" rx="6" fill="#5C9CAB"/>
+  <text x="145.0" y="237.0" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">the hit lines</text>
+  <text x="145.0" y="254.0" font-size="12" fill="#FFFFFF" text-anchor="middle">one line per hit, cut so no</text>
+  <text x="145.0" y="271.0" font-size="12" fill="#FFFFFF" text-anchor="middle">JSON or quote is left open;</text>
+  <text x="145.0" y="288.0" font-size="12" fill="#FFFFFF" text-anchor="middle">gaps are named</text>
+  <!-- masked on the way out -->
+  <path d="M145 306 V380" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#logssearch-head-1d3b4d-11)"/>
+  <text x="161" y="348" font-size="12" fill="#3A4440">lines</text>
+  <rect x="30" y="380" width="270" height="96" rx="6" fill="#1D3B4D"/>
+  <text x="165.0" y="407.0" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">jig-core</text>
+  <text x="165.0" y="424.0" font-size="12" fill="#FFFFFF" text-anchor="middle">masks the lines when the</text>
+  <text x="165.0" y="441.0" font-size="12" fill="#FFFFFF" text-anchor="middle">environment is production,</text>
+  <text x="165.0" y="458.0" font-size="12" fill="#FFFFFF" text-anchor="middle">redacts secrets, caps length</text>
+  <path d="M300 428 H400" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#logssearch-head-1d3b4d-11)"/>
+  <text x="350" y="418" font-size="12" fill="#3A4440" text-anchor="middle">masked lines</text>
+  <rect x="400" y="380" width="250" height="96" rx="6" fill="#5D4B7C"/>
+  <text x="525.0" y="407.0" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">the agent</text>
+  <text x="525.0" y="424.0" font-size="12" fill="#FFFFFF" text-anchor="middle">a header with the status</text>
+  <text x="525.0" y="441.0" font-size="12" fill="#FFFFFF" text-anchor="middle">and counts, the gaps,</text>
+  <text x="525.0" y="458.0" font-size="12" fill="#FFFFFF" text-anchor="middle">then the hits</text>
+  <rect x="690" y="380" width="220" height="96" rx="6" fill="#E2F1E7" stroke="#2C7A4B" stroke-width="1.8"/>
+  <text x="800.0" y="407.0" font-size="13" fill="#2C7A4B" font-weight="700" text-anchor="middle">a search is a read</text>
+  <text x="800.0" y="424.0" font-size="12" fill="#3A4440" text-anchor="middle">allowed in production,</text>
+  <text x="800.0" y="441.0" font-size="12" fill="#3A4440" text-anchor="middle">where it is always</text>
+  <text x="800.0" y="458.0" font-size="12" fill="#3A4440" text-anchor="middle">masked</text>
+</svg>

@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="470" viewBox="0 0 960 470" role="img" aria-label="How jig-agents is planned to work. This is a design, not built. One tmux window holds panes, each a full Pi session. A parent session, for example a planner, starts child agents from an agent file and a task. The parent sends subagent, subagent_message and subagent_interrupt to a child, and the child sends caller_ping and subagent_done with its result back. An agent file such as planner.md, reviewer.md, scout.md or worker.md sets a role, its tools and its model. jig-core governs every child like any session: the same rules, ask becomes deny when there is no screen, and each child has a turn limit and a time limit." font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">
+  <rect x="0.5" y="0.5" width="959" height="469" rx="10" fill="#FAFBFA" stroke="#D2D9D3"/>
+  <defs>
+    <marker id="agentspanes-head-1d3b4d-11" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#1D3B4D"/></marker>
+    <marker id="agentspanes-head-4e7a58-11" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#4E7A58"/></marker>
+  </defs>
+  <!-- one tmux window -->
+  <rect x="30" y="40" width="620" height="392" rx="6" fill="#E8ECEE"/>
+  <rect x="30" y="40" width="620" height="30" rx="6" fill="#1D3B4D"/>
+  <text x="46" y="60" font-size="13" fill="#FFFFFF" font-weight="700">one tmux window</text>
+  <text x="634" y="60" font-size="12" fill="#D9E3E8" text-anchor="end">each pane a full Pi session</text>
+  <rect x="50" y="90" width="170" height="322" rx="6" fill="#1D3B4D"/>
+  <text x="135.0" y="213.0" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">the parent</text>
+  <text x="135.0" y="230.0" font-size="12" fill="#FFFFFF" text-anchor="middle">a Pi session, for</text>
+  <text x="135.0" y="247.0" font-size="12" fill="#FFFFFF" text-anchor="middle">example a planner</text>
+  <text x="135.0" y="281.0" font-size="12" fill="#FFFFFF" text-anchor="middle">starts children,</text>
+  <text x="135.0" y="298.0" font-size="12" fill="#FFFFFF" text-anchor="middle">waits for their results</text>
+  <rect x="440" y="90" width="190" height="150" rx="6" fill="#FFFFFF" stroke="#5C9CAB" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="535.0" y="144.0" font-size="13" fill="#1A1F1D" font-weight="700" text-anchor="middle">child: reviewer</text>
+  <text x="535.0" y="161.0" font-size="12" fill="#3A4440" text-anchor="middle">a full Pi session</text>
+  <text x="535.0" y="178.0" font-size="12" fill="#3A4440" text-anchor="middle">task: review the change</text>
+  <text x="535.0" y="195.0" font-size="12" fill="#3A4440" text-anchor="middle">on this branch</text>
+  <rect x="440" y="262" width="190" height="150" rx="6" fill="#FFFFFF" stroke="#5C9CAB" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="535.0" y="316.0" font-size="13" fill="#1A1F1D" font-weight="700" text-anchor="middle">child: scout</text>
+  <text x="535.0" y="333.0" font-size="12" fill="#3A4440" text-anchor="middle">a full Pi session</text>
+  <text x="535.0" y="350.0" font-size="12" fill="#3A4440" text-anchor="middle">task: find where the</text>
+  <text x="535.0" y="367.0" font-size="12" fill="#3A4440" text-anchor="middle">config is read</text>
+  <!-- the messages -->
+  <path d="M220 112 H440" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#agentspanes-head-1d3b4d-11)"/>
+  <text x="330" y="107" font-size="12" fill="#3A4440" text-anchor="middle">subagent: agent file + task</text>
+  <path d="M220 138 H440" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#agentspanes-head-1d3b4d-11)"/>
+  <text x="330" y="133" font-size="12" fill="#3A4440" text-anchor="middle">subagent_message</text>
+  <path d="M220 164 H440" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#agentspanes-head-1d3b4d-11)"/>
+  <text x="330" y="159" font-size="12" fill="#3A4440" text-anchor="middle">subagent_interrupt</text>
+  <path d="M440 190 H220" fill="none" stroke="#4E7A58" stroke-width="2.4" marker-end="url(#agentspanes-head-4e7a58-11)"/>
+  <text x="330" y="185" font-size="12" fill="#3A4440" text-anchor="middle">caller_ping</text>
+  <path d="M440 216 H220" fill="none" stroke="#4E7A58" stroke-width="2.4" marker-end="url(#agentspanes-head-4e7a58-11)"/>
+  <text x="330" y="211" font-size="12" fill="#3A4440" text-anchor="middle">subagent_done: the result</text>
+  <path d="M220 330 H440" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#agentspanes-head-1d3b4d-11)"/>
+  <path d="M440 356 H220" fill="none" stroke="#4E7A58" stroke-width="2.4" marker-end="url(#agentspanes-head-4e7a58-11)"/>
+  <text x="330" y="322" font-size="12" fill="#3A4440" text-anchor="middle">the same messages, both ways</text>
+  <!-- what it is made of -->
+  <rect x="670" y="60" width="260" height="150" rx="6" fill="#FFFFFF" stroke="#1D3B4D" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="800.0" y="105.5" font-size="13" fill="#1A1F1D" font-weight="700" text-anchor="middle">an agent file</text>
+  <text x="800.0" y="122.5" font-size="12" fill="#3A4440" text-anchor="middle">planner.md, reviewer.md,</text>
+  <text x="800.0" y="139.5" font-size="12" fill="#3A4440" text-anchor="middle">scout.md, worker.md</text>
+  <text x="800.0" y="156.5" font-size="12" fill="#3A4440" text-anchor="middle">sets a role, its tools</text>
+  <text x="800.0" y="173.5" font-size="12" fill="#3A4440" text-anchor="middle">and its model</text>
+  <rect x="670" y="232" width="260" height="180" rx="6" fill="#1D3B4D"/>
+  <text x="800.0" y="284.0" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">jig-core governs each child</text>
+  <text x="800.0" y="301.0" font-size="12" fill="#FFFFFF" text-anchor="middle">the same rules as any session</text>
+  <text x="800.0" y="318.0" font-size="12" fill="#FFFFFF" text-anchor="middle">no screen to ask on:</text>
+  <text x="800.0" y="335.0" font-size="12" fill="#FFFFFF" text-anchor="middle">ask becomes deny</text>
+  <text x="800.0" y="352.0" font-size="12" fill="#FFFFFF" text-anchor="middle">a turn limit and a</text>
+  <text x="800.0" y="369.0" font-size="12" fill="#FFFFFF" text-anchor="middle">time limit for each child</text>
+  <text x="930" y="30" font-size="12" fill="#8A5A12" text-anchor="end">planned, not built</text>
+</svg>

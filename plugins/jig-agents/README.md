@@ -11,6 +11,10 @@ For example, a planner starts a reviewer in a new pane with the task "review the
 change on this branch", and the reviewer's report comes back to the planner when
 the reviewer is done.
 
+![The planned design of jig-agents: a parent and its children in tmux panes, the messages between them, an agent file for each role, and jig-core governing every child](../../docs/img/agents-panes.svg)
+
+*The planned design: a parent and its children in tmux panes, the messages that pass between them, and `jig-core` governing every child. Dashed outlines are not built yet.*
+
 ## Tools
 
 All six act on this machine only.

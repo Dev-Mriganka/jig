@@ -16,6 +16,10 @@ CI is not here: checks, runs, logs and watches are the `ci` tool of
 after a new pull request, `jig-git` announces `jig-git:pushed`, and `jig-ops`
 starts a watch if it knows the repository (see [Events](#events)).
 
+![How a jig-git call runs: jig-core decides, local git and gh do the work, guarded steps ask or refuse, and a push is announced as jig-git:pushed for jig-ops](../../docs/img/git-flow.svg)
+
+*How a call runs. `jig-core` decides first: reads and local writes run, writes to GitHub ask you. `git push`, the `pr` writes and a protected branch each have a guard, and after a push or a new pull request the plugin announces `jig-git:pushed` for `jig-ops`.*
+
 ## Tool: `git`
 
 | Action | Kind | What it does |

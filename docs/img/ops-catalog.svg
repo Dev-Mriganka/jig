@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="540" viewBox="0 0 980 540" role="img" aria-label="How jig-ops works. The service catalog describes each service once: its repository, its CI, and per environment its deploy method, where it runs and its health address. It feeds three tools. ci has status, runs, run, log, rerun, trigger and watch, with an adapter for GitHub Actions, GitLab CI and Jenkins. deploy has plan, run, status, rollback and watch, with an adapter for Helm and for kubectl set image. runtime has pods, rollout, logs, events and health, with a Kubernetes adapter. A watch waits for CI: jig-git announces jig-git:pushed, a watch on jig-core&#x27;s engine polls the CI adapter until an explicit finish line, and one message starts the agent&#x27;s turn. Reruns, triggers, deploys and rollbacks ask you, and production is never deployed to." font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">
+  <rect x="0.5" y="0.5" width="979" height="539" rx="10" fill="#FAFBFA" stroke="#D2D9D3"/>
+  <defs>
+    <marker id="opscatalog-head-1d3b4d-11" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#1D3B4D"/></marker>
+    <marker id="opscatalog-head-5c9cab-11" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#5C9CAB"/></marker>
+  </defs>
+  <!-- the catalog feeds three tools -->
+  <rect x="30" y="24" width="920" height="74" rx="6" fill="#FFFFFF" stroke="#1D3B4D" stroke-width="2"/>
+  <text x="490.0" y="48.5" font-size="13" fill="#1A1F1D" font-weight="700" text-anchor="middle">the service catalog</text>
+  <text x="490.0" y="65.5" font-size="12" fill="#3A4440" text-anchor="middle">each service once: its repository, its CI, and per environment its deploy method,</text>
+  <text x="490.0" y="82.5" font-size="12" fill="#3A4440" text-anchor="middle">where it runs and its health address</text>
+  <path d="M175 98 V128" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#opscatalog-head-1d3b4d-11)"/>
+  <path d="M490 98 V128" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#opscatalog-head-1d3b4d-11)"/>
+  <path d="M805 98 V128" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#opscatalog-head-1d3b4d-11)"/>
+  <text x="190" y="117" font-size="12" fill="#3A4440">repository, CI</text>
+  <text x="505" y="117" font-size="12" fill="#3A4440">deploy method</text>
+  <text x="820" y="117" font-size="12" fill="#3A4440">cluster, selector</text>
+  <rect x="30" y="128" width="290" height="84" rx="6" fill="#5C9CAB"/>
+  <text x="175.0" y="157.5" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">ci</text>
+  <text x="175.0" y="174.5" font-size="12" fill="#FFFFFF" text-anchor="middle">status, runs, run, log,</text>
+  <text x="175.0" y="191.5" font-size="12" fill="#FFFFFF" text-anchor="middle">rerun, trigger, watch</text>
+  <rect x="345" y="128" width="290" height="84" rx="6" fill="#5C9CAB"/>
+  <text x="490.0" y="157.5" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">deploy</text>
+  <text x="490.0" y="174.5" font-size="12" fill="#FFFFFF" text-anchor="middle">plan, run, status,</text>
+  <text x="490.0" y="191.5" font-size="12" fill="#FFFFFF" text-anchor="middle">rollback, watch</text>
+  <rect x="660" y="128" width="290" height="84" rx="6" fill="#5C9CAB"/>
+  <text x="805.0" y="157.5" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">runtime</text>
+  <text x="805.0" y="174.5" font-size="12" fill="#FFFFFF" text-anchor="middle">pods, rollout, logs,</text>
+  <text x="805.0" y="191.5" font-size="12" fill="#FFFFFF" text-anchor="middle">events, health</text>
+  <!-- one adapter per system -->
+  <path d="M175 212 V240" fill="none" stroke="#5C9CAB" stroke-width="2.4" marker-end="url(#opscatalog-head-5c9cab-11)"/>
+  <path d="M490 212 V240" fill="none" stroke="#5C9CAB" stroke-width="2.4" marker-end="url(#opscatalog-head-5c9cab-11)"/>
+  <path d="M805 212 V240" fill="none" stroke="#5C9CAB" stroke-width="2.4" marker-end="url(#opscatalog-head-5c9cab-11)"/>
+  <text x="190" y="230" font-size="12" fill="#3A4440">one per system</text>
+  <rect x="30" y="240" width="290" height="64" rx="6" fill="#FFFFFF" stroke="#1D3B4D" stroke-width="2"/>
+  <text x="175.0" y="268.0" font-size="13" fill="#1A1F1D" font-weight="700" text-anchor="middle">adapters</text>
+  <text x="175.0" y="285.0" font-size="12" fill="#3A4440" text-anchor="middle">GitHub Actions, GitLab CI, Jenkins</text>
+  <rect x="345" y="240" width="290" height="64" rx="6" fill="#FFFFFF" stroke="#1D3B4D" stroke-width="2"/>
+  <text x="490.0" y="268.0" font-size="13" fill="#1A1F1D" font-weight="700" text-anchor="middle">adapters</text>
+  <text x="490.0" y="285.0" font-size="12" fill="#3A4440" text-anchor="middle">Helm, kubectl set image</text>
+  <rect x="660" y="240" width="290" height="64" rx="6" fill="#FFFFFF" stroke="#1D3B4D" stroke-width="2"/>
+  <text x="805.0" y="268.0" font-size="13" fill="#1A1F1D" font-weight="700" text-anchor="middle">adapters</text>
+  <text x="805.0" y="285.0" font-size="12" fill="#3A4440" text-anchor="middle">Kubernetes</text>
+  <!-- a watch waits for CI -->
+  <rect x="30" y="326" width="920" height="118" rx="6" fill="#E8ECEE"/>
+  <text x="46" y="348" font-size="13" fill="#1A1F1D" font-weight="700">A watch waits for CI, so nobody polls</text>
+  <rect x="46" y="364" width="200" height="64" rx="6" fill="#5C9CAB"/>
+  <text x="146.0" y="392.0" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">git push, pr create</text>
+  <text x="146.0" y="409.0" font-size="12" fill="#FFFFFF" text-anchor="middle">jig-git announces it</text>
+  <path d="M246 396 H336" fill="none" stroke="#5C9CAB" stroke-width="2.4" marker-end="url(#opscatalog-head-5c9cab-11)"/>
+  <text x="291" y="386" font-size="12" fill="#3A4440" text-anchor="middle">jig-git:pushed</text>
+  <rect x="336" y="364" width="300" height="64" rx="6" fill="#1D3B4D"/>
+  <text x="486.0" y="383.5" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">a watch, on jig-core's engine</text>
+  <text x="486.0" y="400.5" font-size="12" fill="#FFFFFF" text-anchor="middle">polls the CI adapter until an</text>
+  <text x="486.0" y="417.5" font-size="12" fill="#FFFFFF" text-anchor="middle">explicit finish line</text>
+  <path d="M636 396 H716" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#opscatalog-head-1d3b4d-11)"/>
+  <text x="676" y="386" font-size="12" fill="#3A4440" text-anchor="middle">finish line</text>
+  <rect x="716" y="364" width="218" height="64" rx="6" fill="#5D4B7C"/>
+  <text x="825.0" y="392.0" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">one message</text>
+  <text x="825.0" y="409.0" font-size="12" fill="#FFFFFF" text-anchor="middle">starts the agent's turn</text>
+  <!-- what asks -->
+  <rect x="30" y="462" width="290" height="56" rx="6" fill="#FBF5EA" stroke="#C08326" stroke-width="1.8"/>
+  <text x="175.0" y="486.0" font-size="13" fill="#8A5A12" font-weight="700" text-anchor="middle">ci: reads run</text>
+  <text x="175.0" y="503.0" font-size="12" fill="#3A4440" text-anchor="middle">rerun and trigger ask you</text>
+  <rect x="345" y="462" width="290" height="56" rx="6" fill="#FBF5EA" stroke="#C08326" stroke-width="1.8"/>
+  <text x="490.0" y="486.0" font-size="13" fill="#8A5A12" font-weight="700" text-anchor="middle">deploy: asks, with the plan</text>
+  <text x="490.0" y="503.0" font-size="12" fill="#3A4440" text-anchor="middle">never production; rollback: test only</text>
+  <rect x="660" y="462" width="290" height="56" rx="6" fill="#E2F1E7" stroke="#2C7A4B" stroke-width="1.8"/>
+  <text x="805.0" y="486.0" font-size="13" fill="#2C7A4B" font-weight="700" text-anchor="middle">runtime: every action is a read</text>
+  <text x="805.0" y="503.0" font-size="12" fill="#3A4440" text-anchor="middle">production results are masked</text>
+</svg>

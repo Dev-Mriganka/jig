@@ -13,6 +13,10 @@ production is denied. What the agent may see is set by an allow list or a deny l
 For example, to debug a stuck order the agent runs `count`, then `find` on `orders.orders` in `staging`. It then runs `explain`
 to see whether the query used an index, and `update` to fix the test document, after you approve the preview.
 
+![How a jig-mongo call runs: jig-core decides by environment, the walk checks every field against the access lists, an allow list also reshapes the call, the route reaches MongoDB, and denied fields are stripped from the rows](../../docs/img/mongo-walk.svg)
+
+*How a call is checked and run. `jig-core` decides by environment, then the walk checks every field against the lists and refuses a denied one before anything runs. An allow list also reshapes the call, the route reaches MongoDB, and denied fields are stripped from the rows.*
+
 ## Tool: `mongo`
 
 | Group | Action | Kind | What it does |
