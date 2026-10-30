@@ -100,23 +100,16 @@ describe("a valid section", () => {
 });
 
 describe("the collections", () => {
-    test("a source is exactly one of postman and http", () => {
-        assert.deepEqual(errorsOf({ collections: { a: {} } }), ["api.collections.a: needs a source: one of postman, http"]);
+    test("a source is exactly one of the sources there are", () => {
+        assert.deepEqual(errorsOf({ collections: { a: {} } }), ["api.collections.a: needs a source: one of postman, http, bruno, openapi"]);
+        assert.deepEqual(errorsOf({ collections: { a: { yaml: "/work/x" } } }), [
+            "api.collections.a: needs a source: one of postman, http, bruno, openapi",
+            "api.collections.a.yaml: unknown field",
+        ]);
         assert.deepEqual(errorsOf({ collections: { a: { http: HTTP, postman: POSTMAN } } }), ["api.collections.a: use exactly one source (got http, postman)"]);
         assert.deepEqual(errorsOf({ collections: { a: "orders" } }), [
             'api.collections.a: must be an object with one source, such as { "postman": "<path>" } or { "http": "<folder>" }',
         ]);
-    });
-
-    test("Bruno, OpenAPI and a Postman cloud collection are named as coming in part 2, not as unknown fields", () => {
-        assert.deepEqual(errorsOf({ collections: { a: { bruno: "/work/bruno" } } }), [
-            "api.collections.a.bruno: Bruno collections are coming in part 2 of jig-api; for now use postman or http",
-        ]);
-        assert.deepEqual(errorsOf({ collections: { a: { openapi: "/work/spec.yaml" } } }), [
-            "api.collections.a.openapi: OpenAPI collections are coming in part 2 of jig-api; for now use postman or http",
-        ]);
-        const [cloud] = errorsOf({ collections: { a: { postman: { cloud: "1234", apiKey: "pass:postman/key" } } } });
-        assert.match(cloud ?? "", /^api\.collections\.a\.postman: a Postman cloud collection .* is coming in part 2/);
     });
 
     test("an unknown field is an error at every level, and a misspelt one is not a silent default", () => {
@@ -124,6 +117,25 @@ describe("the collections", () => {
         assert.deepEqual(errorsOf({ collections: { a: { http: HTTP, folder: "x" } } }), ["api.collections.a.folder: unknown field"]);
         assert.deepEqual(errorsOf({ collections: { a: { postman: POSTMAN, enviroments: {} } } }), ["api.collections.a.enviroments: unknown field"]);
         assert.deepEqual(errorsOf(section({ environments: { Staging: { environment: "staging", signin: "x" } } })), ["api.environments.Staging.signin: unknown field"]);
+    });
+
+    test("a Bruno collection is a folder, by an absolute path or ~/, and has no other field", () => {
+        const settings = found({ collections: { a: { bruno: "~/work/bruno" }, b: { bruno: "/work/bruno" } } });
+        assert.equal(settings.collections.get("a")?.kind, "bruno");
+        assert.deepEqual(errorsOf({ collections: { a: { bruno: "work/bruno" } } }), ["api.collections.a.bruno: must be an absolute path or start with ~/"]);
+        assert.deepEqual(errorsOf({ collections: { a: { bruno: 7 } } }), ["api.collections.a.bruno: must be the path of a Bruno collection folder"]);
+        assert.deepEqual(errorsOf({ collections: { a: { bruno: "/work/bruno", environments: {} } } }), ["api.collections.a.environments: unknown field"]);
+    });
+
+    test("an OpenAPI collection names its spec, the environments it may run in, and the server of each", () => {
+        const settings = found({
+            collections: { a: { openapi: "~/work/spec.yaml", environments: ["Staging"], servers: { Staging: "https://stg.example.test/v1" } } },
+            environments: { Staging: "staging" },
+        });
+        assert.equal(settings.collections.get("a")?.kind, "openapi");
+        assert.deepEqual(errorsOf({ collections: { a: { openapi: "/work/spec.yaml" } } }), [
+            'api.collections.a.environments: required, the list of environments this spec may run in, such as ["Staging"]',
+        ]);
     });
 
     test("a path is absolute or starts with ~/, and is not text of no use", () => {
@@ -257,13 +269,13 @@ describe("a section with mistakes", () => {
 
     test("every mistake is reported at once, each with its key", () => {
         const errors = errorsOf({
-            collections: { one: { bruno: "/x" }, two: {} },
+            collections: { one: { http: 5 }, two: {} },
             environments: { Staging: "9" },
             secrets: { token: "pasted" },
             extra: 1,
         });
         assert.equal(errors.length, 5);
-        for (const key of ["api.extra:", "api.collections.one.bruno:", "api.collections.two:", "api.environments.Staging:", "api.secrets.token:"]) {
+        for (const key of ["api.extra:", "api.collections.one.http:", "api.collections.two:", "api.environments.Staging:", "api.secrets.token:"]) {
             assert.ok(errors.some((error) => error.startsWith(key)), key);
         }
     });

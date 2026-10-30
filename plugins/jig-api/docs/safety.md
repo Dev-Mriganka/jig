@@ -43,16 +43,32 @@ request may carry a `Cookie` header its collection gives it.
 ## Files
 
 A file a request uploads (a form file, a whole body, a part of a multipart body) must resolve, after following links, to a path
-inside the collection folder: the folder of a Postman collection file, or the `.http` folder. A path outside it, a link out of it
+inside the collection folder: the folder of a Postman collection file, the `.http` folder, or the Bruno folder. A path outside it, a link out of it
 (to the file, or to a folder that holds it), a missing file, a folder, and a file over 10 MiB are refused with the reason. The file
 is read when the plan is made; the preview names it with its size and a digest, and the digest is in the fingerprint, so a file
 that changed while you read is "changed since the preview" and is not sent.
 
 ## Scripts and protocols
 
-Scripts never run. A request that a pre-request script applies to is refused with its name and whose script it is. A test script or
-a response handler is ignored with a note. WebSocket, gRPC and MQTT are listed and refused as unsupported, as are the sign-in types
-that need a browser, code or another request's answer. Each is named, so a reader knows what is missing.
+Scripts never run. A request that a pre-request script applies to is refused with its name and whose script it is: Postman's,
+Bruno's (a request's, a folder's or the collection's) and `.http` files'. A test script, a post-response script or a response
+handler is ignored with a note. WebSocket, gRPC and MQTT are listed and refused as unsupported, as are the sign-in types that need
+a browser, code or another request's answer. Each is named, so a reader knows what is missing. Bruno's asserts are shown and not run.
+
+## An OpenAPI spec is opt-in
+
+A spec runs only in the environments its configuration lists, only against the servers the configuration maps to them, and in
+production only for reads and only with `allowProductionReads` ([OpenAPI](openapi.md#where-it-runs)). Writes in production are denied
+by the floor, as for every source. A credential in a spec's examples or defaults is never used: a credential is a slot that
+`api.secrets` fills.
+
+## Secrets in files and in the copy
+
+A secret a file marks (Postman `secret`, `http-client.private.env.json`, Bruno `vars:secret` and `secret: true`, an external secret
+manager) has no value here, and a value typed into the file is refused with a warning that names the file and never repeats the value.
+`{{process.env.NAME}}` of a Bruno collection is a secret; no `.env` file is read. The copy of a Postman cloud collection omits the
+value of a secret variable, is mode 0600, and never holds the API key ([Postman cloud](postman-cloud.md)). A message about a YAML or
+`.bru` file that cannot be read names its line and never quotes it.
 
 ## The agent
 
@@ -76,5 +92,6 @@ method does.
 ## Limits
 
 A saved request's body is at most 1 MiB of text, or 20 MiB with files; a call's JSON body at most 256 KiB, with at most 10 headers;
-an answer is cut at 2 MiB; a Postman collection file is at most 32 MiB and an environment export 2 MiB; a `.http` file and an
-environment file of a `.http` folder at most 1 MiB; at most 500 `.http` files.
+an answer is cut at 2 MiB, except the fetch of a Postman cloud collection, which may be 32 MiB; a Postman collection file is at most
+32 MiB and an environment export 2 MiB; a `.http` file and an environment file of a `.http` folder at most 1 MiB; at most 500 `.http`
+files; a Bruno file at most 1 MiB, at most 1000 request files, 12 folders deep; an OpenAPI spec at most 8 MiB.

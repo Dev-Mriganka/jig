@@ -1,0 +1,15 @@
+meta {
+  name: Cancel order
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/{{apiVersion}}/orders/{{orderId}}
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+}

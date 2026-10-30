@@ -1,0 +1,16 @@
+info:
+  name: Import orders
+  type: http
+  seq: 9
+http:
+  method: PUT
+  url: "{{baseUrl}}/{{apiVersion}}/orders/import"
+  body:
+    type: file
+    data:
+      - filePath: files/receipt.txt
+        contentType: text/csv
+        selected: true
+  auth: inherit
+settings:
+  encodeUrl: true

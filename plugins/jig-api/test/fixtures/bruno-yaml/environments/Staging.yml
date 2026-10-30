@@ -1,0 +1,23 @@
+name: Staging
+variables:
+  - name: baseUrl
+    value: https://api.staging.acme.example.test
+  - name: authUrl
+    value: https://auth.staging.acme.example.test
+  - name: customerId
+    value: cust-staging-1
+  - name: clientId
+    value: acme-orders-cli
+  - name: serviceUser
+    value: svc-orders
+  - name: unused
+    value: left over
+    disabled: true
+  - name: token
+    secret: true
+  - name: clientSecret
+    secret: true
+  - name: servicePassword
+    secret: true
+  - name: apiKey
+    secret: true

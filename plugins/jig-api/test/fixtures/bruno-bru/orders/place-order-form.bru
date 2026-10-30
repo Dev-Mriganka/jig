@@ -1,0 +1,21 @@
+meta {
+  name: Place order (form)
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/{{apiVersion}}/orders/form
+  body: formUrlEncoded
+  auth: inherit
+}
+
+body:form-urlencoded {
+  customer: {{customerId}}
+  note: {{note}}
+  ~old: legacy
+}
+
+settings {
+  encodeUrl: true
+}

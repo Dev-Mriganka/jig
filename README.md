@@ -44,7 +44,7 @@ one service catalog. The other plugins are designs.
 | [`jig-mongo`](plugins/jig-mongo/README.md) | design | MongoDB reads, with production limited to approved fields |
 | [`jig-jira`](plugins/jig-jira/README.md) | built | Jira issues: reads, comments, transitions, updates, with rendered previews |
 | [`jig-logs`](plugins/jig-logs/README.md) | built | Log search over Elasticsearch, OpenSearch or Grafana Loki; another backend is one adapter |
-| [`jig-api`](plugins/jig-api/README.md) | built (part 1) | Your team's saved API requests (Postman, `.http` files), run by name with only their variables filled, and sign-in added by the tool |
+| [`jig-api`](plugins/jig-api/README.md) | built | Your team's saved API requests (Postman, `.http` files, Bruno, OpenAPI), run by name with only their variables filled, and sign-in added by the tool |
 | [`jig-ops`](plugins/jig-ops/README.md) | built | CI on GitHub Actions, GitLab CI or Jenkins and watching it until it finishes, deploy and run on a platform, from one service catalog |
 | [`jig-review`](plugins/jig-review/README.md) | design | Code review in the browser |
 | [`jig-agents`](plugins/jig-agents/README.md) | design | Subagents in terminal panes |

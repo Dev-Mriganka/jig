@@ -30,13 +30,23 @@ export function refusalOf(request: SavedRequest): string | undefined {
     return undefined;
 }
 
-/** The variables the agent has to give: used, not secret, and not defined by the collection or any of its environments. */
-function neededVariables(collection: Collection, request: SavedRequest, secretNames: ReadonlySet<string>): string[] {
+/** The variables the agent may give: used, not secret, and not defined by the collection or any of its environments. */
+function givableVariables(collection: Collection, request: SavedRequest, secretNames: ReadonlySet<string>): string[] {
     return request.variables.filter((name) => {
         if (name.startsWith("$") || secretNames.has(name) || request.signsIn.includes(name)) return false;
         if (collection.variables.has(name) || request.defaults.has(name)) return false;
         return ![...collection.environments.values()].some((environment) => environment.variables.has(name));
     });
+}
+
+/** Those of them the request cannot do without. */
+function neededVariables(collection: Collection, request: SavedRequest, secretNames: ReadonlySet<string>): string[] {
+    return givableVariables(collection, request, secretNames).filter((name) => request.optional?.includes(name) !== true);
+}
+
+/** Those it can: a parameter that is left out when it is not given. */
+function optionalVariables(collection: Collection, request: SavedRequest, secretNames: ReadonlySet<string>): string[] {
+    return givableVariables(collection, request, secretNames).filter((name) => request.optional?.includes(name) === true);
 }
 
 function problemLines(problems: readonly Problem[]): string[] {
@@ -59,7 +69,8 @@ export function listText(catalog: Catalog, settings: ApiSettings, filter: Filter
             return wanted === undefined || `${pathOf(request)} ${request.url}`.toLowerCase().includes(wanted);
         });
         const kind = settings.collections.get(collection.name)?.kind ?? "";
-        const environments = [...collection.environments.keys()];
+        const environments = [...collection.environments.values()].map((environment) =>
+            (environment.unavailable === undefined ? environment.name : `${environment.name} (unavailable: ${environment.unavailable})`));
         const count = `${collection.requests.length} request${collection.requests.length === 1 ? "" : "s"}`;
         const named = environments.length === 0 ? "none" : environments.join(", ");
         lines.push(`${collection.name} (${kind}, ${count}; environments: ${named})`);
@@ -70,9 +81,11 @@ export function listText(catalog: Catalog, settings: ApiSettings, filter: Filter
             }
             listed++;
             const needs = neededVariables(collection, request, secretNames);
+            const optional = optionalVariables(collection, request, secretNames);
             const flags = [
                 readsOf(settings, request) ? "reads" : "writes",
                 ...(needs.length > 0 ? [`needs ${needs.join(", ")}`] : []),
+                ...(optional.length > 0 ? [`optional ${optional.join(", ")}`] : []),
                 ...(refusalOf(request) === undefined ? [] : [refusalOf(request) as string]),
             ];
             lines.push(`  ${pathOf(request)}  ${request.method} ${oneLine(request.url, 90)}  [${flags.join("; ")}]`);
@@ -104,18 +117,33 @@ function variableLines(
     label: string | undefined,
 ): string[] {
     return request.variables.map((name) => {
-        if (name.startsWith("$")) return `  ${name}: made when the request is sent`;
-        if (secretNames.has(name)) {
-            const source = settings.secrets.get(name);
-            const reference = label === undefined ? source?.everywhere : source?.byEnvironment.get(label) ?? source?.everywhere;
-            return `  ${name}: secret, ${reference === undefined ? "NOT SET in api.secrets" : "set in api.secrets"}`;
-        }
-        if (request.signsIn.includes(name)) return `  ${name}: fills the sign-in, so it comes from the environment`;
-        if (environment?.variables.has(name) === true) return `  ${name}: from the environment ${label}`;
-        if (request.defaults.has(name)) return `  ${name}: from the file`;
-        if (collection.variables.has(name)) return `  ${name}: from the collection`;
-        return `  ${name}: needs a value (pass it in variables)`;
+        const line = variableLine(settings, collection, request, secretNames, environment, label, name);
+        const docs = request.variableDocs?.get(name);
+        return docs === undefined ? line : `${line} [${oneLine(docs, 160)}]`;
     });
+}
+
+function variableLine(
+    settings: ApiSettings,
+    collection: Collection,
+    request: SavedRequest,
+    secretNames: ReadonlySet<string>,
+    environment: Environment | undefined,
+    label: string | undefined,
+    name: string,
+): string {
+    if (name.startsWith("$")) return `  ${name}: made when the request is sent`;
+    if (secretNames.has(name)) {
+        const source = settings.secrets.get(name);
+        const reference = label === undefined ? source?.everywhere : source?.byEnvironment.get(label) ?? source?.everywhere;
+        return `  ${name}: secret, ${reference === undefined ? "NOT SET in api.secrets" : "set in api.secrets"}`;
+    }
+    if (request.signsIn.includes(name)) return `  ${name}: fills the sign-in, so it comes from the environment`;
+    if (environment?.variables.has(name) === true) return `  ${name}: from the environment ${label}`;
+    if (request.defaults.has(name)) return `  ${name}: from the file`;
+    if (collection.variables.has(name)) return `  ${name}: from the collection`;
+    if (request.optional?.includes(name) === true) return `  ${name}: optional, left out when not given (pass it in variables)`;
+    return `  ${name}: needs a value (pass it in variables)`;
 }
 
 export function showText(catalog: Catalog, settings: ApiSettings, request: SavedRequest, label: string | undefined): string {
@@ -153,6 +181,10 @@ export function showText(catalog: Catalog, settings: ApiSettings, request: Saved
     }
     const variables = variableLines(settings, collection, request, secretNames, environment, label);
     lines.push(variables.length === 0 ? "Variables: none" : "Variables:", ...variables);
+    if (environment?.unavailable !== undefined) lines.push(`Environment ${label}: unavailable: ${environment.unavailable}`);
+    if (request.assertions !== undefined && request.assertions.length > 0) {
+        lines.push("Asserts (declared, not run):", ...request.assertions.map((assertion) => `  ${oneLine(assertion, 160)}`));
+    }
     if (request.description !== undefined) lines.push(`Docs: ${oneLine(request.description, 400)}`);
     for (const note of request.notes) lines.push(`Note: ${note}`);
     lines.push(`From: ${request.origin}`);

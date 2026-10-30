@@ -1,0 +1,21 @@
+meta {
+  name: Key status
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/status
+  body: none
+  auth: apikey
+}
+
+auth:apikey {
+  key: X-Api-Key
+  value: {{apiKey}}
+  placement: header
+}
+
+settings {
+  encodeUrl: true
+}

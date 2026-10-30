@@ -1,0 +1,13 @@
+info:
+  name: Search orders
+  type: http
+  seq: 4
+http:
+  method: POST
+  url: "{{baseUrl}}/{{apiVersion}}/orders/search"
+  body:
+    type: json
+    data: '{"text": "{{text}}"}'
+  auth: inherit
+settings:
+  encodeUrl: true

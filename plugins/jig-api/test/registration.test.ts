@@ -11,9 +11,14 @@ import { ACTION_NAMES, parameters } from "../src/params.ts";
 import { installFakeJig } from "./support/fake-jig.ts";
 import { startFakeApi } from "./support/fake-api.ts";
 
+/** The part of Pi that the plugin uses at load: it takes a tool and a command. */
+function fakePi(tools: ToolDefinition[], commands: string[] = []): ExtensionAPI {
+    return { registerTool: (tool: ToolDefinition) => void tools.push(tool), registerCommand: (name: string) => void commands.push(name) } as unknown as ExtensionAPI;
+}
+
 function load(options = {}): ToolDefinition[] {
     const tools: ToolDefinition[] = [];
-    void jigApi(options)({ registerTool: (tool: ToolDefinition) => void tools.push(tool) } as unknown as ExtensionAPI);
+    void jigApi(options)(fakePi(tools));
     return tools;
 }
 
@@ -23,8 +28,10 @@ describe("the extension", () => {
         const jig = installFakeJig();
         try {
             const tools: ToolDefinition[] = [];
-            void plugin({ registerTool: (tool: ToolDefinition) => void tools.push(tool) } as unknown as ExtensionAPI);
+            const commands: string[] = [];
+            void plugin(fakePi(tools, commands));
             assert.equal(tools.length, 1);
+            assert.deepEqual(commands, ["api"], "and one command, /api, which refreshes what is kept in a service");
             const [tool] = tools;
             assert.equal(tool?.name, "api");
             assert.equal(tool?.label, "API");

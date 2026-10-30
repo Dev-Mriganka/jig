@@ -1,0 +1,16 @@
+meta {
+  name: Stream profile
+  type: grpc
+  seq: 3
+}
+
+grpc {
+  url: grpc://stream.staging.acme.example.test:443
+  method: /acme.Orders/Watch
+  body: grpc
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+}

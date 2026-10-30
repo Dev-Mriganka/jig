@@ -1,0 +1,21 @@
+meta {
+  name: Key in query
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/status
+  body: none
+  auth: apikey
+}
+
+auth:apikey {
+  key: api_key
+  value: {{apiKey}}
+  placement: queryparams
+}
+
+settings {
+  encodeUrl: true
+}

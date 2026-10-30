@@ -15,6 +15,9 @@
     "test": "node --import ./test/support/host.mjs --test \"plugins/*/test/*.test.ts\"",
     "check": "node test/support/link-host.mjs && tsc -p tsconfig.json"
   },
+  "dependencies": {
+    "yaml": "2.9.1"
+  },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*",

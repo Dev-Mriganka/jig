@@ -1,0 +1,15 @@
+meta {
+  name: Random number
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/random/{{$randomInt}}
+  body: none
+  auth: none
+}
+
+settings {
+  encodeUrl: true
+}

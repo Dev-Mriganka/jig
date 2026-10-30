@@ -1,0 +1,22 @@
+opencollection: 1.0.0
+info:
+  name: Acme Orders
+  version: 1.0.0
+request:
+  headers:
+    - name: X-Acme-Client
+      value: jig-tests
+  auth:
+    type: bearer
+    token: "{{token}}"
+  variables:
+    - name: apiVersion
+      value: v1
+    - name: pageSize
+      value: "10"
+      disabled: true
+extensions:
+  bruno:
+    ignore:
+      - node_modules
+      - .git

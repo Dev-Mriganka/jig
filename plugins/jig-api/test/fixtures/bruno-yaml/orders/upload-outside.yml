@@ -1,0 +1,17 @@
+info:
+  name: Upload outside
+  type: http
+  seq: 7
+http:
+  method: POST
+  url: "{{baseUrl}}/{{apiVersion}}/orders/{{orderId}}/receipt"
+  body:
+    type: multipart-form
+    data:
+      - name: receipt
+        type: file
+        value:
+          - ../outside.txt
+  auth: inherit
+settings:
+  encodeUrl: true

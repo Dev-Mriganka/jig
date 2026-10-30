@@ -1,0 +1,15 @@
+meta {
+  name: Deep status
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/status/deep
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+}
