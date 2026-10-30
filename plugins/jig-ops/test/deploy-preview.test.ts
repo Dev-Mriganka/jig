@@ -414,6 +414,9 @@ describe("a command whose outcome is unknown is never run again", () => {
     });
 
     test("a call the user cancelled while helm ran is the same, and the one look is made even so", async () => {
+        // Only the cancel may stop helm here: with the group's 250 ms limit, a slow machine hit the limit first.
+        h.close();
+        h = setupHarness({ writeTimeoutMs: 60_000 });
         h.cluster.answer(orders("1.4.2", { helmUpgrade: { stdout: UPGRADED, delayMs: 20_000 } }));
         const controller = new AbortController();
         const running = run("1.4.3", ORDERS, { signal: controller.signal });
