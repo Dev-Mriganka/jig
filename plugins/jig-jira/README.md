@@ -29,12 +29,15 @@ it, and posts it only after you press `y`.
 | `attachments` | read | The list of attachments; files are not downloaded |
 | `assignable` | read | Users who can take the issue |
 | `find_field` | read | Field ids and names matching a text |
+| `link_types` | read | The link types, with what each end reads, such as `blocks` and `is blocked by` |
 | `create` | external write, asks on the review screen | Creates an issue; the preview shows every field and possible duplicates |
 | `comment` | external write, asks on the review screen | Adds a comment |
 | `edit_comment` | external write, asks on the review screen | Replaces a comment's text |
 | `delete_comment` | external write, asks on a dialog | Deletes a comment. This cannot be undone |
 | `transition` | external write, asks on a dialog | Moves the issue; the name must match exactly one transition |
 | `update` | external write, asks on a dialog; review screen when it sets the description | Sets allowed fields such as summary, labels, priority or assignee |
+| `link` | external write, asks on a dialog | Links two issues with a link type; the preview names both and the type |
+| `unlink` | external write, asks on a dialog | Removes the link between two issues; the preview names both and the type |
 
 Writes go to `external` (or the environment you set), so they ask you by
 default. Each action's parameters, and the limits on what the tool returns, are

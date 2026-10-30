@@ -54,6 +54,17 @@ generic fix, in its own commit.
     after a lost reply goes by the text alone, so it can say "did not happen"
     but only "could not settle it" when a comment has the text.
   - **Any other failure still stops the comment.**
+- **jig-jira: `link`, `unlink` and `link_types`.**
+  - **A call reads "key <phrase> to":** `blocks` makes `key` the outward end, and
+    the inward phrase (`is blocked by`) turns it round. A name or an id means the
+    outward reading.
+  - **`unlink` finds the link by its two issues** in `key`'s own links, so the
+    model never handles a link id. `linkType` says which when there are several.
+  - **Both are external writes on a dialog:** no text, so no review screen. The
+    preview names both issues and the type, and says which issue Jira gets as
+    `outwardIssue`.
+  - **Unverified:** that `outwardIssue` is the issue that reads "blocks". It is
+    listed in the not-verified page, with where to swap it.
 
 ## 2026-10-30: Jig never signs in; it reads a credential and keeps it from the agent
 

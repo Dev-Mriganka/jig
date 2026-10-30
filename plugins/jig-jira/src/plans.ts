@@ -4,6 +4,7 @@ import type { Call } from "./params.ts";
 import type { Plan } from "./plan.ts";
 import { planComment, planDeleteComment, planEditComment } from "./plan-comment.ts";
 import { planCreate } from "./plan-create.ts";
+import { planLink, planUnlink } from "./plan-link.ts";
 import { planTransition, planUpdate } from "./plan-issue.ts";
 import { InputError } from "./values.ts";
 
@@ -22,6 +23,10 @@ export function buildPlan(env: Env, call: Call, preview: boolean): Promise<Plan>
             return planTransition(env, call);
         case "update":
             return planUpdate(env, call);
+        case "link":
+            return planLink(env, call);
+        case "unlink":
+            return planUnlink(env, call);
         default:
             throw new InputError(`jira ${call.action} is a read, so it has no plan`);
     }

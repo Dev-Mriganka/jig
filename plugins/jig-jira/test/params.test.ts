@@ -42,12 +42,15 @@ describe("the schema", () => {
             "attachments",
             "assignable",
             "find_field",
+            "link_types",
             "create",
             "comment",
             "edit_comment",
             "delete_comment",
             "transition",
             "update",
+            "link",
+            "unlink",
         ]);
     });
 
@@ -111,8 +114,8 @@ describe("a call is checked against its action's table", () => {
 
     test("an unknown action lists the actions", () => {
         assert.match(
-            problem({ action: "link" }),
-            /^jira: action must be one of get, search, comments, .* \(got "link"\)$/,
+            problem({ action: "relink" }),
+            /^jira: action must be one of get, search, comments, .* \(got "relink"\)$/,
         );
         assert.match(problem({}), /\(got undefined\)$/);
         assert.match(problem({ action: "__proto__" }), /got "__proto__"/);
@@ -317,6 +320,57 @@ describe("the values", () => {
         assert.match(
             problem({ action: "transition", key: "PROJ-1", transition: "x".repeat(101) }),
             /transition must be text of 1 to 100 characters/,
+        );
+    });
+
+    test("link and unlink take two different issue keys, and link needs a link type", () => {
+        assert.deepEqual(parse({ action: "link", key: "proj-1", to: " proj-2 ", linkType: " Blocks " }), {
+            action: "link",
+            key: "PROJ-1",
+            to: "PROJ-2",
+            linkType: "Blocks",
+        });
+        assert.deepEqual(parse({ action: "unlink", key: "PROJ-1", to: "PROJ-2" }), {
+            action: "unlink",
+            key: "PROJ-1",
+            to: "PROJ-2",
+            linkType: undefined,
+        });
+        assert.equal(
+            (parse({ action: "unlink", key: "PROJ-1", to: "PROJ-2", linkType: "is blocked by" }) as any).linkType,
+            "is blocked by",
+        );
+        assert.deepEqual(parse({ action: "link_types" }), { action: "link_types" });
+        assert.equal(usage("link"), "Usage: jira link {key, to, linkType}");
+        assert.equal(usage("unlink"), "Usage: jira unlink {key, to, linkType?}");
+        assert.equal(usage("link_types"), "Usage: jira link_types {}");
+        assert.equal(
+            problem({ action: "link", key: "PROJ-1", to: "PROJ-2" }),
+            "jira link needs linkType. Usage: jira link {key, to, linkType}",
+        );
+        assert.equal(
+            problem({ action: "unlink", key: "PROJ-1" }),
+            "jira unlink needs to. Usage: jira unlink {key, to, linkType?}",
+        );
+        assert.equal(
+            problem({ action: "link", key: "PROJ-1", to: "PROJ-1", linkType: "Blocks" }),
+            "jira link: key and to must be two different issues (both are PROJ-1)",
+        );
+        assert.equal(
+            problem({ action: "link", key: "PROJ-1", to: "next", linkType: "Blocks" }),
+            'jira link: to must be an issue key such as PROJ-123 (got "next")',
+        );
+        assert.match(
+            problem({ action: "link", key: "PROJ-1", to: "PROJ-2", linkType: "  " }),
+            /linkType must be text of 1 to 100/,
+        );
+        assert.equal(
+            problem({ action: "link_types", key: "PROJ-1" }),
+            "jira link_types does not use key. Usage: jira link_types {}",
+        );
+        assert.equal(
+            problem({ action: "get", key: "PROJ-1", to: "PROJ-2" }),
+            "jira get does not use to. Usage: jira get {key, include?, full?}",
         );
     });
 

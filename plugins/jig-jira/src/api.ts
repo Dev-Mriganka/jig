@@ -3,7 +3,7 @@
 import type { JiraSettings } from "./config.ts";
 import { JiraError, LostReplyError } from "./http.ts";
 import type { Http } from "./http.ts";
-import { arr, InputError, int, nameOf, obj, str, userOf } from "./values.ts";
+import { arr, InputError, int, isObject, nameOf, obj, str, userOf } from "./values.ts";
 import type { Obj, User } from "./values.ts";
 
 /** What later calls of one Pi session may reuse. */
@@ -75,6 +75,76 @@ export async function whoAmI(env: Env): Promise<Identity> {
             return { why: "the transport did not carry GET /myself" };
         }
         throw error;
+    }
+}
+
+// ---- links ------------------------------------------------------------------------------------------------------------
+
+/** A kind of link between issues: `Blocks` says "blocks" from one end and "is blocked by" from the other. */
+export interface LinkType {
+    id: string;
+    name: string;
+    /** What the inward end reads, such as "is blocked by". */
+    inward: string;
+    /** What the outward end reads, such as "blocks". */
+    outward: string;
+}
+
+export function linkTypeOf(value: unknown): LinkType {
+    const type = obj(value);
+    const name = str(type.name);
+    return { id: str(type.id), name, inward: str(type.inward) || name, outward: str(type.outward) || name };
+}
+
+export async function linkTypes(env: Env): Promise<LinkType[]> {
+    const answer = obj(await env.http.request({ method: "GET", path: "/issueLinkType" }));
+    return arr(answer.issueLinkTypes).map(linkTypeOf);
+}
+
+/** One link as an issue lists it: the other issue, and which end of the link the listing issue is. */
+export interface IssueLink {
+    id: string;
+    type: LinkType;
+    /** True when the listing issue is the outward end, so it reads "blocks <other>". */
+    outward: boolean;
+    other: { key: string; summary: string; status: string };
+}
+
+/** The links an issue's `issuelinks` field holds. Jira lists the other issue under `outwardIssue` or `inwardIssue`. */
+export function linksOf(fields: Obj): IssueLink[] {
+    return arr(fields.issuelinks)
+        .map(obj)
+        .map((link): IssueLink => {
+            const outward = isObject(link.outwardIssue);
+            const other = obj(outward ? link.outwardIssue : link.inwardIssue);
+            const otherFields = obj(other.fields);
+            return {
+                id: str(link.id),
+                type: linkTypeOf(link.type),
+                outward,
+                other: { key: str(other.key), summary: str(otherFields.summary), status: nameOf(otherFields.status) },
+            };
+        })
+        .filter((link) => link.other.key !== "");
+}
+
+/** What a link reads from the listing issue's side: `blocks`, or `is blocked by`. */
+export const phraseOf = (link: Pick<IssueLink, "type" | "outward">): string =>
+    link.outward ? link.type.outward : link.type.inward;
+
+/** An issue's title, status and links, for a write that is about its links. */
+export async function issueWithLinks(env: Env, key: string): Promise<IssueHead & { links: IssueLink[] }> {
+    try {
+        const issue = await getIssue(env, key, ["summary", "status", "issuelinks"]);
+        const fields = obj(issue.fields);
+        return {
+            key: str(issue.key) || key,
+            summary: str(fields.summary),
+            status: nameOf(fields.status),
+            links: linksOf(fields),
+        };
+    } catch (error) {
+        throw notFoundAsInvalid(error, key);
     }
 }
 

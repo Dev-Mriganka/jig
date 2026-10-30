@@ -1,6 +1,6 @@
 // What the model reads: Jira's answers as compact plain text. One line per issue, comment or change, no tables, and long
 // text cut with a note that says how to get the rest. Pure functions, no requests.
-import type { Comment, SearchPage, Transition } from "./api.ts";
+import type { Comment, LinkType, SearchPage, Transition } from "./api.ts";
 import { arr, day, describeValue, int, isObject, minute, nameOf, obj, oneLine, str, userOf } from "./values.ts";
 import type { Obj, User } from "./values.ts";
 
@@ -241,4 +241,16 @@ export function formatFields(
         return `No field name or id contains "${query}". Try a shorter part of the name.`;
     }
     return [`Fields matching "${query}" (id  name):`, ...found, ...named].join("\n");
+}
+
+/** The link types of this Jira: the name to pass, and what each end reads. */
+export function formatLinkTypes(types: readonly LinkType[]): string {
+    if (types.length === 0) return "This Jira has no link types (issue linking may be turned off).";
+    const rows = types.map((type) => `- ${type.name}: ${type.outward} / ${type.inward}`);
+    return [
+        `Link types (${types.length}), each as "outward phrase / inward phrase":`,
+        ...rows,
+        'link {key, to, linkType} reads "key <phrase> to": linkType is a name or a phrase above, and a phrase from the ' +
+            'second half turns the link round (key "is blocked by" to).',
+    ].join("\n");
 }

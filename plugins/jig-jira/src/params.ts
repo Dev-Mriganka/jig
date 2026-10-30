@@ -21,7 +21,9 @@ export type Param =
     | "type"
     | "summary"
     | "description"
-    | "fields";
+    | "fields"
+    | "to"
+    | "linkType";
 
 interface ActionSpec {
     kind: "read" | "write";
@@ -38,12 +40,15 @@ export const ACTIONS = {
     attachments: { kind: "read", required: ["key"], optional: [] },
     assignable: { kind: "read", required: ["key"], optional: ["query", "limit"] },
     find_field: { kind: "read", required: ["query"], optional: [] },
+    link_types: { kind: "read", required: [], optional: [] },
     create: { kind: "write", required: ["project", "type", "summary"], optional: ["description", "fields"] },
     comment: { kind: "write", required: ["key", "text"], optional: [] },
     edit_comment: { kind: "write", required: ["key", "commentId", "text"], optional: [] },
     delete_comment: { kind: "write", required: ["key", "commentId"], optional: [] },
     transition: { kind: "write", required: ["key", "transition"], optional: [] },
     update: { kind: "write", required: ["key", "fields"], optional: [] },
+    link: { kind: "write", required: ["key", "to", "linkType"], optional: [] },
+    unlink: { kind: "write", required: ["key", "to"], optional: ["linkType"] },
 } as const satisfies Record<string, ActionSpec>;
 
 export type ActionName = keyof typeof ACTIONS;
@@ -88,6 +93,12 @@ export const parameters = Type.Object({
     type: Type.Optional(Type.String({ description: "Issue type name, such as Bug" })),
     summary: Type.Optional(Type.String({ description: "One-line title" })),
     description: Type.Optional(Type.String({ description: "Description, in Jira wiki markup" })),
+    to: Type.Optional(Type.String({ description: "The other issue's key, for link and unlink" })),
+    linkType: Type.Optional(
+        Type.String({
+            description: 'Link type: a name or phrase from link_types, such as "Blocks" or "is blocked by"',
+        }),
+    ),
     fields: Type.Optional(
         Type.Unsafe<Record<string, unknown>>({
             type: "object",
@@ -122,7 +133,10 @@ export type Call =
     | { action: "edit_comment"; key: string; commentId: string; text: string }
     | { action: "delete_comment"; key: string; commentId: string }
     | { action: "transition"; key: string; transition: string }
-    | { action: "update"; key: string; fields: Fields };
+    | { action: "update"; key: string; fields: Fields }
+    | { action: "link_types" }
+    | { action: "link"; key: string; to: string; linkType: string }
+    | { action: "unlink"; key: string; to: string; linkType: string | undefined };
 
 const ISSUE_KEY = /^[A-Z][A-Z0-9_]*-[1-9][0-9]{0,9}$/;
 const PROJECT_KEY = /^[A-Z][A-Z0-9_]{0,19}$/;
@@ -170,11 +184,16 @@ export function parseCall(input: Readonly<Record<string, unknown>>): Call {
     const fail = (message: string): never => {
         throw new InputError(`jira ${action}: ${message}`);
     };
-    const issueKey = (): string => {
-        const value = typeof input.key === "string" ? input.key.trim().toUpperCase() : "";
+    const issueKey = (name: "key" | "to" = "key"): string => {
+        const value = typeof input[name] === "string" ? input[name].trim().toUpperCase() : "";
         return ISSUE_KEY.test(value)
             ? value
-            : fail(`key must be an issue key such as PROJ-123 (got ${shown(input.key)})`);
+            : fail(`${name} must be an issue key such as PROJ-123 (got ${shown(input[name])})`);
+    };
+    /** The two issues of a link: different ones. */
+    const pair = (): { key: string; to: string } => {
+        const [key, to] = [issueKey("key"), issueKey("to")];
+        return key === to ? fail(`key and to must be two different issues (both are ${key})`) : { key, to };
     };
     const commentId = (): string => {
         const { commentId: given } = input;
@@ -269,6 +288,12 @@ export function parseCall(input: Readonly<Record<string, unknown>>): Call {
             return { action, key: issueKey(), transition: words("transition", 100) };
         case "update":
             return { action, key: issueKey(), fields: fieldValues() };
+        case "link_types":
+            return { action };
+        case "link":
+            return { action, ...pair(), linkType: words("linkType", 100) };
+        case "unlink":
+            return { action, ...pair(), linkType: present(input.linkType) ? words("linkType", 100) : undefined };
     }
 }
 

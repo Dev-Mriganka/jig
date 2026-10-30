@@ -41,6 +41,8 @@ The rules for writes in full, and what each preview shows. Back to the
   | `create` | A search for the summary, created in the last 10 minutes |
   | `transition` | The issue's status |
   | `update` | The values of the fields |
+  | `link` | The issue's links: one of this type to the other issue, reading the same way |
+  | `unlink` | The issue's links: the link's id is gone, or still there |
 
   A write that Jira turned down (a 4xx answer) changed nothing and is reported
   as that. A write that never left (no sign-in) is reported as that.
@@ -70,11 +72,16 @@ The rules for writes in full, and what each preview shows. Back to the
 | `transition` | The issue, its status now and after, and the transition used |
 | `update` | Each field as `before → after`; a person is shown by name |
 | `create` | The project and type, every field with its final value, possible duplicates, and the description |
+| `link` | Both issues with their status, what `key` reads ("blocks"), the type, and what the other issue reads |
+| `unlink` | The same, for the link that is found, and its id |
 
 - **`transition`:** a name that matches no transition, or several, is refused
   with the names. A status name gets a hint at the transition that leads there.
 - **`update`:** a description is shown as source and rendered, with the text it
   replaces.
+- **`link`, `unlink`:** the note under the rows says what Jira receives: which
+  issue is `outwardIssue` (the one that reads "blocks") and which `inwardIssue`.
+  There is no text, so the dialog is enough and there is no page of its own.
 - **`create`:** a priority or component is shown as the create screen spells it.
   Possible duplicates are a summary search in the project over the last 30 days,
   up to 5.
