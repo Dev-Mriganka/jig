@@ -89,18 +89,23 @@ export function buildApi(state: JigState): JigApi {
             },
             addMaskFields: (fields) => state.addMaskFields(fields),
             registerSection(name, validate) {
-                if (typeof name !== "string" || name === "") throw new TypeError("registerSection: the section needs a name");
-                if (typeof validate !== "function") throw new TypeError(`registerSection(${name}): validate must be a function`);
+                if (typeof name !== "string" || name === "")
+                    throw new TypeError("registerSection: the section needs a name");
+                if (typeof validate !== "function")
+                    throw new TypeError(`registerSection(${name}): validate must be a function`);
                 // The names jig-core reads itself stay its own: a plugin could otherwise take over `rules`.
                 if (OWN_SECTIONS.includes(name)) {
-                    throw new Error(`registerSection: "${name}" is a jig-core field, so a plugin cannot use it for a section`);
+                    throw new Error(
+                        `registerSection: "${name}" is a jig-core field, so a plugin cannot use it for a section`,
+                    );
                 }
                 state.sectionChecks.set(name, validate);
                 // A section registered after the file was read is checked now, so the order plugins load in does not matter.
                 if (state.configLoaded) loadPersonalConfig(state, state.personal.file);
             },
             addSectionDefaults(name, defaults) {
-                if (typeof name !== "string" || name === "") throw new TypeError("addSectionDefaults: the section needs a name");
+                if (typeof name !== "string" || name === "")
+                    throw new TypeError("addSectionDefaults: the section needs a name");
                 if (OWN_SECTIONS.includes(name)) {
                     throw new Error(`addSectionDefaults: "${name}" is a jig-core field, not a plugin's section`);
                 }

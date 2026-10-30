@@ -7,7 +7,11 @@
 // Pi ignores an error thrown by a `tool_result` hook and lets the unchanged result through. That would leak, so every
 // failure in here replaces the result with a short error instead: a result is withheld, never passed unchecked.
 import type {
-    ExtensionContext, ToolExecutionEndEvent, ToolResultEvent, ToolResultEventResult, TurnEndEvent,
+    ExtensionContext,
+    ToolExecutionEndEvent,
+    ToolResultEvent,
+    ToolResultEventResult,
+    TurnEndEvent,
 } from "@earendil-works/pi-coding-agent";
 import { capContent, textOf } from "./cap.ts";
 import type { Content } from "./cap.ts";
@@ -37,12 +41,7 @@ function sameJson(a: unknown, b: unknown): boolean {
 }
 
 /** Applies a text change to the text blocks and a value change to the structured parts, and notes what changed. */
-function transform(
-    parts: Parts,
-    text: (input: string) => string,
-    value: <T>(input: T) => T,
-    changed: Changed,
-): Parts {
+function transform(parts: Parts, text: (input: string) => string, value: <T>(input: T) => T, changed: Changed): Parts {
     const content = parts.content.map((block) => {
         if (block.type !== "text") return block;
         const next = text(block.text);
@@ -57,7 +56,11 @@ function transform(
     return { content, structured, details };
 }
 
-export function toolResult(state: JigState, event: ToolResultEvent, ctx: ExtensionContext): ToolResultEventResult | undefined {
+export function toolResult(
+    state: JigState,
+    event: ToolResultEvent,
+    ctx: ExtensionContext,
+): ToolResultEventResult | undefined {
     const call = state.calls.get(event.toolCallId);
     try {
         return protect(state, event, ctx);
@@ -77,7 +80,12 @@ function protect(state: JigState, event: ToolResultEvent, ctx: ExtensionContext)
 
     // 1. Redact: every resolved secret and every secret-shaped string.
     try {
-        parts = transform(parts, (text) => state.redactor.text(text), (value) => state.redactor.value(value), changed);
+        parts = transform(
+            parts,
+            (text) => state.redactor.text(text),
+            (value) => state.redactor.value(value),
+            changed,
+        );
     } catch {
         throw new Withheld("result withheld: it could not be redacted");
     }
@@ -86,7 +94,12 @@ function protect(state: JigState, event: ToolResultEvent, ctx: ExtensionContext)
     if (masked) {
         try {
             const masker = state.masker();
-            parts = transform(parts, (text) => masker.text(text), (value) => masker.value(value), changed);
+            parts = transform(
+                parts,
+                (text) => masker.text(text),
+                (value) => masker.value(value),
+                changed,
+            );
             // An image cannot be masked, so it does not pass.
             if (parts.content.some((block) => block.type === "image")) {
                 const note: Content = { type: "text", text: "[image withheld: images cannot be masked]" };
@@ -146,33 +159,40 @@ export function finishCall(state: JigState, event: ToolExecutionEndEvent, ctx: E
         const plugin = call?.plugin;
         const parent = call?.parentToolCallId ?? event.parentToolCallId;
         writeRecord(
-            callRecord({
-                session: sessionIdOf(ctx),
-                ...(state.ticket === undefined ? {} : { ticket: state.ticket }),
-                tool: event.toolName,
-                ...(classification?.action === undefined ? {} : { action: classification.action }),
-                ...(plugin === undefined ? {} : { plugin }),
-                ...(classification === undefined || call === undefined ? {} : {
-                    environment: classification.environment,
-                    environmentKind: call.environmentKind,
-                    effect: classification.effect,
-                    decision: call.decision,
-                    decisionSource: call.decisionSource,
-                }),
-                ...(call?.approval === undefined ? {} : {
-                    approval: call.approval.kind,
-                    answer: call.approval.answer,
-                    waitedMs: call.approval.waitedMs,
-                }),
-                outcome,
-                ...(errorKind === undefined ? {} : { errorKind }),
-                ...(error === undefined ? {} : { error }),
-                ...(event.durationMs === undefined ? {} : { durationMs: event.durationMs }),
-                toolCallId: event.toolCallId,
-                ...(parent === undefined ? {} : { parentToolCallId: parent }),
-                ...(call?.spill === undefined ? {} : { spill: call.spill }),
-                ...(facts === undefined ? {} : { facts }),
-            }, state.now()),
+            callRecord(
+                {
+                    session: sessionIdOf(ctx),
+                    ...(state.ticket === undefined ? {} : { ticket: state.ticket }),
+                    tool: event.toolName,
+                    ...(classification?.action === undefined ? {} : { action: classification.action }),
+                    ...(plugin === undefined ? {} : { plugin }),
+                    ...(classification === undefined || call === undefined
+                        ? {}
+                        : {
+                              environment: classification.environment,
+                              environmentKind: call.environmentKind,
+                              effect: classification.effect,
+                              decision: call.decision,
+                              decisionSource: call.decisionSource,
+                          }),
+                    ...(call?.approval === undefined
+                        ? {}
+                        : {
+                              approval: call.approval.kind,
+                              answer: call.approval.answer,
+                              waitedMs: call.approval.waitedMs,
+                          }),
+                    outcome,
+                    ...(errorKind === undefined ? {} : { errorKind }),
+                    ...(error === undefined ? {} : { error }),
+                    ...(event.durationMs === undefined ? {} : { durationMs: event.durationMs }),
+                    toolCallId: event.toolCallId,
+                    ...(parent === undefined ? {} : { parentToolCallId: parent }),
+                    ...(call?.spill === undefined ? {} : { spill: call.spill }),
+                    ...(facts === undefined ? {} : { facts }),
+                },
+                state.now(),
+            ),
             state.now(),
         );
     } catch (error) {
@@ -185,7 +205,8 @@ function outcomeOf(
     event: ToolExecutionEndEvent,
     call: CallState | undefined,
 ): { outcome: Outcome; errorKind?: ErrorKind; error?: string } {
-    if (call?.blocked !== undefined) return { outcome: "blocked", errorKind: call.blocked.kind, error: call.blocked.line };
+    if (call?.blocked !== undefined)
+        return { outcome: "blocked", errorKind: call.blocked.kind, error: call.blocked.line };
     if (call?.withheld !== undefined) return { outcome: "error", errorKind: "withheld", error: oneLine(call.withheld) };
     if (!event.isError) return { outcome: "ok" };
     // A call that never reached the tool manager failed before its tool could run, in Pi's own checks. Pi's message can
@@ -203,16 +224,19 @@ export function finishTurn(state: JigState, event: TurnEndEvent, ctx: ExtensionC
     try {
         const { usage } = message;
         writeRecord(
-            turnRecord({
-                session: sessionIdOf(ctx),
-                ...(state.ticket === undefined ? {} : { ticket: state.ticket }),
-                model: message.model,
-                input: usage.input,
-                output: usage.output,
-                cacheRead: usage.cacheRead,
-                cacheWrite: usage.cacheWrite,
-                cost: usage.cost.total,
-            }, state.now()),
+            turnRecord(
+                {
+                    session: sessionIdOf(ctx),
+                    ...(state.ticket === undefined ? {} : { ticket: state.ticket }),
+                    model: message.model,
+                    input: usage.input,
+                    output: usage.output,
+                    cacheRead: usage.cacheRead,
+                    cacheWrite: usage.cacheWrite,
+                    cost: usage.cost.total,
+                },
+                state.now(),
+            ),
             state.now(),
         );
     } catch (error) {

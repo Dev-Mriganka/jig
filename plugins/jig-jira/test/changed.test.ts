@@ -19,7 +19,10 @@ const CHANGED = "changed since the preview; run it again to see the new preview.
 
 describe("a write whose plan differs from the approved preview is refused", () => {
     test("transition: the issue moved while the person read", async () => {
-        const result = await h.call({ action: "transition", key: "PROJ-1", transition: "Resolve Issue" }, { between: () => void (issue("PROJ-1").fields.status = { name: "Open" }) });
+        const result = await h.call(
+            { action: "transition", key: "PROJ-1", transition: "Resolve Issue" },
+            { between: () => void (issue("PROJ-1").fields.status = { name: "Open" }) },
+        );
         assert.equal(result.error?.message, `jira transition on PROJ-1: ${CHANGED}`);
         assert.equal(writes().length, 0);
         assert.deepEqual(issue("PROJ-1").fields.status, { name: "Open" });
@@ -27,26 +30,40 @@ describe("a write whose plan differs from the approved preview is refused", () =
     });
 
     test("transition: the same name now leads somewhere else", async () => {
-        const result = await h.call({ action: "transition", key: "PROJ-1", transition: "Resolve Issue" }, {
-            between: () => void (issue("PROJ-1").transitions[1] = { id: "32", name: "Resolve Issue", to: "Closed" }),
-        });
+        const result = await h.call(
+            { action: "transition", key: "PROJ-1", transition: "Resolve Issue" },
+            {
+                between: () =>
+                    void (issue("PROJ-1").transitions[1] = { id: "32", name: "Resolve Issue", to: "Closed" }),
+            },
+        );
         assert.match(result.error?.message ?? "", /changed since the preview/);
         assert.equal(writes().length, 0);
     });
 
     test("comment: it would now be posted by someone else", async () => {
-        const result = await h.call({ action: "comment", key: "PROJ-1", text: "hi" }, { between: () => void (h.jira.me = h.jira.users[1] as typeof h.jira.me) });
+        const result = await h.call(
+            { action: "comment", key: "PROJ-1", text: "hi" },
+            { between: () => void (h.jira.me = h.jira.users[1] as typeof h.jira.me) },
+        );
         assert.equal(result.error?.message, `jira comment on PROJ-1: ${CHANGED}`);
         assert.equal(writes().length, 0);
     });
 
     test("edit_comment and delete_comment: the comment was edited by someone else", async () => {
-        const edit = () => void (issue("PROJ-1").comments.find((comment) => comment.id === "10003")!.body = "Edited meanwhile.");
-        const edited = await h.call({ action: "edit_comment", key: "PROJ-1", commentId: "10003", text: "mine" }, { between: edit });
+        const edit = () =>
+            void (issue("PROJ-1").comments.find((comment) => comment.id === "10003")!.body = "Edited meanwhile.");
+        const edited = await h.call(
+            { action: "edit_comment", key: "PROJ-1", commentId: "10003", text: "mine" },
+            { between: edit },
+        );
         assert.equal(edited.error?.message, `jira edit_comment on PROJ-1: ${CHANGED}`);
         const deleted = await h.call(
             { action: "delete_comment", key: "PROJ-1", commentId: "10003" },
-            { between: () => void (issue("PROJ-1").comments.find((comment) => comment.id === "10003")!.body = "Edited again.") },
+            {
+                between: () =>
+                    void (issue("PROJ-1").comments.find((comment) => comment.id === "10003")!.body = "Edited again."),
+            },
         );
         assert.equal(deleted.error?.message, `jira delete_comment on PROJ-1: ${CHANGED}`);
         assert.equal(writes().length, 0);
@@ -54,38 +71,65 @@ describe("a write whose plan differs from the approved preview is refused", () =
     });
 
     test("update: a field it changes was changed by someone else", async () => {
-        const result = await h.call({ action: "update", key: "PROJ-2", fields: { labels: ["docs"], summary: "New title" } }, { between: () => void (issue("PROJ-2").fields.labels = ["other"]) });
+        const result = await h.call(
+            { action: "update", key: "PROJ-2", fields: { labels: ["docs"], summary: "New title" } },
+            { between: () => void (issue("PROJ-2").fields.labels = ["other"]) },
+        );
         assert.equal(result.error?.message, `jira update on PROJ-2: ${CHANGED}`);
         assert.equal(writes().length, 0);
     });
 
     test("update and create: a person now means someone else", async () => {
         const rename = () => void ((h.jira.users[1] as { accountId: string }).accountId = "712020:ffff-1111");
-        const update = await h.call({ action: "update", key: "PROJ-2", fields: { assignee: "Sam Lee" } }, { between: rename });
+        const update = await h.call(
+            { action: "update", key: "PROJ-2", fields: { assignee: "Sam Lee" } },
+            { between: rename },
+        );
         assert.equal(update.error?.message, `jira update on PROJ-2: ${CHANGED}`);
         h.reset();
-        const create = await h.call({ action: "create", project: "PROJ", type: "Bug", summary: "A bug", fields: { assignee: "Sam Lee" } }, { between: rename });
+        const create = await h.call(
+            { action: "create", project: "PROJ", type: "Bug", summary: "A bug", fields: { assignee: "Sam Lee" } },
+            { between: rename },
+        );
         assert.equal(create.error?.message, `jira create: ${CHANGED}`);
         assert.equal(writes().length, 0);
     });
 
     test("it is the plan that counts, not the clock: an issue that merely got a new comment is still the same write", async () => {
-        const result = await h.call({ action: "transition", key: "PROJ-1", transition: "Resolve Issue" }, {
-            between: () => void issue("PROJ-1").comments.push({ id: "99", author: h.jira.users[1]!, body: "new", created: "2026-10-30T10:00:00.000+0000", updated: "2026-10-30T10:00:00.000+0000" }),
-        });
+        const result = await h.call(
+            { action: "transition", key: "PROJ-1", transition: "Resolve Issue" },
+            {
+                between: () =>
+                    void issue("PROJ-1").comments.push({
+                        id: "99",
+                        author: h.jira.users[1]!,
+                        body: "new",
+                        created: "2026-10-30T10:00:00.000+0000",
+                        updated: "2026-10-30T10:00:00.000+0000",
+                    }),
+            },
+        );
         assert.equal(ok(result), 'PROJ-1 moved from In Progress to Done (transition "Resolve Issue").');
     });
 });
 
 describe("when nothing was approved there is nothing to compare", () => {
     test("a call that did not ask runs on the state it finds", async () => {
-        const result = await h.call({ action: "transition", key: "PROJ-1", transition: "Resolve Issue" }, { ask: false, between: () => void (issue("PROJ-1").fields.status = { name: "Open" }) });
+        const result = await h.call(
+            { action: "transition", key: "PROJ-1", transition: "Resolve Issue" },
+            { ask: false, between: () => void (issue("PROJ-1").fields.status = { name: "Open" }) },
+        );
         assert.equal(result.preview, undefined);
         assert.equal(ok(result), 'PROJ-1 moved from Open to Done (transition "Resolve Issue").');
     });
 
     test("a preview that could not be built has no fingerprint, and the person's choice stands", async () => {
-        h.jira.misbehave({ match: (request) => request.path === "/issue/PROJ-1", status: 502, apply: false, afterMs: 0 });
+        h.jira.misbehave({
+            match: (request) => request.path === "/issue/PROJ-1",
+            status: 502,
+            apply: false,
+            afterMs: 0,
+        });
         const result = await h.call({ action: "comment", key: "PROJ-1", text: "hi" });
         assert.match(result.preview?.summary ?? "", /^preview unavailable/);
         assert.equal(result.preview?.fingerprint, undefined);
@@ -95,7 +139,10 @@ describe("when nothing was approved there is nothing to compare", () => {
 
 describe("the refusal", () => {
     test("says what to do, and names the call without the text", async () => {
-        const result = await h.call({ action: "comment", key: "PROJ-1", text: "SECRET-TEXT" }, { between: () => void (h.jira.me = h.jira.users[1] as typeof h.jira.me) });
+        const result = await h.call(
+            { action: "comment", key: "PROJ-1", text: "SECRET-TEXT" },
+            { between: () => void (h.jira.me = h.jira.users[1] as typeof h.jira.me) },
+        );
         assert.match(result.error?.message ?? "", /run it again to see the new preview/);
         assert.doesNotMatch(result.error?.message ?? "", /SECRET-TEXT/);
     });
@@ -105,7 +152,10 @@ describe("the refusal", () => {
         const refused = await h.call(call, { between: () => void (issue("PROJ-1").fields.status = { name: "Open" }) });
         assert.ok(refused.error);
         const again = await h.call(call);
-        assert.equal(again.preview?.summary, 'Move PROJ-1 "Fix login crash on Safari" from Open to Done (transition "Resolve Issue")');
+        assert.equal(
+            again.preview?.summary,
+            'Move PROJ-1 "Fix login crash on Safari" from Open to Done (transition "Resolve Issue")',
+        );
         assert.equal(ok(again), 'PROJ-1 moved from Open to Done (transition "Resolve Issue").');
     });
 });

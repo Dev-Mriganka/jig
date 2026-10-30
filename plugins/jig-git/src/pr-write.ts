@@ -558,7 +558,9 @@ export async function planMerge(
                     }),
                 );
                 return (
-                    auto ? now.autoMergeRequest !== null && now.autoMergeRequest !== undefined : now.state === "MERGED"
+                    auto
+                        ? now.autoMergeRequest !== null && now.autoMergeRequest !== undefined
+                        : now.state === "MERGED"
                 )
                     ? done
                     : undefined;

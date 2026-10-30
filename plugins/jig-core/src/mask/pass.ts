@@ -117,11 +117,16 @@ export class Pass implements Host {
     /** Usage counters such as `tokens` or `input_tokens: 42` are metrics; credential fields named that way are not. */
     #isNumericTokenCount(key: string, value: unknown, parent: string): boolean {
         const numeric =
-            typeof value === "number" || typeof value === "bigint" || value === null || value === undefined ||
+            typeof value === "number" ||
+            typeof value === "bigint" ||
+            value === null ||
+            value === undefined ||
             (typeof value === "object" && !Array.isArray(value) && isRawNumber(value));
-        return numeric &&
+        return (
+            numeric &&
             (key === "tokens" || key.endsWith("_tokens") || key.startsWith("tokens_") || key.includes("_tokens_")) &&
-            this.kindOf(key.replaceAll("tokens", "units"), parent) !== "credential";
+            this.kindOf(key.replaceAll("tokens", "units"), parent) !== "credential"
+        );
     }
 
     // ---- scalars -----------------------------------------------------------------------------------------
@@ -134,12 +139,18 @@ export class Pass implements Host {
             case "user":
             case "personal":
                 return this.tokens.mint(kind, text);
-            case "ip": return maskIpAddresses(text, this); // public addresses only; a hostname is left as it is
-            case "phone": return this.#phone(text);
-            case "card": return this.#card(text);
-            case "identifier": return this.#identifier(text, depth);
-            case "safe": return this.#safeValue(text);
-            case "other": return this.text(text, depth);
+            case "ip":
+                return maskIpAddresses(text, this); // public addresses only; a hostname is left as it is
+            case "phone":
+                return this.#phone(text);
+            case "card":
+                return this.#card(text);
+            case "identifier":
+                return this.#identifier(text, depth);
+            case "safe":
+                return this.#safeValue(text);
+            case "other":
+                return this.text(text, depth);
             default: // every other kind is removed whole
                 return removed(kind);
         }

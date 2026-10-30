@@ -13,8 +13,12 @@ import { passed, rig, savedFile, scripted, seconds } from "./support/watches.ts"
 import type { Rig } from "./support/watches.ts";
 
 const state = tempState();
-beforeEach(() => { state.start(); });
-afterEach(() => { state.stop(); });
+beforeEach(() => {
+    state.start();
+});
+afterEach(() => {
+    state.stop();
+});
 
 const SECOND = 1000;
 const MINUTE = 60 * SECOND;
@@ -24,7 +28,11 @@ let sessions = 0;
 
 /** A rig with a session started and one kind registered, and a started watch. Each call has a session of its own, so
  *  the watches of one call are not picked up by the next in the same state folder. */
-function started(answer: Parameters<typeof scripted>[2], extra: Partial<WatchKind<unknown, unknown>> = {}, watch: { timeoutMinutes?: number; stallMinutes?: number } = {}) {
+function started(
+    answer: Parameters<typeof scripted>[2],
+    extra: Partial<WatchKind<unknown, unknown>> = {},
+    watch: { timeoutMinutes?: number; stallMinutes?: number } = {},
+) {
     const r = rig();
     const { kind, polls } = scripted(r.clock, "k", answer, extra);
     r.engine.registerKind(kind);
@@ -38,7 +46,10 @@ describe("registering kinds", () => {
     test("a watch needs a registered kind, and the error says what is missing", () => {
         const r = rig();
         r.begin();
-        assert.throws(() => r.engine.start({ kind: "nope", spec: {}, title: "t" }), /no watch kind is registered as "nope": is the plugin that supplies it loaded\?/);
+        assert.throws(
+            () => r.engine.start({ kind: "nope", spec: {}, title: "t" }),
+            /no watch kind is registered as "nope": is the plugin that supplies it loaded\?/,
+        );
         assert.equal(existsSync(path.join(state.dir, "watches")), false, "nothing was saved");
         assert.deepEqual(r.engine.list(), []);
     });
@@ -72,8 +83,15 @@ describe("registering kinds", () => {
         const r = rig();
         const ok = scripted(r.clock, "k", () => ({ state: 1 })).kind;
         for (const bad of [
-            undefined, {}, { ...ok, kind: "" }, { ...ok, plugin: "" }, { ...ok, intervalMs: 0 }, { ...ok, intervalMs: Number.NaN },
-            { ...ok, intervalMs: "30000" }, { ...ok, poll: undefined }, { ...ok, describe: undefined },
+            undefined,
+            {},
+            { ...ok, kind: "" },
+            { ...ok, plugin: "" },
+            { ...ok, intervalMs: 0 },
+            { ...ok, intervalMs: Number.NaN },
+            { ...ok, intervalMs: "30000" },
+            { ...ok, poll: undefined },
+            { ...ok, describe: undefined },
         ]) {
             assert.throws(() => r.engine.registerKind(bad as never), TypeError, JSON.stringify(bad));
         }
@@ -137,8 +155,14 @@ describe("starting a watch", () => {
         assert.throws(() => r.engine.start({ kind: "k", spec: {}, title: "" }), /needs a title/);
         assert.throws(() => r.engine.start({ kind: "k", spec: {}, title: "  " }), /needs a title/);
         for (const bad of [0, -5, Number.NaN, Number.POSITIVE_INFINITY, "30" as unknown as number]) {
-            assert.throws(() => r.engine.start({ kind: "k", spec: {}, title: "t", timeoutMinutes: bad }), /timeoutMinutes must be a number of minutes above 0/);
-            assert.throws(() => r.engine.start({ kind: "k", spec: {}, title: "t", stallMinutes: bad }), /stallMinutes must be a number of minutes above 0/);
+            assert.throws(
+                () => r.engine.start({ kind: "k", spec: {}, title: "t", timeoutMinutes: bad }),
+                /timeoutMinutes must be a number of minutes above 0/,
+            );
+            assert.throws(
+                () => r.engine.start({ kind: "k", spec: {}, title: "t", stallMinutes: bad }),
+                /stallMinutes must be a number of minutes above 0/,
+            );
         }
         assert.equal(r.engine.list().length, 0, "nothing was started");
     });
@@ -147,7 +171,11 @@ describe("starting a watch", () => {
         const r = rig();
         r.engine.registerKind(scripted(r.clock, "k", () => ({ state: 1 })).kind);
         r.begin();
-        const id = r.engine.start({ kind: "k", spec: {}, title: `checks\nof\u001b[31m pull\u0007 request ${"x".repeat(300)}` });
+        const id = r.engine.start({
+            kind: "k",
+            spec: {},
+            title: `checks\nof\u001b[31m pull\u0007 request ${"x".repeat(300)}`,
+        });
         const title = savedFile(state.dir, id).title;
         assert.ok(title.startsWith("checks of pull request "), title);
         assert.ok(!/[\u0000-\u001f]/.test(title));
@@ -183,7 +211,10 @@ describe("polling", () => {
         const { r, polls, from } = started((n) => ({ state: { n } }));
         await r.clock.advance(5 * MINUTE);
         assert.deepEqual(seconds(polls, from), [2, 32, 62, 92, 122, 152, 182, 212, 242, 272]);
-        assert.deepEqual(polls.map((polled) => polled.state), [undefined, ...Array.from({ length: 9 }, (_, i) => ({ n: i + 1 }))]);
+        assert.deepEqual(
+            polls.map((polled) => polled.state),
+            [undefined, ...Array.from({ length: 9 }, (_, i) => ({ n: i + 1 }))],
+        );
     });
 
     test("saves the state after every poll, so a restart goes on from there", async () => {
@@ -197,7 +228,10 @@ describe("polling", () => {
 
     test("the poll can ask for the next one sooner or later (nextPollMs)", async () => {
         const asks = [12_000, 45_000, undefined];
-        const { r, polls, from } = started((n) => ({ state: n, ...(asks[n - 1] === undefined ? {} : { nextPollMs: asks[n - 1] as number }) }));
+        const { r, polls, from } = started((n) => ({
+            state: n,
+            ...(asks[n - 1] === undefined ? {} : { nextPollMs: asks[n - 1] as number }),
+        }));
         await r.clock.advance(2 * MINUTE);
         assert.deepEqual(seconds(polls, from), [2, 14, 59, 89, 119]);
     });
@@ -220,16 +254,23 @@ describe("polling", () => {
     });
 
     test("a nextPollMs that is not a number is ignored", async () => {
-        const { r, polls, from } = started((n) => ({ state: n, nextPollMs: n === 1 ? ("soon" as unknown as number) : Number.NaN }));
+        const { r, polls, from } = started((n) => ({
+            state: n,
+            nextPollMs: n === 1 ? ("soon" as unknown as number) : Number.NaN,
+        }));
         await r.clock.advance(70 * SECOND);
         assert.deepEqual(seconds(polls, from), [2, 32, 62]);
     });
 
     test("the next poll waits for a slow poll to end: they never overlap", async () => {
         let release: (() => void) | undefined;
-        const { r, polls, from } = started((n) => (n === 1
-            ? new Promise<PollOutcome<unknown>>((resolve) => { release = () => resolve({ state: 1 }); })
-            : { state: n }));
+        const { r, polls, from } = started((n) =>
+            n === 1
+                ? new Promise<PollOutcome<unknown>>((resolve) => {
+                      release = () => resolve({ state: 1 });
+                  })
+                : { state: n },
+        );
         await r.clock.advance(50 * SECOND);
         assert.equal(polls.length, 1, "the first poll is still out");
         release?.();
@@ -254,7 +295,10 @@ describe("polling", () => {
 
     test("an answer that is not an outcome is a failed poll, like a throw", async () => {
         const answers: unknown[] = [
-            undefined, null, 42, "done",
+            undefined,
+            null,
+            42,
+            "done",
             { state: 1, done: { outcome: "great", summary: "x" } },
             { state: 1, done: { outcome: "passed" } },
             { state: 1, done: { outcome: "passed", summary: "x", links: "https://x" } },
@@ -283,7 +327,11 @@ describe("polling", () => {
     });
 
     test("a poll function that throws before it returns a promise is a failed poll too", async () => {
-        const { r, id } = started(() => ({ state: 1 }), { poll: (() => { throw new Error("not even a promise"); }) as never });
+        const { r, id } = started(() => ({ state: 1 }), {
+            poll: (() => {
+                throw new Error("not even a promise");
+            }) as never,
+        });
         await r.clock.advance(FIRST_POLL_MS);
         assert.equal(savedFile(state.dir, id).failures, 1);
     });
@@ -291,22 +339,38 @@ describe("polling", () => {
 
 describe("finishing", () => {
     test("a poll that is done ends the watch: saved, announced once, and the agent told once", async () => {
-        const { r, polls, id } = started((n) => (n < 3 ? { state: n } : {
-            state: n,
-            done: { outcome: "passed", summary: "12 of 12 checks passed", details: "build ok\ntest ok", links: ["https://ci.example/run/7"], facts: { passed: 12 } },
-        }));
+        const { r, polls, id } = started((n) =>
+            n < 3
+                ? { state: n }
+                : {
+                      state: n,
+                      done: {
+                          outcome: "passed",
+                          summary: "12 of 12 checks passed",
+                          details: "build ok\ntest ok",
+                          links: ["https://ci.example/run/7"],
+                          facts: { passed: 12 },
+                      },
+                  },
+        );
         await r.clock.advance(FIRST_POLL_MS + 60 * SECOND);
         assert.equal(polls.length, 3);
 
         const saved = savedFile(state.dir, id);
         assert.equal(saved.status, "done");
         assert.deepEqual(saved.result, {
-            outcome: "passed", summary: "12 of 12 checks passed", details: "build ok\ntest ok", links: ["https://ci.example/run/7"], facts: { passed: 12 },
+            outcome: "passed",
+            summary: "12 of 12 checks passed",
+            details: "build ok\ntest ok",
+            links: ["https://ci.example/run/7"],
+            facts: { passed: 12 },
         });
         assert.equal(saved.finishedAt, new Date(polls[2]?.at ?? 0).toISOString());
         assert.equal("state" in saved, false, "a finished watch needs no poll state");
 
-        assert.deepEqual(r.events, [{ id, kind: "k", plugin: "jig-test", title: "checks of pull request 42", result: saved.result }]);
+        assert.deepEqual(r.events, [
+            { id, kind: "k", plugin: "jig-test", title: "checks of pull request 42", result: saved.result },
+        ]);
         assert.equal(r.sent.length, 0, "the agent is told after the 1 s that results are given to arrive together");
         await r.clock.advance(SECOND);
         assert.equal(r.sent.length, 1);
@@ -333,18 +397,24 @@ describe("finishing", () => {
     test("the agent's message is built from the title, the outcome, the summary, a few detail lines and the links", async () => {
         const details = Array.from({ length: 14 }, (_, i) => `line ${i + 1}`).join("\n");
         const links = Array.from({ length: 7 }, (_, i) => `https://ci.example/${i + 1}`);
-        const { r } = started(() => ({ state: 1, done: { outcome: "failed", summary: "2 of 12 checks failed: build, lint", details, links } }));
+        const { r } = started(() => ({
+            state: 1,
+            done: { outcome: "failed", summary: "2 of 12 checks failed: build, lint", details, links },
+        }));
         await r.clock.advance(FIRST_POLL_MS + SECOND);
-        assert.equal(r.sent[0]?.content, [
-            'The watch "checks of pull request 42" failed.',
-            "2 of 12 checks failed: build, lint",
-            "Details:",
-            ...Array.from({ length: 10 }, (_, i) => `  line ${i + 1}`),
-            "  [4 more lines not shown]",
-            "Links:",
-            ...links.slice(0, 5).map((link) => `  ${link}`),
-            "  [2 more links not shown]",
-        ].join("\n"));
+        assert.equal(
+            r.sent[0]?.content,
+            [
+                'The watch "checks of pull request 42" failed.',
+                "2 of 12 checks failed: build, lint",
+                "Details:",
+                ...Array.from({ length: 10 }, (_, i) => `  line ${i + 1}`),
+                "  [4 more lines not shown]",
+                "Links:",
+                ...links.slice(0, 5).map((link) => `  ${link}`),
+                "  [2 more links not shown]",
+            ].join("\n"),
+        );
     });
 
     test("a watch with only a summary gets a short message", async () => {
@@ -356,11 +426,25 @@ describe("finishing", () => {
     test("the message carries what a screen or another plugin needs, besides its text", async () => {
         const { r, id } = started(() => passed());
         await r.clock.advance(FIRST_POLL_MS + SECOND);
-        assert.deepEqual(r.sent[0]?.details, { watches: [{ id, kind: "k", plugin: "jig-test", title: "checks of pull request 42", event: "finished", outcome: "passed" }] });
+        assert.deepEqual(r.sent[0]?.details, {
+            watches: [
+                {
+                    id,
+                    kind: "k",
+                    plugin: "jig-test",
+                    title: "checks of pull request 42",
+                    event: "finished",
+                    outcome: "passed",
+                },
+            ],
+        });
     });
 
     test("a plugin that ends a watch with the outcome stopped still tells the agent: nobody asked for that one", async () => {
-        const { r } = started(() => ({ state: 1, done: { outcome: "stopped", summary: "the pull request was closed" } }));
+        const { r } = started(() => ({
+            state: 1,
+            done: { outcome: "stopped", summary: "the pull request was closed" },
+        }));
         await r.clock.advance(FIRST_POLL_MS + SECOND);
         assert.equal(r.sent.length, 1);
         assert.match(r.sent[0]?.content ?? "", /was stopped\.\nthe pull request was closed/);
@@ -373,7 +457,11 @@ describe("the deadline", () => {
         await r.clock.advance(HOUR + 10 * MINUTE);
         const times = seconds(polls, from);
         assert.equal(times.at(-1), 3600, "the last poll is exactly at the deadline");
-        assert.equal(times.at(-2), 3572, "the one before it keeps the cadence, and the next would have been past the deadline");
+        assert.equal(
+            times.at(-2),
+            3572,
+            "the one before it keeps the cadence, and the next would have been past the deadline",
+        );
         assert.ok(times.every((time) => time <= 3600));
 
         const saved = savedFile(state.dir, id);
@@ -384,7 +472,10 @@ describe("the deadline", () => {
         assert.equal(r.events.length, 1);
         assert.equal(r.events[0]?.result.outcome, "timed-out");
         assert.equal(r.sent.length, 1);
-        assert.match(r.sent[0]?.content ?? "", /^The watch "checks of pull request 42" timed out\.\nIt was not finished after 1 h/);
+        assert.match(
+            r.sent[0]?.content ?? "",
+            /^The watch "checks of pull request 42" timed out\.\nIt was not finished after 1 h/,
+        );
         assert.equal(r.clock.pending(), 0);
     });
 
@@ -392,11 +483,18 @@ describe("the deadline", () => {
         const { r, polls, from, id } = started((n) => ({ state: n }), {}, { timeoutMinutes: 2 });
         await r.clock.advance(5 * MINUTE);
         assert.deepEqual(seconds(polls, from), [2, 32, 62, 92, 120]);
-        assert.equal(savedFile(state.dir, id).result?.summary, "It was not finished after 2 min, so Pi stopped watching.");
+        assert.equal(
+            savedFile(state.dir, id).result?.summary,
+            "It was not finished after 2 min, so Pi stopped watching.",
+        );
     });
 
     test("the last poll can still find the watch done, and then it is not timed out", async () => {
-        const { r, polls, id } = started((n) => (n === 5 ? passed("finished at the last moment") : { state: n }), {}, { timeoutMinutes: 2 });
+        const { r, polls, id } = started(
+            (n) => (n === 5 ? passed("finished at the last moment") : { state: n }),
+            {},
+            { timeoutMinutes: 2 },
+        );
         await r.clock.advance(5 * MINUTE);
         assert.equal(polls.length, 5);
         assert.equal(savedFile(state.dir, id).result?.outcome, "passed");
@@ -404,19 +502,36 @@ describe("the deadline", () => {
     });
 
     test("a last poll that fails ends the watch as timed out, and says why", async () => {
-        const { r, id } = started((n) => { if (n === 5) throw new Error("GitHub said 502"); return { state: n }; }, {}, { timeoutMinutes: 2 });
+        const { r, id } = started(
+            (n) => {
+                if (n === 5) throw new Error("GitHub said 502");
+                return { state: n };
+            },
+            {},
+            { timeoutMinutes: 2 },
+        );
         await r.clock.advance(5 * MINUTE);
         const result = savedFile(state.dir, id).result;
         assert.equal(result?.outcome, "timed-out");
-        assert.equal(result?.summary, "It was not finished after 2 min, so Pi stopped watching. The last check failed: GitHub said 502");
+        assert.equal(
+            result?.summary,
+            "It was not finished after 2 min, so Pi stopped watching. The last check failed: GitHub said 502",
+        );
     });
 
     test("a poll that was out when the deadline passed is the last one", async () => {
         let release: (() => void) | undefined;
         // The deadline is at 120 s. The poll at 92 s is slow and answers at 130 s.
-        const { r, polls, id } = started((n) => (n === 4
-            ? new Promise<PollOutcome<unknown>>((resolve) => { release = () => resolve({ state: 4 }); })
-            : { state: n }), {}, { timeoutMinutes: 2 });
+        const { r, polls, id } = started(
+            (n) =>
+                n === 4
+                    ? new Promise<PollOutcome<unknown>>((resolve) => {
+                          release = () => resolve({ state: 4 });
+                      })
+                    : { state: n },
+            {},
+            { timeoutMinutes: 2 },
+        );
         await r.clock.advance(100 * SECOND);
         assert.equal(polls.length, 4);
         await r.clock.advance(30 * SECOND);
@@ -435,7 +550,10 @@ describe("a watch that outlives its stall time", () => {
         await r.clock.advance(2 * MINUTE);
         assert.equal(r.shown.length, 1);
         assert.equal(r.shown[0]?.level, "warning");
-        assert.match(r.shown[0]?.message ?? "", /^Still waiting for "checks of pull request 42": it has been running for 30 min\.$/);
+        assert.match(
+            r.shown[0]?.message ?? "",
+            /^Still waiting for "checks of pull request 42": it has been running for 30 min\.$/,
+        );
         assert.ok((polls.at(-1)?.at ?? 0) > from + 30 * MINUTE);
         await r.clock.advance(20 * MINUTE);
         assert.equal(r.shown.length, 1, "once, however long it goes on");
@@ -494,7 +612,9 @@ describe("a watch that outlives its stall time", () => {
 });
 
 describe("polls that fail", () => {
-    const fails = (message = "GitHub said 502") => { throw new Error(message); };
+    const fails = (message = "GitHub said 502") => {
+        throw new Error(message);
+    };
 
     test("three in a row pause the watch, with one notice to the user and one message to the agent", async () => {
         const { r, polls, id } = started(() => fails("the login expired"));
@@ -505,16 +625,27 @@ describe("polls that fail", () => {
 
         assert.equal(r.shown.length, 1);
         assert.equal(r.shown[0]?.level, "warning");
-        assert.match(r.shown[0]?.message ?? "", /^Paused "checks of pull request 42": 3 polls in a row failed \(the login expired\)\. It starts again when this session next starts\.$/);
+        assert.match(
+            r.shown[0]?.message ?? "",
+            /^Paused "checks of pull request 42": 3 polls in a row failed \(the login expired\)\. It starts again when this session next starts\.$/,
+        );
         assert.equal(r.sent.length, 1);
-        assert.equal(r.sent[0]?.content, [
-            'The watch "checks of pull request 42" is paused: its last 3 polls in a row failed. The last error was: the login expired',
-            `It starts again when this session next starts. To give it up now, stop it with the watch tool (id ${id}).`,
-        ].join("\n"));
-        assert.deepEqual(r.sent[0]?.details, { watches: [{ id, kind: "k", plugin: "jig-test", title: "checks of pull request 42", event: "paused" }] });
+        assert.equal(
+            r.sent[0]?.content,
+            [
+                'The watch "checks of pull request 42" is paused: its last 3 polls in a row failed. The last error was: the login expired',
+                `It starts again when this session next starts. To give it up now, stop it with the watch tool (id ${id}).`,
+            ].join("\n"),
+        );
+        assert.deepEqual(r.sent[0]?.details, {
+            watches: [{ id, kind: "k", plugin: "jig-test", title: "checks of pull request 42", event: "paused" }],
+        });
         assert.deepEqual(r.events, [], "a paused watch has not ended");
         assert.equal(r.clock.pending(), 0);
-        assert.deepEqual(r.engine.list().map((watch) => watch.status), ["paused"]);
+        assert.deepEqual(
+            r.engine.list().map((watch) => watch.status),
+            ["paused"],
+        );
     });
 
     test("a poll that works in between starts the count again", async () => {
@@ -535,8 +666,12 @@ describe("polls that fail", () => {
     });
 
     test("the error in the notices is cleaned, on one line, and short", async () => {
-        const cleaning = rig({ protect: { redact: (text) => text.replaceAll("SECRET", "[redacted]"), mask: (text) => text } });
-        cleaning.engine.registerKind(scripted(cleaning.clock, "k", () => fails(`line one\nline two SECRET ${"y".repeat(400)}`)).kind);
+        const cleaning = rig({
+            protect: { redact: (text) => text.replaceAll("SECRET", "[redacted]"), mask: (text) => text },
+        });
+        cleaning.engine.registerKind(
+            scripted(cleaning.clock, "k", () => fails(`line one\nline two SECRET ${"y".repeat(400)}`)).kind,
+        );
         cleaning.begin();
         cleaning.engine.start({ kind: "k", spec: {}, title: "t" });
         await cleaning.clock.advance(5 * MINUTE);
@@ -571,7 +706,10 @@ describe("polls that fail", () => {
         second.begin();
         assert.equal(savedFile(state.dir, id).status, "open");
         assert.equal(savedFile(state.dir, id).failures, 0);
-        assert.deepEqual(second.engine.list().map((watch) => watch.status), ["open"]);
+        assert.deepEqual(
+            second.engine.list().map((watch) => watch.status),
+            ["open"],
+        );
         await second.clock.advance(5 * MINUTE);
         assert.ok(polls.length > 3, "polled again, and two failures do not pause it");
         assert.equal(savedFile(state.dir, id).status, "open");
@@ -610,7 +748,10 @@ describe("saved watches and a restart of Pi", () => {
         const { kind, polls } = scripted(second.clock, "k", (n) => ({ state: { n: 100 + n } }));
         second.engine.registerKind(kind);
         second.begin();
-        assert.deepEqual(second.engine.list().map((watch) => [watch.id, watch.title, watch.status]), [[id, "checks of pull request 42", "open"]]);
+        assert.deepEqual(
+            second.engine.list().map((watch) => [watch.id, watch.title, watch.status]),
+            [[id, "checks of pull request 42", "open"]],
+        );
         const reopened = second.clock.now();
         await second.clock.advance(FIRST_POLL_MS - 1);
         assert.equal(polls.length, 0);
@@ -637,7 +778,10 @@ describe("saved watches and a restart of Pi", () => {
         second.begin();
         await second.clock.advance(FIRST_POLL_MS + SECOND);
         assert.equal(second.sent.length, 1);
-        assert.equal(second.sent[0]?.content, 'While Pi was closed: the watch "checks of pull request 42" passed.\nall 12 checks passed');
+        assert.equal(
+            second.sent[0]?.content,
+            'While Pi was closed: the watch "checks of pull request 42" passed.\nall 12 checks passed',
+        );
         assert.equal(second.sent[0]?.details.watches[0]?.afterRestart, true);
         assert.equal(second.events.length, 1);
     });
@@ -693,12 +837,18 @@ describe("saved watches and a restart of Pi", () => {
         const { kind, polls } = scripted(second.clock, "k", (n) => ({ state: n }));
         second.engine.registerKind(kind);
         second.begin("session-a");
-        assert.deepEqual(second.engine.list().map((watch) => watch.id), [mine]);
+        assert.deepEqual(
+            second.engine.list().map((watch) => watch.id),
+            [mine],
+        );
         assert.equal(second.engine.stop(theirs), false, "it is not this session's to stop");
         await second.clock.advance(10 * MINUTE);
         assert.deepEqual(savedFile(state.dir, theirs), before, "untouched");
         assert.ok(polls.length > 0);
-        assert.ok(polls.every((polled) => (polled.spec as { who: string }).who === "mine"), "only this session's watch was polled");
+        assert.ok(
+            polls.every((polled) => (polled.spec as { who: string }).who === "mine"),
+            "only this session's watch was polled",
+        );
     });
 
     test("a watch whose kind is not registered stays saved, and shows as waiting for its plugin", async () => {
@@ -748,13 +898,19 @@ describe("saved watches and a restart of Pi", () => {
         first.engine.end();
         const folder = path.join(state.dir, "watches");
         writeFileSync(path.join(folder, "abcdefgh.json"), "{ not json");
-        writeFileSync(path.join(folder, "bcdefghj.json"), JSON.stringify({ version: 1, id: "someone-else", kind: "k" }));
+        writeFileSync(
+            path.join(folder, "bcdefghj.json"),
+            JSON.stringify({ version: 1, id: "someone-else", kind: "k" }),
+        );
         writeFileSync(path.join(folder, "notes.txt"), "not a watch");
 
         const second = rig({ clock: first.clock });
         second.engine.registerKind(scripted(second.clock, "k", (n) => ({ state: n })).kind);
         second.begin();
-        assert.deepEqual(second.engine.list().map((watch) => watch.id), [id]);
+        assert.deepEqual(
+            second.engine.list().map((watch) => watch.id),
+            [id],
+        );
         assert.equal(second.engine.problem(), "2 saved watch files could not be read");
         assert.ok(existsSync(path.join(folder, "notes.txt")), "other files are left alone");
     });
@@ -768,7 +924,13 @@ describe("saved watches and a restart of Pi", () => {
         const file = path.join(state.dir, "watches", `${id}.json`);
         const good = savedFile(state.dir, id);
         for (const damage of [
-            { version: 2 }, { status: "stuck" }, { deadlineAt: "tomorrow" }, { failures: -1 }, { failures: 1.5 }, { session: 7 }, { title: null },
+            { version: 2 },
+            { status: "stuck" },
+            { deadlineAt: "tomorrow" },
+            { failures: -1 },
+            { failures: 1.5 },
+            { session: 7 },
+            { title: null },
             { status: "done" },
         ]) {
             writeFileSync(file, JSON.stringify({ ...good, ...damage }));
@@ -816,7 +978,9 @@ describe("stopping a watch", () => {
     });
 
     test("works on a paused watch", async () => {
-        const { r, id } = started(() => { throw new Error("down"); });
+        const { r, id } = started(() => {
+            throw new Error("down");
+        });
         await r.clock.advance(5 * MINUTE);
         assert.equal(r.engine.list()[0]?.status, "paused");
         assert.equal(r.engine.stop(id), true);
@@ -837,7 +1001,12 @@ describe("stopping a watch", () => {
 
     test("cancels the poll that is out, and its late answer changes nothing", async () => {
         let release: (() => void) | undefined;
-        const { r, polls, id } = started(() => new Promise<PollOutcome<unknown>>((resolve) => { release = () => resolve(passed("too late")); }));
+        const { r, polls, id } = started(
+            () =>
+                new Promise<PollOutcome<unknown>>((resolve) => {
+                    release = () => resolve(passed("too late"));
+                }),
+        );
         await r.clock.advance(FIRST_POLL_MS);
         assert.equal(polls.length, 1);
         assert.equal(r.engine.stop(id), true);
@@ -854,19 +1023,39 @@ describe("stopping a watch", () => {
 describe("listing", () => {
     test("holds the contract's fields, and the result once a watch is done", async () => {
         const { r, id, from } = started((n) => (n === 2 ? passed("done") : { state: n }));
-        assert.deepEqual(r.engine.list(), [{ id, kind: "k", plugin: "jig-test", title: "checks of pull request 42", status: "open", startedAt: new Date(from).toISOString() }]);
+        assert.deepEqual(r.engine.list(), [
+            {
+                id,
+                kind: "k",
+                plugin: "jig-test",
+                title: "checks of pull request 42",
+                status: "open",
+                startedAt: new Date(from).toISOString(),
+            },
+        ]);
         await r.clock.advance(2 * MINUTE);
-        assert.deepEqual(r.engine.list(), [{
-            id, kind: "k", plugin: "jig-test", title: "checks of pull request 42", status: "done", startedAt: new Date(from).toISOString(),
-            result: { outcome: "passed", summary: "done" },
-        }]);
+        assert.deepEqual(r.engine.list(), [
+            {
+                id,
+                kind: "k",
+                plugin: "jig-test",
+                title: "checks of pull request 42",
+                status: "done",
+                startedAt: new Date(from).toISOString(),
+                result: { outcome: "passed", summary: "done" },
+            },
+        ]);
     });
 
     test("is this session's open and paused watches, oldest first, with the ones that finished in the last 24 hours", async () => {
         const r = rig();
         r.engine.registerKind(scripted(r.clock, "quick", () => passed()).kind);
         r.engine.registerKind(scripted(r.clock, "slow", (n) => ({ state: n }), { intervalMs: 10 * MINUTE }).kind);
-        r.engine.registerKind(scripted(r.clock, "broken", () => { throw new Error("down"); }).kind);
+        r.engine.registerKind(
+            scripted(r.clock, "broken", () => {
+                throw new Error("down");
+            }).kind,
+        );
         r.begin();
         const ids: string[] = [];
         ids.push(r.engine.start({ kind: "slow", spec: {}, title: "first", timeoutMinutes: 3 * 24 * 60 }));
@@ -875,15 +1064,31 @@ describe("listing", () => {
         await r.clock.advance(SECOND);
         ids.push(r.engine.start({ kind: "broken", spec: {}, title: "third" }));
         await r.clock.advance(10 * MINUTE);
-        assert.deepEqual(r.engine.list().map((watch) => [watch.title, watch.status]), [["first", "open"], ["second", "done"], ["third", "paused"]]);
-        assert.deepEqual(r.engine.list().map((watch) => watch.id), ids);
+        assert.deepEqual(
+            r.engine.list().map((watch) => [watch.title, watch.status]),
+            [
+                ["first", "open"],
+                ["second", "done"],
+                ["third", "paused"],
+            ],
+        );
+        assert.deepEqual(
+            r.engine.list().map((watch) => watch.id),
+            ids,
+        );
 
         // The finished one drops out 24 hours after it finished; the others stay for as long as they are not finished.
         const finishedAt = Date.parse(savedFile(state.dir, ids[1] as string).finishedAt as string);
         await r.clock.advance(finishedAt + LIST_WINDOW_MS - SECOND - r.clock.now());
-        assert.ok(r.engine.list().some((watch) => watch.title === "second"), "a second inside the window");
+        assert.ok(
+            r.engine.list().some((watch) => watch.title === "second"),
+            "a second inside the window",
+        );
         await r.clock.advance(2 * SECOND);
-        assert.deepEqual(r.engine.list().map((watch) => watch.title), ["first", "third"]);
+        assert.deepEqual(
+            r.engine.list().map((watch) => watch.title),
+            ["first", "third"],
+        );
     });
 
     test("does not hold what a caller changes in what it was given", async () => {
@@ -908,7 +1113,10 @@ describe("listing", () => {
 
         const second = rig({ clock: first.clock });
         second.begin();
-        assert.deepEqual(second.engine.list().map((watch) => [watch.id, watch.status]), [[id, "done"]]);
+        assert.deepEqual(
+            second.engine.list().map((watch) => [watch.id, watch.status]),
+            [[id, "done"]],
+        );
         const third = rig({ clock: first.clock });
         await third.clock.advance(2 * HOUR);
         third.begin();
@@ -916,7 +1124,9 @@ describe("listing", () => {
     });
 
     test("the entries the watch tool shows say which watches wait for their plugin, how old they are, and what the kind watches", async () => {
-        const { r } = started((n) => ({ state: n }), { describe: (spec) => `pull request ${(spec as { pr: number }).pr}\nin the repository` });
+        const { r } = started((n) => ({ state: n }), {
+            describe: (spec) => `pull request ${(spec as { pr: number }).pr}\nin the repository`,
+        });
         await r.clock.advance(90 * SECOND);
         const [entry] = r.engine.entries();
         assert.equal(entry?.ageMs, 90 * SECOND);
@@ -925,7 +1135,13 @@ describe("listing", () => {
     });
 
     test("a describe that throws or answers with something else is left out", () => {
-        for (const describe of [() => { throw new Error("no"); }, () => 42, () => ""]) {
+        for (const describe of [
+            () => {
+                throw new Error("no");
+            },
+            () => 42,
+            () => "",
+        ]) {
             const { r } = started((n) => ({ state: n }), { describe: describe as never });
             assert.equal(r.engine.entries()[0]?.describes, undefined);
         }
@@ -949,7 +1165,11 @@ describe("old files", () => {
         const kept = rig({ clock: first.clock });
         kept.begin("session-a");
         const folder = path.join(state.dir, "watches");
-        assert.deepEqual(readdirSync(folder).sort(), [`${old}.json`, `${other}.json`].sort(), "6 days and 23 hours later, nothing is deleted yet");
+        assert.deepEqual(
+            readdirSync(folder).sort(),
+            [`${old}.json`, `${other}.json`].sort(),
+            "6 days and 23 hours later, nothing is deleted yet",
+        );
         kept.engine.end();
 
         await first.clock.advance(30 * SECOND);
@@ -961,7 +1181,11 @@ describe("old files", () => {
     test("open and paused watches are never deleted, however old, and neither are other sessions' unfinished ones", async () => {
         const first = rig();
         first.engine.registerKind(scripted(first.clock, "k", (n) => ({ state: n })).kind);
-        first.engine.registerKind(scripted(first.clock, "broken", () => { throw new Error("down"); }).kind);
+        first.engine.registerKind(
+            scripted(first.clock, "broken", () => {
+                throw new Error("down");
+            }).kind,
+        );
         first.begin("session-a");
         const open = first.engine.start({ kind: "k", spec: {}, title: "open", timeoutMinutes: 30 * 24 * 60 });
         const paused = first.engine.start({ kind: "broken", spec: {}, title: "paused" });
@@ -974,7 +1198,10 @@ describe("old files", () => {
 
         const later = rig({ clock: first.clock });
         later.begin("session-c");
-        assert.deepEqual(readdirSync(path.join(state.dir, "watches")).sort(), [open, paused, elsewhere].map((id) => `${id}.json`).sort());
+        assert.deepEqual(
+            readdirSync(path.join(state.dir, "watches")).sort(),
+            [open, paused, elsewhere].map((id) => `${id}.json`).sort(),
+        );
     });
 
     test("a temporary file left by a writer that crashed is removed once it is an hour old", () => {
@@ -1000,7 +1227,9 @@ describe("old files", () => {
 describe("ending the session", () => {
     test("clears every timer, cancels the polls that are out, and keeps the saved watches", async () => {
         const r = rig();
-        const { kind, polls } = scripted(r.clock, "k", (n) => (n === 1 ? new Promise<PollOutcome<unknown>>(() => {}) : { state: n }));
+        const { kind, polls } = scripted(r.clock, "k", (n) =>
+            n === 1 ? new Promise<PollOutcome<unknown>>(() => {}) : { state: n },
+        );
         r.engine.registerKind(kind);
         r.begin();
         const first = r.engine.start({ kind: "k", spec: {}, title: "its poll never answers" });
@@ -1012,7 +1241,10 @@ describe("ending the session", () => {
         r.engine.end();
         assert.equal(r.clock.pending(), 0);
         assert.equal(polls[0]?.signal.aborted, true);
-        assert.deepEqual(readdirSync(path.join(state.dir, "watches")).sort(), [`${first}.json`, `${second}.json`].sort());
+        assert.deepEqual(
+            readdirSync(path.join(state.dir, "watches")).sort(),
+            [`${first}.json`, `${second}.json`].sort(),
+        );
         assert.equal(savedFile(state.dir, first).status, "open");
         assert.equal(savedFile(state.dir, second).status, "open");
         assert.deepEqual(r.engine.list(), []);
@@ -1024,7 +1256,12 @@ describe("ending the session", () => {
 
     test("an answer that comes after the end is ignored", async () => {
         let release: (() => void) | undefined;
-        const { r, id } = started(() => new Promise<PollOutcome<unknown>>((resolve) => { release = () => resolve(passed("too late")); }));
+        const { r, id } = started(
+            () =>
+                new Promise<PollOutcome<unknown>>((resolve) => {
+                    release = () => resolve(passed("too late"));
+                }),
+        );
         await r.clock.advance(FIRST_POLL_MS);
         r.engine.end();
         release?.();
@@ -1064,7 +1301,10 @@ describe("ending the session", () => {
 describe("telling the agent", () => {
     /** Starts `count` watches of a kind that ends at its first poll, each `gap` ms after the one before. */
     async function endingWatches(r: Rig, gaps: number[]) {
-        r.engine.registerKind(scripted(r.clock, "quick", (n, polled) => passed(`result ${String((polled.spec as { n: number }).n)}`)).kind);
+        r.engine.registerKind(
+            scripted(r.clock, "quick", (_n, polled) => passed(`result ${String((polled.spec as { n: number }).n)}`))
+                .kind,
+        );
         r.begin();
         let n = 0;
         for (const gap of gaps) {
@@ -1079,7 +1319,10 @@ describe("telling the agent", () => {
         // The watches end at 2.0 s, 2.3 s and 2.7 s after the first one started.
         await r.clock.advance(FIRST_POLL_MS + 5 * SECOND);
         assert.equal(r.sent.length, 1);
-        assert.deepEqual(r.sent[0]?.details.watches.map((watch) => watch.title), ["watch 1", "watch 2", "watch 3"]);
+        assert.deepEqual(
+            r.sent[0]?.details.watches.map((watch) => watch.title),
+            ["watch 1", "watch 2", "watch 3"],
+        );
         assert.equal(
             r.sent[0]?.content,
             [1, 2, 3].map((n) => `The watch "watch ${n}" passed.\nresult ${n}`).join("\n\n"),
@@ -1103,8 +1346,14 @@ describe("telling the agent", () => {
         await endingWatches(r, [0, 1_500]);
         const first = r.clock.now() - 1_500;
         await r.clock.advance(60 * SECOND);
-        assert.deepEqual(r.sent.map((sent) => (sent.at - first) / 1000), [3, 13]);
-        assert.deepEqual(r.sent.map((sent) => sent.details.watches.map((watch) => watch.title)), [["watch 1"], ["watch 2"]]);
+        assert.deepEqual(
+            r.sent.map((sent) => (sent.at - first) / 1000),
+            [3, 13],
+        );
+        assert.deepEqual(
+            r.sent.map((sent) => sent.details.watches.map((watch) => watch.title)),
+            [["watch 1"], ["watch 2"]],
+        );
     });
 
     test("messages are at least 10 seconds apart, and one waiting message takes every later result", async () => {
@@ -1113,7 +1362,11 @@ describe("telling the agent", () => {
         await endingWatches(r, [0, 3_000, 3_000, 3_000]);
         const first = r.clock.now() - 9_000;
         await r.clock.advance(60 * SECOND);
-        assert.deepEqual(r.sent.map((sent) => (sent.at - first) / 1000), [3, 13], "the first at 3 s; the next waits for 13 s");
+        assert.deepEqual(
+            r.sent.map((sent) => (sent.at - first) / 1000),
+            [3, 13],
+            "the first at 3 s; the next waits for 13 s",
+        );
         assert.deepEqual(
             r.sent.map((sent) => sent.details.watches.map((watch) => watch.title)),
             [["watch 1"], ["watch 2", "watch 3", "watch 4"]],
@@ -1135,17 +1388,31 @@ describe("telling the agent", () => {
     test("a pause is told the same way, and is combined with a result that ends just before it", async () => {
         const r = rig();
         r.engine.registerKind(scripted(r.clock, "quick", () => passed("fine")).kind);
-        r.engine.registerKind(scripted(r.clock, "broken", () => { throw new Error("down"); }, { intervalMs: 5_000 }).kind);
+        r.engine.registerKind(
+            scripted(
+                r.clock,
+                "broken",
+                () => {
+                    throw new Error("down");
+                },
+                { intervalMs: 5_000 },
+            ).kind,
+        );
         r.begin();
         r.engine.start({ kind: "broken", spec: {}, title: "broken one" }); // fails at 2 s, 7 s and 12 s
         await r.clock.advance(9_500);
         r.engine.start({ kind: "quick", spec: {}, title: "quick one" }); // ends at 11.5 s, so its message leaves at 12.5 s
         await r.clock.advance(10 * SECOND);
         assert.equal(r.sent.length, 1);
-        assert.deepEqual(r.sent[0]?.details.watches.map((watch) => [watch.title, watch.event]), [["quick one", "finished"], ["broken one", "paused"]]);
+        assert.deepEqual(
+            r.sent[0]?.details.watches.map((watch) => [watch.title, watch.event]),
+            [
+                ["quick one", "finished"],
+                ["broken one", "paused"],
+            ],
+        );
         assert.match(r.sent[0]?.content ?? "", /passed\.\nfine\n\nThe watch "broken one" is paused/);
     });
-
 });
 
 describe("a plugin or Pi that fails", () => {
@@ -1154,9 +1421,18 @@ describe("a plugin or Pi that fails", () => {
         const events: unknown[] = [];
         const sent: unknown[] = [];
         const engine = createWatchEngine({
-            now: r.clock.now, timers: r.clock.timers, store: createWatchStore(),
+            now: r.clock.now,
+            timers: r.clock.timers,
+            store: createWatchStore(),
             protect: { redact: (text) => text, mask: (text) => text },
-            notify: () => true, emit: (event) => { events.push(event); throw new Error("a listener broke"); }, send: (message) => { sent.push(message); },
+            notify: () => true,
+            emit: (event) => {
+                events.push(event);
+                throw new Error("a listener broke");
+            },
+            send: (message) => {
+                sent.push(message);
+            },
         });
         engine.registerKind(scripted(r.clock, "k", () => passed()).kind);
         engine.begin("session-1");
@@ -1172,10 +1448,16 @@ describe("a plugin or Pi that fails", () => {
         let breaks = true;
         const sent: unknown[] = [];
         const engine = createWatchEngine({
-            now: r.clock.now, timers: r.clock.timers, store: createWatchStore(),
+            now: r.clock.now,
+            timers: r.clock.timers,
+            store: createWatchStore(),
             protect: { redact: (text) => text, mask: (text) => text },
-            notify: () => true, emit: () => {},
-            send: (message) => { if (breaks) throw new Error("the session is gone"); sent.push(message); },
+            notify: () => true,
+            emit: () => {},
+            send: (message) => {
+                if (breaks) throw new Error("the session is gone");
+                sent.push(message);
+            },
         });
         engine.registerKind(scripted(r.clock, "k", () => passed()).kind);
         engine.begin("session-1");
@@ -1191,11 +1473,21 @@ describe("a plugin or Pi that fails", () => {
     test("a screen that throws is ignored", async () => {
         const r = rig();
         const engine = createWatchEngine({
-            now: r.clock.now, timers: r.clock.timers, store: createWatchStore(),
+            now: r.clock.now,
+            timers: r.clock.timers,
+            store: createWatchStore(),
             protect: { redact: (text) => text, mask: (text) => text },
-            notify: () => { throw new Error("stale context"); }, emit: () => {}, send: () => {},
+            notify: () => {
+                throw new Error("stale context");
+            },
+            emit: () => {},
+            send: () => {},
         });
-        engine.registerKind(scripted(r.clock, "k", () => { throw new Error("down"); }).kind);
+        engine.registerKind(
+            scripted(r.clock, "k", () => {
+                throw new Error("down");
+            }).kind,
+        );
         engine.begin("session-1");
         const id = engine.start({ kind: "k", spec: {}, title: "t", stallMinutes: 0.01 });
         await r.clock.advance(5 * MINUTE);
@@ -1207,10 +1499,21 @@ describe("a plugin or Pi that fails", () => {
         const real = createWatchStore();
         let saves = 0;
         const engine = createWatchEngine({
-            now: r.clock.now, timers: r.clock.timers,
-            store: { ...real, save: () => { saves++; throw new Error("EACCES: permission denied"); } },
+            now: r.clock.now,
+            timers: r.clock.timers,
+            store: {
+                ...real,
+                save: () => {
+                    saves++;
+                    throw new Error("EACCES: permission denied");
+                },
+            },
             protect: { redact: (text) => text, mask: (text) => text },
-            notify: () => true, emit: () => {}, send: (message) => { r.sent.push({ ...message, at: r.clock.now() }); },
+            notify: () => true,
+            emit: () => {},
+            send: (message) => {
+                r.sent.push({ ...message, at: r.clock.now() });
+            },
         });
         const { kind, polls } = scripted(r.clock, "k", (n) => (n === 3 ? passed("still works") : { state: n }));
         engine.registerKind(kind);
@@ -1231,9 +1534,14 @@ describe("what a finished watch says is cleaned first", () => {
         mask: (text: string) => text.replaceAll("PERSONAL", "[masked]"),
     };
 
-    async function finishedWith(result: PollOutcome<unknown>["done"], options: Parameters<typeof rig>[0] = { protect }) {
+    async function finishedWith(
+        result: PollOutcome<unknown>["done"],
+        options: Parameters<typeof rig>[0] = { protect },
+    ) {
         const r = rig(options);
-        r.engine.registerKind(scripted(r.clock, "k", () => ({ state: 1, ...(result === undefined ? {} : { done: result }) })).kind);
+        r.engine.registerKind(
+            scripted(r.clock, "k", () => ({ state: 1, ...(result === undefined ? {} : { done: result }) })).kind,
+        );
         r.begin();
         const id = r.engine.start({ kind: "k", spec: {}, title: "t" });
         await r.clock.advance(FIRST_POLL_MS + SECOND);
@@ -1247,19 +1555,38 @@ describe("what a finished watch says is cleaned first", () => {
             details: "log: SECRET\nlog: PERSONAL",
             links: ["https://ci.example/run?token=SECRET"],
         });
-        const expected = { outcome: "failed", summary: "[redacted] for [masked]", details: "log: [redacted]\nlog: [masked]", links: ["https://ci.example/run?token=[redacted]"] };
+        const expected = {
+            outcome: "failed",
+            summary: "[redacted] for [masked]",
+            details: "log: [redacted]\nlog: [masked]",
+            links: ["https://ci.example/run?token=[redacted]"],
+        };
         assert.deepEqual(savedFile(state.dir, id).result, expected);
         assert.deepEqual(r.events[0]?.result, expected);
         assert.equal(r.sent.length, 1);
         assert.ok(!r.sent[0]?.content.includes("SECRET") && !r.sent[0]?.content.includes("PERSONAL"));
-        assert.match(r.sent[0]?.content ?? "", /\[redacted\] for \[masked\]\nDetails:\n {2}log: \[redacted\]\n {2}log: \[masked\]\nLinks:\n {2}https:\/\/ci\.example\/run\?token=\[redacted\]$/);
+        assert.match(
+            r.sent[0]?.content ?? "",
+            /\[redacted\] for \[masked\]\nDetails:\n {2}log: \[redacted\]\n {2}log: \[masked\]\nLinks:\n {2}https:\/\/ci\.example\/run\?token=\[redacted\]$/,
+        );
     });
 
     test("redaction runs before masking, so the masker never sees a secret that the redactor knows", async () => {
         const order: string[] = [];
         const { id } = await finishedWith(
             { outcome: "passed", summary: "SECRET" },
-            { protect: { redact: (text) => { order.push("redact"); return text.replaceAll("SECRET", "[redacted]"); }, mask: (text) => { order.push(`mask:${text}`); return text; } } },
+            {
+                protect: {
+                    redact: (text) => {
+                        order.push("redact");
+                        return text.replaceAll("SECRET", "[redacted]");
+                    },
+                    mask: (text) => {
+                        order.push(`mask:${text}`);
+                        return text;
+                    },
+                },
+            },
         );
         assert.deepEqual(order.slice(0, 2), ["redact", "mask:[redacted]"]);
         assert.equal(savedFile(state.dir, id).result?.summary, "[redacted]");
@@ -1267,7 +1594,9 @@ describe("what a finished watch says is cleaned first", () => {
 
     test("the details are cut to 40 lines in the result, and the message shows the first 10", async () => {
         const { r, id } = await finishedWith({
-            outcome: "failed", summary: "s", details: Array.from({ length: 100 }, (_, i) => `line ${i + 1}`).join("\n"),
+            outcome: "failed",
+            summary: "s",
+            details: Array.from({ length: 100 }, (_, i) => `line ${i + 1}`).join("\n"),
         });
         const kept = savedFile(state.dir, id).result?.details?.split("\n") ?? [];
         assert.equal(kept.length, 40);
@@ -1281,7 +1610,14 @@ describe("what a finished watch says is cleaned first", () => {
     test("when the masker cannot mask, the outcome is kept and the text is withheld everywhere", async () => {
         const { r, id } = await finishedWith(
             { outcome: "failed", summary: "customer jane.doe@example.com", details: "and more" },
-            { protect: { redact: (text) => text, mask: () => { throw new Error("masking is broken"); } } },
+            {
+                protect: {
+                    redact: (text) => text,
+                    mask: () => {
+                        throw new Error("masking is broken");
+                    },
+                },
+            },
         );
         const result = savedFile(state.dir, id).result;
         assert.equal(result?.outcome, "failed");
@@ -1294,11 +1630,19 @@ describe("what a finished watch says is cleaned first", () => {
 
     test("a timed-out watch's summary is cleaned too, because it carries the text of the last error", async () => {
         const r = rig({ protect });
-        r.engine.registerKind(scripted(r.clock, "k", (n) => { if (n >= 2) throw new Error("login SECRET for PERSONAL"); return { state: n }; }).kind);
+        r.engine.registerKind(
+            scripted(r.clock, "k", (n) => {
+                if (n >= 2) throw new Error("login SECRET for PERSONAL");
+                return { state: n };
+            }).kind,
+        );
         r.begin();
         const id = r.engine.start({ kind: "k", spec: {}, title: "t", timeoutMinutes: 1 });
         await r.clock.advance(2 * MINUTE);
-        assert.equal(savedFile(state.dir, id).result?.summary, "It was not finished after 1 min, so Pi stopped watching. The last check failed: login [redacted] for [masked]");
+        assert.equal(
+            savedFile(state.dir, id).result?.summary,
+            "It was not finished after 1 min, so Pi stopped watching. The last check failed: login [redacted] for [masked]",
+        );
     });
 
     test("the title in the agent's message and in the notices is redacted; the saved title is what the plugin gave", async () => {
@@ -1308,14 +1652,24 @@ describe("what a finished watch says is cleaned first", () => {
         const id = r.engine.start({ kind: "k", spec: {}, title: "deploy with SECRET", stallMinutes: 0.5 });
         // The poll at 32 s is the first after the half minute, so the notice comes then; the watch ends at 62 s.
         await r.clock.advance(FIRST_POLL_MS + 60 * SECOND + SECOND);
-        assert.deepEqual(r.shown.map((notice) => notice.message), ['Still waiting for "deploy with [redacted]": it has been running for 32 s.']);
+        assert.deepEqual(
+            r.shown.map((notice) => notice.message),
+            ['Still waiting for "deploy with [redacted]": it has been running for 32 s.'],
+        );
         assert.ok(r.sent[0]?.content.startsWith('The watch "deploy with [redacted]" passed.'));
         assert.equal(r.sent[0]?.details.watches[0]?.title, "deploy with [redacted]");
         assert.equal(savedFile(state.dir, id).title, "deploy with SECRET");
     });
 
     test("colour codes in a log are gone before the agent sees them", async () => {
-        const { r } = await finishedWith({ outcome: "failed", summary: "\u001b[31mfailed\u001b[0m", details: "\u001b[1mbuild\u001b[0m: error\u001b]0;title\u0007" }, { protect: { redact: (t) => t, mask: (t) => t } });
+        const { r } = await finishedWith(
+            {
+                outcome: "failed",
+                summary: "\u001b[31mfailed\u001b[0m",
+                details: "\u001b[1mbuild\u001b[0m: error\u001b]0;title\u0007",
+            },
+            { protect: { redact: (t) => t, mask: (t) => t } },
+        );
         assert.equal(r.sent[0]?.content, 'The watch "t" failed.\nfailed\nDetails:\n  build: error');
     });
 });

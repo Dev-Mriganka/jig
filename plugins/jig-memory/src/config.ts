@@ -31,13 +31,16 @@ export function validateMemory(raw: unknown): string[] {
             try {
                 new RegExp(ticketPattern);
             } catch (error) {
-                errors.push(`memory.ticketPattern: not a regular expression (${error instanceof Error ? error.message : String(error)})`);
+                errors.push(
+                    `memory.ticketPattern: not a regular expression (${error instanceof Error ? error.message : String(error)})`,
+                );
             }
         }
     }
     if (folder !== undefined) {
         if (typeof folder !== "string" || folder === "") errors.push("memory.folder: must be a path");
-        else if (!path.isAbsolute(folder) && !folder.startsWith("~/")) errors.push("memory.folder: use an absolute path, or one that starts with ~/");
+        else if (!path.isAbsolute(folder) && !folder.startsWith("~/"))
+            errors.push("memory.folder: use an absolute path, or one that starts with ~/");
     }
     return errors;
 }
@@ -48,7 +51,8 @@ export function folderOf(settings: MemorySettings | undefined): string {
     if (folder === undefined) {
         // The XDG rule: an empty or relative XDG_DATA_HOME is not valid, so the default is used instead.
         const home = process.env.XDG_DATA_HOME;
-        const dataHome = home !== undefined && path.isAbsolute(home) ? home : path.join(os.homedir(), ".local", "share");
+        const dataHome =
+            home !== undefined && path.isAbsolute(home) ? home : path.join(os.homedir(), ".local", "share");
         return path.join(dataHome, "jig", "tickets");
     }
     return folder.startsWith("~/") ? path.join(os.homedir(), folder.slice(2)) : folder;

@@ -18,7 +18,12 @@ import { resolveProgram } from "./exec.ts";
 import { createPrivateFile, privateDir, removeOldFiles, stateDir } from "./paths.ts";
 
 export function escapeHtml(text: string): string {
-    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
 }
 
 const markdown = new Marked({
@@ -36,12 +41,16 @@ const markdown = new Marked({
 /** A diff with a colour for added and removed lines. */
 function renderDiff(text: string): string {
     const lines = text.split("\n").map((line) => {
-        const kind = line.startsWith("+++") || line.startsWith("---") || line.startsWith("diff ") || line.startsWith("index ")
-            ? "d-meta"
-            : line.startsWith("@@") ? "d-hunk"
-            : line.startsWith("+") ? "d-add"
-            : line.startsWith("-") ? "d-del"
-            : "d-ctx";
+        const kind =
+            line.startsWith("+++") || line.startsWith("---") || line.startsWith("diff ") || line.startsWith("index ")
+                ? "d-meta"
+                : line.startsWith("@@")
+                  ? "d-hunk"
+                  : line.startsWith("+")
+                    ? "d-add"
+                    : line.startsWith("-")
+                      ? "d-del"
+                      : "d-ctx";
         return `<span class="${kind}">${escapeHtml(line)}</span>`;
     });
     return `<pre class="diff">${lines.join("\n")}</pre>`;
@@ -80,7 +89,8 @@ table { border-collapse: collapse; } td, th { border: 1px solid var(--line); pad
 /** The page for a preview. `header` is the line that names the tool, the action, the environment and the effect. */
 /** Tags that could run, load or navigate. The page's policy already blocks scripts and requests; removing these is
  *  the second lock, for a tool whose renderer lets one through: a `<meta http-equiv="refresh">`, for one, navigates. */
-const ACTIVE_TAGS = /<\/?(?:script|iframe|frame|frameset|object|embed|applet|meta|link|base|form|input|button|textarea|select|svg|math)\b[^>]*>/gi;
+const ACTIVE_TAGS =
+    /<\/?(?:script|iframe|frame|frameset|object|embed|applet|meta|link|base|form|input|button|textarea|select|svg|math)\b[^>]*>/gi;
 
 export function withoutActiveTags(html: string): string {
     return html.replace(ACTIVE_TAGS, "");
@@ -137,7 +147,10 @@ export function browserCommand(
     platform: NodeJS.Platform = process.platform,
 ): { program: string; args: string[] } {
     const configured = env.BROWSER?.trim();
-    const chosen = configured !== undefined && configured !== "" ? configured.split(/\s+/) : [platform === "darwin" ? "open" : "xdg-open"];
+    const chosen =
+        configured !== undefined && configured !== ""
+            ? configured.split(/\s+/)
+            : [platform === "darwin" ? "open" : "xdg-open"];
     const [program, ...rest] = chosen as [string, ...string[]];
     const args = rest.some((arg) => arg.includes("%s")) ? rest.map((arg) => arg.replaceAll("%s", url)) : [...rest, url];
     return { program, args };

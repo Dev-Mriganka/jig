@@ -8,7 +8,8 @@ export const isObject = (value: unknown): value is Obj =>
 export const obj = (value: unknown): Obj => (isObject(value) ? value : {});
 export const arr = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 export const str = (value: unknown): string => (typeof value === "string" ? value : "");
-export const int = (value: unknown): number => (typeof value === "number" && Number.isFinite(value) ? Math.trunc(value) : 0);
+export const int = (value: unknown): number =>
+    typeof value === "number" && Number.isFinite(value) ? Math.trunc(value) : 0;
 
 /**
  * A mistake in a call's input. jig-core takes a `TypeError` from a preview to mean "invalid input" and blocks the call

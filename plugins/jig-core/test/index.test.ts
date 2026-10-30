@@ -31,7 +31,14 @@ describe("the factory", () => {
     test("registers the hooks it needs, the /jig command and the watch tool", () => {
         const host = fakePi();
         jigCore()(host.pi);
-        assert.deepEqual([...host.handlers.keys()].sort(), ["session_shutdown", "session_start", "tool_call", "tool_execution_end", "tool_result", "turn_end"]);
+        assert.deepEqual([...host.handlers.keys()].sort(), [
+            "session_shutdown",
+            "session_start",
+            "tool_call",
+            "tool_execution_end",
+            "tool_result",
+            "turn_end",
+        ]);
         assert.ok(host.commands.has("jig"));
         assert.deepEqual([...host.registered.keys()], ["watch"]);
         withdrawJig(jig());
@@ -60,13 +67,27 @@ describe("the factory", () => {
         jigCore()(host.pi);
         const api = jig();
         assert.equal(api.version, 1);
-        for (const part of ["declareTool", "approvedPreview", "addFacts", "setTicket", "secrets", "signIn", "mask", "watches", "config", "exec"]) assert.ok(part in api, part);
+        for (const part of [
+            "declareTool",
+            "approvedPreview",
+            "addFacts",
+            "setTicket",
+            "secrets",
+            "signIn",
+            "mask",
+            "watches",
+            "config",
+            "exec",
+        ])
+            assert.ok(part in api, part);
         withdrawJig(api);
     });
 
     test("a plugin that was waiting for jig-core gets the API as soon as it is published", () => {
         let version: number | undefined;
-        withJig((api) => { version = api.version; });
+        withJig((api) => {
+            version = api.version;
+        });
         assert.equal(version, undefined);
         const host = fakePi();
         jigCore()(host.pi);
@@ -75,14 +96,20 @@ describe("the factory", () => {
     });
 
     test("a plugin whose start-up callback fails does not stop jig-core from governing, and the failure is reported", async () => {
-        withJig(() => { throw new Error("the other plugin broke"); });
+        withJig(() => {
+            throw new Error("the other plugin broke");
+        });
         const host = fakePi();
         jigCore()(host.pi);
         assert.ok(host.handlers.has("tool_call"), "the hooks are in place");
         const { ctx, log } = fakeContext({ ui: { select: () => "Allow" } });
         await host.fire("session_start", { reason: "startup" }, ctx);
         assert.match(log.notifications[0]?.message ?? "", /a plugin failed while loading: the other plugin broke/);
-        const blocked = await host.fire("tool_call", { toolCallId: "c", toolName: "mystery", input: {} }, fakeContext({ ui: false }).ctx);
+        const blocked = await host.fire(
+            "tool_call",
+            { toolCallId: "c", toolName: "mystery", input: {} },
+            fakeContext({ ui: false }).ctx,
+        );
         assert.deepEqual((blocked as { block: boolean }).block, true);
         withdrawJig(jig());
     });
@@ -97,7 +124,11 @@ describe("the factory", () => {
         jigCore()(second.pi);
         assert.notEqual(jig(), firstApi);
         // The new load knows nothing of the old declaration, so the tool is unknown again.
-        const blocked = await second.fire("tool_call", { toolCallId: "c", toolName: "t", input: {} }, fakeContext({ ui: false }).ctx);
+        const blocked = await second.fire(
+            "tool_call",
+            { toolCallId: "c", toolName: "t", input: {} },
+            fakeContext({ ui: false }).ctx,
+        );
         assert.equal((blocked as { block?: boolean }).block, true);
         withdrawJig(jig());
     });
@@ -128,7 +159,10 @@ describe("the API that plugins get", () => {
         assert.equal(made.length, 1);
         day = new Date("2026-10-31T00:00:00.000Z");
         api.mask.text("next day");
-        assert.deepEqual(made, [{ dir: state.dir, day: "2026-10-30" }, { dir: state.dir, day: "2026-10-31" }]);
+        assert.deepEqual(made, [
+            { dir: state.dir, day: "2026-10-30" },
+            { dir: state.dir, day: "2026-10-31" },
+        ]);
         withdrawJig(api);
     });
 
@@ -144,7 +178,11 @@ describe("the API that plugins get", () => {
         const host = fakePi();
         jigCore({ now: clock.date, timers: clock.timers })(host.pi);
         const api = jig();
-        assert.deepEqual(Object.keys(api.watches).sort(), ["list", "registerKind", "start", "stop"], "a plugin gets the four calls and no more");
+        assert.deepEqual(
+            Object.keys(api.watches).sort(),
+            ["list", "registerKind", "start", "stop"],
+            "a plugin gets the four calls and no more",
+        );
         const { kind, polls } = scripted(clock, "ci", () => passed("done"));
         api.watches.registerKind(kind);
         assert.deepEqual(api.watches.list(), []);
@@ -152,7 +190,10 @@ describe("the API that plugins get", () => {
 
         await host.fire("session_start", { reason: "startup" }, fakeContext({ session: "session-1" }).ctx);
         const id = api.watches.start({ kind: "ci", spec: {}, title: "checks of pull request 42" });
-        assert.deepEqual(api.watches.list().map((watch) => [watch.id, watch.status]), [[id, "open"]]);
+        assert.deepEqual(
+            api.watches.list().map((watch) => [watch.id, watch.status]),
+            [[id, "open"]],
+        );
         assert.equal(api.watches.stop("zzzzzzzz"), false);
         await clock.advance(5_000);
         assert.equal(polls.length, 1);
@@ -174,16 +215,28 @@ describe("the API that plugins get", () => {
         assert.deepEqual(host.sent[0]?.options, { deliverAs: "followUp", triggerTurn: true });
         assert.equal(host.sent[0]?.message.customType, "jig-watch");
         assert.equal(host.sent[0]?.message.display, true);
-        assert.equal(host.sent[0]?.message.content, 'The watch "checks of pull request 42" passed.\n12 of 12 checks passed');
+        assert.equal(
+            host.sent[0]?.message.content,
+            'The watch "checks of pull request 42" passed.\n12 of 12 checks passed',
+        );
         const done = host.emitted.filter((entry) => entry.channel === "jig:watch-done");
         assert.equal(done.length, 1);
-        assert.deepEqual(done[0]?.data, { id, kind: "ci", plugin: "jig-test", title: "checks of pull request 42", result: { outcome: "passed", summary: "12 of 12 checks passed" } });
+        assert.deepEqual(done[0]?.data, {
+            id,
+            kind: "ci",
+            plugin: "jig-test",
+            title: "checks of pull request 42",
+            result: { outcome: "passed", summary: "12 of 12 checks passed" },
+        });
         await host.fire("session_shutdown", { reason: "quit" }, fakeContext().ctx);
         withdrawJig(api);
     });
 
     test("watches: the session's screen gets the notices, and a session without one gets none", async () => {
-        for (const [ui, expected] of [[{ select: () => "Allow" }, 1], [false, 0]] as const) {
+        for (const [ui, expected] of [
+            [{ select: () => "Allow" }, 1],
+            [false, 0],
+        ] as const) {
             const clock = fakeClock();
             const host = fakePi();
             jigCore({ now: clock.date, timers: clock.timers })(host.pi);
@@ -193,7 +246,10 @@ describe("the API that plugins get", () => {
             await host.fire("session_start", { reason: "startup" }, ctx);
             api.watches.start({ kind: "ci", spec: {}, title: "t", stallMinutes: 1 });
             await clock.advance(5 * 60_000);
-            assert.equal(log.notifications.filter((notice) => notice.message.startsWith("Still waiting")).length, expected);
+            assert.equal(
+                log.notifications.filter((notice) => notice.message.startsWith("Still waiting")).length,
+                expected,
+            );
             await host.fire("session_shutdown", { reason: "quit" }, ctx);
             withdrawJig(api);
         }
@@ -215,7 +271,10 @@ describe("the API that plugins get", () => {
         const api = jig();
         api.watches.registerKind(scripted(clock, "ci", () => passed("finished while Pi was closed")).kind);
         await second.fire("session_start", { reason: "resume" }, fakeContext({ session: "session-9" }).ctx);
-        assert.deepEqual(api.watches.list().map((watch) => watch.id), [id]);
+        assert.deepEqual(
+            api.watches.list().map((watch) => watch.id),
+            [id],
+        );
         await clock.advance(10_000);
         assert.equal(second.sent.length, 1);
         assert.match(String(second.sent[0]?.message.content), /^While Pi was closed: the watch "t" passed\./);
@@ -261,24 +320,33 @@ describe("the API that plugins get", () => {
         assert.throws(() => api.declareTool({ tool: "t", plugin: "", classify: () => undefined }), TypeError);
         assert.throws(() => api.declareTool({ tool: "t", plugin: "p" } as never), TypeError);
         api.declareTool({ tool: "t", plugin: "p", classify: () => ({ environment: "local", effect: "read" }) });
-        assert.doesNotThrow(() => api.declareTool({ tool: "t", plugin: "p2", classify: () => ({ environment: "local", effect: "write" }) }));
+        assert.doesNotThrow(() =>
+            api.declareTool({ tool: "t", plugin: "p2", classify: () => ({ environment: "local", effect: "write" }) }),
+        );
         withdrawJig(api);
     });
 
     test("setTicket accepts a key and clears it", () => {
         const { api } = load();
-        assert.doesNotThrow(() => { api.setTicket("T-1"); api.setTicket(undefined); api.setTicket(""); });
+        assert.doesNotThrow(() => {
+            api.setTicket("T-1");
+            api.setTicket(undefined);
+            api.setTicket("");
+        });
         withdrawJig(api);
     });
 });
-
 
 describe("plugins that load before jig-core", () => {
     test("each queued callback runs even when an earlier one throws, and the errors come back", async () => {
         const { withJig, publishJig: publish, withdrawJig: withdraw } = await import("../src/client.ts");
         const ran: string[] = [];
-        withJig(() => { throw new Error("first plugin broke"); });
-        withJig(() => { ran.push("second"); });
+        withJig(() => {
+            throw new Error("first plugin broke");
+        });
+        withJig(() => {
+            ran.push("second");
+        });
         const fake = { version: 1 } as never;
         const errors = publish(fake);
         assert.deepEqual(ran, ["second"]);

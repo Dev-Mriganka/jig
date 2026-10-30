@@ -28,22 +28,41 @@ export const TIMEOUT_CODE = 124;
  *   team keeps on purpose (husky, git-lfs) do not run either.
  */
 export const GIT_FIXED_FLAGS: readonly string[] = [
-    "-c", "core.fsmonitor=false",
-    "-c", "core.hooksPath=/dev/null",
-    "-c", "color.ui=false",
+    "-c",
+    "core.fsmonitor=false",
+    "-c",
+    "core.hooksPath=/dev/null",
+    "-c",
+    "color.ui=false",
 ];
 
 // ---- the environment ------------------------------------------------------------------------------------------------
 
 /** What every program inherits from Pi's environment. Nothing else is passed on: not tokens, not cloud credentials. */
 const BASE_ENV = [
-    "PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "LC_CTYPE", "TZ", "TMPDIR",
-    "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "XDG_RUNTIME_DIR",
+    "PATH",
+    "HOME",
+    "USER",
+    "LOGNAME",
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+    "TZ",
+    "TMPDIR",
+    "XDG_CONFIG_HOME",
+    "XDG_DATA_HOME",
+    "XDG_CACHE_HOME",
+    "XDG_RUNTIME_DIR",
 ];
 
 /** What git also inherits: the user's own ssh agent and ssh command, so a push signs in the way the user set up. */
 const GIT_ENV = [
-    "SSH_AUTH_SOCK", "GIT_SSH", "GIT_SSH_COMMAND", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM", "GIT_CONFIG_NOSYSTEM",
+    "SSH_AUTH_SOCK",
+    "GIT_SSH",
+    "GIT_SSH_COMMAND",
+    "GIT_CONFIG_GLOBAL",
+    "GIT_CONFIG_SYSTEM",
+    "GIT_CONFIG_NOSYSTEM",
     "DBUS_SESSION_BUS_ADDRESS",
 ];
 
@@ -108,7 +127,11 @@ function safePath(value: string | undefined, writable: readonly string[]): strin
         .join(path.delimiter);
 }
 
-function childEnv(options: RunOptions, extraNames: readonly string[], fixed: Readonly<Record<string, string>>): NodeJS.ProcessEnv {
+function childEnv(
+    options: RunOptions,
+    extraNames: readonly string[],
+    fixed: Readonly<Record<string, string>>,
+): NodeJS.ProcessEnv {
     const env: NodeJS.ProcessEnv = {};
     for (const name of [...BASE_ENV, ...extraNames]) {
         const value = process.env[name];
@@ -136,7 +159,8 @@ function isExecutableFile(file: string): boolean {
  *  `ExecError` when the program is missing or only in a folder the agent can write to. */
 export function resolveProgram(file: string, cwd: string | undefined): string {
     if (path.isAbsolute(file)) return file;
-    if (file.includes("/") || file.includes("\\")) throw new ExecError(`give a program name or an absolute path, not ${file}`);
+    if (file.includes("/") || file.includes("\\"))
+        throw new ExecError(`give a program name or an absolute path, not ${file}`);
     const writable = writableFolders(cwd);
     const wanted = (process.env.PATH ?? "").split(path.delimiter).filter((entry) => path.isAbsolute(entry));
     let rejected: string | undefined;
@@ -147,7 +171,9 @@ export function resolveProgram(file: string, cwd: string | undefined): string {
         rejected ??= entry;
     }
     if (rejected !== undefined) {
-        throw new ExecError(`${file} is on PATH only in ${rejected}, a folder the agent can write to: install it in a system folder`);
+        throw new ExecError(
+            `${file} is on PATH only in ${rejected}, a folder the agent can write to: install it in a system folder`,
+        );
     }
     throw new ExecError(`${file} is not installed or not on PATH`);
 }
@@ -241,7 +267,11 @@ async function spawnProgram(
             // `detached` gives the child a session of its own: it has no controlling terminal, so ssh or gpg cannot
             // prompt on Pi's screen, and its whole group (git's helpers, ssh) can be killed on a timeout.
             child = spawn(program, [...args], {
-                cwd: options.cwd, env, detached: true, windowsHide: true, stdio: ["pipe", "pipe", "pipe"],
+                cwd: options.cwd,
+                env,
+                detached: true,
+                windowsHide: true,
+                stdio: ["pipe", "pipe", "pipe"],
             });
         } catch (error) {
             reject(new ExecError(`${what} could not start: ${(error as Error).message}`));
@@ -274,24 +304,39 @@ async function spawnProgram(
 
         child.stdout.on("data", (chunk: Buffer) => stdout.add(chunk));
         child.stderr.on("data", (chunk: Buffer) => stderr.add(chunk));
-        child.once("error", (error: NodeJS.ErrnoException) => finish(() => {
-            if (error.code === "ENOENT") {
-                // The same error code says the program is missing or the working folder is.
-                const folderExists = existsSync(options.cwd ?? ".");
-                reject(new ExecError(
-                    folderExists ? `${what} is not installed or not on PATH` : `the working folder ${options.cwd} does not exist`,
-                ));
-            } else {
-                reject(new ExecError(`${what} could not start: ${error.message}`));
-            }
-        }));
-        child.once("close", (code, signal) => finish(() => {
-            if (stop === "aborted") return reject(new ExecError(`${what} was aborted`));
-            if (stop === "timeout") return resolve({ code: TIMEOUT_CODE, stdout: stdout.text(), stderr: stderr.text(), timedOut: true });
-            if (typeof code === "number") return resolve({ code, stdout: stdout.text(), stderr: stderr.text(), timedOut: false });
-            const stopped = `${what} was stopped by ${signal ?? "a signal"}`;
-            resolve({ code: 1, stdout: stdout.text(), stderr: stderr.text() || stopped, timedOut: false });
-        }));
+        child.once("error", (error: NodeJS.ErrnoException) =>
+            finish(() => {
+                if (error.code === "ENOENT") {
+                    // The same error code says the program is missing or the working folder is.
+                    const folderExists = existsSync(options.cwd ?? ".");
+                    reject(
+                        new ExecError(
+                            folderExists
+                                ? `${what} is not installed or not on PATH`
+                                : `the working folder ${options.cwd} does not exist`,
+                        ),
+                    );
+                } else {
+                    reject(new ExecError(`${what} could not start: ${error.message}`));
+                }
+            }),
+        );
+        child.once("close", (code, signal) =>
+            finish(() => {
+                if (stop === "aborted") return reject(new ExecError(`${what} was aborted`));
+                if (stop === "timeout")
+                    return resolve({
+                        code: TIMEOUT_CODE,
+                        stdout: stdout.text(),
+                        stderr: stderr.text(),
+                        timedOut: true,
+                    });
+                if (typeof code === "number")
+                    return resolve({ code, stdout: stdout.text(), stderr: stderr.text(), timedOut: false });
+                const stopped = `${what} was stopped by ${signal ?? "a signal"}`;
+                resolve({ code: 1, stdout: stdout.text(), stderr: stderr.text() || stopped, timedOut: false });
+            }),
+        );
 
         timer = setTimeout(() => kill("timeout"), timeoutMs);
         if (options.signal !== undefined) {
@@ -352,16 +397,20 @@ const CONFIG_LIST_BYTES = 4 * 1024 * 1024;
  *  repository, or git is missing): the real call then fails for the same reason. */
 function listLocalConfig(cwd: string): string | undefined {
     try {
-        return execFileSync(resolveProgram("git", cwd), [...GIT_FIXED_FLAGS, "config", "--list", "--null", "--show-origin", "--show-scope"], {
-            cwd,
-            env: childEnv({ cwd }, GIT_ENV, GIT_FIXED_ENV),
-            encoding: "utf8",
-            timeout: CONFIG_LIST_MS,
-            killSignal: "SIGKILL",
-            maxBuffer: CONFIG_LIST_BYTES,
-            stdio: ["ignore", "pipe", "ignore"],
-            windowsHide: true,
-        });
+        return execFileSync(
+            resolveProgram("git", cwd),
+            [...GIT_FIXED_FLAGS, "config", "--list", "--null", "--show-origin", "--show-scope"],
+            {
+                cwd,
+                env: childEnv({ cwd }, GIT_ENV, GIT_FIXED_ENV),
+                encoding: "utf8",
+                timeout: CONFIG_LIST_MS,
+                killSignal: "SIGKILL",
+                maxBuffer: CONFIG_LIST_BYTES,
+                stdio: ["ignore", "pipe", "ignore"],
+                windowsHide: true,
+            },
+        );
     } catch {
         return undefined;
     }

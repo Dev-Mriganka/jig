@@ -35,7 +35,10 @@ function bashRepositories(command: string, repos: Repository[], cwd: string): st
         while (from !== -1) {
             const previous = command[from - 1];
             const next = command[from + repo.root.length];
-            if ((previous === undefined || !/[A-Za-z0-9._~/-]/.test(previous)) && (next === undefined || !/[A-Za-z0-9._~-]/.test(next))) {
+            if (
+                (previous === undefined || !/[A-Za-z0-9._~/-]/.test(previous)) &&
+                (next === undefined || !/[A-Za-z0-9._~-]/.test(next))
+            ) {
                 roots.add(repo.root);
                 break;
             }

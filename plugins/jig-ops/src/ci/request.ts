@@ -161,7 +161,9 @@ async function direct(
         redirect: "manual",
     });
     const headers: Record<string, string> = {};
-    response.headers.forEach((value, name) => void (headers[name.toLowerCase()] = value));
+    response.headers.forEach((value, name) => {
+        headers[name.toLowerCase()] = value;
+    });
     const body = await readText(response, request.maxBytes ?? MAX_REPLY_BYTES);
     return { status: response.status, headers, cookies: cookiesOf(response), body };
 }

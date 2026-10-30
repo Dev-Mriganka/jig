@@ -1,88 +1,61 @@
 {
-  "category": "person_name",
-  "cases": [
-    {
-      "id": "name-fields-mixed-case",
-      "input": {
-        "firstName": "Alex",
-        "lastName": "Example",
-        "FullName": "Casey Sample",
-        "accountId": "acct-demo-201"
-      },
-      "must_not_contain": [
-        "Alex",
-        "Example",
-        "Casey Sample"
-      ],
-      "must_keep": [
-        "acct-demo-201"
-      ],
-      "expect_tags": [
-        "name"
-      ],
-      "notes": "Structured first, last, and full names."
-    },
-    {
-      "id": "name-contact-array",
-      "input": {
-        "contacts": [
-          {
-            "name": "Jordan Test",
-            "role": "billing"
-          },
-          {
-            "name": "Morgan Sample",
-            "role": "technical"
-          }
-        ],
-        "orderId": "ord-7202"
-      },
-      "must_not_contain": [
-        "Jordan Test",
-        "Morgan Sample"
-      ],
-      "must_keep": [
-        "billing",
-        "technical",
-        "ord-7202"
-      ],
-      "expect_tags": [
-        "name"
-      ],
-      "notes": "Names in a Mongo-style contact array."
-    },
-    {
-      "id": "name-cardholder",
-      "input": {
-        "cardholderName": "Taylor Example",
-        "invoiceId": "inv-demo-203"
-      },
-      "must_not_contain": [
-        "Taylor Example"
-      ],
-      "must_keep": [
-        "inv-demo-203"
-      ],
-      "expect_tags": [
-        "name"
-      ],
-      "notes": "Cardholder name is personal information."
-    },
-    {
-      "id": "name-company-negative",
-      "input": {
-        "companyName": "Example Telecom LLC",
-        "productName": "Sample SIP Gateway",
-        "orderId": "ord-7205"
-      },
-      "must_not_contain": [],
-      "must_keep": [
-        "Example Telecom LLC",
-        "Sample SIP Gateway",
-        "ord-7205"
-      ],
-      "expect_tags": [],
-      "notes": "Company and product names remain visible."
-    }
-  ]
+    "category": "person_name",
+    "cases": [
+        {
+            "id": "name-fields-mixed-case",
+            "input": {
+                "firstName": "Alex",
+                "lastName": "Example",
+                "FullName": "Casey Sample",
+                "accountId": "acct-demo-201"
+            },
+            "must_not_contain": ["Alex", "Example", "Casey Sample"],
+            "must_keep": ["acct-demo-201"],
+            "expect_tags": ["name"],
+            "notes": "Structured first, last, and full names."
+        },
+        {
+            "id": "name-contact-array",
+            "input": {
+                "contacts": [
+                    {
+                        "name": "Jordan Test",
+                        "role": "billing"
+                    },
+                    {
+                        "name": "Morgan Sample",
+                        "role": "technical"
+                    }
+                ],
+                "orderId": "ord-7202"
+            },
+            "must_not_contain": ["Jordan Test", "Morgan Sample"],
+            "must_keep": ["billing", "technical", "ord-7202"],
+            "expect_tags": ["name"],
+            "notes": "Names in a Mongo-style contact array."
+        },
+        {
+            "id": "name-cardholder",
+            "input": {
+                "cardholderName": "Taylor Example",
+                "invoiceId": "inv-demo-203"
+            },
+            "must_not_contain": ["Taylor Example"],
+            "must_keep": ["inv-demo-203"],
+            "expect_tags": ["name"],
+            "notes": "Cardholder name is personal information."
+        },
+        {
+            "id": "name-company-negative",
+            "input": {
+                "companyName": "Example Telecom LLC",
+                "productName": "Sample SIP Gateway",
+                "orderId": "ord-7205"
+            },
+            "must_not_contain": [],
+            "must_keep": ["Example Telecom LLC", "Sample SIP Gateway", "ord-7205"],
+            "expect_tags": [],
+            "notes": "Company and product names remain visible."
+        }
+    ]
 }

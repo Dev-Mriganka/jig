@@ -91,7 +91,12 @@ export function installFakeJig(): FakeJig {
             },
         },
         environments: {
-            kindOf: (name: string) => (name === "local" || name === "external" ? name : name === "production" || name === "prod" ? "production" : "test"),
+            kindOf: (name: string) =>
+                name === "local" || name === "external"
+                    ? name
+                    : name === "production" || name === "prod"
+                      ? "production"
+                      : "test",
         },
         tunnels: {
             register: () => {},

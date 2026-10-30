@@ -20,14 +20,18 @@ export const parameters = Type.Object(
             description: "A service from the ops catalog. An unknown name is refused with the names there are",
         }),
         environment: Type.String({ description: "One of the service's environments, such as staging" }),
-        version: Type.Optional(Type.String({
-            description: "plan, run, watch: the image tag to deploy or to wait for, such as 1.4.3",
-        })),
-        timeoutMinutes: Type.Optional(Type.Integer({
-            minimum: 1,
-            maximum: MAX_WATCH_MINUTES,
-            description: `watch: minutes to watch, at most ${MAX_WATCH_MINUTES} (default ${DEFAULT_WATCH_MINUTES})`,
-        })),
+        version: Type.Optional(
+            Type.String({
+                description: "plan, run, watch: the image tag to deploy or to wait for, such as 1.4.3",
+            }),
+        ),
+        timeoutMinutes: Type.Optional(
+            Type.Integer({
+                minimum: 1,
+                maximum: MAX_WATCH_MINUTES,
+                description: `watch: minutes to watch, at most ${MAX_WATCH_MINUTES} (default ${DEFAULT_WATCH_MINUTES})`,
+            }),
+        ),
     },
     { additionalProperties: false },
 );

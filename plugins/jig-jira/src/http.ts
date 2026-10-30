@@ -267,13 +267,18 @@ function describeFailure(request: JiraRequest, answer: Answer, data: unknown): s
     const { status } = answer;
     let problem = problemOf(data);
     if (problem === "" && data === NOT_JSON) {
-        problem = answer.text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 160);
+        problem = answer.text
+            .replace(/<[^>]*>/g, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+            .slice(0, 160);
     }
     let hint = HINTS[status] ?? "";
     if (status >= 300 && status < 400) {
         // Only the host is named: a sign-in redirect can carry state in its query.
         const host = hostOf(answer.headers.location);
-        hint = `Jira redirected the request${host === "" ? "" : ` to ${host}`}; it was not followed. ` +
+        hint =
+            `Jira redirected the request${host === "" ? "" : ` to ${host}`}; it was not followed. ` +
             "The sign-in may have expired, or the site address is wrong";
     }
     if (status === 429) {

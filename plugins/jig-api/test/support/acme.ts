@@ -27,7 +27,10 @@ function copyFixture(kind: string, into: string, replace: ReadonlyArray<readonly
             const full = path.join(directory, entry.name);
             if (entry.isDirectory()) visit(full);
             else if (/\.(?:json|http|ya?ml|bru)$/.test(entry.name)) {
-                fs.writeFileSync(full, replace.reduce((text, [from, to]) => text.split(from).join(to), fs.readFileSync(full, "utf8")));
+                fs.writeFileSync(
+                    full,
+                    replace.reduce((text, [from, to]) => text.split(from).join(to), fs.readFileSync(full, "utf8")),
+                );
             }
         }
     };
@@ -56,10 +59,26 @@ export function copyAcme(h: Harness, kind: string): string {
 
 /** Everything of an `api` section but its collections: the environments, the secrets (given per environment, so that a staging
  *  token is never sent to production), and the switches. The secrets' values are set in the fake jig-core. */
-export function acmeSettings(h: Harness, collections: Record<string, unknown>, extra: Record<string, unknown> = {}): Record<string, unknown> {
-    for (const { reference, value } of [...Object.values(TOKENS), SERVICE_USER, SERVICE_PASSWORD, API_KEY, CLIENT_SECRET, REPORT_KEY, CLIENT_ID]) h.jig.secrets.set(reference, value);
+export function acmeSettings(
+    h: Harness,
+    collections: Record<string, unknown>,
+    extra: Record<string, unknown> = {},
+): Record<string, unknown> {
+    for (const { reference, value } of [
+        ...Object.values(TOKENS),
+        SERVICE_USER,
+        SERVICE_PASSWORD,
+        API_KEY,
+        CLIENT_SECRET,
+        REPORT_KEY,
+        CLIENT_ID,
+    ])
+        h.jig.secrets.set(reference, value);
     const perEnvironment = (staging: string, production: string): Record<string, string> => ({
-        Staging: staging, staging, Production: production, production,
+        Staging: staging,
+        staging,
+        Production: production,
+        production,
     });
     return {
         collections,
@@ -97,16 +116,20 @@ export function acmeSettings(h: Harness, collections: Record<string, unknown>, e
 export function acmeSection(h: Harness, extra: Record<string, unknown> = {}): Record<string, unknown> {
     const postman = copyAcme(h, "postman");
     const http = copyAcme(h, "http");
-    return acmeSettings(h, {
-        acme: {
-            postman: path.join(postman, "acme-orders.postman_collection.json"),
-            environments: {
-                Staging: path.join(postman, "acme-staging.postman_environment.json"),
-                Production: path.join(postman, "acme-production.postman_environment.json"),
+    return acmeSettings(
+        h,
+        {
+            acme: {
+                postman: path.join(postman, "acme-orders.postman_collection.json"),
+                environments: {
+                    Staging: path.join(postman, "acme-staging.postman_environment.json"),
+                    Production: path.join(postman, "acme-production.postman_environment.json"),
+                },
             },
+            ledger: { http },
         },
-        ledger: { http },
-    }, extra);
+        extra,
+    );
 }
 
 /** Sets the acme collections as the configuration of the harness. */
@@ -117,12 +140,20 @@ export function useAcme(h: Harness, extra: Record<string, unknown> = {}): Record
 }
 
 /** The `api` section for the Bruno fixture in one of its formats, as the collection `acme` (environments `Staging`, `Production`). */
-export function brunoSection(h: Harness, format: "yaml" | "bru", extra: Record<string, unknown> = {}): Record<string, unknown> {
+export function brunoSection(
+    h: Harness,
+    format: "yaml" | "bru",
+    extra: Record<string, unknown> = {},
+): Record<string, unknown> {
     return acmeSettings(h, { acme: { bruno: copyAcme(h, `bruno-${format}`) } }, extra);
 }
 
 /** Sets the Bruno fixture as the configuration of the harness. */
-export function useBruno(h: Harness, format: "yaml" | "bru", extra: Record<string, unknown> = {}): Record<string, unknown> {
+export function useBruno(
+    h: Harness,
+    format: "yaml" | "bru",
+    extra: Record<string, unknown> = {},
+): Record<string, unknown> {
     const section = brunoSection(h, format, extra);
     h.configure(section);
     return section;
@@ -132,7 +163,12 @@ export function useBruno(h: Harness, format: "yaml" | "bru", extra: Record<strin
  * The `api` section for the OpenAPI fixture, as the collection `acme`. By default it may run in `Staging` only, against the fake
  * API; `collection` replaces fields of the collection's own configuration (`environments`, `servers`, `allowProductionReads`).
  */
-export function openapiSection(h: Harness, format: "yaml" | "json", collection: Record<string, unknown> = {}, extra: Record<string, unknown> = {}): Record<string, unknown> {
+export function openapiSection(
+    h: Harness,
+    format: "yaml" | "json",
+    collection: Record<string, unknown> = {},
+    extra: Record<string, unknown> = {},
+): Record<string, unknown> {
     const file = path.join(copyAcme(h, "openapi"), `acme-orders.openapi.${format}`);
     const environments = Array.isArray(collection.environments) ? (collection.environments as string[]) : ["Staging"];
     const known: Record<string, string> = { Staging: `${h.api.origin}/v1`, Production: `${h.prod.origin}/v1` };
@@ -141,7 +177,12 @@ export function openapiSection(h: Harness, format: "yaml" | "json", collection: 
 }
 
 /** Sets the OpenAPI fixture as the configuration of the harness. */
-export function useOpenApi(h: Harness, format: "yaml" | "json", collection: Record<string, unknown> = {}, extra: Record<string, unknown> = {}): Record<string, unknown> {
+export function useOpenApi(
+    h: Harness,
+    format: "yaml" | "json",
+    collection: Record<string, unknown> = {},
+    extra: Record<string, unknown> = {},
+): Record<string, unknown> {
     const section = openapiSection(h, format, collection, extra);
     h.configure(section);
     return section;

@@ -17,7 +17,8 @@ beforeEach(() => h.reset());
 const issue = (key: string): FakeIssue => h.jira.issues.get(key) as FakeIssue;
 
 /** The tags jig-core removes from a page a tool brings (its preview-html.ts). Whatever is written here must survive that. */
-const REMOVED = /<\/?(?:script|iframe|frame|frameset|object|embed|applet|meta|link|base|form|input|button|textarea|select|svg|math)\b[^>]*>/gi;
+const REMOVED =
+    /<\/?(?:script|iframe|frame|frameset|object|embed|applet|meta|link|base|form|input|button|textarea|select|svg|math)\b[^>]*>/gi;
 
 async function previewOf(input: Record<string, unknown>): Promise<Preview> {
     return h.declaration.preview?.(input, new AbortController().signal) as Promise<Preview>;
@@ -60,10 +61,26 @@ describe("the fingerprint", () => {
         issue("PROJ-1").comments.find((comment) => comment.id === "10003")!.body = "Someone else edited this.";
         issue("PROJ-2").fields.summary = "Renamed by someone else";
         h.jira.me = h.jira.users[1] as typeof h.jira.me;
-        assert.notEqual((await previewOf(CALLS[3] as Record<string, unknown>)).fingerprint, before.transition, "the status it moves from");
-        assert.notEqual((await previewOf(CALLS[1] as Record<string, unknown>)).fingerprint, before.edit, "the text it replaces");
-        assert.notEqual((await previewOf(CALLS[4] as Record<string, unknown>)).fingerprint, before.update, "the values it changes");
-        assert.notEqual((await previewOf(CALLS[0] as Record<string, unknown>)).fingerprint, before.comment, "who posts");
+        assert.notEqual(
+            (await previewOf(CALLS[3] as Record<string, unknown>)).fingerprint,
+            before.transition,
+            "the status it moves from",
+        );
+        assert.notEqual(
+            (await previewOf(CALLS[1] as Record<string, unknown>)).fingerprint,
+            before.edit,
+            "the text it replaces",
+        );
+        assert.notEqual(
+            (await previewOf(CALLS[4] as Record<string, unknown>)).fingerprint,
+            before.update,
+            "the values it changes",
+        );
+        assert.notEqual(
+            (await previewOf(CALLS[0] as Record<string, unknown>)).fingerprint,
+            before.comment,
+            "who posts",
+        );
     });
 
     test("what only informs does not change it: the duplicates of a new issue, and the title of the issue", async () => {
@@ -89,12 +106,15 @@ describe("flags for text that points at things readers cannot open", () => {
     test("a comment is flagged at the top of the body, in the summary and on the page, and still goes", async () => {
         const result = await h.call({ action: "comment", key: "PROJ-1", text: POINTS });
         assert.match(result.preview?.summary ?? "", /\[2 pointers flagged\]$/);
-        assert.equal((result.preview?.body ?? "").split("\n").slice(0, 4).join("\n"), [
-            "WARNING: the text points at things its readers may not be able to open:",
-            "  - local path: /home/alice/work/export.csv",
-            "  - relative path: ./queries/export.sql",
-            "Rewrite the text, or approve it if this is intended.",
-        ].join("\n"));
+        assert.equal(
+            (result.preview?.body ?? "").split("\n").slice(0, 4).join("\n"),
+            [
+                "WARNING: the text points at things its readers may not be able to open:",
+                "  - local path: /home/alice/work/export.csv",
+                "  - relative path: ./queries/export.sql",
+                "Rewrite the text, or approve it if this is intended.",
+            ].join("\n"),
+        );
         assert.match(
             result.preview?.html ?? "",
             /<div class="flags"><p>WARNING: the text points at things its readers may not be able to open:<\/p><ul><li>local path: \/home\/alice\/work\/export\.csv<\/li><li>relative path: \.\/queries\/export\.sql<\/li><\/ul><\/div>/,
@@ -109,20 +129,60 @@ describe("flags for text that points at things readers cannot open", () => {
     });
 
     test("every write that carries text is checked: edit, update (title, description, labels, other fields) and create", async () => {
-        h.configure({ site: "https://jira.example.test", auth: { token: "pass:jira/token" }, updateFields: ["summary", "description", "labels", "customfield_10600"] });
+        h.configure({
+            site: "https://jira.example.test",
+            auth: { token: "pass:jira/token" },
+            updateFields: ["summary", "description", "labels", "customfield_10600"],
+        });
         const flagged = async (input: Record<string, unknown>) => (await h.call(input)).preview?.summary ?? "";
-        assert.match(await flagged({ action: "edit_comment", key: "PROJ-1", commentId: "10003", text: "see ~/notes.md" }), /\[1 pointer flagged\]$/);
-        assert.match(await flagged({ action: "update", key: "PROJ-2", fields: { summary: "Fix in /Users/bob/dev" } }), /\[1 pointer flagged\]$/);
-        assert.match(await flagged({ action: "update", key: "PROJ-2", fields: { description: "file:///etc/hosts" } }), /\[1 pointer flagged\]$/);
-        assert.match(await flagged({ action: "update", key: "PROJ-2", fields: { labels: ["ok", "C:\\work"] } }), /\[1 pointer flagged\]$/);
-        assert.match(await flagged({ action: "update", key: "PROJ-2", fields: { customfield_10600: "see /tmp/x.log" } }), /\[1 pointer flagged\]$/);
-        assert.match(await flagged({ action: "create", project: "PROJ", type: "Bug", summary: "A bug", description: "in /home/a/b", fields: { labels: ["~/x"] } }), /\[2 pointers flagged\]$/);
+        assert.match(
+            await flagged({ action: "edit_comment", key: "PROJ-1", commentId: "10003", text: "see ~/notes.md" }),
+            /\[1 pointer flagged\]$/,
+        );
+        assert.match(
+            await flagged({ action: "update", key: "PROJ-2", fields: { summary: "Fix in /Users/bob/dev" } }),
+            /\[1 pointer flagged\]$/,
+        );
+        assert.match(
+            await flagged({ action: "update", key: "PROJ-2", fields: { description: "file:///etc/hosts" } }),
+            /\[1 pointer flagged\]$/,
+        );
+        assert.match(
+            await flagged({ action: "update", key: "PROJ-2", fields: { labels: ["ok", "C:\\work"] } }),
+            /\[1 pointer flagged\]$/,
+        );
+        assert.match(
+            await flagged({ action: "update", key: "PROJ-2", fields: { customfield_10600: "see /tmp/x.log" } }),
+            /\[1 pointer flagged\]$/,
+        );
+        assert.match(
+            await flagged({
+                action: "create",
+                project: "PROJ",
+                type: "Bug",
+                summary: "A bug",
+                description: "in /home/a/b",
+                fields: { labels: ["~/x"] },
+            }),
+            /\[2 pointers flagged\]$/,
+        );
     });
 
     test("the names in privateNames are flagged, without regard to case", async () => {
-        h.configure({ site: "https://jira.example.test", auth: { token: "pass:jira/token" }, privateNames: ["payroll", "corp.example.net"] });
-        const result = await h.call({ action: "comment", key: "PROJ-1", text: "Ask Payroll, or look at CORP.example.NET." });
-        assert.match(result.preview?.body ?? "", /\n {2}- private name: payroll\n {2}- private name: corp\.example\.net\n/);
+        h.configure({
+            site: "https://jira.example.test",
+            auth: { token: "pass:jira/token" },
+            privateNames: ["payroll", "corp.example.net"],
+        });
+        const result = await h.call({
+            action: "comment",
+            key: "PROJ-1",
+            text: "Ask Payroll, or look at CORP.example.NET.",
+        });
+        assert.match(
+            result.preview?.body ?? "",
+            /\n {2}- private name: payroll\n {2}- private name: corp\.example\.net\n/,
+        );
         assert.match(result.preview?.summary ?? "", /\[2 pointers flagged\]$/);
     });
 
@@ -149,11 +209,25 @@ describe("flags for text that points at things readers cannot open", () => {
 
 describe("the page for o", () => {
     test("is markup for jig-core's page: no document of its own, and nothing jig-core would remove", async () => {
-        for (const input of [CALLS[0], CALLS[1], CALLS[2], CALLS[5], { action: "update", key: "PROJ-2", fields: { description: "h3. Hi", summary: "x" } }]) {
+        for (const input of [
+            CALLS[0],
+            CALLS[1],
+            CALLS[2],
+            CALLS[5],
+            { action: "update", key: "PROJ-2", fields: { description: "h3. Hi", summary: "x" } },
+        ]) {
             const html = (await previewOf(input as Record<string, unknown>)).html ?? "";
             assert.ok(html.startsWith('<div class="jira-preview"><style>'), String(input?.action));
-            assert.doesNotMatch(html, /<!doctype|<html|<head|<body|<title|<meta|<h1>/i, "jig-core supplies the document, the title and the policy");
-            assert.equal(html.replace(REMOVED, ""), html, `${String(input?.action)}: nothing in it is a tag that jig-core removes`);
+            assert.doesNotMatch(
+                html,
+                /<!doctype|<html|<head|<body|<title|<meta|<h1>/i,
+                "jig-core supplies the document, the title and the policy",
+            );
+            assert.equal(
+                html.replace(REMOVED, ""),
+                html,
+                `${String(input?.action)}: nothing in it is a tag that jig-core removes`,
+            );
             assert.doesNotMatch(html, /<script|\son[a-z]+=|javascript:|url\(/i);
         }
     });
@@ -164,46 +238,88 @@ describe("the page for o", () => {
     });
 
     test("shows the text as Jira will, and what it replaces", async () => {
-        const html = (await previewOf({ action: "edit_comment", key: "PROJ-1", commentId: "10003", text: "h3. Result\n* *fixed* in {{1.2.3}}\n||a||b||\n|1|2|" })).html ?? "";
-        assert.ok(html.includes(
-            '<h2>New text, as Jira will show it</h2><div class="wiki"><h3>Result</h3>\n' +
-                "<ul><li><strong>fixed</strong> in <code>1.2.3</code></li></ul>\n" +
-                "<table><tr><th>a</th><th>b</th></tr><tr><td>1</td><td>2</td></tr></table></div>",
-        ));
-        assert.match(html, /<details><summary>It replaces this text<\/summary><div class="wiki"><p>Verified on staging\.<\/p><\/div><\/details>/);
+        const html =
+            (
+                await previewOf({
+                    action: "edit_comment",
+                    key: "PROJ-1",
+                    commentId: "10003",
+                    text: "h3. Result\n* *fixed* in {{1.2.3}}\n||a||b||\n|1|2|",
+                })
+            ).html ?? "";
+        assert.ok(
+            html.includes(
+                '<h2>New text, as Jira will show it</h2><div class="wiki"><h3>Result</h3>\n' +
+                    "<ul><li><strong>fixed</strong> in <code>1.2.3</code></li></ul>\n" +
+                    "<table><tr><th>a</th><th>b</th></tr><tr><td>1</td><td>2</td></tr></table></div>",
+            ),
+        );
+        assert.match(
+            html,
+            /<details><summary>It replaces this text<\/summary><div class="wiki"><p>Verified on staging\.<\/p><\/div><\/details>/,
+        );
     });
 
     test("a create shows its fields as a table, the duplicates, and the description", async () => {
         h.jira.duplicates = ["PROJ-2"];
-        const html = (await previewOf({ action: "create", project: "PROJ", type: "Bug", summary: "A <b>bug</b>", description: "Steps & more" })).html ?? "";
-        assert.ok(html.includes(
-            '<table class="facts"><tr><th>Project</th><td>PROJ</td></tr><tr><th>Type</th><td>Bug</td></tr>' +
-                "<tr><th>Summary</th><td>A &lt;b&gt;bug&lt;/b&gt;</td></tr></table>",
-        ));
-        assert.match(html, /<p>Possible duplicates, created in PROJ in the last 30 days:<\/p><p> {2}PROJ-2 \[Open\] Update the onboarding guide<\/p>/);
-        assert.match(html, /<h2>Description, as Jira will show it<\/h2><div class="wiki"><p>Steps &amp; more<\/p><\/div>/);
+        const html =
+            (
+                await previewOf({
+                    action: "create",
+                    project: "PROJ",
+                    type: "Bug",
+                    summary: "A <b>bug</b>",
+                    description: "Steps & more",
+                })
+            ).html ?? "";
+        assert.ok(
+            html.includes(
+                '<table class="facts"><tr><th>Project</th><td>PROJ</td></tr><tr><th>Type</th><td>Bug</td></tr>' +
+                    "<tr><th>Summary</th><td>A &lt;b&gt;bug&lt;/b&gt;</td></tr></table>",
+            ),
+        );
+        assert.match(
+            html,
+            /<p>Possible duplicates, created in PROJ in the last 30 days:<\/p><p> {2}PROJ-2 \[Open\] Update the onboarding guide<\/p>/,
+        );
+        assert.match(
+            html,
+            /<h2>Description, as Jira will show it<\/h2><div class="wiki"><p>Steps &amp; more<\/p><\/div>/,
+        );
     });
 
     test("markup in the text, in a title or in a field value reaches the page only as escaped text", async () => {
         const evil = `<script>alert(1)</script><img src=x onerror=alert(2)>`;
         issue("PROJ-2").fields.summary = evil;
         const comment = (await previewOf({ action: "comment", key: "PROJ-2", text: evil })).html ?? "";
-        const update = (await previewOf({ action: "update", key: "PROJ-2", fields: { summary: evil, description: evil } })).html ?? "";
+        const update =
+            (await previewOf({ action: "update", key: "PROJ-2", fields: { summary: evil, description: evil } })).html ??
+            "";
         for (const html of [comment, update]) {
             assert.doesNotMatch(html, /<script>|<img/);
             assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;&lt;img src=x onerror=alert\(2\)&gt;/);
         }
-        assert.equal((await previewOf({ action: "comment", key: "PROJ-2", text: "x" })).summary.includes("<script>"), true, "the one-line summary is plain text, which jig-core escapes itself");
+        assert.equal(
+            (await previewOf({ action: "comment", key: "PROJ-2", text: "x" })).summary.includes("<script>"),
+            true,
+            "the one-line summary is plain text, which jig-core escapes itself",
+        );
     });
 });
 
 describe("a call that cannot run", () => {
     test("is a TypeError from the preview, so jig-core blocks it with the message and nobody is asked", async () => {
         const invalid: Array<Record<string, unknown>> = [
-            {}, { action: "comment" }, { action: "comment", key: "nope", text: "x" }, { action: "comment", key: "PROJ-1", text: "" },
-            { action: "comment", key: "PROJ-1", text: "x".repeat(32768) }, { action: "comment", key: "PROJ-99", text: "x" },
-            { action: "transition", key: "PROJ-1", transition: "Nowhere" }, { action: "update", key: "PROJ-1", fields: { reporter: "x" } },
-            { action: "create", project: "PROJ", type: "Epic", summary: "x" }, { action: "create", project: "PROJ", type: "Task", summary: "x" },
+            {},
+            { action: "comment" },
+            { action: "comment", key: "nope", text: "x" },
+            { action: "comment", key: "PROJ-1", text: "" },
+            { action: "comment", key: "PROJ-1", text: "x".repeat(32768) },
+            { action: "comment", key: "PROJ-99", text: "x" },
+            { action: "transition", key: "PROJ-1", transition: "Nowhere" },
+            { action: "update", key: "PROJ-1", fields: { reporter: "x" } },
+            { action: "create", project: "PROJ", type: "Epic", summary: "x" },
+            { action: "create", project: "PROJ", type: "Task", summary: "x" },
         ];
         for (const input of invalid) {
             await assert.rejects(previewOf(input), (error: unknown) => {
@@ -212,7 +328,11 @@ describe("a call that cannot run", () => {
                 return true;
             });
             const result = await h.call(input);
-            assert.match(result.blocked ?? "", /^Blocked by jig-core: jira cannot run with this input: /, JSON.stringify(input));
+            assert.match(
+                result.blocked ?? "",
+                /^Blocked by jig-core: jira cannot run with this input: /,
+                JSON.stringify(input),
+            );
             assert.equal(result.text, "");
             assert.equal(result.error, undefined, "the tool never ran");
         }
@@ -223,7 +343,10 @@ describe("a call that cannot run", () => {
     test("an unconfigured tool is blocked too, since nothing can work", async () => {
         h.jig.reset();
         const result = await h.call({ action: "comment", key: "PROJ-1", text: "x" });
-        assert.match(result.blocked ?? "", /jira cannot run with this input: jira is not set up: add a "jira" section with "site" and "auth" to jig\.json/);
+        assert.match(
+            result.blocked ?? "",
+            /jira cannot run with this input: jira is not set up: add a "jira" section with "site" and "auth" to jig\.json/,
+        );
     });
 
     test("a failure that is not about the input is not a TypeError: the person sees 'preview unavailable' and decides", async () => {
@@ -233,7 +356,12 @@ describe("a call that cannot run", () => {
             assert.match(error.message, /^no answer from Jira \(/);
             return true;
         });
-        h.jira.misbehave({ match: (request) => request.path === "/issue/PROJ-1", status: 401, apply: false, afterMs: 0 });
+        h.jira.misbehave({
+            match: (request) => request.path === "/issue/PROJ-1",
+            status: 401,
+            apply: false,
+            afterMs: 0,
+        });
         const result = await h.call(CALLS[0] as Record<string, unknown>);
         assert.match(result.preview?.summary ?? "", /^preview unavailable: Jira said 401 to GET \/issue\/PROJ-1/);
         assert.equal(result.blocked, undefined);

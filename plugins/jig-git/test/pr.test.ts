@@ -444,8 +444,8 @@ test("create announces the new pull request, so a watch on the pushed commit can
     const text = ok(await h.call("pr", { action: "create", repo: r.name, title: "T", body: BODY }));
     const events = h.announced.filter((entry) => entry.event === "jig-git:pushed").map((entry) => entry.payload);
     assert.deepEqual(events, [
-        { repo: "acme/" + r.name, branch: "feature/one", sha: head },
-        { repo: "acme/" + r.name, branch: "feature/one", sha: head, pr: 77 },
+        { repo: `acme/${r.name}`, branch: "feature/one", sha: head },
+        { repo: `acme/${r.name}`, branch: "feature/one", sha: head, pr: 77 },
     ]);
     assert.equal(h.jig.started.length, 0, "jig-git starts no watch");
     assert.doesNotMatch(text, /Watching/);
@@ -765,7 +765,7 @@ test("review: a comment or a request for changes; approving is not possible", as
     const approve = await h.call("pr", { action: "review", repo: r.name, number: 42, event: "approve", body: "LGTM" });
     assert.match(approve.error?.message ?? "", /never approves: approval stays with a person/);
     assert.equal(h.gh.callsOf("pr review").length, 2);
-    const event = (h.tools.get("pr")?.parameters as unknown as { properties: { event: { enum: string[] } } }).properties
+    const event = (h.tools.get("pr")!.parameters as unknown as { properties: { event: { enum: string[] } } }).properties
         .event;
     assert.deepEqual(event.enum, ["comment", "request_changes"], "the schema has no way to approve");
 });

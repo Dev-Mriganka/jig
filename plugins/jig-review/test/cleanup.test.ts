@@ -61,11 +61,15 @@ function deadPid(): number {
 }
 
 /** A pending review as another session left it: owned by `ownerPid`, last touched `ageMs` ago. */
-async function pendingReview(cwd: string, options: { ownerPid?: number; ageMs?: number; discussed?: boolean } = {}): Promise<{ store: ReviewStore; id: string; file: string }> {
+async function pendingReview(
+    cwd: string,
+    options: { ownerPid?: number; ageMs?: number; discussed?: boolean } = {},
+): Promise<{ store: ReviewStore; id: string; file: string }> {
     const settings = new SettingsStore(workspaceDirFor(roots.get(cwd)!, cwd));
     const store = new ReviewStore(settings);
     const review = await store.create("head", "diff", "all");
-    if (options.discussed) await store.addIteration(await store.addSubmittedComments(review, [{ body: "Please check." }]), "second diff");
+    if (options.discussed)
+        await store.addIteration(await store.addSubmittedComments(review, [{ body: "Please check." }]), "second diff");
     // Ids are timestamps to the second: give each record its own file so records made together do not collide.
     const created = path.join(settings.reviewsDir, `${review.id}.json`);
     const record = JSON.parse(readFileSync(created, "utf8")) as ReviewRecord;
@@ -82,7 +86,9 @@ async function pendingReview(cwd: string, options: { ownerPid?: number; ageMs?: 
 /** Starts a Pi session in `cwd` the way Pi does: the factory, then session_start. */
 async function startSession(cwd: string, mode: "tui" | "print" | "json" = "tui"): Promise<void> {
     const host = fakeHost();
-    new ReviewCoordinator(host.pi, cwd, { root: roots.get(cwd) ?? mkdtempSync(path.join(os.tmpdir(), "jig-review-root-")) }).register();
+    new ReviewCoordinator(host.pi, cwd, {
+        root: roots.get(cwd) ?? mkdtempSync(path.join(os.tmpdir(), "jig-review-root-")),
+    }).register();
     await host.fire("session_start", context(cwd, mode).ctx);
 }
 
@@ -172,6 +178,10 @@ describe("session_start", () => {
         writeFileSync(path.join(path.dirname(stale.file), "2026-01-01T00-00-00Z.json"), "{ half written");
         await startSession(cwd);
         assert.equal(existsSync(stale.file), false);
-        assert.equal(existsSync(path.join(path.dirname(stale.file), "2026-01-01T00-00-00Z.json")), true, "a record it cannot read is left alone");
+        assert.equal(
+            existsSync(path.join(path.dirname(stale.file), "2026-01-01T00-00-00Z.json")),
+            true,
+            "a record it cannot read is left alone",
+        );
     });
 });

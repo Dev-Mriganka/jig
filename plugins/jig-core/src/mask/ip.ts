@@ -45,10 +45,16 @@ function formatIPv6(groups: number[]): string {
     let bestStart = -1;
     let bestLength = 1; // a single zero group is never compressed (RFC 5952)
     for (let start = 0; start < 8; ) {
-        if (groups[start] !== 0) { start++; continue; }
+        if (groups[start] !== 0) {
+            start++;
+            continue;
+        }
         let end = start;
         while (end < 8 && groups[end] === 0) end++;
-        if (end - start > bestLength) { bestStart = start; bestLength = end - start; }
+        if (end - start > bestLength) {
+            bestStart = start;
+            bestLength = end - start;
+        }
         start = end;
     }
     const hex = (slice: number[]): string => slice.map((g) => g.toString(16)).join(":");
@@ -68,8 +74,13 @@ export function canonicalIp(text: string): string | undefined {
 function isInternalIPv4(octets: number[]): boolean {
     const [a = 0, b = 0] = octets;
     return (
-        a === 0 || a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) ||
-        (a === 169 && b === 254) || (a === 100 && b >= 64 && b <= 127)
+        a === 0 ||
+        a === 10 ||
+        a === 127 ||
+        (a === 172 && b >= 16 && b <= 31) ||
+        (a === 192 && b === 168) ||
+        (a === 169 && b === 254) ||
+        (a === 100 && b >= 64 && b <= 127)
     );
 }
 

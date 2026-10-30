@@ -32,9 +32,10 @@ export function saveEvidence(folder: string, key: string, call: EvidenceCall, no
     const paths = ticketPaths(folder, key);
     const tool = /^[A-Za-z][A-Za-z0-9_.:-]{0,63}$/.test(call.tool) ? call.tool : "unnamed";
     const action = actionOf(call.input.action);
-    const name = [stampOf(now), slug(tool), action === undefined ? "" : slug(action), randomBytes(3).toString("hex")]
+    const stem = [stampOf(now), slug(tool), action === undefined ? "" : slug(action), randomBytes(3).toString("hex")]
         .filter((part) => part !== "")
-        .join("-") + ".txt";
+        .join("-");
+    const name = `${stem}.txt`;
     mkdirSync(paths.evidence, { recursive: true, mode: FOLDER_MODE });
     if (!createFile(path.join(paths.evidence, name), clipBytes(call.text, EVIDENCE_LIMIT, CLIP_NOTE))) {
         throw new Error(`${name} already exists`);
@@ -46,7 +47,9 @@ export function saveEvidence(folder: string, key: string, call: EvidenceCall, no
 
 /** Results saved for the ticket: the lines of evidence/index.md. */
 export function indexCount(folder: string, key: string): number {
-    return readText(ticketPaths(folder, key).index).split("\n").filter((line) => line.startsWith("- ")).length;
+    return readText(ticketPaths(folder, key).index)
+        .split("\n")
+        .filter((line) => line.startsWith("- ")).length;
 }
 
 /** The action of a call when it is a short word of letters, `-` or `_`. Anything else, such as a token typed into the
@@ -55,4 +58,8 @@ function actionOf(value: unknown): string | undefined {
     return typeof value === "string" && /^[A-Za-z][A-Za-z_-]{0,31}$/.test(value) ? value : undefined;
 }
 
-const slug = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+const slug = (value: string) =>
+    value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");

@@ -38,7 +38,8 @@ function checkResponse(name: string, value: unknown): TransportResponse {
             throw new TypeError(`${who} returned headers that are not an object`);
         }
         for (const [header, headerValue] of Object.entries(headers)) {
-            if (typeof headerValue !== "string") throw new TypeError(`${who} returned a header (${printable(header)}) that is not text`);
+            if (typeof headerValue !== "string")
+                throw new TypeError(`${who} returned a header (${printable(header)}) that is not text`);
             copy[header.toLowerCase()] = headerValue;
         }
     }

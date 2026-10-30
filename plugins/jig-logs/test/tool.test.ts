@@ -406,7 +406,7 @@ test("a refused call adds nothing to the record", async (t) => {
 
 test("a partial answer says what is missing and what to do", async (t) => {
     const w = await world(t, {
-        responder: (request, n) =>
+        responder: (_request, n) =>
             n === 2
                 ? { status: 429, text: "" }
                 : searchReply({

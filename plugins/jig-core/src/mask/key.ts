@@ -1,6 +1,13 @@
 import { randomBytes } from "node:crypto";
 import {
-    chmodSync, linkSync, mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync,
+    chmodSync,
+    linkSync,
+    mkdirSync,
+    readFileSync,
+    readdirSync,
+    renameSync,
+    unlinkSync,
+    writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
 import { MaskError } from "./error.ts";
@@ -38,7 +45,9 @@ function deleteOldKeys(dir: string, now: Date): void {
         if (!(age > KEEP_DAYS)) continue;
         try {
             unlinkSync(join(dir, name));
-        } catch { /* a concurrent cleanup got there first */ }
+        } catch {
+            /* a concurrent cleanup got there first */
+        }
     }
 }
 
@@ -75,7 +84,9 @@ export function dailyMaskKey(stateDir: string, now: Date = new Date()): Uint8Arr
     } finally {
         try {
             unlinkSync(temp);
-        } catch { /* renamed away, or already gone */ }
+        } catch {
+            /* renamed away, or already gone */
+        }
     }
     return new Uint8Array(fresh);
 }

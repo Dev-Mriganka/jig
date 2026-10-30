@@ -59,9 +59,10 @@ export function capContent(input: {
     const images = input.content.filter((block) => block.type !== "text");
     const spill = writeSpill(input.sessionId, input.toolCallId, full);
     const cut = `Output cut: ${full.length} characters in total, the first ${shown.length} shown.`;
-    const note = spill === undefined
-        ? `[${cut} The full text could not be saved.]`
-        : `[${cut} The full text is in ${spill}: read it with the read tool.]`;
+    const note =
+        spill === undefined
+            ? `[${cut} The full text could not be saved.]`
+            : `[${cut} The full text is in ${spill}: read it with the read tool.]`;
     return {
         content: [{ type: "text", text: `${shown}\n\n${note}` }, ...images],
         ...(spill === undefined ? {} : { spill }),

@@ -211,7 +211,7 @@ export function createAccess(rules: AccessRules): Access {
 
     function visible(db: string, coll: string | undefined): boolean {
         if (SYSTEM_DATABASES.has(db.toLowerCase())) return false;
-        if (coll !== undefined && coll.toLowerCase().startsWith("system.")) return false;
+        if (coll?.toLowerCase().startsWith("system.")) return false;
         if (rules.mode === "deny") {
             if (rules.deny.databases.has(db)) return false;
             return coll === undefined || !rules.deny.collections.has(`${db}.${coll}`);
@@ -236,7 +236,7 @@ export function createAccess(rules: AccessRules): Access {
             if (SYSTEM_DATABASES.has(db.toLowerCase())) {
                 throw new InputError(`${db}: the databases admin, local and config are always denied`);
             }
-            if (coll !== undefined && coll.toLowerCase().startsWith("system.")) {
+            if (coll?.toLowerCase().startsWith("system.")) {
                 throw new InputError(`${name}: system collections are always denied`);
             }
             if (visible(db, coll)) return;

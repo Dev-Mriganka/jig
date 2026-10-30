@@ -1,10 +1,9 @@
 // How requests travel: straight to a backend over a socket, or through a transport. The same searches run both ways and
 // must give the same answers, because everything above the request function is the same code.
 import assert from "node:assert/strict";
-import { createServer } from "node:net";
 import { test } from "node:test";
 import { createLogsTool } from "../src/tool.ts";
-import { errorReply, hit, PUBLIC_URL, rangeOf, searchReply } from "./support/fake-search.ts";
+import { errorReply, hit, rangeOf, searchReply } from "./support/fake-search.ts";
 import type { Answer, Recorded, Responder } from "./support/fake-search.ts";
 import { docs, NOW, ok, world } from "./support/world.ts";
 import type { World } from "./support/world.ts";
@@ -314,16 +313,15 @@ test("direct: a redirect is an error, and the credential is not sent to where it
 });
 
 test("direct: an address nobody listens at is an error that names the cause, not a result made of gaps", async (t) => {
-    const port = await new Promise<number>((resolve) => {
-        const probe = createServer().listen(0, "127.0.0.1", () => {
-            const { port: free } = probe.address() as { port: number };
-            probe.close(() => resolve(free));
-        });
-    });
+    // A refused connection as Node's fetch reports it: a TypeError with the system error as its cause. A real closed port
+    // is not used, because a test file running in parallel can take a freed port before the request reaches it.
+    const refused = Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:9"), { code: "ECONNREFUSED" });
     const w = await world(t);
     const closed = createLogsTool({
         now: () => NOW,
-        fetch: (input, init) => fetch(String(input).replace(PUBLIC_URL, `http://127.0.0.1:${port}`), init),
+        fetch: async () => {
+            throw new TypeError("fetch failed", { cause: refused });
+        },
     });
     await assert.rejects(
         closed.definition.execute("c", call as never, undefined, undefined, {} as never),

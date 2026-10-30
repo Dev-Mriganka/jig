@@ -56,13 +56,17 @@ export interface Harness {
 }
 
 /** The default section: the https address, and an email with a token reference. */
-export const cloudSection = (): Record<string, unknown> => ({ site: SITE, auth: { email: "jane@example.test", token: TOKEN_REFERENCE } });
+export const cloudSection = (): Record<string, unknown> => ({
+    site: SITE,
+    auth: { email: "jane@example.test", token: TOKEN_REFERENCE },
+});
 
 export async function setupHarness(flavor: Flavor = "cloud", timeouts = LONG_TIMEOUTS): Promise<Harness> {
     const jira = await startFakeJira(flavor);
     const jig = installFakeJig();
     // Requests for the https address go to the fake on this machine; everything else about them is real.
-    const reach = ((input: string | URL | Request, init?: RequestInit) => fetch(String(input).replace(SITE, jira.origin), init)) as typeof fetch;
+    const reach = ((input: string | URL | Request, init?: RequestInit) =>
+        fetch(String(input).replace(SITE, jira.origin), init)) as typeof fetch;
 
     /** Loads the plugin into a fake Pi, as Pi does at start-up. A new load has learned nothing yet. */
     function load(): { tool: ToolDefinition; declaration: ToolDeclaration } {
@@ -107,17 +111,37 @@ export async function setupHarness(flavor: Flavor = "cloud", timeouts = LONG_TIM
                 } catch (error) {
                     // What jig-core does: the message is cut to one line of 200 characters; a TypeError blocks the call,
                     // anything else shows "preview unavailable" and the person can still decide.
-                    const reason = (error instanceof Error ? error.message : String(error)).replace(/\s+/g, " ").slice(0, 200);
-                    if (error instanceof TypeError) return { id, text: "", blocked: `Blocked by jig-core: jira cannot run with this input: ${reason}`, cls };
+                    const reason = (error instanceof Error ? error.message : String(error))
+                        .replace(/\s+/g, " ")
+                        .slice(0, 200);
+                    if (error instanceof TypeError)
+                        return {
+                            id,
+                            text: "",
+                            blocked: `Blocked by jig-core: jira cannot run with this input: ${reason}`,
+                            cls,
+                        };
                     preview = { summary: `preview unavailable: ${reason}` };
                 }
                 jig.approved.set(id, preview);
             }
             await options.between?.();
             try {
-                const result = await tool.execute(id, input as never, options.signal, undefined, {} as ExtensionToolContext);
+                const result = await tool.execute(
+                    id,
+                    input as never,
+                    options.signal,
+                    undefined,
+                    {} as ExtensionToolContext,
+                );
                 const first = result.content[0];
-                return { id, text: first !== undefined && first.type === "text" ? first.text : "", cls, ...(preview === undefined ? {} : { preview }), details: result.details };
+                return {
+                    id,
+                    text: first !== undefined && first.type === "text" ? first.text : "",
+                    cls,
+                    ...(preview === undefined ? {} : { preview }),
+                    details: result.details,
+                };
             } catch (error) {
                 return { id, text: "", error: error as Error, cls, ...(preview === undefined ? {} : { preview }) };
             }
@@ -132,7 +156,9 @@ export async function setupHarness(flavor: Flavor = "cloud", timeouts = LONG_TIM
 
 /** The text of a call that must have worked; a failure or a block fails the test with the message. */
 export function ok(result: CallResult): string {
-    if (result.blocked !== undefined) throw new Error(`expected the call to work, but it was blocked: ${result.blocked}`);
-    if (result.error !== undefined) throw new Error(`expected the call to work, but it failed: ${result.error.message}`);
+    if (result.blocked !== undefined)
+        throw new Error(`expected the call to work, but it was blocked: ${result.blocked}`);
+    if (result.error !== undefined)
+        throw new Error(`expected the call to work, but it failed: ${result.error.message}`);
     return result.text;
 }

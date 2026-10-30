@@ -1,8 +1,20 @@
 // The one place kubectl is built and run: the arguments it gets, what it may be asked to do, its limits and its failures.
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, test } from "node:test";
-import { argvOf, CHANGE, cutMark, getJson, LOGS, READ, READS, readKubectl, runKubectl, startKubectl, wasCut, WRITES } from "../src/runtime/kubernetes/kubectl.ts";
-import type { Verb } from "../src/runtime/kubernetes/kubectl.ts";
+import {
+    argvOf,
+    CHANGE,
+    cutMark,
+    getJson,
+    LOGS,
+    READ,
+    READS,
+    readKubectl,
+    runKubectl,
+    startKubectl,
+    wasCut,
+    WRITES,
+} from "../src/runtime/kubernetes/kubectl.ts";
 import { rig } from "./support/rig.ts";
 import type { Rig } from "./support/rig.ts";
 
@@ -39,19 +51,30 @@ describe("the arguments", () => {
 
     test("only three commands read and two change, and each of the two is one word and the word after it", () => {
         assert.deepEqual([...READS], ["get", "logs", "exec"]);
-        assert.deepEqual(WRITES.map((write) => `${write.verb} ${write.then}`), ["set image", "rollout undo"]);
+        assert.deepEqual(
+            WRITES.map((write) => `${write.verb} ${write.then}`),
+            ["set image", "rollout undo"],
+        );
     });
 
     test("a change is built like a read: the same three flags first, then the verb and its words", () => {
-        assert.deepEqual(argvOf(r.target(), "set", ["image", "deployment/orders-api", "orders-api=registry.example.test/shop/orders-api:1.4.3"], CHANGE), [
-            "--request-timeout=50s",
-            "--context=test-cluster",
-            "--namespace=orders-staging",
-            "set",
-            "image",
-            "deployment/orders-api",
-            "orders-api=registry.example.test/shop/orders-api:1.4.3",
-        ]);
+        assert.deepEqual(
+            argvOf(
+                r.target(),
+                "set",
+                ["image", "deployment/orders-api", "orders-api=registry.example.test/shop/orders-api:1.4.3"],
+                CHANGE,
+            ),
+            [
+                "--request-timeout=50s",
+                "--context=test-cluster",
+                "--namespace=orders-staging",
+                "set",
+                "image",
+                "deployment/orders-api",
+                "orders-api=registry.example.test/shop/orders-api:1.4.3",
+            ],
+        );
     });
 });
 
@@ -64,12 +87,21 @@ describe("running kubectl", () => {
         assert.equal(r.jig.started.length, 1);
         const [started] = r.jig.started;
         assert.equal(started?.file, "kubectl");
-        assert.deepEqual(started?.args, ["--request-timeout=25s", "--context=test-cluster", "--namespace=orders-staging", "get", "pods"]);
+        assert.deepEqual(started?.args, [
+            "--request-timeout=25s",
+            "--context=test-cluster",
+            "--namespace=orders-staging",
+            "get",
+            "pods",
+        ]);
         assert.equal(started?.options.timeoutMs, 30_000);
         assert.equal(started?.options.maxOutputBytes, 8 * 1024 * 1024);
         assert.equal(started?.options.signal, controller.signal);
         assert.equal(started?.options.input, undefined, "nothing is written to its standard input");
-        assert.deepEqual(r.cluster.calls().map((call) => call.argv), [started?.args]);
+        assert.deepEqual(
+            r.cluster.calls().map((call) => call.argv),
+            [started?.args],
+        );
     });
 
     test("tells kubectl where the kubeconfig is, when Pi was told, and passes nothing else of its own environment on", async () => {
@@ -88,22 +120,60 @@ describe("running kubectl", () => {
             if (other === undefined) delete process.env.AWS_PROFILE;
             else process.env.AWS_PROFILE = other;
         }
-        assert.deepEqual(r.cluster.calls().map((call) => call.kubeconfig), ["/tmp/some/kubeconfig", undefined]);
-        assert.deepEqual(r.jig.started.map((started) => started.options.env), [{ KUBECONFIG: "/tmp/some/kubeconfig" }, {}]);
+        assert.deepEqual(
+            r.cluster.calls().map((call) => call.kubeconfig),
+            ["/tmp/some/kubeconfig", undefined],
+        );
+        assert.deepEqual(
+            r.jig.started.map((started) => started.options.env),
+            [{ KUBECONFIG: "/tmp/some/kubeconfig" }, {}],
+        );
     });
 
     test("refuses a command that is not on the lists before anything starts", async () => {
         const refused: Array<[string, string[]]> = [
-            ...["delete", "scale", "apply", "edit", "port-forward", "cp", "patch", "replace", "create", "run", "attach", "label", "annotate", "drain", "cordon", "taint", "auth", "config", "proxy", "debug", "expose", "autoscale"].map((verb): [string, string[]] => [verb, []]),
+            ...[
+                "delete",
+                "scale",
+                "apply",
+                "edit",
+                "port-forward",
+                "cp",
+                "patch",
+                "replace",
+                "create",
+                "run",
+                "attach",
+                "label",
+                "annotate",
+                "drain",
+                "cordon",
+                "taint",
+                "auth",
+                "config",
+                "proxy",
+                "debug",
+                "expose",
+                "autoscale",
+            ].map((verb): [string, string[]] => [verb, []]),
             // The two verbs that can change something are allowed only with the word that makes them what they are.
-            ["set", []], ["set", ["env", "deployment/orders-api", "A=b"]], ["set", ["resources", "deployment/orders-api"]], ["set", ["serviceaccount", "x", "y"]],
-            ["rollout", []], ["rollout", ["restart", "deployment/orders-api"]], ["rollout", ["pause", "deployment/orders-api"]], ["rollout", ["status", "deployment/orders-api"]],
+            ["set", []],
+            ["set", ["env", "deployment/orders-api", "A=b"]],
+            ["set", ["resources", "deployment/orders-api"]],
+            ["set", ["serviceaccount", "x", "y"]],
+            ["rollout", []],
+            ["rollout", ["restart", "deployment/orders-api"]],
+            ["rollout", ["pause", "deployment/orders-api"]],
+            ["rollout", ["status", "deployment/orders-api"]],
         ];
         for (const [verb, args] of refused) {
             const what = [verb, args[0]].filter((word) => word !== undefined).join(" ");
             for (const start of [runKubectl, startKubectl]) {
                 await assert.rejects(start(r.kube(), verb as never, args, READ), (error: Error) => {
-                    assert.equal(error.message, `kubectl ${what} is not allowed: the tools run only get, logs, exec, set image and rollout undo`);
+                    assert.equal(
+                        error.message,
+                        `kubectl ${what} is not allowed: the tools run only get, logs, exec, set image and rollout undo`,
+                    );
                     return true;
                 });
             }
@@ -112,13 +182,33 @@ describe("running kubectl", () => {
     });
 
     test("starts the two changes with the three flags of the target, and a timeout is a result and not an error", async () => {
-        r.cluster.answer({ setImage: { stdout: "deployment.apps/orders-api image updated\n" }, rolloutUndo: { stdout: "late", delayMs: 3000 } });
-        const done = await startKubectl(r.kube(), "set", ["image", "deployment/orders-api", "orders-api=registry.example.test/shop/orders-api:1.4.3"], CHANGE);
+        r.cluster.answer({
+            setImage: { stdout: "deployment.apps/orders-api image updated\n" },
+            rolloutUndo: { stdout: "late", delayMs: 3000 },
+        });
+        const done = await startKubectl(
+            r.kube(),
+            "set",
+            ["image", "deployment/orders-api", "orders-api=registry.example.test/shop/orders-api:1.4.3"],
+            CHANGE,
+        );
         assert.equal(done.code, 0);
-        assert.deepEqual(r.cluster.calls()[0]?.argv.slice(0, 5), ["--request-timeout=50s", "--context=test-cluster", "--namespace=orders-staging", "set", "image"]);
-        const late = await startKubectl(r.kube(), "rollout", ["undo", "deployment/orders-api"], { ...CHANGE, timeoutMs: 150 });
+        assert.deepEqual(r.cluster.calls()[0]?.argv.slice(0, 5), [
+            "--request-timeout=50s",
+            "--context=test-cluster",
+            "--namespace=orders-staging",
+            "set",
+            "image",
+        ]);
+        const late = await startKubectl(r.kube(), "rollout", ["undo", "deployment/orders-api"], {
+            ...CHANGE,
+            timeoutMs: 150,
+        });
         assert.equal(late.timedOut, true);
-        await assert.rejects(runKubectl(r.kube(), "rollout", ["undo", "deployment/orders-api"], { ...CHANGE, timeoutMs: 150 }), /^Error: kubectl rollout timed out after 0\.15 s: the cluster is slow or unreachable$/);
+        await assert.rejects(
+            runKubectl(r.kube(), "rollout", ["undo", "deployment/orders-api"], { ...CHANGE, timeoutMs: 150 }),
+            /^Error: kubectl rollout timed out after 0\.15 s: the cluster is slow or unreachable$/,
+        );
     });
 
     test("a command that runs out of time is an error that says how long it had", async () => {
@@ -155,7 +245,9 @@ describe("reading what kubectl prints", () => {
     });
 
     test("a command that failed is one line that says what to do", async () => {
-        r.cluster.answer({ logs: { code: 1, stderr: "Error from server (Forbidden): pods is forbidden: User cannot get resource\n" } });
+        r.cluster.answer({
+            logs: { code: 1, stderr: "Error from server (Forbidden): pods is forbidden: User cannot get resource\n" },
+        });
         await assert.rejects(
             readKubectl(r.kube(), "logs", ["orders-api-0"], LOGS),
             /^Error: The kubeconfig user is not allowed to read orders-api in staging \(Error from server \(Forbidden\)/,
@@ -164,15 +256,29 @@ describe("reading what kubectl prints", () => {
 
     test("getJson asks for JSON and parses it", async () => {
         r.cluster.answer({ pods: { stdout: { items: [{ metadata: { name: "a" } }] } } });
-        assert.deepEqual(await getJson(r.kube(), "pods", ["--selector=app=orders-api"]), { items: [{ metadata: { name: "a" } }] });
-        assert.deepEqual(r.cluster.calls()[0]?.argv.slice(3), ["get", "pods", "--selector=app=orders-api", "-o", "json"]);
+        assert.deepEqual(await getJson(r.kube(), "pods", ["--selector=app=orders-api"]), {
+            items: [{ metadata: { name: "a" } }],
+        });
+        assert.deepEqual(r.cluster.calls()[0]?.argv.slice(3), [
+            "get",
+            "pods",
+            "--selector=app=orders-api",
+            "-o",
+            "json",
+        ]);
     });
 
     test("getJson says when the output is not JSON, and when it was too big to be", async () => {
         r.cluster.answer({ pods: { stdout: "<html>nope</html>" } });
-        await assert.rejects(getJson(r.kube(), "pods"), /^Error: kubectl returned output that is not JSON: report it to the user$/);
+        await assert.rejects(
+            getJson(r.kube(), "pods"),
+            /^Error: kubectl returned output that is not JSON: report it to the user$/,
+        );
         r.jig.script = () => ({ code: 0, stdout: `{"items": [${cutMark(READ.maxBytes)}`, stderr: "", timedOut: false });
-        await assert.rejects(getJson(r.kube(), "pods"), /^Error: kubectl's answer is larger than 8 MiB: the selector matches too much$/);
+        await assert.rejects(
+            getJson(r.kube(), "pods"),
+            /^Error: kubectl's answer is larger than 8 MiB: the selector matches too much$/,
+        );
     });
 
     test("a kubectl that is not installed is reported as it is", async () => {

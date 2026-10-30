@@ -18,13 +18,22 @@ import type { Session } from "./support/harness.ts";
 const cleanups: Array<() => Promise<void> | void> = [];
 let jig: FakeJig;
 const roots = new Map<string, string>();
-const reviewsDirOf = (workspaceRoot: string): string => path.join(workspaceDirFor(roots.get(workspaceRoot)!, workspaceRoot), "reviews");
+const reviewsDirOf = (workspaceRoot: string): string =>
+    path.join(workspaceDirFor(roots.get(workspaceRoot)!, workspaceRoot), "reviews");
 
-type Stored = { fileScope: string; ticket?: string; heads?: string; headSha?: string; iterations: Array<{ diff: string }> };
+type Stored = {
+    fileScope: string;
+    ticket?: string;
+    heads?: string;
+    headSha?: string;
+    iterations: Array<{ diff: string }>;
+};
 const readRecords = (workspaceRoot: string): Stored[] => {
     const dir = reviewsDirOf(workspaceRoot);
     if (!existsSync(dir)) return [];
-    return readdirSync(dir).filter((name) => name.endsWith(".json")).map((name) => JSON.parse(readFileSync(path.join(dir, name), "utf8")) as Stored);
+    return readdirSync(dir)
+        .filter((name) => name.endsWith(".json"))
+        .map((name) => JSON.parse(readFileSync(path.join(dir, name), "utf8")) as Stored);
 };
 const filesOf = (diff: string): string[] => [...diff.matchAll(/^diff --git a\/(\S+)/gm)].map((match) => match[1]!);
 
@@ -52,7 +61,10 @@ function newWorkspace(mode: "tui" | "print" = "tui", options: { git?: Git; entri
     git(repo, "commit", "-q", "-m", "init");
 
     const host = fakeHost();
-    const coordinator = new ReviewCoordinator(host.pi, root, { root: agentRoot, ...(options.git ? { git: options.git } : {}) });
+    const coordinator = new ReviewCoordinator(host.pi, root, {
+        root: agentRoot,
+        ...(options.git ? { git: options.git } : {}),
+    });
     coordinator.register();
     const session = context(root, mode, options.entries);
     session.answer = (title) => title === "Review generated code?";
@@ -68,11 +80,19 @@ type ToolCall = { toolName: string; input: Record<string, unknown> };
 
 /** One agent run: `change` stands for whatever the agent does (bash, the user's editor), and the calls are what Pi saw. */
 function runner(w: ReturnType<typeof newWorkspace>) {
-    return async (change: () => void, toolEdits: string[] = [], calls: ToolCall[] = [{ toolName: "bash", input: { command: `cd ${w.repo} && ./gradlew build` } }]): Promise<void> => {
+    return async (
+        change: () => void,
+        toolEdits: string[] = [],
+        calls: ToolCall[] = [{ toolName: "bash", input: { command: `cd ${w.repo} && ./gradlew build` } }],
+    ): Promise<void> => {
         await w.host.fire("agent_start", w.session.ctx);
         await w.coordinator.runStartTaken();
         change();
-        for (const file of toolEdits) await w.host.fire("tool_call", w.session.ctx, { toolName: "edit", input: { path: path.join(w.repo, file) } });
+        for (const file of toolEdits)
+            await w.host.fire("tool_call", w.session.ctx, {
+                toolName: "edit",
+                input: { path: path.join(w.repo, file) },
+            });
         for (const call of calls) await w.host.fire("tool_call", w.session.ctx, call);
         await w.host.fire("agent_end", w.session.ctx);
     };
@@ -85,7 +105,8 @@ function reviewed(root: string): string[] {
     return records.flatMap((record) => filesOf(record.iterations.at(-1)?.diff ?? "")).sort();
 }
 
-const linkNotice = (session: Session): boolean => session.notices.some((notice) => notice.startsWith("Interactive review ready: "));
+const linkNotice = (session: Session): boolean =>
+    session.notices.some((notice) => notice.startsWith("Interactive review ready: "));
 
 test("after a two-file edit on a ticket branch with earlier commits, the offer reviews those two files only", async () => {
     const w = newWorkspace();
@@ -98,14 +119,21 @@ test("after a two-file edit on a ticket branch with earlier commits, the offer r
     writeFileSync(path.join(w.repo, "Service.java"), "one\nnow\n");
     writeFileSync(path.join(w.repo, "ServiceTest.java"), "one\nnow\n");
 
-    for (const file of ["Service.java", "ServiceTest.java"]) await w.host.fire("tool_call", w.session.ctx, { toolName: "edit", input: { path: path.join(w.repo, file) } });
+    for (const file of ["Service.java", "ServiceTest.java"])
+        await w.host.fire("tool_call", w.session.ctx, { toolName: "edit", input: { path: path.join(w.repo, file) } });
     await w.host.fire("agent_end", w.session.ctx);
 
     assert.ok(linkNotice(w.session), w.session.notices.join(" | "));
     const [record, ...others] = readRecords(w.root);
     assert.equal(others.length, 0);
     assert.equal(record?.fileScope, "touched");
-    assert.deepEqual(filesOf(record!.iterations.at(-1)!.diff).map((file) => path.basename(file)).sort(), ["Service.java", "ServiceTest.java"], "the earlier commit on the branch is not in it");
+    assert.deepEqual(
+        filesOf(record!.iterations.at(-1)!.diff)
+            .map((file) => path.basename(file))
+            .sort(),
+        ["Service.java", "ServiceTest.java"],
+        "the earlier commit on the branch is not in it",
+    );
     assert.match(w.session.asked[0] ?? "", /changed 2 files/);
 });
 
@@ -124,9 +152,17 @@ test("the agent's start tool opens the ticket's branch review itself; only the u
     const result = await w.host.tool("start_interactive_code_review", {}, w.session.ctx);
 
     // The link carries the server's secret: the agent must not get it.
-    assert.equal(result.content[0]!.text, "Review opened in the user's browser. Ask the user to review and approve it there.");
+    assert.equal(
+        result.content[0]!.text,
+        "Review opened in the user's browser. Ask the user to review and approve it there.",
+    );
     assert.doesNotMatch(JSON.stringify(result), /http|localhost|127\.0\.0\.1|[?&]k=/);
-    assert.ok(w.session.notices.some((notice) => /^Interactive review ready: http:\/\/localhost:\d+\/\S+[?&]k=\S+$/.test(notice)), `the user gets the link: ${w.session.notices.join(" | ")}`);
+    assert.ok(
+        w.session.notices.some((notice) =>
+            /^Interactive review ready: http:\/\/localhost:\d+\/\S+[?&]k=\S+$/.test(notice),
+        ),
+        `the user gets the link: ${w.session.notices.join(" | ")}`,
+    );
     assert.ok(!w.host.sent.includes("/code-review"), "nothing is posted as a chat message");
     const [record] = readRecords(w.root);
     assert.equal(record?.fileScope, "branch");
@@ -148,7 +184,10 @@ test("an active ticket that jig-memory has no bound repositories for says what t
     const w = newWorkspace("tui", { entries });
     writeFileSync(path.join(w.repo, "Service.java"), "one\nuncommitted\n");
     const result = await w.host.tool("start_interactive_code_review", {}, w.session.ctx);
-    assert.match(result.content[0]!.text, /^The review did not open: Ticket scope needs jig-memory with bound repositories: PROJ-9 has none/);
+    assert.match(
+        result.content[0]!.text,
+        /^The review did not open: Ticket scope needs jig-memory with bound repositories: PROJ-9 has none/,
+    );
     assert.deepEqual(readRecords(w.root), []);
 });
 
@@ -174,7 +213,11 @@ test("changes the agent committed during the run are reviewed from where the run
         git(w.repo, "commit", "-q", "-m", "PROJ-7 Address review");
         writeFileSync(path.join(w.repo, "Other.java"), "one\nafter the commit\n");
     });
-    assert.deepEqual(reviewed(w.root), ["orders-api/Other.java", "orders-api/Service.java", "orders-api/ServiceTest.java"]);
+    assert.deepEqual(reviewed(w.root), [
+        "orders-api/Other.java",
+        "orders-api/Service.java",
+        "orders-api/ServiceTest.java",
+    ]);
     assert.match(readRecords(w.root)[0]!.iterations.at(-1)!.diff, /^\+fixed and committed$/m);
 });
 
@@ -216,22 +259,31 @@ test("a file that was dirty before the run and untouched during it is not offere
 test("a file that was dirty before the run and changed again during it is offered", async () => {
     const w = newWorkspace();
     writeFileSync(path.join(w.repo, "Dirty.java"), "one\nhand edit before the run\n");
-    await runner(w)(() => writeFileSync(path.join(w.repo, "Dirty.java"), "one\nhand edit before the run\nand the agent's\n"));
+    await runner(w)(() =>
+        writeFileSync(path.join(w.repo, "Dirty.java"), "one\nhand edit before the run\nand the agent's\n"),
+    );
     assert.deepEqual(reviewed(w.root), ["orders-api/Dirty.java"]);
 });
 
 test("the edit tool still counts alone, and together with bash changes", async () => {
     const alone = newWorkspace();
     writeFileSync(path.join(alone.repo, "Service.java"), "one\nedited\n");
-    await alone.host.fire("tool_call", alone.session.ctx, { toolName: "edit", input: { path: path.join(alone.repo, "Service.java") } });
+    await alone.host.fire("tool_call", alone.session.ctx, {
+        toolName: "edit",
+        input: { path: path.join(alone.repo, "Service.java") },
+    });
     await alone.host.fire("agent_end", alone.session.ctx);
     assert.deepEqual(reviewed(alone.root), ["orders-api/Service.java"]);
 
     const both = newWorkspace();
-    await runner(both)(() => {
-        writeFileSync(path.join(both.repo, "Service.java"), "one\nedited\n");
-        writeFileSync(path.join(both.repo, "Other.java"), "one\nbash\n");
-    }, ["Service.java"], []);
+    await runner(both)(
+        () => {
+            writeFileSync(path.join(both.repo, "Service.java"), "one\nedited\n");
+            writeFileSync(path.join(both.repo, "Other.java"), "one\nbash\n");
+        },
+        ["Service.java"],
+        [],
+    );
     assert.deepEqual(reviewed(both.root), ["orders-api/Other.java", "orders-api/Service.java"]);
     assert.match(both.session.asked[0] ?? "", /changed 2 files/);
 });
@@ -285,10 +337,14 @@ function sharedWorkspace() {
 
 test("a file another session changes in a repository this run did not use is not offered", async () => {
     const w = sharedWorkspace();
-    await w.run(() => {
-        writeFileSync(path.join(w.repo, "Service.java"), "one\nthis run\n");
-        writeFileSync(path.join(w.other, "Payment.java"), "one\nthe other session\n");
-    }, [], [w.usedByBash]);
+    await w.run(
+        () => {
+            writeFileSync(path.join(w.repo, "Service.java"), "one\nthis run\n");
+            writeFileSync(path.join(w.other, "Payment.java"), "one\nthe other session\n");
+        },
+        [],
+        [w.usedByBash],
+    );
     assert.deepEqual(reviewed(w.root), ["orders-api/Service.java"]);
     assert.match(w.session.asked[0] ?? "", /changed 1 file\./);
 });
@@ -296,9 +352,13 @@ test("a file another session changes in a repository this run did not use is not
 test("a file dirty before the run and committed by someone else in an unused repository is not offered", async () => {
     const w = sharedWorkspace();
     writeFileSync(path.join(w.other, "Dirty.java"), "one\nhalf done\n");
-    await w.run(() => {
-        git(w.other, "commit", "-q", "-am", "PROJ-1 finished by the other session");
-    }, [], [w.usedByBash]);
+    await w.run(
+        () => {
+            git(w.other, "commit", "-q", "-am", "PROJ-1 finished by the other session");
+        },
+        [],
+        [w.usedByBash],
+    );
     assert.deepEqual(reviewed(w.root), []);
     assert.deepEqual(w.session.asked, []);
     assert.deepEqual(w.session.notices, []);
@@ -306,34 +366,48 @@ test("a file dirty before the run and committed by someone else in an unused rep
 
 test("a commit this run made in a repository it used is offered, and another session's commit in an unused one is not", async () => {
     const w = sharedWorkspace();
-    await w.run(() => {
-        writeFileSync(path.join(w.repo, "Service.java"), "one\ncommitted by this run\n");
-        git(w.repo, "commit", "-q", "-am", "this run");
-        writeFileSync(path.join(w.other, "Payment.java"), "one\ncommitted elsewhere\n");
-        git(w.other, "commit", "-q", "-am", "other session");
-    }, [], [w.usedByBash]);
+    await w.run(
+        () => {
+            writeFileSync(path.join(w.repo, "Service.java"), "one\ncommitted by this run\n");
+            git(w.repo, "commit", "-q", "-am", "this run");
+            writeFileSync(path.join(w.other, "Payment.java"), "one\ncommitted elsewhere\n");
+            git(w.other, "commit", "-q", "-am", "other session");
+        },
+        [],
+        [w.usedByBash],
+    );
     assert.deepEqual(reviewed(w.root), ["orders-api/Service.java"]);
 });
 
 test("the git tool's repo parameter marks a repository used, by name or by absolute path", async () => {
     for (const repoParam of ["payments-api", "path"] as const) {
         const w = sharedWorkspace();
-        await w.run(() => writeFileSync(path.join(w.other, "Payment.java"), "one\nviaBash\n"), [], [
-            { toolName: "git", input: { action: "status", repo: repoParam === "path" ? w.other : "payments-api" } },
-        ]);
+        await w.run(
+            () => writeFileSync(path.join(w.other, "Payment.java"), "one\nviaBash\n"),
+            [],
+            [{ toolName: "git", input: { action: "status", repo: repoParam === "path" ? w.other : "payments-api" } }],
+        );
         assert.deepEqual(reviewed(w.root), ["payments-api/Payment.java"], repoParam);
     }
 });
 
 test("a git call for another repository does not mark this one used", async () => {
     const w = sharedWorkspace();
-    await w.run(() => writeFileSync(path.join(w.repo, "Service.java"), "one\nviaBash\n"), [], [{ toolName: "git", input: { action: "status", repo: "payments-api" } }]);
+    await w.run(
+        () => writeFileSync(path.join(w.repo, "Service.java"), "one\nviaBash\n"),
+        [],
+        [{ toolName: "git", input: { action: "status", repo: "payments-api" } }],
+    );
     assert.deepEqual(reviewed(w.root), []);
 });
 
 test("a run that used no repository finds no git changes", async () => {
     const w = sharedWorkspace();
-    await w.run(() => writeFileSync(path.join(w.repo, "Service.java"), "one\nsomeone else\n"), [], [{ toolName: "bash", input: { command: "ls ~/dev" } }]);
+    await w.run(
+        () => writeFileSync(path.join(w.repo, "Service.java"), "one\nsomeone else\n"),
+        [],
+        [{ toolName: "bash", input: { command: "ls ~/dev" } }],
+    );
     assert.deepEqual(reviewed(w.root), []);
     assert.deepEqual(w.session.asked, []);
     assert.deepEqual(w.session.notices, []);
@@ -341,17 +415,25 @@ test("a run that used no repository finds no git changes", async () => {
 
 test("a bash call that cds into a repository with a relative directory uses it", async () => {
     const w = sharedWorkspace();
-    await w.run(() => writeFileSync(path.join(w.other, "Payment.java"), "one\nsed -i\n"), [], [{ toolName: "bash", input: { command: "cd payments-api && sed -i s/one/two/ Payment.java" } }]);
+    await w.run(
+        () => writeFileSync(path.join(w.other, "Payment.java"), "one\nsed -i\n"),
+        [],
+        [{ toolName: "bash", input: { command: "cd payments-api && sed -i s/one/two/ Payment.java" } }],
+    );
     assert.deepEqual(reviewed(w.root), ["payments-api/Payment.java"]);
 });
 
 test("the review's head label names the repository the run committed in, not a dirty repository another session works in", async () => {
     const w = sharedWorkspace();
-    await w.run(() => {
-        writeFileSync(path.join(w.repo, "Service.java"), "one\ncommitted by this run\n");
-        git(w.repo, "commit", "-q", "-am", "this run");
-        writeFileSync(path.join(w.other, "Payment.java"), "one\nuncommitted elsewhere\n");
-    }, [], [w.usedByBash]);
+    await w.run(
+        () => {
+            writeFileSync(path.join(w.repo, "Service.java"), "one\ncommitted by this run\n");
+            git(w.repo, "commit", "-q", "-am", "this run");
+            writeFileSync(path.join(w.other, "Payment.java"), "one\nuncommitted elsewhere\n");
+        },
+        [],
+        [w.usedByBash],
+    );
     const [record] = readRecords(w.root);
     assert.equal(record?.heads, `orders-api@${git(w.repo, "rev-parse", "HEAD").trim().slice(0, 12)}`);
     assert.equal(record?.headSha, "workspace");

@@ -353,13 +353,21 @@ export function exampleRecords(): RecordLine[] {
         records.push(call(id("c"), at(55 + i), "demo", "git", { ...who, action: "status", durationMs: 60 + i * 10 }));
     }
     const asked = { ...who, action: "push", decision: "ask", approval: "review" } as const;
-    records.push(call(id("c"), at(60), "demo", "git", { ...asked, durationMs: 1800, answer: "allow", waitedMs: 41_000 }));
+    records.push(
+        call(id("c"), at(60), "demo", "git", { ...asked, durationMs: 1800, answer: "allow", waitedMs: 41_000 }),
+    );
     records.push(
         call(id("c"), at(90), "demo", "git", { ...asked, durationMs: 2400, answer: "allow-session", waitedMs: 12_000 }),
     );
     const facts = { conclusion: "success", passed: 412, failed: 0 };
     records.push(call(id("c"), at(92), "demo", "ci", { ...who, action: "watch", durationMs: 250_000, facts }));
-    const stopped = { ...who, outcome: "blocked", errorKind: "denied", decisionSource: "rule", decision: "deny" } as const;
+    const stopped = {
+        ...who,
+        outcome: "blocked",
+        errorKind: "denied",
+        decisionSource: "rule",
+        decision: "deny",
+    } as const;
     records.push(call(id("c"), at(80), "demo", "http", stopped), call(id("c"), at(81), "demo", "http", stopped));
     return records;
 }

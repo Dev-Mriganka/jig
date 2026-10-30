@@ -27,17 +27,30 @@ export async function refreshCollections(
         }
         if (found.refresher === undefined) {
             const names = fetchable.map((each) => each.name).join(", ") || "none";
-            return { lines: [`${wanted} is read from files, so there is nothing to fetch. Collections that can be fetched: ${names}`], failed: true };
+            return {
+                lines: [
+                    `${wanted} is read from files, so there is nothing to fetch. Collections that can be fetched: ${names}`,
+                ],
+                failed: true,
+            };
         }
     }
     const chosen = fetchable.filter((collection) => wanted === undefined || collection.name === wanted);
     if (chosen.length === 0) {
         const how = '{ "postman": { "cloud": "<id>", "apiKey": "<secret reference>" } }';
-        return { lines: [`No collection is a Postman cloud collection: add one under api.collections as ${how}`], failed: true };
+        return {
+            lines: [`No collection is a Postman cloud collection: add one under api.collections as ${how}`],
+            failed: true,
+        };
     }
 
     const http = createHttp(options);
-    const deps = { http, timeoutSec: settings.timeoutSec, allowPlainLocal: settings.allowPlainLocal, serviceUrl: options.postmanApi };
+    const deps = {
+        http,
+        timeoutSec: settings.timeoutSec,
+        allowPlainLocal: settings.allowPlainLocal,
+        serviceUrl: options.postmanApi,
+    };
     const lines: string[] = [];
     let failed = false;
     for (const collection of chosen) {
@@ -48,7 +61,9 @@ export async function refreshCollections(
             failed ||= report.failed;
         } catch (error) {
             // The engine and the source report what they know. This is for what they did not expect.
-            lines.push(`${collection.name}: the refresh stopped (${errorMessage(error).replace(/\s+/g, " ").slice(0, 120)})`);
+            lines.push(
+                `${collection.name}: the refresh stopped (${errorMessage(error).replace(/\s+/g, " ").slice(0, 120)})`,
+            );
             failed = true;
         }
     }
@@ -63,7 +78,10 @@ export function registerRefresh(pi: ExtensionAPI, options: ApiOptions): void {
             return matches.length === 0 ? null : matches.map((word) => ({ value: word, label: word }));
         },
         handler: async (args: string, ctx: ExtensionCommandContext) => {
-            const [word, wanted, ...rest] = args.trim().split(/\s+/).filter((part) => part !== "");
+            const [word, wanted, ...rest] = args
+                .trim()
+                .split(/\s+/)
+                .filter((part) => part !== "");
             if (word !== "refresh" || rest.length > 0) {
                 ctx.ui.notify(USAGE, "warning");
                 return;

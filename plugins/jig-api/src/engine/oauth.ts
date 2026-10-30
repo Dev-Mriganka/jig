@@ -23,7 +23,12 @@ const MAX_TOKEN_ANSWER_BYTES = 64 * 1024;
 const TOKEN = /^[\x21-\x7e]{1,8192}$/;
 /** The error codes of RFC 6749, section 5.2: the only words of the endpoint's answer that are repeated. */
 const OAUTH_ERRORS: ReadonlySet<string> = new Set([
-    "invalid_request", "invalid_client", "invalid_grant", "unauthorized_client", "unsupported_grant_type", "invalid_scope",
+    "invalid_request",
+    "invalid_client",
+    "invalid_grant",
+    "unauthorized_client",
+    "unsupported_grant_type",
+    "invalid_scope",
 ]);
 
 export interface Token {
@@ -159,7 +164,10 @@ export function createTokens(now: () => number): Tokens {
             text === undefined ? Promise.resolve(undefined) : fillString(text, login.fillers);
         try {
             const [clientId, clientSecret, username, password] = await Promise.all([
-                read(oauth.clientId), read(oauth.clientSecret), read(oauth.username), read(oauth.password),
+                read(oauth.clientId),
+                read(oauth.clientSecret),
+                read(oauth.username),
+                read(oauth.password),
             ]);
             return { clientId: clientId ?? "", clientSecret, username, password };
         } catch (error) {
@@ -184,7 +192,13 @@ export function createTokens(now: () => number): Tokens {
         async get(login, oauth, stops) {
             // The key holds the references of the secrets and never their values.
             const key = JSON.stringify([
-                oauth.grant, oauth.tokenUrl, oauth.clientId, oauth.clientSecret, oauth.username, oauth.password, oauth.scope,
+                oauth.grant,
+                oauth.tokenUrl,
+                oauth.clientId,
+                oauth.clientSecret,
+                oauth.username,
+                oauth.password,
+                oauth.scope,
                 oauth.clientAuth,
             ]);
             const kept = cache.get(login.scope);

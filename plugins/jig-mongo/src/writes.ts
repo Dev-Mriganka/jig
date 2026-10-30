@@ -119,7 +119,9 @@ function planInsert(call: Call, access: Access): WriteRun {
         throw new InputError(
             `insert takes at most ${cap} documents; raise limit (up to ${MAX_LIMIT}) on purpose to insert more`,
         );
-    given.forEach((doc, index) => checkDocument(doc, ns, access, `document ${index + 1}`));
+    given.forEach((doc, index) => {
+        checkDocument(doc, ns, access, `document ${index + 1}`);
+    });
     const label = labelOf(call);
     return {
         label,
@@ -306,10 +308,10 @@ function planBulk(call: Call, access: Access): WriteRun {
                         );
                     }
                     const found =
-                    checks.length === 0
-                        ? "the operations were inserts only; read the documents to see them"
-                        : checks.join("; ");
-                return `Read once per operation to check: ${found}.`;
+                        checks.length === 0
+                            ? "the operations were inserts only; read the documents to see them"
+                            : checks.join("; ");
+                    return `Read once per operation to check: ${found}.`;
                 },
             };
         },

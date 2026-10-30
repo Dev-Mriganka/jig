@@ -36,16 +36,16 @@ export type Auth =
     /** The key goes in a header. A key in the query string is refused by the source: an address ends up in logs. */
     | { kind: "apiKey"; name: Template; value: Template }
     | {
-        kind: "oauth2";
-        grant: "client_credentials" | "password";
-        tokenUrl: Template;
-        clientId: Template;
-        clientSecret?: Template;
-        username?: Template;
-        password?: Template;
-        scope?: Template;
-        clientAuth: "header" | "body";
-    };
+          kind: "oauth2";
+          grant: "client_credentials" | "password";
+          tokenUrl: Template;
+          clientId: Template;
+          clientSecret?: Template;
+          username?: Template;
+          password?: Template;
+          scope?: Template;
+          clientAuth: "header" | "body";
+      };
 
 /** One saved request. */
 export interface SavedRequest {
@@ -81,7 +81,10 @@ export interface SavedRequest {
     /** What the collection says the answer must be, as `expression operator value`. Shown by `show`; nothing checks them yet. */
     assertions?: readonly string[];
     /** A script that would have to run before the request. Scripts never run, so such a request is refused. */
-    scripts: { prerequest: boolean; /** Whose it is: "the request", "the folder Setup" or "the collection". */ where?: string };
+    scripts: {
+        prerequest: boolean /** Whose it is: "the request", "the folder Setup" or "the collection". */;
+        where?: string;
+    };
     /** Why the request cannot run at all: a protocol, a method or a sign-in this plugin does not send. */
     unsupported?: string;
     /** Things that do not stop it but that the reader should know, such as a test script that is ignored. */

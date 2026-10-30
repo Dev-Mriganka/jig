@@ -1,7 +1,16 @@
 // The daily masking key: one per UTC day, private on disk, shared by processes, and gone after two days.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+    existsSync,
+    mkdirSync,
+    mkdtempSync,
+    readdirSync,
+    readFileSync,
+    rmSync,
+    statSync,
+    writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
@@ -103,13 +112,25 @@ describe("daily mask key", () => {
             process.stdout.write(keys.join(" "));
         `;
         const firstTick = String(Date.now() + 1_500);
-        const run = (): Promise<string[]> => new Promise((resolve, reject) => {
-            const child = spawn(process.execPath, ["--input-type=module", "-e", code, state, firstTick, String(rounds)]);
-            let out = "";
-            child.stdout.on("data", (chunk: Buffer) => { out += chunk.toString(); });
-            child.on("error", reject);
-            child.on("close", (status) => (status === 0 ? resolve(out.split(" ")) : reject(new Error(`child exited with ${status}`))));
-        });
+        const run = (): Promise<string[]> =>
+            new Promise((resolve, reject) => {
+                const child = spawn(process.execPath, [
+                    "--input-type=module",
+                    "-e",
+                    code,
+                    state,
+                    firstTick,
+                    String(rounds),
+                ]);
+                let out = "";
+                child.stdout.on("data", (chunk: Buffer) => {
+                    out += chunk.toString();
+                });
+                child.on("error", reject);
+                child.on("close", (status) =>
+                    status === 0 ? resolve(out.split(" ")) : reject(new Error(`child exited with ${status}`)),
+                );
+            });
         const children = await Promise.all(Array.from({ length: 6 }, run));
         for (let round = 0; round < rounds; round++) {
             const keys = children.map((keysOfChild) => keysOfChild[round]);
@@ -155,7 +176,14 @@ describe("daily mask key", () => {
 
         it("leave every other file in the folder alone", () => {
             const state = freshState();
-            const others = ["notes.txt", "2026-10-01.keys", "key-2026-10-01.key", "2026-13-45.key", "2026-10-1.key", "README"];
+            const others = [
+                "notes.txt",
+                "2026-10-01.keys",
+                "key-2026-10-01.key",
+                "2026-13-45.key",
+                "2026-10-1.key",
+                "README",
+            ];
             for (const name of others) writeKey(state, name);
             dailyMaskKey(state, new Date("2026-10-30T12:00:00Z"));
             assert.deepEqual(keyFiles(state), [...others, "2026-10-30.key"].sort());

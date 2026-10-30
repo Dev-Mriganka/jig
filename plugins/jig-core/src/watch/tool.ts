@@ -53,9 +53,10 @@ export function registerWatchTool(pi: ExtensionAPI, api: JigApi, engine: WatchEn
             if (params.action === "stop") return stopWatch(engine, params.id);
 
             const entries = engine.entries();
-            const text = entries.length === 0
-                ? `No open watches, and none finished in the last ${LIST_WINDOW_MS / 3_600_000} hours.`
-                : entries.map(describeEntry).join("\n");
+            const text =
+                entries.length === 0
+                    ? `No open watches, and none finished in the last ${LIST_WINDOW_MS / 3_600_000} hours.`
+                    : entries.map(describeEntry).join("\n");
             return { content: [{ type: "text", text }], details: { watches: entries } };
         },
     });

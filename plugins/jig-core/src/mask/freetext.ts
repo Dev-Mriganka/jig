@@ -37,9 +37,8 @@ const NATIONAL_PHONE = new RegExp(
 const streetAddress: Stage = (text, { protect }) => text.replace(ADDRESS, () => protect(removed("address")));
 
 const coordinates: Stage = (text, { protect }) =>
-    text.replace(
-        /\b(?:gps|lat|lon|latitude|longitude)\s*=\s*-?\d{1,3}\.\d{4,}(?:\s*,\s*-?\d{1,3}\.\d{4,})?/gi,
-        () => protect(removed("geo")),
+    text.replace(/\b(?:gps|lat|lon|latitude|longitude)\s*=\s*-?\d{1,3}\.\d{4,}(?:\s*,\s*-?\d{1,3}\.\d{4,})?/gi, () =>
+        protect(removed("geo")),
     );
 
 const dateOfBirth: Stage = (text, { protect }) =>
@@ -49,7 +48,8 @@ const dateOfBirth: Stage = (text, { protect }) =>
 const email: Stage = (text, { tokens, protect }) => {
     if (!text.includes("@")) return text;
     return text.replace(/(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, (found) =>
-        protect(tokens.mint("email", found)));
+        protect(tokens.mint("email", found)),
+    );
 };
 
 /**

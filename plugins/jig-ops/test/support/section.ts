@@ -30,7 +30,13 @@ export function section(extra: Raw = {}): Raw {
                         },
                     },
                     production: {
-                        runtime: { kubernetes: { context: "prod-cluster", namespace: "orders", selector: "app=orders-api,tier=web" } },
+                        runtime: {
+                            kubernetes: {
+                                context: "prod-cluster",
+                                namespace: "orders",
+                                selector: "app=orders-api,tier=web",
+                            },
+                        },
                         health: "https://api.example.com/orders/health",
                     },
                 },
@@ -39,7 +45,13 @@ export function section(extra: Raw = {}): Raw {
                 environments: {
                     staging: {
                         deploy: { method: "kubectl-image", workload: "deployment/billing", container: "billing" },
-                        runtime: { kubernetes: { context: "test-cluster", namespace: "billing-staging", selector: "app=billing" } },
+                        runtime: {
+                            kubernetes: {
+                                context: "test-cluster",
+                                namespace: "billing-staging",
+                                selector: "app=billing",
+                            },
+                        },
                         health: "https://billing.staging.example.com/health",
                     },
                 },

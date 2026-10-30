@@ -57,7 +57,10 @@ export const UNKNOWN_CLASS: CallClass = { environment: "external", effect: "writ
 /** Matches a tool name against a rule's `tool`, where `*` stands for any run of characters. */
 export function matchesName(pattern: string, name: string): boolean {
     if (!pattern.includes("*")) return pattern === name;
-    const source = pattern.split("*").map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*");
+    const source = pattern
+        .split("*")
+        .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&"))
+        .join(".*");
     return new RegExp(`^${source}$`).test(name);
 }
 
@@ -103,9 +106,12 @@ export function classify(tool: string, input: Readonly<Record<string, unknown>>,
 
 /** A declaration is code from another package: check what it returns before the rules rely on it. */
 function isValidClass(answer: CallClass): boolean {
-    return typeof answer.environment === "string" && answer.environment !== ""
-        && (answer.effect === "read" || answer.effect === "write")
-        && (answer.atLeast === undefined || answer.atLeast === "ask" || answer.atLeast === "deny");
+    return (
+        typeof answer.environment === "string" &&
+        answer.environment !== "" &&
+        (answer.effect === "read" || answer.effect === "write") &&
+        (answer.atLeast === undefined || answer.atLeast === "ask" || answer.atLeast === "deny")
+    );
 }
 
 function classifyRuleMatches(rule: ClassifyRule, tool: string, input: Readonly<Record<string, unknown>>): boolean {

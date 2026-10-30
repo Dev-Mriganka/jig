@@ -32,7 +32,12 @@ export const DEFAULT_UPDATE_FIELDS: readonly string[] = ["summary", "description
 export const DEFAULT_ENVIRONMENT = "external";
 
 const SECTION_FIELDS: ReadonlySet<string> = new Set([
-    "site", "auth", "updateFields", "fields", "privateNames", "environment",
+    "site",
+    "auth",
+    "updateFields",
+    "fields",
+    "privateNames",
+    "environment",
 ]);
 const AUTH_FIELDS: ReadonlySet<string> = new Set(["email", "token", "signIn", "transport"]);
 
@@ -99,9 +104,14 @@ function checkAuth(value: unknown, errors: string[]): Auth | undefined {
         if (email !== undefined || token !== undefined || (signIn !== undefined && transport !== undefined)) {
             errors.push("jira.auth: use exactly one of signIn, transport, or token (with an email for Jira Cloud)");
         }
-        for (const [key, name] of [["signIn", signIn], ["transport", transport]] as const) {
+        for (const [key, name] of [
+            ["signIn", signIn],
+            ["transport", transport],
+        ] as const) {
             if (name !== undefined && (typeof name !== "string" || name.trim() === "" || name.length > 64)) {
-                errors.push(`jira.auth.${key}: must be the name of a ${key === "signIn" ? "sign-in service" : "transport"}`);
+                errors.push(
+                    `jira.auth.${key}: must be the name of a ${key === "signIn" ? "sign-in service" : "transport"}`,
+                );
             }
         }
         if (errors.length > before) return undefined;

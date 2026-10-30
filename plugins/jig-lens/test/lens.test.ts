@@ -372,8 +372,8 @@ test("when the viewer never answers, /lens grafana gives up after about a minute
     assert.match(
         text(notices),
         new RegExp(
-            `Grafana was started but does not answer on http://127\\.0\\.0\\.1:3300 yet\\. `
-                + `Its output is in ${r.where.log}\\.`,
+            `Grafana was started but does not answer on http://127\\.0\\.0\\.1:3300 yet\\. ` +
+                `Its output is in ${r.where.log}\\.`,
         ),
     );
     assert.equal(r.slept.length, START_ATTEMPTS);

@@ -44,9 +44,12 @@ describe("masking corpus", () => {
                 const text = render(masked);
 
                 if (typeof c.input === "string") assert.equal(masked, m.text(c.input), "text() and value() disagree");
-                for (const needle of c.must_not_contain) assert.ok(!text.includes(needle), `leaked ${JSON.stringify(needle)} in ${text}`);
-                for (const needle of c.must_keep) assert.ok(text.includes(needle), `lost ${JSON.stringify(needle)} in ${text}`);
-                for (const tag of c.expect_tags) assert.ok(text.includes(marker(tag)), `missing ${marker(tag)} in ${text}`);
+                for (const needle of c.must_not_contain)
+                    assert.ok(!text.includes(needle), `leaked ${JSON.stringify(needle)} in ${text}`);
+                for (const needle of c.must_keep)
+                    assert.ok(text.includes(needle), `lost ${JSON.stringify(needle)} in ${text}`);
+                for (const tag of c.expect_tags)
+                    assert.ok(text.includes(marker(tag)), `missing ${marker(tag)} in ${text}`);
 
                 assert.equal(render(m.value(structuredClone(c.input))), text, "nondeterministic output");
             });

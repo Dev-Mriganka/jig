@@ -16,7 +16,11 @@ const SHOWN_HEADERS = 6;
 const TRACE = /trace|request-?id|correlation-?id/i;
 
 /** A header value on one line, cut: it is text from outside. */
-const headerValue = (text: string): string => text.replace(/[\u0000-\u001f\u007f\s]+/g, " ").trim().slice(0, 200);
+const headerValue = (text: string): string =>
+    text
+        .replace(/[\u0000-\u001f\u007f\s]+/g, " ")
+        .trim()
+        .slice(0, 200);
 
 /** `content-type`, `location` and trace or request ids: what a follow-up needs, and not the rest. */
 export function shownHeaders(headers: Readonly<Record<string, string>>): string[] {

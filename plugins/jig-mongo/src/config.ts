@@ -288,7 +288,7 @@ export function readMongo(raw: unknown): { settings?: MongoSettings; errors: str
     ) {
         errors.push(
             `mongo.connections: required, 1 to ${MAX_CONNECTIONS} connections by environment name, ` +
-                    'such as { "staging": { "uri": "mongodb://db.staging.example.com:27017", ... } }',
+                'such as { "staging": { "uri": "mongodb://db.staging.example.com:27017", ... } }',
         );
     } else {
         for (const [name, value] of Object.entries(raw.connections)) {

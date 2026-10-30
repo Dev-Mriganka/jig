@@ -6,7 +6,13 @@ import { RP_ID, toBase64Url } from "../../src/passkey/webauthn.ts";
 
 // ---- a CBOR encoder, enough for an attestation object ------------------------------------------------------------------
 
-export type Encodable = number | string | Uint8Array | Encodable[] | Array<[Encodable, Encodable]> | { map: Array<[Encodable, Encodable]> };
+export type Encodable =
+    | number
+    | string
+    | Uint8Array
+    | Encodable[]
+    | Array<[Encodable, Encodable]>
+    | { map: Array<[Encodable, Encodable]> };
 
 function head(major: number, value: number): Buffer {
     if (value < 24) return Buffer.from([(major << 5) | value]);
@@ -83,7 +89,10 @@ export class FakeAuthenticator {
     public signCount: number;
     private readonly counting: boolean;
 
-    public constructor(algorithm: "ES256" | "RS256" = "ES256", options: { counting?: boolean; modulusLength?: number; credentialId?: Buffer } = {}) {
+    public constructor(
+        algorithm: "ES256" | "RS256" = "ES256",
+        options: { counting?: boolean; modulusLength?: number; credentialId?: Buffer } = {},
+    ) {
         this.algorithm = algorithm;
         const pair =
             algorithm === "ES256"
@@ -101,14 +110,34 @@ export class FakeAuthenticator {
         const jwk = key.export({ format: "jwk" }) as { x?: string; y?: string; n?: string; e?: string };
         const bytes = (value: string | undefined): Buffer => Buffer.from(value ?? "", "base64url");
         return alg === "ES256"
-            ? { map: [[1, 2], [3, -7], [-1, 1], [-2, bytes(jwk.x)], [-3, bytes(jwk.y)]] }
-            : { map: [[1, 3], [3, -257], [-1, bytes(jwk.n)], [-2, bytes(jwk.e)]] };
+            ? {
+                  map: [
+                      [1, 2],
+                      [3, -7],
+                      [-1, 1],
+                      [-2, bytes(jwk.x)],
+                      [-3, bytes(jwk.y)],
+                  ],
+              }
+            : {
+                  map: [
+                      [1, 3],
+                      [3, -257],
+                      [-1, bytes(jwk.n)],
+                      [-2, bytes(jwk.e)],
+                  ],
+              };
     }
 
     /** What `navigator.credentials.create` hands the page, as the page posts it. */
     public create(ceremony: Ceremony, faults: Faults = {}, coseOverride?: Encodable): Created {
         const credentialId = faults.credentialId ?? this.credentialId;
-        const clientData = clientDataJSON(faults.type ?? "webauthn.create", faults.challenge ?? ceremony.challenge, faults.origin ?? ceremony.origin, faults.crossOrigin);
+        const clientData = clientDataJSON(
+            faults.type ?? "webauthn.create",
+            faults.challenge ?? ceremony.challenge,
+            faults.origin ?? ceremony.origin,
+            faults.crossOrigin,
+        );
         const authData = Buffer.concat([
             authenticatorHeader(faults, 0x40, faults.signCount ?? 0),
             Buffer.alloc(16),
@@ -117,26 +146,59 @@ export class FakeAuthenticator {
             encodeCbor(coseOverride ?? this.cose()),
             faults.trailing ?? Buffer.alloc(0),
         ]);
-        const attestation = encodeCbor({ map: [["fmt", "none"], ["attStmt", { map: [] }], ["authData", authData]] });
-        return { id: toBase64Url(credentialId), response: { clientDataJSON: toBase64Url(clientData), attestationObject: toBase64Url(attestation) } };
+        const attestation = encodeCbor({
+            map: [
+                ["fmt", "none"],
+                ["attStmt", { map: [] }],
+                ["authData", authData],
+            ],
+        });
+        return {
+            id: toBase64Url(credentialId),
+            response: { clientDataJSON: toBase64Url(clientData), attestationObject: toBase64Url(attestation) },
+        };
     }
 
     /** What `navigator.credentials.get` hands the page, as the page posts it. */
     public get(ceremony: Ceremony, faults: Faults = {}): Asserted {
         const credentialId = faults.credentialId ?? this.credentialId;
-        const clientData = clientDataJSON(faults.type ?? "webauthn.get", faults.challenge ?? ceremony.challenge, faults.origin ?? ceremony.origin, faults.crossOrigin);
+        const clientData = clientDataJSON(
+            faults.type ?? "webauthn.get",
+            faults.challenge ?? ceremony.challenge,
+            faults.origin ?? ceremony.origin,
+            faults.crossOrigin,
+        );
         if (this.counting && faults.signCount === undefined) this.signCount += 1;
-        const authData = Buffer.concat([authenticatorHeader(faults, 0, faults.signCount ?? (this.counting ? this.signCount : 0)), faults.trailing ?? Buffer.alloc(0)]);
+        const authData = Buffer.concat([
+            authenticatorHeader(faults, 0, faults.signCount ?? (this.counting ? this.signCount : 0)),
+            faults.trailing ?? Buffer.alloc(0),
+        ]);
         // Sign what the specification says: authenticatorData followed by the hash of the client data.
-        const signature = sign("sha256", Buffer.concat([authData, sha256(clientData)]), faults.signWith ?? this.privateKey);
+        const signature = sign(
+            "sha256",
+            Buffer.concat([authData, sha256(clientData)]),
+            faults.signWith ?? this.privateKey,
+        );
         if (faults.badSignature) signature[signature.length - 1]! ^= 0x01;
-        return { id: toBase64Url(credentialId), response: { clientDataJSON: toBase64Url(clientData), authenticatorData: toBase64Url(authData), signature: toBase64Url(signature) } };
+        return {
+            id: toBase64Url(credentialId),
+            response: {
+                clientDataJSON: toBase64Url(clientData),
+                authenticatorData: toBase64Url(authData),
+                signature: toBase64Url(signature),
+            },
+        };
     }
 }
 
 function clientDataJSON(type: string, challenge: Buffer | string, origin: string, crossOrigin?: boolean): Buffer {
     return Buffer.from(
-        JSON.stringify({ type, challenge: typeof challenge === "string" ? challenge : toBase64Url(challenge), origin, ...(crossOrigin === undefined ? {} : { crossOrigin }) }),
+        JSON.stringify({
+            type,
+            challenge: typeof challenge === "string" ? challenge : toBase64Url(challenge),
+            origin,
+            ...(crossOrigin === undefined ? {} : { crossOrigin }),
+        }),
     );
 }
 

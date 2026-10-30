@@ -53,7 +53,15 @@ export interface ApiSettings {
 export const DEFAULT_TIMEOUT_SEC = 30;
 export const MAX_TIMEOUT_SEC = 120;
 
-const SECTION_FIELDS: ReadonlySet<string> = new Set(["collections", "environments", "secrets", "reads", "adHoc", "timeoutSec", "allowPlainLocal"]);
+const SECTION_FIELDS: ReadonlySet<string> = new Set([
+    "collections",
+    "environments",
+    "secrets",
+    "reads",
+    "adHoc",
+    "timeoutSec",
+    "allowPlainLocal",
+]);
 const MAPPING_FIELDS: ReadonlySet<string> = new Set(["environment", "signIn", "transport"]);
 
 const COLLECTION_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$/;
@@ -70,7 +78,9 @@ function checkCollection(name: string, raw: unknown, errors: string[]): Configur
     const at = `api.collections.${name}`;
     const known = [...new Set(SOURCES.map((source) => source.kind))];
     if (!isObject(raw)) {
-        errors.push(`${at}: must be an object with one source, such as { "postman": "<path>" } or { "http": "<folder>" }`);
+        errors.push(
+            `${at}: must be an object with one source, such as { "postman": "<path>" } or { "http": "<folder>" }`,
+        );
         return undefined;
     }
     const kinds = Object.keys(raw).filter((key) => known.includes(key));
@@ -96,7 +106,9 @@ function checkCollection(name: string, raw: unknown, errors: string[]): Configur
 
 function checkCollections(raw: unknown, errors: string[]): Map<string, ConfiguredCollection> | undefined {
     if (raw === undefined) {
-        errors.push('api.collections: required, an object that maps a name to a source, such as { "orders": { "http": "~/work/orders/http" } }');
+        errors.push(
+            'api.collections: required, an object that maps a name to a source, such as { "orders": { "http": "~/work/orders/http" } }',
+        );
         return undefined;
     }
     if (!isObject(raw)) {
@@ -137,12 +149,15 @@ function checkMapping(label: string, raw: unknown, errors: string[]): Environmen
         return undefined;
     }
     for (const key of Object.keys(raw)) if (!MAPPING_FIELDS.has(key)) errors.push(`${at}.${key}: unknown field`);
-    const environment = typeof raw.environment === "string" && ENVIRONMENT_NAME.test(raw.environment) ? raw.environment : undefined;
-    if (environment === undefined) errors.push(`${at}.environment: required, a jig-core environment name such as staging`);
+    const environment =
+        typeof raw.environment === "string" && ENVIRONMENT_NAME.test(raw.environment) ? raw.environment : undefined;
+    if (environment === undefined)
+        errors.push(`${at}.environment: required, a jig-core environment name such as staging`);
     const named = (key: "signIn" | "transport", what: string): string | undefined => {
         const value = raw[key];
         if (value === undefined) return undefined;
-        if (typeof value === "string" && value.trim() !== "" && value.length <= 64 && !CONTROL_CHARACTER.test(value)) return value;
+        if (typeof value === "string" && value.trim() !== "" && value.length <= 64 && !CONTROL_CHARACTER.test(value))
+            return value;
         errors.push(`${at}.${key}: must be the name of a ${what}`);
         return undefined;
     };
@@ -150,7 +165,11 @@ function checkMapping(label: string, raw: unknown, errors: string[]): Environmen
     const transport = named("transport", "transport");
     if (signIn !== undefined && transport !== undefined) errors.push(`${at}: use signIn or transport, not both`);
     if (errors.length > before || environment === undefined) return undefined;
-    return { environment, ...(signIn === undefined ? {} : { signIn }), ...(transport === undefined ? {} : { transport }) };
+    return {
+        environment,
+        ...(signIn === undefined ? {} : { signIn }),
+        ...(transport === undefined ? {} : { transport }),
+    };
 }
 
 function checkEnvironments(raw: unknown, errors: string[]): Map<string, EnvironmentMapping> {
@@ -169,7 +188,9 @@ function checkEnvironments(raw: unknown, errors: string[]): Map<string, Environm
     }
     for (const [label, value] of Object.entries(raw)) {
         if (!ENVIRONMENT_LABEL.test(label)) {
-            errors.push("api.environments: an environment name is text of 1 to 60 characters with no control characters");
+            errors.push(
+                "api.environments: an environment name is text of 1 to 60 characters with no control characters",
+            );
             continue;
         }
         const mapping = checkMapping(label, value, errors);
@@ -182,7 +203,9 @@ function checkSecrets(raw: unknown, errors: string[]): Map<string, SecretSource>
     const secrets = new Map<string, SecretSource>();
     if (raw === undefined) return secrets;
     if (!isObject(raw)) {
-        errors.push("api.secrets: must be an object that maps a variable name to a secret reference, such as { \"token\": \"pass:orders/token\" }");
+        errors.push(
+            'api.secrets: must be an object that maps a variable name to a secret reference, such as { "token": "pass:orders/token" }',
+        );
         return secrets;
     }
     if (Object.keys(raw).length > MAX_LIST) {
@@ -210,7 +233,9 @@ function checkSecrets(raw: unknown, errors: string[]): Map<string, SecretSource>
             }
             if (byEnvironment.size > 0) secrets.set(name, { byEnvironment });
         } else {
-            errors.push(`${at}: must be a secret reference such as pass:work/api-token, or an object of one reference per environment`);
+            errors.push(
+                `${at}: must be a secret reference such as pass:work/api-token, or an object of one reference per environment`,
+            );
         }
     }
     return secrets;
@@ -246,12 +271,18 @@ export function readApi(raw: unknown): { settings?: ApiSettings; errors: string[
     const adHoc = checkNames(raw.adHoc, "api.adHoc", ENVIRONMENT_NAME, "environment names", errors);
     const mapped = new Set([...environments.values()].map((mapping) => mapping.environment));
     for (const name of adHoc) {
-        if (!mapped.has(name)) errors.push(`api.adHoc: ${shown(name, 30)} is not an environment that api.environments maps to`);
+        if (!mapped.has(name))
+            errors.push(`api.adHoc: ${shown(name, 30)} is not an environment that api.environments maps to`);
     }
 
     let timeoutSec = DEFAULT_TIMEOUT_SEC;
     if (raw.timeoutSec !== undefined) {
-        if (typeof raw.timeoutSec === "number" && Number.isSafeInteger(raw.timeoutSec) && raw.timeoutSec >= 1 && raw.timeoutSec <= MAX_TIMEOUT_SEC) {
+        if (
+            typeof raw.timeoutSec === "number" &&
+            Number.isSafeInteger(raw.timeoutSec) &&
+            raw.timeoutSec >= 1 &&
+            raw.timeoutSec <= MAX_TIMEOUT_SEC
+        ) {
             timeoutSec = raw.timeoutSec;
         } else {
             errors.push(`api.timeoutSec: must be a whole number from 1 to ${MAX_TIMEOUT_SEC}`);

@@ -49,7 +49,8 @@ function describeFailure(plan: Plan, error: unknown): unknown {
     if (!(error instanceof LostReplyError)) return error;
     const why = error.reason === "timeout" ? `timed out after ${plan.timeoutSec} s` : error.message;
     const lead = `${plan.label}: no answer (${why}).`;
-    if (READ_METHODS.has(plan.method)) return new Error(`${lead} A ${plan.method} changes nothing, so it can be sent again.`);
+    if (READ_METHODS.has(plan.method))
+        return new Error(`${lead} A ${plan.method} changes nothing, so it can be sent again.`);
     return new Error(
         `${lead} The outcome is unknown: the server may have carried it out. It was not sent again. ` +
             "Check with a GET before trying again.",
@@ -60,7 +61,9 @@ function describeFailure(plan: Plan, error: unknown): unknown {
 function requiredSettings(): ApiSettings {
     const settings = settingsOf(jig().config.section("api"));
     if (settings === undefined) {
-        throw new InputError('api is not set up: add an "api" section with "collections" to jig.json (/jig lists configuration problems)');
+        throw new InputError(
+            'api is not set up: add an "api" section with "collections" to jig.json (/jig lists configuration problems)',
+        );
     }
     return settings;
 }
@@ -85,28 +88,51 @@ interface Prepared {
 function prepare(ctx: PlanContext, call: Extract<Call, { action: "run" | "run-folder" | "call" }>): Prepared {
     if (call.action === "call") {
         const plan = planCall(ctx, {
-            environment: call.environment, collection: call.collection, method: call.method, url: call.url, body: call.body,
-            headers: call.headers, timeoutSec: call.timeoutSec,
+            environment: call.environment,
+            collection: call.collection,
+            method: call.method,
+            url: call.url,
+            body: call.body,
+            headers: call.headers,
+            timeoutSec: call.timeoutSec,
         });
         // Only the method decides an ad-hoc call: a name in `reads` cannot turn every call into a read.
-        return { plans: [plan], action: "call", effect: READ_METHODS.has(plan.method) ? "read" : "write", environment: plan.jigEnvironment };
+        return {
+            plans: [plan],
+            action: "call",
+            effect: READ_METHODS.has(plan.method) ? "read" : "write",
+            environment: plan.jigEnvironment,
+        };
     }
     if (call.action === "run") {
         const request = ctx.catalog.request(call.request, call.collection, call.folder);
         const plan = planRequest(ctx, request, call);
-        return { plans: [plan], action: request.name, effect: readsOf(ctx.settings, request) ? "read" : "write", environment: plan.jigEnvironment };
+        return {
+            plans: [plan],
+            action: request.name,
+            effect: readsOf(ctx.settings, request) ? "read" : "write",
+            environment: plan.jigEnvironment,
+        };
     }
     const found = ctx.catalog.folder(call.folder, call.collection);
     // The values are for the whole folder: each request gets the ones it uses, and each value must be used by one of them.
     const given = Object.entries(call.variables ?? {});
-    const uses = [...new Set(found.requests.flatMap((request) => request.variables.filter((name) => !name.startsWith("$"))))];
+    const uses = [
+        ...new Set(found.requests.flatMap((request) => request.variables.filter((name) => !name.startsWith("$")))),
+    ];
     const unused = given.find(([name]) => !uses.includes(name));
     if (unused !== undefined) {
         const list = shortList(uses, ", ", 70);
-        throw new InputError(`${JSON.stringify(unused[0])} is not a variable of any request in ${found.folder}; they use ${list}`);
+        throw new InputError(
+            `${JSON.stringify(unused[0])} is not a variable of any request in ${found.folder}; they use ${list}`,
+        );
     }
     const plans = found.requests.map((request) =>
-        planRequest(ctx, request, { ...call, variables: Object.fromEntries(given.filter(([name]) => request.variables.includes(name))) }));
+        planRequest(ctx, request, {
+            ...call,
+            variables: Object.fromEntries(given.filter(([name]) => request.variables.includes(name))),
+        }),
+    );
     const writes = found.requests.some((request) => !readsOf(ctx.settings, request));
     const first = plans[0] as Plan;
     // A folder is as strict as its strictest request: one write makes it a write.
@@ -122,7 +148,8 @@ function prepare(ctx: PlanContext, call: Extract<Call, { action: "run" | "run-fo
 /** jig-core takes any TypeError to mean that the input is invalid. Only an InputError may say so: a TypeError from a bug here
  *  is an ordinary failure, which shows as "preview unavailable" and leaves the decision to the person. */
 function asInvalidInput(error: unknown): unknown {
-    if (error instanceof TypeError && !(error instanceof InputError)) return new Error(`internal error: ${error.message}`);
+    if (error instanceof TypeError && !(error instanceof InputError))
+        return new Error(`internal error: ${error.message}`);
     return error;
 }
 
@@ -148,14 +175,17 @@ async function runFolder(
             if (sent.answer.status < 200 || sent.answer.status >= 300) failure = renderResult(plan, sent);
         } catch (error) {
             const described = describeFailure(plan, error);
-            lines.push(`${number}: ${described instanceof Error ? described.message.replace(`${plan.label}: `, "") : "failed"}`);
+            lines.push(
+                `${number}: ${described instanceof Error ? described.message.replace(`${plan.label}: `, "") : "failed"}`,
+            );
             failure = described instanceof Error ? described.message : "failed";
             ran++;
         }
     }
     const first = prepared.plans[0] as Plan;
     const outcome = failure === undefined ? ", all answered 2xx" : ", stopped at the first failure";
-    const head = `Folder ${prepared.folder ?? ""} in ${first.environment} (${first.jigEnvironment}): ` +
+    const head =
+        `Folder ${prepared.folder ?? ""} in ${first.environment} (${first.jigEnvironment}): ` +
         `${ran} of ${prepared.plans.length} ran${outcome}`;
     const text = [head, ...lines, ...(failure === undefined ? [] : ["", "Failed request:", failure])].join("\n");
     return { text, ran, failed: failure !== undefined };
@@ -168,7 +198,9 @@ export function createTool(options: ApiOptions = {}): ApiTool {
     function guard(toolCallId: string, label: string, fingerprint: string): void {
         const approved = jig().approvedPreview(toolCallId);
         if (approved?.fingerprint !== undefined && approved.fingerprint !== fingerprint) {
-            throw new Error(`${label}: changed since the preview; run it again to see the new preview. Nothing was sent.`);
+            throw new Error(
+                `${label}: changed since the preview; run it again to see the new preview. Nothing was sent.`,
+            );
         }
     }
 
@@ -205,14 +237,17 @@ export function createTool(options: ApiOptions = {}): ApiTool {
             name: "api",
             label: "API",
             description: DESCRIPTION,
-            promptSnippet: "api: run the team's saved API requests by name (list, show, run, run-folder); call for an ad-hoc one",
+            promptSnippet:
+                "api: run the team's saved API requests by name (list, show, run, run-folder); call for an ad-hoc one",
             parameters,
             // One call at a time and in order: a write must be done before the read that checks it.
             executionMode: "sequential",
             async execute(toolCallId, params, signal) {
                 const call = parseCall(params);
-                const text = (value: string, details: Record<string, unknown> = {}) =>
-                    ({ content: [{ type: "text" as const, text: value }], details });
+                const text = (value: string, details: Record<string, unknown> = {}) => ({
+                    content: [{ type: "text" as const, text: value }],
+                    details,
+                });
                 if (call.action === "list" || call.action === "show") {
                     const ctx = contextOf();
                     if (call.action === "list") {
@@ -220,7 +255,10 @@ export function createTool(options: ApiOptions = {}): ApiTool {
                         return text(listText(ctx.catalog, ctx.settings, filter), { action: "list" });
                     }
                     const request = ctx.catalog.request(call.request, call.collection, call.folder);
-                    return text(showText(ctx.catalog, ctx.settings, request, call.environment), { action: "show", request: request.name });
+                    return text(showText(ctx.catalog, ctx.settings, request, call.environment), {
+                        action: "show",
+                        request: request.name,
+                    });
                 }
 
                 const prepared = prepare(contextOf(), call);
@@ -228,8 +266,17 @@ export function createTool(options: ApiOptions = {}): ApiTool {
                 if (prepared.folder !== undefined) {
                     guard(toolCallId, `api run-folder ${prepared.folder}`, fingerprintOfAll(prepared.plans));
                     const folder = await runFolder(http, prepared, signal);
-                    jig().addFacts(toolCallId, { requests: prepared.plans.length, ran: folder.ran, failed: folder.failed ? 1 : 0 });
-                    return text(folder.text, { folder: prepared.folder, requests: prepared.plans.length, ran: folder.ran, failed: folder.failed });
+                    jig().addFacts(toolCallId, {
+                        requests: prepared.plans.length,
+                        ran: folder.ran,
+                        failed: folder.failed ? 1 : 0,
+                    });
+                    return text(folder.text, {
+                        folder: prepared.folder,
+                        requests: prepared.plans.length,
+                        ran: folder.ran,
+                        failed: folder.failed,
+                    });
                 }
 
                 guard(toolCallId, first.label, first.fingerprint);
@@ -240,7 +287,11 @@ export function createTool(options: ApiOptions = {}): ApiTool {
                     throw describeFailure(first, error);
                 }
                 jig().addFacts(toolCallId, { status: sent.answer.status });
-                return text(renderResult(first, sent), { request: first.request, method: first.method, status: sent.answer.status });
+                return text(renderResult(first, sent), {
+                    request: first.request,
+                    method: first.method,
+                    status: sent.answer.status,
+                });
             },
         },
     };

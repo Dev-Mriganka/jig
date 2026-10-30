@@ -7,8 +7,21 @@ import { convertField, MAX_TEXT } from "./fields.ts";
 import { InputError, shortList } from "./values.ts";
 
 export type Param =
-    | "key" | "jql" | "page" | "limit" | "include" | "full" | "query" | "commentId" | "text" | "transition"
-    | "project" | "type" | "summary" | "description" | "fields";
+    | "key"
+    | "jql"
+    | "page"
+    | "limit"
+    | "include"
+    | "full"
+    | "query"
+    | "commentId"
+    | "text"
+    | "transition"
+    | "project"
+    | "type"
+    | "summary"
+    | "description"
+    | "fields";
 
 interface ActionSpec {
     kind: "read" | "write";
@@ -56,12 +69,16 @@ export const parameters = Type.Object({
     key: Type.Optional(Type.String({ description: "Issue key, such as PROJ-123" })),
     jql: Type.Optional(Type.String({ description: "JQL query" })),
     page: Type.Optional(Type.String({ description: "Search: the page value the previous result gave" })),
-    limit: Type.Optional(Type.Integer({
-        minimum: 1,
-        maximum: 100,
-        description: "How many to return (search and assignable: up to 50)",
-    })),
-    include: Type.Optional(Type.Array(Type.String(), { description: "Extra fields to show, by name or id (up to 10)" })),
+    limit: Type.Optional(
+        Type.Integer({
+            minimum: 1,
+            maximum: 100,
+            description: "How many to return (search and assignable: up to 50)",
+        }),
+    ),
+    include: Type.Optional(
+        Type.Array(Type.String(), { description: "Extra fields to show, by name or id (up to 10)" }),
+    ),
     full: Type.Optional(Type.Boolean({ description: "Do not cut long text. Use it before rewriting a description" })),
     query: Type.Optional(Type.String({ description: "Text to match: part of a user's name, or of a field's name" })),
     commentId: Type.Optional(Type.String({ description: "Comment id, from comments" })),
@@ -71,11 +88,13 @@ export const parameters = Type.Object({
     type: Type.Optional(Type.String({ description: "Issue type name, such as Bug" })),
     summary: Type.Optional(Type.String({ description: "One-line title" })),
     description: Type.Optional(Type.String({ description: "Description, in Jira wiki markup" })),
-    fields: Type.Optional(Type.Unsafe<Record<string, unknown>>({
-        type: "object",
-        additionalProperties: true,
-        description: 'Fields to set, by name or id: {"labels": ["a"], "priority": "High", "assignee": "<id>"}',
-    })),
+    fields: Type.Optional(
+        Type.Unsafe<Record<string, unknown>>({
+            type: "object",
+            additionalProperties: true,
+            description: 'Fields to set, by name or id: {"labels": ["a"], "priority": "High", "assignee": "<id>"}',
+        }),
+    ),
 });
 
 // ---- parsed calls -----------------------------------------------------------------------------------------------------
@@ -91,7 +110,14 @@ export type Call =
     | { action: "attachments"; key: string }
     | { action: "assignable"; key: string; query: string | undefined; limit: number }
     | { action: "find_field"; query: string }
-    | { action: "create"; project: string; type: string; summary: string; description: string | undefined; fields: Fields }
+    | {
+          action: "create";
+          project: string;
+          type: string;
+          summary: string;
+          description: string | undefined;
+          fields: Fields;
+      }
     | { action: "comment"; key: string; text: string }
     | { action: "edit_comment"; key: string; commentId: string; text: string }
     | { action: "delete_comment"; key: string; commentId: string }
@@ -129,7 +155,9 @@ export function parseCall(input: Readonly<Record<string, unknown>>): Call {
     const action = input.action;
     if (!isAction(action)) {
         // The schema lists every action and Pi checks against it first, so this reaches the model rarely and stays short.
-        throw new InputError(`jira: action must be one of ${shortList(ACTION_NAMES, ", ", 100)} (got ${shown(action)})`);
+        throw new InputError(
+            `jira: action must be one of ${shortList(ACTION_NAMES, ", ", 100)} (got ${shown(action)})`,
+        );
     }
     const { required, optional }: ActionSpec = ACTIONS[action];
     const known: readonly string[] = ["action", ...required, ...optional];
@@ -144,7 +172,9 @@ export function parseCall(input: Readonly<Record<string, unknown>>): Call {
     };
     const issueKey = (): string => {
         const value = typeof input.key === "string" ? input.key.trim().toUpperCase() : "";
-        return ISSUE_KEY.test(value) ? value : fail(`key must be an issue key such as PROJ-123 (got ${shown(input.key)})`);
+        return ISSUE_KEY.test(value)
+            ? value
+            : fail(`key must be an issue key such as PROJ-123 (got ${shown(input.key)})`);
     };
     const commentId = (): string => {
         const { commentId: given } = input;
@@ -192,7 +222,8 @@ export function parseCall(input: Readonly<Record<string, unknown>>): Call {
             return fail('fields must be an object such as {"labels": ["a"]}');
         }
         const entries = Object.entries(value);
-        if (entries.length === 0 || entries.length > MAX_FIELDS) return fail(`fields must name 1 to ${MAX_FIELDS} fields`);
+        if (entries.length === 0 || entries.length > MAX_FIELDS)
+            return fail(`fields must name 1 to ${MAX_FIELDS} fields`);
         return Object.fromEntries(entries);
     };
 

@@ -107,6 +107,8 @@ export function checkArtifacts(raw: unknown, errors: string[]): ArtifactRule[] {
         return [];
     }
     const before = errors.length;
-    raw.forEach((rule, index) => checkRule(rule, `ops.artifacts[${index}]`, errors));
+    raw.forEach((rule, index) => {
+        checkRule(rule, `ops.artifacts[${index}]`, errors);
+    });
     return errors.length > before ? [] : (raw as ArtifactRule[]);
 }

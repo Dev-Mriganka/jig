@@ -114,7 +114,8 @@ export class ReviewServer {
             if (!hosts.includes(context.req.header("host") ?? "")) return context.text("Forbidden", 403);
             const key = context.req.query("k");
             if (key !== undefined) {
-                if (!sameSecret(key, this.secret)) return context.text("This review link has expired: open the one Pi printed.", 403);
+                if (!sameSecret(key, this.secret))
+                    return context.text("This review link has expired: open the one Pi printed.", 403);
                 // Lax, because Strict is not sent on the redirect after the link was opened from outside the browser.
                 context.header("Set-Cookie", `${COOKIE}=${this.secret}; HttpOnly; SameSite=Lax; Path=/`);
                 return context.redirect(context.req.path, 302);
@@ -123,7 +124,11 @@ export class ReviewServer {
                 return context.text("Open the review from the link Pi printed.", 403);
             }
             const origin = context.req.header("origin");
-            if (context.req.method !== "GET" && origin !== undefined && !hosts.some((host) => origin === `http://${host}`)) {
+            if (
+                context.req.method !== "GET" &&
+                origin !== undefined &&
+                !hosts.some((host) => origin === `http://${host}`)
+            ) {
                 return context.text("Forbidden", 403);
             }
             await next();
@@ -133,7 +138,13 @@ export class ReviewServer {
                 if (!context.res.headers.has(name)) context.res.headers.set(name, value);
             }
         });
-        app.use("/api/*", bodyLimit({ maxSize: MAX_BODY_BYTES, onError: (context) => context.json({ error: "The request is too big." }, 413) }));
+        app.use(
+            "/api/*",
+            bodyLimit({
+                maxSize: MAX_BODY_BYTES,
+                onError: (context) => context.json({ error: "The request is too big." }, 413),
+            }),
+        );
 
         app.onError((error, context) => {
             if (error instanceof ApprovalError) return context.json({ error: error.message }, error.status as 400);
@@ -175,12 +186,16 @@ export class ReviewServer {
         // Approval. There is no route that approves because the page asked: each of these checks something the agent
         // cannot supply (a passkey signature) or waits for the user in Pi.
         app.post("/api/approve/options", (context) => context.json(approval.approvalOptions()));
-        app.post("/api/approve/passkey", async (context) => context.json(await approval.approveWithPasskey(await readJson(context))));
+        app.post("/api/approve/passkey", async (context) =>
+            context.json(await approval.approveWithPasskey(await readJson(context))),
+        );
         app.post("/api/approve/page", async (context) => context.json(await approval.approveInPage()));
 
         app.get("/api/passkeys", (context) => context.json(approval.passkeys()));
         app.post("/api/passkeys/options", (context) => context.json(approval.registrationOptions()));
-        app.post("/api/passkeys", async (context) => context.json({ ok: true, passkey: await approval.register(await readJson(context)) }));
+        app.post("/api/passkeys", async (context) =>
+            context.json({ ok: true, passkey: await approval.register(await readJson(context)) }),
+        );
         app.delete("/api/passkeys/:fingerprint", async (context) => {
             const result = await approval.removePasskey(context.req.param("fingerprint"));
             return context.json(result, result.ok ? 200 : 409);
@@ -264,7 +279,8 @@ async function readJson(context: Context): Promise<unknown> {
  * keep a browser from guessing a type, caching what is private, or sending the link on as a referrer.
  */
 const SECURITY_HEADERS: Record<string, string> = {
-    "Content-Security-Policy": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+    "Content-Security-Policy":
+        "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
     "Cache-Control": "no-store",
@@ -285,9 +301,13 @@ async function readStaticAsset(requestPath: string): Promise<Response> {
     } catch {
         // A path the page's router knows (a review's own address) gets the page, so a reload keeps the place.
         try {
-            return new Response(await readFile(path.join(webRoot, "index.html")), { headers: getStaticAssetHeaders("index.html") });
+            return new Response(await readFile(path.join(webRoot, "index.html")), {
+                headers: getStaticAssetHeaders("index.html"),
+            });
         } catch {
-            return new Response("The review page is not built: run `npm --prefix plugins/jig-review/web run build`.", { status: 500 });
+            return new Response("The review page is not built: run `npm --prefix plugins/jig-review/web run build`.", {
+                status: 500,
+            });
         }
     }
 }

@@ -24,7 +24,8 @@ async function approveInPi(s: ReviewSession, answer = true) {
     return s.post("/api/approve/page");
 }
 
-const json = (response: { body: string }): Record<string, unknown> => JSON.parse(response.body) as Record<string, unknown>;
+const json = (response: { body: string }): Record<string, unknown> =>
+    JSON.parse(response.body) as Record<string, unknown>;
 
 test("approving a branch review records the full HEAD of every reviewed repository, and nothing else about the commits", async () => {
     session = await openReview("--branch");
@@ -40,8 +41,11 @@ test("approving a branch review records the full HEAD of every reviewed reposito
     assert.equal(others.length, 0, "approval updates the review, it does not add one");
     assert.equal(record?.status, "approved");
     assert.equal(record?.id, pending?.id);
-    assert.deepEqual(record?.approvedHeads, REPOSITORIES.map((repo) => ({ repo, sha: git(path.join(session!.root, repo), "rev-parse", "HEAD").trim() })));
-    for (const head of record?.approvedHeads as Array<Record<string, unknown>>) {
+    assert.deepEqual(
+        record?.approvedHeads,
+        REPOSITORIES.map((repo) => ({ repo, sha: git(path.join(session!.root, repo), "rev-parse", "HEAD").trim() })),
+    );
+    for (const head of record!.approvedHeads as Array<Record<string, unknown>>) {
         assert.deepEqual(Object.keys(head).sort(), ["repo", "sha"]);
         assert.match(String(head.sha), /^[0-9a-f]{40}$/, "a full commit, not the 12 characters the page shows");
     }
@@ -81,8 +85,13 @@ test("approving a review the agent asked for tells it how it was approved and wh
     assert.equal(session.records()[0]?.fileScope, "branch");
     assert.equal((await approveInPi(session)).status, 200);
     const [message] = session.host.sent;
-    const covered = REPOSITORIES.map((repo) => `${repo}@${git(path.join(session!.root, repo), "rev-parse", "HEAD").trim().slice(0, 12)}`).join(", ");
-    assert.equal(message, `The user approved the ${TICKET} review in the page and then with a \`y\` in Pi, covering ${covered}. Continue with what was waiting on it (for example the push of exactly those commits; the push still asks the user to confirm).`);
+    const covered = REPOSITORIES.map(
+        (repo) => `${repo}@${git(path.join(session!.root, repo), "rev-parse", "HEAD").trim().slice(0, 12)}`,
+    ).join(", ");
+    assert.equal(
+        message,
+        `The user approved the ${TICKET} review in the page and then with a \`y\` in Pi, covering ${covered}. Continue with what was waiting on it (for example the push of exactly those commits; the push still asks the user to confirm).`,
+    );
     assert.equal(session.host.sent.length, 1);
 });
 
@@ -97,7 +106,10 @@ test("an approval of the latest changes the agent asked for says it does not cle
     session = await openReview("", { byAgent: true, ticket: false });
     assert.equal(session.records()[0]?.fileScope, "all");
     assert.equal((await approveInPi(session)).status, 200);
-    assert.match(session.host.sent[0] ?? "", /of the latest changes in the page and then with a `y` in Pi\. It covers those changes only, not the whole branch, so it does not clear a push\./);
+    assert.match(
+        session.host.sent[0] ?? "",
+        /of the latest changes in the page and then with a `y` in Pi\. It covers those changes only, not the whole branch, so it does not clear a push\./,
+    );
 });
 
 test("approving a review the user opened with /code-review is recorded and sends the agent nothing", async () => {
@@ -118,7 +130,10 @@ test("approving a review the after-turn offer opened sends the agent nothing", a
     offered.answer = (title) => title === "Review generated code?";
     await host.fire("agent_start", offered.ctx);
     appendFileSync(path.join(session.root, REPOSITORIES[0]!, "Service.java"), "changed by the next run\n");
-    await host.fire("tool_call", offered.ctx, { toolName: "edit", input: { path: path.join(session.root, REPOSITORIES[0]!, "Service.java") } });
+    await host.fire("tool_call", offered.ctx, {
+        toolName: "edit",
+        input: { path: path.join(session.root, REPOSITORIES[0]!, "Service.java") },
+    });
     await host.fire("agent_end", offered.ctx);
     assert.equal(session.records().at(-1)!.fileScope, "touched");
 
@@ -156,14 +171,21 @@ test("an approval is announced on the event bus, with the commits and the files"
     assert.equal(event.ticket, TICKET);
     assert.equal(event.method, "page-and-pi");
     assert.equal(event.covered, true);
-    assert.deepEqual(event.repos, REPOSITORIES.map((repo) => ({ repo, head: git(path.join(session!.root, repo), "rev-parse", "HEAD").trim() })));
-    assert.deepEqual(event.files, REPOSITORIES.map((repo) => `${repo}/Service.java`));
+    assert.deepEqual(
+        event.repos,
+        REPOSITORIES.map((repo) => ({ repo, head: git(path.join(session!.root, repo), "rev-parse", "HEAD").trim() })),
+    );
+    assert.deepEqual(
+        event.files,
+        REPOSITORIES.map((repo) => `${repo}/Service.java`),
+    );
 });
 
 test("the event says when the approval vouches for no commit, and still names where each repository stood", async () => {
     session = await openReview("");
     await approveInPi(session);
-    const event = session.host.events.find((entry) => entry.channel === REVIEW_EVENTS.approved)!.data as ReviewApprovedEvent;
+    const event = session.host.events.find((entry) => entry.channel === REVIEW_EVENTS.approved)!
+        .data as ReviewApprovedEvent;
     assert.equal(event.scope, "all");
     assert.equal(event.covered, false);
     assert.equal(event.repos.length, 2);
@@ -178,7 +200,8 @@ test("a clean repository next to the reviewed ones is not named in the event", a
     git(clean, "add", ".");
     git(clean, "commit", "-q", "-m", "init");
     await approveInPi(session);
-    const event = session.host.events.find((entry) => entry.channel === REVIEW_EVENTS.approved)!.data as ReviewApprovedEvent;
+    const event = session.host.events.find((entry) => entry.channel === REVIEW_EVENTS.approved)!
+        .data as ReviewApprovedEvent;
     assert.deepEqual(event.repos.map((repo) => repo.repo).sort(), [...REPOSITORIES].sort());
 });
 
@@ -233,35 +256,50 @@ test("registering a passkey through the page, then approving with it, needs no y
     assert.deepEqual(json(await s.post("/api/approve/options")), { method: "none", canRegister: true });
     const registration = json(await s.post("/api/passkeys/options")) as { publicKey: { challenge: string } };
     s.session.answer = (title) => title === "Register this passkey?";
-    const registered = await s.post("/api/passkeys", auth.create({ challenge: fromBase64Url(registration.publicKey.challenge), origin }));
+    const registered = await s.post(
+        "/api/passkeys",
+        auth.create({ challenge: fromBase64Url(registration.publicKey.challenge), origin }),
+    );
     assert.equal(registered.status, 200, registered.body);
     const fingerprint = fingerprintOf(auth.publicKey.export({ type: "spki", format: "der" }));
     assert.equal((json(registered).passkey as { fingerprint: string }).fingerprint, fingerprint);
-    assert.ok(s.session.asked.some((question) => question.includes(fingerprint.slice(0, 8))), "Pi showed the fingerprint");
+    assert.ok(
+        s.session.asked.some((question) => question.includes(fingerprint.slice(0, 8))),
+        "Pi showed the fingerprint",
+    );
     assert.equal(s.records()[0]?.status, "awaiting-review", "registering approves nothing");
 
     // The page lists the key, and not the key itself.
     const listed = json(await s.get("/api/passkeys")) as { passkeys: Array<Record<string, unknown>> };
-    assert.deepEqual(listed.passkeys.map((key) => key.fingerprint), [fingerprint]);
+    assert.deepEqual(
+        listed.passkeys.map((key) => key.fingerprint),
+        [fingerprint],
+    );
     assert.ok(!JSON.stringify(listed).includes("publicKey"), "the key itself is not sent to the page");
 
     s.session.asked.length = 0;
     s.session.answer = () => {
         throw new Error("a passkey approval must not ask in Pi");
     };
-    const options = json(await s.post("/api/approve/options")) as { method: string; publicKey: { challenge: string; rpId: string; userVerification: string } };
+    const options = json(await s.post("/api/approve/options")) as {
+        method: string;
+        publicKey: { challenge: string; rpId: string; userVerification: string };
+    };
     assert.equal(options.method, "passkey");
     assert.equal(options.publicKey.rpId, "localhost");
     assert.equal(options.publicKey.userVerification, "required");
-    const approved = await s.post("/api/approve/passkey", auth.get({ challenge: fromBase64Url(options.publicKey.challenge), origin }));
+    const approved = await s.post(
+        "/api/approve/passkey",
+        auth.get({ challenge: fromBase64Url(options.publicKey.challenge), origin }),
+    );
     assert.equal(approved.status, 200, approved.body);
     assert.deepEqual(json(approved), { ok: true, method: "passkey" });
     assert.deepEqual(s.session.asked, []);
 
     const [record] = s.records();
     assert.equal(record?.status, "approved");
-    assert.deepEqual((record?.approval as { method: string; fingerprint: string }).method, "passkey");
-    assert.equal((record?.approval as { fingerprint: string }).fingerprint, fingerprint);
+    assert.deepEqual((record!.approval as { method: string; fingerprint: string }).method, "passkey");
+    assert.equal((record!.approval as { fingerprint: string }).fingerprint, fingerprint);
     const event = s.host.events.find((entry) => entry.channel === REVIEW_EVENTS.approved)!.data as ReviewApprovedEvent;
     assert.equal(event.method, "passkey");
     assert.equal(event.covered, true);
@@ -275,7 +313,10 @@ test("a page that posts an approval without a valid signature approves nothing, 
     const auth = new FakeAuthenticator();
     const registration = json(await s.post("/api/passkeys/options")) as { publicKey: { challenge: string } };
     s.session.answer = (title) => title === "Register this passkey?";
-    await s.post("/api/passkeys", auth.create({ challenge: fromBase64Url(registration.publicKey.challenge), origin: s.base }));
+    await s.post(
+        "/api/passkeys",
+        auth.create({ challenge: fromBase64Url(registration.publicKey.challenge), origin: s.base }),
+    );
 
     // What the agent could try with a stolen cookie: no signature, a signature by its own key, a replayed or guessed challenge.
     const options = json(await s.post("/api/approve/options")) as { publicKey: { challenge: string } };
@@ -302,7 +343,10 @@ test("the old route that approved because the page asked is gone", async () => {
     session = await openReview("--branch");
     // (A GET of that path gets the page, as every address the page's router might know does.)
     for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
-        const response = await (await import("./support/harness.ts")).request(session.base, "/api/approve", { method, cookie: session.cookie });
+        const response = await (await import("./support/harness.ts")).request(session.base, "/api/approve", {
+            method,
+            cookie: session.cookie,
+        });
         assert.notEqual(response.status, 200, method);
     }
     assert.equal(session.records()[0]?.status, "awaiting-review");

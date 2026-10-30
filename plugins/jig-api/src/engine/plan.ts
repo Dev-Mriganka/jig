@@ -32,17 +32,17 @@ export type SignIn =
     /** The tool fetches an access token with a grant that needs no browser, keeps it until shortly before it expires, and
      *  sends it as a Bearer token. */
     | {
-        kind: "oauth";
-        grant: "password" | "client_credentials";
-        tokenUrl: string;
-        clientId: Text;
-        clientSecret?: Text;
-        username?: Text;
-        password?: Text;
-        scope?: string;
-        /** Where the client's id and secret go: HTTP Basic (RFC 6749 asks for it first), or the form. */
-        clientAuth: "header" | "body";
-    }
+          kind: "oauth";
+          grant: "password" | "client_credentials";
+          tokenUrl: string;
+          clientId: Text;
+          clientSecret?: Text;
+          username?: Text;
+          password?: Text;
+          scope?: string;
+          /** Where the client's id and secret go: HTTP Basic (RFC 6749 asks for it first), or the form. */
+          clientAuth: "header" | "body";
+      }
     /** A company sign-in service that jig-core knows by name and that supplies the headers of each request. */
     | { kind: "service"; name: string }
     /** A company transport that carries the whole request. The tool holds no credential and adds no header. */
@@ -77,32 +77,49 @@ export interface Plan {
 /** How a request signs in, in words for the person who approves it. Never a reference or a value. */
 export function describeSignIn(signIn: SignIn): string {
     switch (signIn.kind) {
-        case "none": return "none";
-        case "bearer": return "a bearer token";
-        case "basic": return "a user name and password (HTTP Basic)";
-        case "apiKey": return `an API key in the ${signIn.name} header`;
-        case "oauth": return `an OAuth token (${signIn.grant === "password" ? "password grant" : "client credentials"})`;
-        case "service": return `sign-in service "${signIn.name}"`;
-        case "transport": return `transport "${signIn.name}"`;
+        case "none":
+            return "none";
+        case "bearer":
+            return "a bearer token";
+        case "basic":
+            return "a user name and password (HTTP Basic)";
+        case "apiKey":
+            return `an API key in the ${signIn.name} header`;
+        case "oauth":
+            return `an OAuth token (${signIn.grant === "password" ? "password grant" : "client credentials"})`;
+        case "service":
+            return `sign-in service "${signIn.name}"`;
+        case "transport":
+            return `transport "${signIn.name}"`;
     }
 }
 
 /** The texts a sign-in holds, in a fixed order. */
 function signInTexts(signIn: SignIn): Text[] {
     switch (signIn.kind) {
-        case "bearer": return [signIn.token];
-        case "basic": return [signIn.username, signIn.password];
-        case "apiKey": return [signIn.value];
+        case "bearer":
+            return [signIn.token];
+        case "basic":
+            return [signIn.username, signIn.password];
+        case "apiKey":
+            return [signIn.value];
         case "oauth": {
-            return [signIn.clientId, signIn.clientSecret, signIn.username, signIn.password].filter((text): text is Text => text !== undefined);
+            return [signIn.clientId, signIn.clientSecret, signIn.username, signIn.password].filter(
+                (text): text is Text => text !== undefined,
+            );
         }
-        default: return [];
+        default:
+            return [];
     }
 }
 
 /** Every secret a plan uses, once each, by variable name and reference. */
 export function secretsOf(plan: Omit<Plan, "fingerprint">): Array<{ name: string; reference: string }> {
-    const texts = [...plan.headers.map(([, value]) => value), ...(plan.body === undefined ? [] : [plan.body]), ...signInTexts(plan.signIn)];
+    const texts = [
+        ...plan.headers.map(([, value]) => value),
+        ...(plan.body === undefined ? [] : [plan.body]),
+        ...signInTexts(plan.signIn),
+    ];
     const seen = new Map<string, string>();
     for (const text of texts) for (const secret of secretsIn(text)) seen.set(secret.secret, secret.reference);
     return [...seen].map(([name, reference]) => ({ name, reference })).sort((a, b) => (a.name < b.name ? -1 : 1));
@@ -110,19 +127,32 @@ export function secretsOf(plan: Omit<Plan, "fingerprint">): Array<{ name: string
 
 function signInFacts(signIn: SignIn): unknown {
     switch (signIn.kind) {
-        case "none": return ["none"];
-        case "bearer": return ["bearer", displayOf(signIn.token)];
-        case "basic": return ["basic", displayOf(signIn.username), displayOf(signIn.password)];
-        case "apiKey": return ["apiKey", signIn.name.toLowerCase(), displayOf(signIn.value)];
+        case "none":
+            return ["none"];
+        case "bearer":
+            return ["bearer", displayOf(signIn.token)];
+        case "basic":
+            return ["basic", displayOf(signIn.username), displayOf(signIn.password)];
+        case "apiKey":
+            return ["apiKey", signIn.name.toLowerCase(), displayOf(signIn.value)];
         case "oauth": {
             const shown = (text: Text | undefined): string | null => (text === undefined ? null : displayOf(text));
             return [
-                "oauth", signIn.grant, signIn.tokenUrl, shown(signIn.clientId), shown(signIn.clientSecret), shown(signIn.username),
-                shown(signIn.password), signIn.scope ?? null, signIn.clientAuth,
+                "oauth",
+                signIn.grant,
+                signIn.tokenUrl,
+                shown(signIn.clientId),
+                shown(signIn.clientSecret),
+                shown(signIn.username),
+                shown(signIn.password),
+                signIn.scope ?? null,
+                signIn.clientAuth,
             ];
         }
-        case "service": return ["service", signIn.name];
-        case "transport": return ["transport", signIn.name];
+        case "service":
+            return ["service", signIn.name];
+        case "transport":
+            return ["transport", signIn.name];
     }
 }
 
@@ -135,8 +165,16 @@ export function fingerprintOf(plan: Omit<Plan, "fingerprint">): string {
         .map(([name, value]) => [name.toLowerCase(), displayOf(value)] as const)
         .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
     const facts = [
-        plan.collection ?? null, plan.request, plan.environment, plan.jigEnvironment, signInFacts(plan.signIn), plan.method, plan.url,
-        headers, plan.body === undefined ? null : displayOf(plan.body), secretsOf(plan),
+        plan.collection ?? null,
+        plan.request,
+        plan.environment,
+        plan.jigEnvironment,
+        signInFacts(plan.signIn),
+        plan.method,
+        plan.url,
+        headers,
+        plan.body === undefined ? null : displayOf(plan.body),
+        secretsOf(plan),
     ];
     return createHash("sha256").update(JSON.stringify(facts)).digest("hex").slice(0, 32);
 }
@@ -148,5 +186,8 @@ export function sealed(plan: Omit<Plan, "fingerprint">): Plan {
 
 /** A fingerprint for several plans that are approved together. */
 export function fingerprintOfAll(plans: readonly Plan[]): string {
-    return createHash("sha256").update(JSON.stringify(plans.map((plan) => plan.fingerprint))).digest("hex").slice(0, 32);
+    return createHash("sha256")
+        .update(JSON.stringify(plans.map((plan) => plan.fingerprint)))
+        .digest("hex")
+        .slice(0, 32);
 }

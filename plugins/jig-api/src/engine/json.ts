@@ -27,7 +27,7 @@ export function prettyJson(text: string): string | undefined {
             inString = true;
             out += char;
         } else if (isSpace(char)) {
-            continue;
+            // Whitespace outside a string is dropped.
         } else if (char === "{" || char === "[") {
             const close = char === "{" ? "}" : "]";
             let next = i + 1;

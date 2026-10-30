@@ -40,7 +40,10 @@ interface Defined {
  * layer can make an environment stricter, but never looser: production stays production, and a mask stays on.
  * What a layer is not allowed to do comes back as problems, and the earlier definition stays.
  */
-export function buildEnvironments(layers: readonly EnvironmentLayer[]): { environments: Environments; problems: Problem[] } {
+export function buildEnvironments(layers: readonly EnvironmentLayer[]): {
+    environments: Environments;
+    problems: Problem[];
+} {
     const defined = new Map<string, Defined>();
     const problems: Problem[] = [];
 

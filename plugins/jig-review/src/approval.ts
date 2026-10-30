@@ -10,7 +10,7 @@
 import { randomBytes } from "node:crypto";
 import { filesOfDiff } from "./diff.ts";
 import { ChallengeBook, CHALLENGE_TTL_MS } from "./passkey/challenges.ts";
-import { PasskeyStore, PasskeyStoreError } from "./passkey/store.ts";
+import { type PasskeyStore, PasskeyStoreError } from "./passkey/store.ts";
 import {
     challengeOf,
     fingerprintOf,
@@ -94,7 +94,12 @@ export class ApprovalService {
     /** One approval, registration or removal at a time: each may be waiting on the user in Pi. */
     private busy = false;
 
-    public constructor(host: ApprovalHost, store: PasskeyStore, origins: () => readonly string[], now: () => number = Date.now) {
+    public constructor(
+        host: ApprovalHost,
+        store: PasskeyStore,
+        origins: () => readonly string[],
+        now: () => number = Date.now,
+    ) {
         this.host = host;
         this.store = store;
         this.origins = origins;
@@ -139,7 +144,8 @@ export class ApprovalService {
     /** What the page passes to `navigator.credentials.create`. */
     public registrationOptions(): RegistrationOptions {
         const read = this.store.read();
-        if (read.unusable !== undefined) throw new ApprovalError(409, `Cannot register: passkeys.json ${read.unusable}.`);
+        if (read.unusable !== undefined)
+            throw new ApprovalError(409, `Cannot register: passkeys.json ${read.unusable}.`);
         const challenge = this.challenges.issue("register", undefined);
         return {
             publicKey: {
@@ -165,9 +171,16 @@ export class ApprovalService {
      */
     public async register(body: unknown): Promise<PasskeySummary> {
         return this.exclusive(async () => {
-            const input = readBody(body, ["clientDataJSON", "attestationObject"], { clientDataJSON: MAX_CLIENT_DATA, attestationObject: MAX_ATTESTATION });
+            const input = readBody(body, ["clientDataJSON", "attestationObject"], {
+                clientDataJSON: MAX_CLIENT_DATA,
+                attestationObject: MAX_ATTESTATION,
+            });
             const challenge = this.challenges.take("register", challengeFrom(input.clientDataJSON));
-            if (challenge === undefined) throw new ApprovalError(403, "That registration is not current: the challenge was used, expired or never issued. Try again.");
+            if (challenge === undefined)
+                throw new ApprovalError(
+                    403,
+                    "That registration is not current: the challenge was used, expired or never issued. Try again.",
+                );
             let registration: ReturnType<typeof verifyRegistration>;
             try {
                 registration = verifyRegistration({
@@ -179,7 +192,8 @@ export class ApprovalService {
             } catch (error) {
                 throw asApprovalError(error);
             }
-            if (!input.id.equals(registration.credentialId)) throw new ApprovalError(403, "The credential id does not match the attestation.");
+            if (!input.id.equals(registration.credentialId))
+                throw new ApprovalError(403, "The credential id does not match the attestation.");
 
             const fingerprint = fingerprintOf(registration.key.spki);
             const answer = await this.host.ask(
@@ -243,7 +257,11 @@ export class ApprovalService {
                 signature: MAX_SIGNATURE,
             });
             const challenge = this.challenges.take("approve", challengeFrom(input.clientDataJSON));
-            if (challenge === undefined) throw new ApprovalError(403, "That approval is not current: the challenge was used, expired or never issued. Approve again.");
+            if (challenge === undefined)
+                throw new ApprovalError(
+                    403,
+                    "That approval is not current: the challenge was used, expired or never issued. Approve again.",
+                );
 
             const read = this.store.read();
             const credentialId = toBase64Url(input.id);
@@ -269,7 +287,10 @@ export class ApprovalService {
             const review = this.openReview();
             const bound = challenge.context;
             if (bound === undefined || bound.reviewId !== review.id || bound.diffHash !== diffHashOf(review)) {
-                throw new ApprovalError(409, "The review changed while you were approving it. Look at it again, then approve.");
+                throw new ApprovalError(
+                    409,
+                    "The review changed while you were approving it. Look at it again, then approve.",
+                );
             }
             this.mutate(() => this.store.recordUse(passkey.fingerprint, signCount, new Date(this.now()).toISOString()));
             await this.host.approved(review, "passkey", passkey.fingerprint);
@@ -287,7 +308,10 @@ export class ApprovalService {
             const diffHash = diffHashOf(review);
             await this.host.pageApproved(review);
             this.host.changed();
-            const answer = await this.host.ask("Approve this review?", `${describe(review)}\nApprove was pressed in the review page. y approves it; n declines.`);
+            const answer = await this.host.ask(
+                "Approve this review?",
+                `${describe(review)}\nApprove was pressed in the review page. y approves it; n declines.`,
+            );
 
             const now = this.host.current();
             if (answer !== "yes") {
@@ -295,10 +319,18 @@ export class ApprovalService {
                 this.host.changed();
                 return { ok: false, message: answer === "no" ? "Not approved: you declined in Pi." : unavailable() };
             }
-            if (now === undefined || now.id !== review.id || diffHashOf(now) !== diffHash || now.status !== "awaiting-review") {
+            if (
+                now === undefined ||
+                now.id !== review.id ||
+                diffHashOf(now) !== diffHash ||
+                now.status !== "awaiting-review"
+            ) {
                 await this.host.pageDeclined(review);
                 this.host.changed();
-                return { ok: false, message: "The review changed while you were deciding, so it was not approved. Look at it again." };
+                return {
+                    ok: false,
+                    message: "The review changed while you were deciding, so it was not approved. Look at it again.",
+                };
             }
             await this.host.approved(now, "page-and-pi");
             return { ok: true, method: "page-and-pi" };
@@ -311,7 +343,12 @@ export class ApprovalService {
         const review = this.host.current();
         if (review === undefined) throw new ApprovalError(409, "No review is open.");
         if (review.status !== "awaiting-review") {
-            throw new ApprovalError(409, review.status === "approved" ? "This review is already approved." : "This review is not waiting for you: it is waiting for the agent, or it ended.");
+            throw new ApprovalError(
+                409,
+                review.status === "approved"
+                    ? "This review is already approved."
+                    : "This review is not waiting for you: it is waiting for the agent, or it ended.",
+            );
         }
         return review;
     }
@@ -341,7 +378,12 @@ function unavailable(): string {
     return "Pi cannot ask you right now (no interactive session), so nothing was approved. Run /code-review in Pi.";
 }
 
-function summary(key: { fingerprint: string; algorithm: "ES256" | "RS256"; createdAt: string; lastUsedAt?: string }): PasskeySummary {
+function summary(key: {
+    fingerprint: string;
+    algorithm: "ES256" | "RS256";
+    createdAt: string;
+    lastUsedAt?: string;
+}): PasskeySummary {
     return {
         fingerprint: key.fingerprint,
         algorithm: key.algorithm,
@@ -384,15 +426,21 @@ function readBody<Field extends string>(
     fields: readonly Field[],
     limits: Record<Field, number>,
 ): { id: Buffer } & Record<Field, Buffer> {
-    const record = typeof body === "object" && body !== null && !Array.isArray(body) ? (body as Record<string, unknown>) : undefined;
+    const record =
+        typeof body === "object" && body !== null && !Array.isArray(body)
+            ? (body as Record<string, unknown>)
+            : undefined;
     const response = record?.response;
-    if (record === undefined || typeof response !== "object" || response === null) throw new ApprovalError(400, "The request is not a WebAuthn response.");
+    if (record === undefined || typeof response !== "object" || response === null)
+        throw new ApprovalError(400, "The request is not a WebAuthn response.");
     try {
         const out: Record<string, Buffer> = { id: fromBase64Url(record.id, "the credential id") };
-        if (out.id!.length === 0 || out.id!.length > 1023) throw new WebAuthnError("malformed", "the credential id has a bad length");
+        if (out.id!.length === 0 || out.id!.length > 1023)
+            throw new WebAuthnError("malformed", "the credential id has a bad length");
         for (const field of fields) {
             const bytes = fromBase64Url((response as Record<string, unknown>)[field], field);
-            if (bytes.length === 0 || bytes.length > limits[field]) throw new WebAuthnError("malformed", `${field} has a bad length`);
+            if (bytes.length === 0 || bytes.length > limits[field])
+                throw new WebAuthnError("malformed", `${field} has a bad length`);
             out[field] = bytes;
         }
         return out as { id: Buffer } & Record<Field, Buffer>;

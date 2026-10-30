@@ -94,18 +94,31 @@ export function textBody(kind: "json" | "text" | "xml", text: string): ParsedBod
 /** A URL-encoded form. */
 export function urlencodedBody(fields: readonly FormField[]): ParsedBody {
     if (fields.length === 0) return noBody();
-    return { body: { kind: "form", encoding: "urlencoded", fields }, contentType: "application/x-www-form-urlencoded", notes: [] };
+    return {
+        body: { kind: "form", encoding: "urlencoded", fields },
+        contentType: "application/x-www-form-urlencoded",
+        notes: [],
+    };
 }
 
 /** A whole body that is a file, with the content type its entry gives. */
 export function fileBody(file: string, contentType: string | undefined): ParsedBody {
-    return { body: { kind: "file", file: { path: file } }, ...(contentType === undefined || contentType === "" ? {} : { contentType }), notes: [] };
+    return {
+        body: { kind: "file", file: { path: file } },
+        ...(contentType === undefined || contentType === "" ? {} : { contentType }),
+        notes: [],
+    };
 }
 
 /** Bruno's `@file(a|b)` value in a multipart form or a file body: the paths. */
 export function filesOf(value: string): string[] | undefined {
     const match = /^@file\((.*)\)$/s.exec(value.trim());
-    return match === null ? undefined : (match[1] as string).split("|").map((part) => part.trim()).filter((part) => part !== "");
+    return match === null
+        ? undefined
+        : (match[1] as string)
+              .split("|")
+              .map((part) => part.trim())
+              .filter((part) => part !== "");
 }
 
 /** The sign-in forms that this plugin does not send, by the name Bruno gives them. */
@@ -146,10 +159,16 @@ export function oauth2Auth(fields: OAuthFields): AuthSetting {
     const grant = fields.grant === "resource_owner_password_credentials" ? "password" : fields.grant;
     if (grant !== "client_credentials" && grant !== "password") {
         const named = grant === "" ? "no headless grant" : `the grant "${grant}"`;
-        return { kind: "refused", reason: `OAuth 2.0 with ${named} (it needs a browser; only client_credentials and password work)` };
+        return {
+            kind: "refused",
+            reason: `OAuth 2.0 with ${named} (it needs a browser; only client_credentials and password work)`,
+        };
     }
     if (fields.tokenPlacement !== "" && fields.tokenPlacement !== "header") {
-        return { kind: "refused", reason: "OAuth 2.0 with the token in the query string (a token is sent in a header only)" };
+        return {
+            kind: "refused",
+            reason: "OAuth 2.0 with the token in the query string (a token is sent in a header only)",
+        };
     }
     const prefix = fields.tokenPrefix.trim();
     if (prefix !== "" && !/^(?:bearer|authorization)$/i.test(prefix)) {
@@ -173,7 +192,10 @@ export function oauth2Auth(fields: OAuthFields): AuthSetting {
 /** An API key in a header, or the reason a key anywhere else is refused. */
 export function apiKeyAuth(key: string, value: string, placement: string): AuthSetting {
     if (placement !== "" && placement !== "header") {
-        return { kind: "refused", reason: "an API key sent in the query string (an address ends up in logs, so a key is sent in a header only)" };
+        return {
+            kind: "refused",
+            reason: "an API key sent in the query string (an address ends up in logs, so a key is sent in a header only)",
+        };
     }
     return { kind: "set", auth: { kind: "apiKey", name: key, value } };
 }

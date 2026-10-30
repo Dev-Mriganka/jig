@@ -30,7 +30,10 @@ describe("ReviewStore", () => {
     it("deletes empty pending reviews during inactive cleanup", async () => {
         const { reviewStore } = await createStores();
         const review = await reviewStore.create("head", "diff", "all");
-        assert.deepEqual(await reviewStore.cleanupInactiveReviews(undefined, A_DAY_LATER()), { abandoned: 0, deleted: 1 });
+        assert.deepEqual(await reviewStore.cleanupInactiveReviews(undefined, A_DAY_LATER()), {
+            abandoned: 0,
+            deleted: 1,
+        });
         await assert.rejects(reviewStore.load(review.id));
     });
 
@@ -39,14 +42,20 @@ describe("ReviewStore", () => {
         const review = await reviewStore.create("head", "diff", "all");
         await reviewStore.addSubmittedComments(review, [{ body: "Please check this." }]);
         await reviewStore.addIteration(review, "updated diff");
-        assert.deepEqual(await reviewStore.cleanupInactiveReviews(undefined, A_DAY_LATER()), { abandoned: 1, deleted: 0 });
+        assert.deepEqual(await reviewStore.cleanupInactiveReviews(undefined, A_DAY_LATER()), {
+            abandoned: 1,
+            deleted: 0,
+        });
         assert.equal((await reviewStore.load(review.id)).status, "abandoned");
     });
 
     it("does not clean up the active pending review", async () => {
         const { reviewStore } = await createStores();
         const review = await reviewStore.create("head", "diff", "all");
-        assert.deepEqual(await reviewStore.cleanupInactiveReviews(review.id, A_DAY_LATER()), { abandoned: 0, deleted: 0 });
+        assert.deepEqual(await reviewStore.cleanupInactiveReviews(review.id, A_DAY_LATER()), {
+            abandoned: 0,
+            deleted: 0,
+        });
         assert.equal((await reviewStore.load(review.id)).status, "awaiting-review");
     });
 
@@ -61,9 +70,14 @@ describe("ReviewStore", () => {
 
     it("never touches reviews that are approved or waiting for the agent", async () => {
         const { reviewStore } = await createStores();
-        const approved = await reviewStore.approve(await reviewStore.create("head", "diff", "all"), { method: "passkey" });
+        const approved = await reviewStore.approve(await reviewStore.create("head", "diff", "all"), {
+            method: "passkey",
+        });
         await reviewStore.save({ ...approved, id: `${approved.id}-b`, status: "awaiting-agent" });
-        assert.deepEqual(await reviewStore.cleanupInactiveReviews(undefined, A_DAY_LATER()), { abandoned: 0, deleted: 0 });
+        assert.deepEqual(await reviewStore.cleanupInactiveReviews(undefined, A_DAY_LATER()), {
+            abandoned: 0,
+            deleted: 0,
+        });
         assert.equal((await reviewStore.load(approved.id)).status, "approved");
         assert.equal((await reviewStore.load(`${approved.id}-b`)).status, "awaiting-agent");
     });
@@ -78,7 +92,10 @@ describe("ReviewStore", () => {
         const { reviewStore } = await createStores();
         const older = await reviewStore.create("a", "diff", "all");
         await reviewStore.save({ ...older, id: "2099-01-01T00-00-00Z", createdAt: "2099-01-01T00:00:00.000Z" });
-        assert.deepEqual((await reviewStore.listAll()).map((review) => review.headSha), ["a", "a"]);
+        assert.deepEqual(
+            (await reviewStore.listAll()).map((review) => review.headSha),
+            ["a", "a"],
+        );
         assert.equal((await reviewStore.listAll())[0]?.id, "2099-01-01T00-00-00Z");
     });
 });
@@ -125,7 +142,9 @@ describe("approval", () => {
     it("records the approved commits and how it was approved, and no commits when none are given", async () => {
         const { reviewStore } = await createStores();
         const first = await reviewStore.create("PROJ-7", "diff", "branch", { ticket: "PROJ-7" });
-        const approved = await reviewStore.approve(first, { method: "passkey", fingerprint: "ab".repeat(32) }, [{ repo: "worktrees/PROJ-7/api", sha: "a".repeat(40) }]);
+        const approved = await reviewStore.approve(first, { method: "passkey", fingerprint: "ab".repeat(32) }, [
+            { repo: "worktrees/PROJ-7/api", sha: "a".repeat(40) },
+        ]);
         const loaded = await reviewStore.load(approved.id);
         assert.equal(loaded.status, "approved");
         assert.deepEqual(loaded.approvedHeads, [{ repo: "worktrees/PROJ-7/api", sha: "a".repeat(40) }]);

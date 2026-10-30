@@ -18,7 +18,12 @@ function setup(t: TestContext) {
 
 test("a result is one file of its text and one index line: time, tool, action and file name", (t) => {
     const { folder, paths } = setup(t);
-    const line = saveEvidence(folder, "ACME-1", { tool: "logs", input: { action: "query", env: "staging" }, text: "131 hits" }, NOW);
+    const line = saveEvidence(
+        folder,
+        "ACME-1",
+        { tool: "logs", input: { action: "query", env: "staging" }, text: "131 hits" },
+        NOW,
+    );
     assert.match(line, LINE);
     const name = line.split(" | ").at(-1)!;
     assert.equal(readFileSync(path.join(paths.evidence, name), "utf8"), "131 hits");
@@ -27,8 +32,16 @@ test("a result is one file of its text and one index line: time, tool, action an
 
 test("only the action of a call is stored, so a secret in another argument is not", (t) => {
     const { folder, paths } = setup(t);
-    saveEvidence(folder, "ACME-1", { tool: "logs", input: { action: "query", apiKey: "sk-live-SECRET123", note: "Bearer abc.def" }, text: "ok" }, NOW);
-    const everything = readdirSync(paths.evidence).map((name) => readFileSync(path.join(paths.evidence, name), "utf8")).join("\n") + readFileSync(paths.index, "utf8");
+    saveEvidence(
+        folder,
+        "ACME-1",
+        { tool: "logs", input: { action: "query", apiKey: "sk-live-SECRET123", note: "Bearer abc.def" }, text: "ok" },
+        NOW,
+    );
+    const everything =
+        readdirSync(paths.evidence)
+            .map((name) => readFileSync(path.join(paths.evidence, name), "utf8"))
+            .join("\n") + readFileSync(paths.index, "utf8");
     assert.doesNotMatch(everything, /SECRET123|Bearer|sk-live/);
     assert.match(readFileSync(paths.index, "utf8"), /\| query \|/);
 });
@@ -42,7 +55,12 @@ test("an action that is not a plain word, such as a token typed into the field, 
 
 test("a result over 8 KB is clipped to 8 KB, and the file says so", (t) => {
     const { folder, paths } = setup(t);
-    const line = saveEvidence(folder, "ACME-1", { tool: "logs", input: { action: "query" }, text: "line of output\n".repeat(2000) }, NOW);
+    const line = saveEvidence(
+        folder,
+        "ACME-1",
+        { tool: "logs", input: { action: "query" }, text: "line of output\n".repeat(2000) },
+        NOW,
+    );
     const saved = readFileSync(path.join(paths.evidence, line.split(" | ").at(-1)!), "utf8");
     assert.ok(Buffer.byteLength(saved) <= EVIDENCE_LIMIT, `${Buffer.byteLength(saved)} bytes`);
     assert.match(saved, /^line of output\n/);
@@ -51,7 +69,8 @@ test("a result over 8 KB is clipped to 8 KB, and the file says so", (t) => {
 
 test("each result adds one index line, in order, and the count follows them", (t) => {
     const { folder, paths } = setup(t);
-    for (const text of ["first", "second", "third"]) saveEvidence(folder, "ACME-1", { tool: "logs", input: { action: "query" }, text }, NOW);
+    for (const text of ["first", "second", "third"])
+        saveEvidence(folder, "ACME-1", { tool: "logs", input: { action: "query" }, text }, NOW);
     assert.equal(indexCount(folder, "ACME-1"), 3);
     assert.equal(readdirSync(paths.evidence).filter((name) => name.endsWith(".txt")).length, 3);
 });

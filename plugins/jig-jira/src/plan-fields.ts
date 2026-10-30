@@ -13,7 +13,8 @@ type Scope = { key: string } | { project: string };
 async function resolveUser(env: Env, scope: Scope, wanted: string): Promise<User> {
     const users = await assignableUsers(env, scope, wanted, 50);
     const byId = users.filter((user) => [user.accountId, user.username, user.key].includes(wanted));
-    const matches = byId.length > 0 ? byId : users.filter((user) => user.displayName.toLowerCase() === wanted.toLowerCase());
+    const matches =
+        byId.length > 0 ? byId : users.filter((user) => user.displayName.toLowerCase() === wanted.toLowerCase());
     const [only] = matches;
     if (matches.length === 1 && only !== undefined) return only;
     const shown = (user: User): string => `${user.displayName} (${userId(user)})`;

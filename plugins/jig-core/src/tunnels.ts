@@ -38,7 +38,9 @@ export function createTunnels(): Tunnels {
             if (provider === undefined) {
                 const names = [...providers.keys()].slice(0, MAX_NAMES_SHOWN).map(printable);
                 const known = names.length === 0 ? "none is registered" : `registered: ${names.join(", ")}`;
-                throw new Error(`no tunnel provider named "${printable(name)}" (${known}); a company plugin registers it`);
+                throw new Error(
+                    `no tunnel provider named "${printable(name)}" (${known}); a company plugin registers it`,
+                );
             }
             if (typeof target?.host !== "string" || target.host === "" || !validPort(target.port)) {
                 throw new TypeError("a tunnel needs a target host and a port from 1 to 65535");

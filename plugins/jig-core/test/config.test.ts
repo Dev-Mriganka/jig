@@ -5,8 +5,16 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, before, describe, test } from "node:test";
 import {
-    addCompanyClassifyRules, addCompanyEnvironments, addCompanyRules, buildPolicy, defaultConfig, describeProblem,
-    emptyAdditions, floorViolation, loadConfigFile, parseConfig,
+    addCompanyClassifyRules,
+    addCompanyEnvironments,
+    addCompanyRules,
+    buildPolicy,
+    defaultConfig,
+    describeProblem,
+    emptyAdditions,
+    floorViolation,
+    loadConfigFile,
+    parseConfig,
 } from "../src/config.ts";
 import type { LoadedConfig } from "../src/config.ts";
 import { buildEnvironments } from "../src/environments.ts";
@@ -21,7 +29,9 @@ function personal(value: unknown): LoadedConfig {
 
 describe("loading the file", () => {
     let dir: string;
-    before(() => { dir = mkdtempSync(path.join(tmpdir(), "jig-config-")); });
+    before(() => {
+        dir = mkdtempSync(path.join(tmpdir(), "jig-config-"));
+    });
     after(() => rmSync(dir, { recursive: true, force: true }));
 
     test("no file means the defaults, and that is not an error", () => {
@@ -36,14 +46,17 @@ describe("loading the file", () => {
 
     test("a valid file loads, with a byte-order mark tolerated", () => {
         const file = path.join(dir, "valid.json");
-        writeFileSync(file, `﻿${JSON.stringify({
-            environments: { staging: { kind: "test", mask: true }, prod: { kind: "production" } },
-            rules: [{ tool: "git", action: "push", decision: "ask", approval: "review" }],
-            classify: [{ tool: "other_db", param: "target", value: "live", environment: "prod", effect: "read" }],
-            secrets: { backends: ["pass", "env"] },
-            records: { retentionDays: 30 },
-            spill: { retentionDays: 3 },
-        })}`);
+        writeFileSync(
+            file,
+            `﻿${JSON.stringify({
+                environments: { staging: { kind: "test", mask: true }, prod: { kind: "production" } },
+                rules: [{ tool: "git", action: "push", decision: "ask", approval: "review" }],
+                classify: [{ tool: "other_db", param: "target", value: "live", environment: "prod", effect: "read" }],
+                secrets: { backends: ["pass", "env"] },
+                records: { retentionDays: 30 },
+                spill: { retentionDays: 3 },
+            })}`,
+        );
         const loaded = loadConfigFile(file);
         assert.deepEqual(loaded.problems, []);
         assert.equal(loaded.config.environments.staging?.mask, true);
@@ -76,7 +89,12 @@ describe("an unknown field is an error", () => {
     });
 
     test("inside a rule: the key says which rule and which field", () => {
-        const loaded = personal({ rules: [{ tool: "a", decision: "allow" }, { tool: "b", decison: "deny" }] });
+        const loaded = personal({
+            rules: [
+                { tool: "a", decision: "allow" },
+                { tool: "b", decison: "deny" },
+            ],
+        });
         const keys = loaded.problems.map((problem) => problem.key);
         assert.ok(keys.includes("rules[1].decison"), keys.join());
         assert.ok(keys.includes("rules[1].decision"), "the missing decision is reported as well");
@@ -86,13 +104,19 @@ describe("an unknown field is an error", () => {
     test("in every nested section", () => {
         for (const [section, value] of [
             ["environments.qa.colour", { environments: { qa: { kind: "test", colour: "blue" } } }],
-            ["classify[0].extra", { classify: [{ tool: "t", param: "p", value: "v", environment: "e", effect: "read", extra: 1 }] }],
+            [
+                "classify[0].extra",
+                { classify: [{ tool: "t", param: "p", value: "v", environment: "e", effect: "read", extra: 1 }] },
+            ],
             ["secrets.backend", { secrets: { backend: ["pass"] } }],
             ["records.keepDays", { records: { keepDays: 3 } }],
             ["spill.keepDays", { spill: { keepDays: 3 } }],
         ] as const) {
             const loaded = personal(value);
-            assert.ok(loaded.problems.some((problem) => problem.key === section), `${section}: ${loaded.problems.map((p) => p.key).join()}`);
+            assert.ok(
+                loaded.problems.some((problem) => problem.key === section),
+                `${section}: ${loaded.problems.map((p) => p.key).join()}`,
+            );
         }
     });
 
@@ -103,7 +127,11 @@ describe("an unknown field is an error", () => {
     });
 
     test("wrong types and values are errors too", () => {
-        const bad = (value: unknown, key: string) => assert.ok(personal(value).problems.some((problem) => problem.key === key), key);
+        const bad = (value: unknown, key: string) =>
+            assert.ok(
+                personal(value).problems.some((problem) => problem.key === key),
+                key,
+            );
         bad({ rules: "all" }, "rules");
         bad({ rules: [{ tool: "t", decision: "maybe" }] }, "rules[0].decision");
         bad({ rules: [{ tool: "t", decision: "ask", approval: "popup" }] }, "rules[0].approval");
@@ -112,8 +140,14 @@ describe("an unknown field is an error", () => {
         bad({ records: { retentionDays: 0 } }, "records.retentionDays");
         bad({ records: { retentionDays: 1.5 } }, "records.retentionDays");
         bad({ classify: [{ tool: "t", param: "p", environment: "e", effect: "read" }] }, "classify[0]");
-        bad({ classify: [{ tool: "t", param: "p", value: "v", pattern: "x", environment: "e", effect: "read" }] }, "classify[0]");
-        bad({ classify: [{ tool: "t", param: "p", pattern: "(", environment: "e", effect: "read" }] }, "classify[0].pattern");
+        bad(
+            { classify: [{ tool: "t", param: "p", value: "v", pattern: "x", environment: "e", effect: "read" }] },
+            "classify[0]",
+        );
+        bad(
+            { classify: [{ tool: "t", param: "p", pattern: "(", environment: "e", effect: "read" }] },
+            "classify[0].pattern",
+        );
         bad({ environments: { qa: { kind: "staging" } } }, "environments.qa.kind");
         bad([], "(file)");
     });
@@ -121,7 +155,9 @@ describe("an unknown field is an error", () => {
     test("production masking cannot be turned off, and the built-in environments cannot be redefined", () => {
         const masking = personal({ environments: { prod: { kind: "production", mask: false } } });
         assert.ok(masking.problems.some((problem) => problem.key === "environments.prod.mask"));
-        const merged = buildEnvironments([{ source: FILE, environments: { production: { kind: "test" }, local: { kind: "production" } } }]);
+        const merged = buildEnvironments([
+            { source: FILE, environments: { production: { kind: "test" }, local: { kind: "production" } } },
+        ]);
         assert.equal(merged.problems.length, 2);
         assert.equal(merged.environments.kindOf("production"), "production");
         assert.equal(merged.environments.kindOf("local"), "local");
@@ -131,7 +167,13 @@ describe("an unknown field is an error", () => {
 describe("a rule that would lower the floor is refused, with the file and the key named", () => {
     const rule = (extra: Partial<Rule>): Rule => ({ tool: "deploy", decision: "allow", ...extra });
 
-    function refusals(rules: Rule[], environments: Record<string, { kind: "test" | "production" }> = { prod: { kind: "production" }, qa: { kind: "test" } }) {
+    function refusals(
+        rules: Rule[],
+        environments: Record<string, { kind: "test" | "production" }> = {
+            prod: { kind: "production" },
+            qa: { kind: "test" },
+        },
+    ) {
         return buildPolicy(personal({ environments, rules }), emptyAdditions());
     }
 
@@ -142,7 +184,10 @@ describe("a rule that would lower the floor is refused, with the file and the ke
             assert.equal(policy.problems.length, 1);
             assert.equal(policy.problems[0]?.source, FILE);
             assert.equal(policy.problems[0]?.key, "rules[0].decision");
-            assert.match(describeProblem(policy.problems[0]!), /jig\.json: rules\[0\]\.decision: .*production writes.*always denied/);
+            assert.match(
+                describeProblem(policy.problems[0]!),
+                /jig\.json: rules\[0\]\.decision: .*production writes.*always denied/,
+            );
         }
     });
 
@@ -173,8 +218,15 @@ describe("a rule that would lower the floor is refused, with the file and the ke
     });
 
     test("one refused rule does not take the others with it", () => {
-        const policy = refusals([rule({ tool: "a", environment: "qa", decision: "allow" }), rule({ tool: "b", environment: "prod", effect: "write" }), rule({ tool: "c", decision: "deny" })]);
-        assert.deepEqual(policy.rules.map((r) => r.tool), ["a", "c"]);
+        const policy = refusals([
+            rule({ tool: "a", environment: "qa", decision: "allow" }),
+            rule({ tool: "b", environment: "prod", effect: "write" }),
+            rule({ tool: "c", decision: "deny" }),
+        ]);
+        assert.deepEqual(
+            policy.rules.map((r) => r.tool),
+            ["a", "c"],
+        );
         assert.equal(policy.problems[0]?.key, "rules[1].decision");
     });
 
@@ -189,10 +241,16 @@ describe("environments from configuration", () => {
     test("a company environment cannot be lowered by the personal file, and a mask can be added", () => {
         const company = emptyAdditions();
         addCompanyEnvironments(company, { prod: { kind: "production" }, qa: { kind: "test" } });
-        const policy = buildPolicy(personal({ environments: { prod: { kind: "test" }, qa: { kind: "test", mask: true } } }), company);
+        const policy = buildPolicy(
+            personal({ environments: { prod: { kind: "test" }, qa: { kind: "test", mask: true } } }),
+            company,
+        );
         assert.equal(policy.environments.kindOf("prod"), "production");
         assert.equal(policy.environments.masks("qa"), true);
-        assert.ok(policy.problems.some((problem) => problem.source === FILE && problem.key === "environments.prod.kind"), JSON.stringify(policy.problems));
+        assert.ok(
+            policy.problems.some((problem) => problem.source === FILE && problem.key === "environments.prod.kind"),
+            JSON.stringify(policy.problems),
+        );
     });
 
     test("a personal file can make a company test environment production", () => {
@@ -208,16 +266,30 @@ describe("personal over company", () => {
     test("personal rules come first, so they win; the company's follow", () => {
         const company = emptyAdditions();
         addCompanyEnvironments(company, { staging: { kind: "test" } });
-        addCompanyRules(company, [{ tool: "deploy", environment: "staging", decision: "allow" }, { tool: "other", decision: "ask" }]);
+        addCompanyRules(company, [
+            { tool: "deploy", environment: "staging", decision: "allow" },
+            { tool: "other", decision: "ask" },
+        ]);
         const policy = buildPolicy(personal({ rules: [{ tool: "deploy", decision: "ask" }] }), company);
-        assert.deepEqual(policy.rules.map((r) => `${r.tool}:${r.decision}`), ["deploy:ask", "deploy:allow", "other:ask"]);
+        assert.deepEqual(
+            policy.rules.map((r) => `${r.tool}:${r.decision}`),
+            ["deploy:ask", "deploy:allow", "other:ask"],
+        );
     });
 
     test("classification rules follow the same order", () => {
         const company = emptyAdditions();
-        addCompanyClassifyRules(company, [{ tool: "db", param: "t", value: "x", environment: "from-company", effect: "read" }]);
-        const policy = buildPolicy(personal({ classify: [{ tool: "db", param: "t", value: "x", environment: "from-me", effect: "read" }] }), company);
-        assert.deepEqual(policy.classify.map((r) => r.environment), ["from-me", "from-company"]);
+        addCompanyClassifyRules(company, [
+            { tool: "db", param: "t", value: "x", environment: "from-company", effect: "read" },
+        ]);
+        const policy = buildPolicy(
+            personal({ classify: [{ tool: "db", param: "t", value: "x", environment: "from-me", effect: "read" }] }),
+            company,
+        );
+        assert.deepEqual(
+            policy.classify.map((r) => r.environment),
+            ["from-me", "from-company"],
+        );
     });
 
     test("a company rule that would lower the floor is refused too, as `company`", () => {
@@ -233,8 +305,14 @@ describe("personal over company", () => {
     test("invalid company additions are reported, not thrown, and the valid ones stay", () => {
         const company = emptyAdditions();
         addCompanyRules(company, [{ tool: "ok", decision: "ask" }]);
-        addCompanyRules(company, [{ tool: "bad", decision: "sometimes" }, { tool: "fine", decision: "deny" }]);
-        assert.deepEqual(company.rules.map((r) => r.tool), ["ok", "fine"]);
+        addCompanyRules(company, [
+            { tool: "bad", decision: "sometimes" },
+            { tool: "fine", decision: "deny" },
+        ]);
+        assert.deepEqual(
+            company.rules.map((r) => r.tool),
+            ["ok", "fine"],
+        );
         assert.equal(company.problems.length, 1);
         // The position counts the earlier call, so the key can be found in the plugin's own list.
         assert.equal(company.problems[0]?.key, "rules[1].decision");

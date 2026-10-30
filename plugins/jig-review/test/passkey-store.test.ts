@@ -2,7 +2,16 @@
 // fingerprint (what the user confirmed) is the SHA-256 of its public key; an entry that fails is ignored and reported; a file
 // that is unreadable, loose or not ours is not trusted at all and is never written over.
 import assert from "node:assert/strict";
-import { chmodSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+    chmodSync,
+    mkdtempSync,
+    readFileSync,
+    readdirSync,
+    rmSync,
+    statSync,
+    symlinkSync,
+    writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, test } from "node:test";
@@ -62,7 +71,10 @@ test("the same key cannot be added twice, and at most ten are kept", () => {
     store.add(stored(auth));
     assert.throws(() => store.add(stored(auth)), /already registered/);
     for (let i = 0; i < 9; i++) store.add(stored());
-    assert.throws(() => store.add(stored()), (error) => error instanceof PasskeyStoreError && /at most 10/.test(error.message));
+    assert.throws(
+        () => store.add(stored()),
+        (error) => error instanceof PasskeyStoreError && /at most 10/.test(error.message),
+    );
 });
 
 test("removing a key by its fingerprint, and recording a use", () => {
@@ -75,7 +87,10 @@ test("removing a key by its fingerprint, and recording a use", () => {
     assert.equal(first?.signCount, 7);
     assert.equal(first?.lastUsedAt, "2026-10-30T11:00:00.000Z");
     assert.equal(store.remove(a.fingerprint), true);
-    assert.deepEqual(store.read().passkeys.map((key) => key.fingerprint), [b.fingerprint]);
+    assert.deepEqual(
+        store.read().passkeys.map((key) => key.fingerprint),
+        [b.fingerprint],
+    );
     assert.equal(store.remove(a.fingerprint), false, "already gone");
     assert.throws(() => store.recordUse(a.fingerprint, 1, "x"), /no longer registered/);
 });
@@ -87,9 +102,16 @@ test("a key whose fingerprint is not its key's was never confirmed: it is ignore
     const swapped = stored(new FakeAuthenticator(), { fingerprint: real.fingerprint });
     plant({ version: 1, passkeys: [swapped, real] });
     const read = store.read();
-    assert.deepEqual(read.passkeys, [real], "the entry that carries the real fingerprint with another key is not trusted");
+    assert.deepEqual(
+        read.passkeys,
+        [real],
+        "the entry that carries the real fingerprint with another key is not trusted",
+    );
     assert.equal(read.unusable, undefined, "the file itself is fine");
-    assert.match(read.problems.join("\n"), /entry 1 ignored: its fingerprint is not the fingerprint of its key, so this key was never confirmed/);
+    assert.match(
+        read.problems.join("\n"),
+        /entry 1 ignored: its fingerprint is not the fingerprint of its key, so this key was never confirmed/,
+    );
 });
 
 test("an entry with no confirmation time, a weak key, a wrong algorithm or a damaged field is ignored; the others stay", () => {
@@ -121,7 +143,10 @@ test("ignored entries are dropped by the next write, and the good ones are kept"
     plant({ version: 1, passkeys: [stored(new FakeAuthenticator(), { confirmedAt: undefined as never }), good] });
     const added = stored();
     store.add(added);
-    assert.deepEqual(JSON.parse(readFileSync(file, "utf8")).passkeys.map((key: StoredPasskey) => key.fingerprint), [good.fingerprint, added.fingerprint]);
+    assert.deepEqual(
+        JSON.parse(readFileSync(file, "utf8")).passkeys.map((key: StoredPasskey) => key.fingerprint),
+        [good.fingerprint, added.fingerprint],
+    );
 });
 
 test("a file that cannot be parsed is not trusted, and nothing is written over it", () => {

@@ -71,7 +71,10 @@ function startSession(state: JigState, ctx: ExtensionContext): void {
     if (problems.length > 0 && ctx.hasUI) {
         const shown = problems.slice(0, 5).join("\n");
         const more = problems.length > 5 ? `\n... and ${problems.length - 5} more (see /jig)` : "";
-        ctx.ui.notify(`jig-core: ${problems.length} configuration problem${problems.length === 1 ? "" : "s"}\n${shown}${more}`, "error");
+        ctx.ui.notify(
+            `jig-core: ${problems.length} configuration problem${problems.length === 1 ? "" : "s"}\n${shown}${more}`,
+            "error",
+        );
     }
 
     // Old records, spill files and preview pages are removed when a session starts.

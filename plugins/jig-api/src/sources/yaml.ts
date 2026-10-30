@@ -23,7 +23,12 @@ export function parseYaml(text: string, file: string, problems: Problem[]): unkn
         }
         return document.toJS({ maxAliasCount: MAX_ALIASES });
     } catch {
-        problems.push({ file, key: "", message: "is not valid YAML (too many aliases, or a structure that is too deep)", level: "error" });
+        problems.push({
+            file,
+            key: "",
+            message: "is not valid YAML (too many aliases, or a structure that is too deep)",
+            level: "error",
+        });
         return undefined;
     }
 }

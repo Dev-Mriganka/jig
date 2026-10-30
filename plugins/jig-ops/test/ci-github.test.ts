@@ -474,7 +474,7 @@ test("watch on a branch resolves the commit through the API; on a sha too; with 
     assert.ok(h.gh.calls().some((c) => c.args.includes(`repos/${SLUG}/commits/abc1234`)));
     h.gh.on("api", { json: { default_branch: "develop" } }, [`=repos/${SLUG}`]);
     ok(await call({ action: "watch" }));
-    assert.equal((h.jig.watches[2]?.spec as { branch: string }).branch, "develop");
+    assert.equal((h.jig.watches[2]!.spec as { branch: string }).branch, "develop");
 });
 
 test("watch finish lines: a named check, a run, approval, merge, a comment, a tag, a release", async () => {
@@ -498,13 +498,13 @@ test("watch finish lines: a named check, a run, approval, merge, a comment, a ta
         finish: { kind: "run" },
     });
     ok(await call({ action: "watch", number: 42, finish: "approved" }));
-    assert.deepEqual((h.jig.watches[2]?.spec as { finish: unknown }).finish, { kind: "pr", state: "approved" });
+    assert.deepEqual((h.jig.watches[2]!.spec as { finish: unknown }).finish, { kind: "pr", state: "approved" });
     assert.equal(h.jig.watches[2]?.title, "approval of pull request 42");
     ok(await call({ action: "watch", number: 42, finish: "merged" }));
     assert.equal(h.jig.watches[3]?.title, "merge of pull request 42");
     ok(await call({ action: "watch", number: 42, finish: "comment", pattern: "image: (\\S+)", bot: "ci-bot" }));
     const comment = (
-        h.jig.watches[4]?.spec as { finish: { kind: string; pattern: string; bot: string; since: string } }
+        h.jig.watches[4]!.spec as { finish: { kind: string; pattern: string; bot: string; since: string } }
     ).finish;
     assert.deepEqual([comment.kind, comment.pattern, comment.bot], ["comment", "image: (\\S+)", "ci-bot"]);
     assert.equal(

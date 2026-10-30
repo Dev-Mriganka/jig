@@ -64,7 +64,9 @@ function checkServer(value: unknown, key: string, errors: string[]): string | un
         return undefined;
     }
     if (url.protocol !== "https:" && url.protocol !== "http:") {
-        errors.push(`${key}: must start with https:// (plain http is only for this machine, and needs allowPlainLocal)`);
+        errors.push(
+            `${key}: must start with https:// (plain http is only for this machine, and needs allowPlainLocal)`,
+        );
     } else if (url.username !== "" || url.password !== "" || url.search !== "" || url.hash !== "") {
         errors.push(`${key}: must be a host and a base path only, with no user, query or fragment`);
     } else {
@@ -76,7 +78,8 @@ function checkServer(value: unknown, key: string, errors: string[]): string | un
 function check(entry: Readonly<Record<string, unknown>>, at: string, errors: string[]): OpenApiConfig | undefined {
     const before = errors.length;
     for (const key of Object.keys(entry)) {
-        if (!["openapi", "servers", "environments", "allowProductionReads"].includes(key)) errors.push(`${at}.${key}: unknown field`);
+        if (!["openapi", "servers", "environments", "allowProductionReads"].includes(key))
+            errors.push(`${at}.${key}: unknown field`);
     }
 
     let file: string | undefined;
@@ -97,8 +100,11 @@ function check(entry: Readonly<Record<string, unknown>>, at: string, errors: str
     } else {
         for (const item of entry.environments as unknown[]) {
             if (typeof item !== "string" || !NAME.test(item)) {
-                errors.push(`${at}.environments: an environment name is text of 1 to 60 characters with no control characters`);
-            } else if (environments.includes(item)) errors.push(`${at}.environments: ${JSON.stringify(item)} is listed twice`);
+                errors.push(
+                    `${at}.environments: an environment name is text of 1 to 60 characters with no control characters`,
+                );
+            } else if (environments.includes(item))
+                errors.push(`${at}.environments: ${JSON.stringify(item)} is listed twice`);
             else environments.push(item);
         }
     }
@@ -139,7 +145,10 @@ function dereferencer(spec: Record<string, unknown>, report: (key: string, messa
         if (!ref.startsWith("#/")) {
             if (!refused.has(ref)) {
                 refused.add(ref);
-                report(ref.slice(0, 60), "is a reference outside the document, which is not followed: put it in the document");
+                report(
+                    ref.slice(0, 60),
+                    "is a reference outside the document, which is not followed: put it in the document",
+                );
             }
             return undefined;
         }
@@ -147,7 +156,8 @@ function dereferencer(spec: Record<string, unknown>, report: (key: string, messa
         let current: unknown = spec;
         for (const part of ref.slice(2).split("/")) {
             const key = decodeURIComponent(part).replace(/~1/g, "/").replace(/~0/g, "~");
-            current = isObject(current) || Array.isArray(current) ? (current as Record<string, unknown>)[key] : undefined;
+            current =
+                isObject(current) || Array.isArray(current) ? (current as Record<string, unknown>)[key] : undefined;
             if (current === undefined) return undefined;
         }
         return follow(current, depth + 1);
@@ -191,30 +201,48 @@ function schemeOf(name: string, definition: unknown, serverOrigins: ReadonlySet<
             if (scheme === "bearer") return { slots: [name], auth: () => ({ kind: "bearer", token: `{{${name}}}` }) };
             if (scheme === "basic") {
                 const slots = [`${name}.username`, `${name}.password`];
-                return { slots, auth: () => ({ kind: "basic", username: `{{${slots[0]}}}`, password: `{{${slots[1]}}}` }) };
+                return {
+                    slots,
+                    auth: () => ({ kind: "basic", username: `{{${slots[0]}}}`, password: `{{${slots[1]}}}` }),
+                };
             }
             return { slots: [], refused: `the HTTP scheme "${scheme}" is not sent (bearer and basic are)` };
         }
         case "apiKey": {
             if (definition.in === "header" && textOf(definition.name) !== "") {
-                return { slots: [name], auth: () => ({ kind: "apiKey", name: textOf(definition.name), value: `{{${name}}}` }) };
+                return {
+                    slots: [name],
+                    auth: () => ({ kind: "apiKey", name: textOf(definition.name), value: `{{${name}}}` }),
+                };
             }
-            const where = definition.in === "query"
-                ? "the query string (an address ends up in logs, so a key is sent in a header only)"
-                : `a ${textOf(definition.in) || "cookie"} (no cookies are sent)`;
+            const where =
+                definition.in === "query"
+                    ? "the query string (an address ends up in logs, so a key is sent in a header only)"
+                    : `a ${textOf(definition.in) || "cookie"} (no cookies are sent)`;
             return { slots: [], refused: `an API key sent in ${where}` };
         }
         case "oauth2": {
             const flows = isObject(definition.flows) ? definition.flows : {};
-            const flow = isObject(flows.clientCredentials) ? "client_credentials" : isObject(flows.password) ? "password" : undefined;
+            const flow = isObject(flows.clientCredentials)
+                ? "client_credentials"
+                : isObject(flows.password)
+                  ? "password"
+                  : undefined;
             if (flow === undefined) {
                 const named = Object.keys(flows).join(", ") || "none";
-                return { slots: [], refused: `OAuth 2.0 with the flows ${named} (they need a browser; only clientCredentials and password work)` };
+                return {
+                    slots: [],
+                    refused: `OAuth 2.0 with the flows ${named} (they need a browser; only clientCredentials and password work)`,
+                };
             }
             const details = (flow === "password" ? flows.password : flows.clientCredentials) as Record<string, unknown>;
             const tokenUrl = tokenAddress(textOf(details.tokenUrl), serverOrigins);
             if (tokenUrl.refused !== undefined) return { slots: [], refused: tokenUrl.refused };
-            const slots = [`${name}.clientId`, `${name}.clientSecret`, ...(flow === "password" ? [`${name}.username`, `${name}.password`] : [])];
+            const slots = [
+                `${name}.clientId`,
+                `${name}.clientSecret`,
+                ...(flow === "password" ? [`${name}.username`, `${name}.password`] : []),
+            ];
             return {
                 slots,
                 auth: (scopes) => ({
@@ -223,7 +251,9 @@ function schemeOf(name: string, definition: unknown, serverOrigins: ReadonlySet<
                     tokenUrl: tokenUrl.template as string,
                     clientId: `{{${name}.clientId}}`,
                     clientSecret: `{{${name}.clientSecret}}`,
-                    ...(flow === "password" ? { username: `{{${name}.username}}`, password: `{{${name}.password}}` } : {}),
+                    ...(flow === "password"
+                        ? { username: `{{${name}.username}}`, password: `{{${name}.password}}` }
+                        : {}),
                     ...(scopes.length > 0 ? { scope: scopes.join(" ") } : {}),
                     clientAuth: "header",
                 }),
@@ -256,7 +286,7 @@ function tokenAddress(address: string, serverOrigins: ReadonlySet<string>): { te
         return {
             refused:
                 `OAuth 2.0 with its token address on ${url.host}, which is not one of the servers of the spec, ` +
-                    "so it is not a host of the environment",
+                "so it is not a host of the environment",
         };
     }
     return { template: `{{${SERVER_ORIGIN}}}${url.pathname}${url.search}` };
@@ -288,15 +318,19 @@ function chooseAuth(requirements: unknown, schemes: ReadonlyMap<string, Scheme>)
         if (scheme === undefined) reasons.push(`it names the security scheme ${name}, which the spec does not define`);
         else if (scheme.refused !== undefined || scheme.auth === undefined) {
             reasons.push(`the security scheme ${name}: ${scheme.refused ?? "cannot be sent"}`);
-        }
-        else {
-            const listed = isObject(requirement) && Array.isArray(requirement[name]) ? (requirement[name] as unknown[]) : [];
+        } else {
+            const listed =
+                isObject(requirement) && Array.isArray(requirement[name]) ? (requirement[name] as unknown[]) : [];
             const scopes = listed.filter((scope): scope is string => typeof scope === "string");
             return { auth: scheme.auth(scopes), slots: scheme.slots };
         }
     }
     if (anonymous) return { auth: { kind: "none" }, slots: [] };
-    return { auth: { kind: "none" }, slots: [], unsupported: reasons[0] ?? "it has a security requirement that cannot be read" };
+    return {
+        auth: { kind: "none" },
+        slots: [],
+        unsupported: reasons[0] ?? "it has a security requirement that cannot be read",
+    };
 }
 
 // Operations -----------------------------------------------------------------------------------------------------------
@@ -319,12 +353,20 @@ function parametersOf(
     report: (key: string, message: string) => void,
 ): Parameter[] {
     const found = new Map<string, Parameter>();
-    for (const [from, list] of [["path item", pathItem.parameters], ["operation", operation.parameters]] as const) {
+    for (const [from, list] of [
+        ["path item", pathItem.parameters],
+        ["operation", operation.parameters],
+    ] as const) {
         if (!Array.isArray(list)) continue;
         (list as unknown[]).forEach((raw, index) => {
             const parameter = deref(raw);
             // A name with braces or control characters could not stand in a `{{variable}}`.
-            if (!isObject(parameter) || typeof parameter.name !== "string" || parameter.name === "" || /[{}\u0000-\u001f]/.test(parameter.name)) {
+            if (
+                !isObject(parameter) ||
+                typeof parameter.name !== "string" ||
+                parameter.name === "" ||
+                /[{}\u0000-\u001f]/.test(parameter.name)
+            ) {
                 report(`${from} parameters[${index}]`, "has no name that can be a variable, and is left out");
                 return;
             }
@@ -392,9 +434,11 @@ function requestOf(
     }
     if (operation.deprecated === true) notes.push("the spec marks it deprecated");
     if (Array.isArray(operation.servers) && operation.servers.length > 0) {
-        unsupported ??= "it has servers of its own, and a host comes only from the servers the configuration maps to the environment";
+        unsupported ??=
+            "it has servers of its own, and a host comes only from the servers the configuration maps to the environment";
     }
-    if (!SENT_METHODS.has(upper)) unsupported ??= `the method ${upper} is not sent (GET, HEAD, OPTIONS, POST, PUT, PATCH and DELETE are)`;
+    if (!SENT_METHODS.has(upper))
+        unsupported ??= `the method ${upper} is not sent (GET, HEAD, OPTIONS, POST, PUT, PATCH and DELETE are)`;
 
     // The sign-in: the operation's own security, else the spec's.
     const chosen = chooseAuth(operation.security ?? reading.rootSecurity, reading.schemes);
@@ -408,15 +452,20 @@ function requestOf(
     const used: Array<{ parameter: Parameter; part: Part }> = [];
     for (const parameter of parameters) {
         const lower = parameter.name.toLowerCase();
-        if (parameter.in === "header" && (IGNORED_HEADERS.has(lower) || CREDENTIAL_HEADERS.has(lower) || CREDENTIAL_NAME.test(parameter.name))) {
+        if (
+            parameter.in === "header" &&
+            (IGNORED_HEADERS.has(lower) || CREDENTIAL_HEADERS.has(lower) || CREDENTIAL_NAME.test(parameter.name))
+        ) {
             // A credential is never a value the agent gives: it comes from a security scheme. The specification itself says that a
             // parameter named Accept, Content-Type or Authorization is ignored, and the key the sign-in sends is the sign-in's.
             if (parameter.required && !IGNORED_HEADERS.has(lower) && lower !== signedHeader) {
                 unsupported ??=
                     `it needs the header ${parameter.name}, which carries a credential: ` +
-                        "declare it as a security scheme so that it comes from api.secrets";
+                    "declare it as a security scheme so that it comes from api.secrets";
             } else {
-                notes.push(`the header parameter ${parameter.name} is ignored: a credential or a header the tool sets comes from the sign-in`);
+                notes.push(
+                    `the header parameter ${parameter.name} is ignored: a credential or a header the tool sets comes from the sign-in`,
+                );
             }
             continue;
         }
@@ -428,12 +477,21 @@ function requestOf(
         const why = whyNotScalar(parameter.schema);
         if (why !== undefined) {
             const what = `the ${parameter.in} parameter ${parameter.name}`;
-            if (parameter.required) unsupported ??= `it needs ${what}, which is ${why} and cannot be filled from a variable`;
-            else notes.push(`the optional ${what.replace(/^the /, "")} is left out: it is ${why}, and cannot be filled from a variable`);
+            if (parameter.required)
+                unsupported ??= `it needs ${what}, which is ${why} and cannot be filled from a variable`;
+            else
+                notes.push(
+                    `the optional ${what.replace(/^the /, "")} is left out: it is ${why}, and cannot be filled from a variable`,
+                );
             continue;
         }
         const docs = [describeScalar(parameter.schema), parameter.description].filter((part) => part !== "").join("; ");
-        const part: Part = { kind: parameter.in, name: parameter.name, required: parameter.required, doc: `${parameter.in} parameter, ${docs}` };
+        const part: Part = {
+            kind: parameter.in,
+            name: parameter.name,
+            required: parameter.required,
+            doc: `${parameter.in} parameter, ${docs}`,
+        };
         parts.push(part);
         used.push({ parameter, part });
     }
@@ -448,7 +506,8 @@ function requestOf(
         if (json === undefined) {
             const named = types.join(", ") || "none";
             if (wanted) unsupported ??= `its request body is ${named}, and only JSON bodies are filled from a spec`;
-            else notes.push(`its optional request body (${named}) is left out: only JSON bodies are filled from a spec`);
+            else
+                notes.push(`its optional request body (${named}) is left out: only JSON bodies are filled from a spec`);
         } else {
             const media = (requestBody.content as Record<string, unknown>)[json];
             bodyShape = shapeOf(isObject(media) ? media.schema : undefined, deref, wanted);
@@ -464,7 +523,8 @@ function requestOf(
     const counts = new Map<string, number>();
     for (const part of parts) counts.set(part.name, (counts.get(part.name) ?? 0) + 1);
     const reserved = new Set([SERVER_URL, SERVER_ORIGIN]);
-    const nameOf = (part: Part): string => ((counts.get(part.name) ?? 0) > 1 || reserved.has(part.name) ? `${part.kind}.${part.name}` : part.name);
+    const nameOf = (part: Part): string =>
+        (counts.get(part.name) ?? 0) > 1 || reserved.has(part.name) ? `${part.kind}.${part.name}` : part.name;
 
     // The address: the server, the path with its parameters, and the query parameters.
     let route = pathName.startsWith("/") ? pathName : `/${pathName}`;
@@ -487,7 +547,9 @@ function requestOf(
         .map(({ parameter, part }) => [parameter.name, `{{${nameOf(part)}}}`]);
     let body: Body | undefined;
     if (bodyShape?.root !== undefined) {
-        const names = new Map(parts.filter((part) => part.leaf !== undefined).map((part) => [part.leaf as Leaf, nameOf(part)]));
+        const names = new Map(
+            parts.filter((part) => part.leaf !== undefined).map((part) => [part.leaf as Leaf, nameOf(part)]),
+        );
         body = { kind: "json", text: templateOf(bodyShape.root, (leaf) => names.get(leaf) as string) };
         headers.push(["Content-Type", "application/json"]);
     }
@@ -496,8 +558,12 @@ function requestOf(
     const variables = variablesIn(url, ...headers.map(([, value]) => value), bodyText, ...authTexts(chosen.auth));
     unsupported ??= unsupportedVariable(variables);
     const signsIn = variablesIn(...authTexts(chosen.auth));
-    const description = [textOf(operation.summary).trim(), textOf(operation.description).trim()].filter((part) => part !== "").join("\n\n");
-    const tag = Array.isArray(operation.tags) ? operation.tags.find((item): item is string => typeof item === "string" && item !== "") : undefined;
+    const description = [textOf(operation.summary).trim(), textOf(operation.description).trim()]
+        .filter((part) => part !== "")
+        .join("\n\n");
+    const tag = Array.isArray(operation.tags)
+        ? operation.tags.find((item): item is string => typeof item === "string" && item !== "")
+        : undefined;
 
     return {
         collection: reading.collection,
@@ -549,13 +615,20 @@ function readSpec(config: OpenApiConfig, shown: string, problems: Problem[]): Re
         problems.push({
             file: shown,
             key: swagger ? "swagger" : "openapi",
-            message: swagger ? "is a Swagger 2.0 document: only OpenAPI 3.0 and 3.1 are read" : "is missing: this is not an OpenAPI document",
+            message: swagger
+                ? "is a Swagger 2.0 document: only OpenAPI 3.0 and 3.1 are read"
+                : "is missing: this is not an OpenAPI document",
             level: "error",
         });
         return undefined;
     }
     if (!/^3\.[01]\./.test(raw.openapi)) {
-        problems.push({ file: shown, key: "openapi", message: `is ${raw.openapi}: only OpenAPI 3.0 and 3.1 are read`, level: "error" });
+        problems.push({
+            file: shown,
+            key: "openapi",
+            message: `is ${raw.openapi}: only OpenAPI 3.0 and 3.1 are read`,
+            level: "error",
+        });
         return undefined;
     }
     return raw;
@@ -566,8 +639,14 @@ function load(config: OpenApiConfig, name: string): Collection {
     const shown = path.basename(config.file);
     const root = path.dirname(config.file);
     const empty = (): Collection => ({
-        name, root, requests: [], environments: new Map(), variables: new Map(), auth: { kind: "none" },
-        productionReads: config.allowProductionReads, problems,
+        name,
+        root,
+        requests: [],
+        environments: new Map(),
+        variables: new Map(),
+        auth: { kind: "none" },
+        productionReads: config.allowProductionReads,
+        problems,
     });
     if (!fs.existsSync(config.file)) {
         problems.push({ file: shown, key: "", message: "no such file", level: "error" });
@@ -576,23 +655,36 @@ function load(config: OpenApiConfig, name: string): Collection {
     const spec = readSpec(config, shown, problems);
     if (spec === undefined) return empty();
 
-    const deref = dereferencer(spec, (ref, message) => problems.push({ file: shown, key: ref, message, level: "warning" }));
+    const deref = dereferencer(spec, (ref, message) =>
+        problems.push({ file: shown, key: ref, message, level: "warning" }),
+    );
     const declared = Array.isArray(spec.servers) ? (spec.servers as unknown[]) : [];
     const serverOrigins = new Set(declared.map(originOf).filter((origin): origin is string => origin !== undefined));
     const components = isObject(spec.components) ? spec.components : {};
     const schemes = new Map<string, Scheme>();
     if (isObject(components.securitySchemes)) {
-        for (const [scheme, raw] of Object.entries(components.securitySchemes)) schemes.set(scheme, schemeOf(scheme, deref(raw), serverOrigins));
+        for (const [scheme, raw] of Object.entries(components.securitySchemes))
+            schemes.set(scheme, schemeOf(scheme, deref(raw), serverOrigins));
     }
 
-    const reading: Reading = { collection: name, shown, problems, deref, schemes, rootSecurity: spec.security, slots: new Set() };
+    const reading: Reading = {
+        collection: name,
+        shown,
+        problems,
+        deref,
+        schemes,
+        rootSecurity: spec.security,
+        slots: new Set(),
+    };
     const requests: SavedRequest[] = [];
     const seen = new Set<string>();
     if (isObject(spec.paths)) {
         for (const [pathName, rawItem] of Object.entries(spec.paths)) {
             const pathItem = deref(rawItem);
             if (!isObject(pathItem)) continue;
-            const methods = Object.keys(pathItem).filter((each): each is (typeof METHODS)[number] => (METHODS as readonly string[]).includes(each));
+            const methods = Object.keys(pathItem).filter((each): each is (typeof METHODS)[number] =>
+                (METHODS as readonly string[]).includes(each),
+            );
             for (const method of methods) {
                 const operation = deref(pathItem[method]);
                 if (!isObject(operation)) continue;
@@ -600,7 +692,12 @@ function load(config: OpenApiConfig, name: string): Collection {
                 // An operationId is unique in a spec; a second one with the same name could not be told apart.
                 if (seen.has(request.name) && textOf(operation.operationId).trim() !== "") {
                     const message = `${request.name} is used again: the later operation is refused`;
-                    problems.push({ file: shown, key: `paths.${pathName}.${method}.operationId`, message, level: "warning" });
+                    problems.push({
+                        file: shown,
+                        key: `paths.${pathName}.${method}.operationId`,
+                        message,
+                        level: "warning",
+                    });
                     const again = `its operationId ${request.name} is used by another operation too`;
                     requests.push({ ...request, unsupported: request.unsupported ?? again });
                 } else {
@@ -629,7 +726,9 @@ function load(config: OpenApiConfig, name: string): Collection {
             file: shown,
             variables,
             ...(server === undefined
-                ? { unavailable: `no server is mapped to it: add ${JSON.stringify(label)} to servers in the configuration of ${name}` }
+                ? {
+                      unavailable: `no server is mapped to it: add ${JSON.stringify(label)} to servers in the configuration of ${name}`,
+                  }
                 : {}),
         });
     }

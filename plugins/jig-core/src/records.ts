@@ -7,22 +7,30 @@
 import { randomUUID } from "node:crypto";
 import { readdirSync, readFileSync, statSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
-import type { ApprovalKind, Decision, DecisionEvent, Effect, EnvironmentKind, EnvironmentName, Facts } from "./contract.ts";
+import type {
+    ApprovalKind,
+    Decision,
+    DecisionEvent,
+    Effect,
+    EnvironmentKind,
+    EnvironmentName,
+    Facts,
+} from "./contract.ts";
 import { appendPrivateLine, privateDir, stateDir } from "./paths.ts";
 
 export type Outcome = "ok" | "error" | "blocked";
 
 /** Why a call did not run or did not succeed, in words a dashboard can group by. */
 export type ErrorKind =
-    | "denied"     // a rule, the table or the tool's declaration said deny
-    | "no-screen"  // the call needed approval and there was no screen
-    | "declined"   // the user said no
-    | "invalid"    // the tool's preview said the input is invalid, so nobody was asked
-    | "dismissed"  // the question was closed without an answer
-    | "internal"   // jig-core could not decide, so it blocked the call
-    | "tool"       // the tool ran and failed
-    | "withheld"   // the tool ran, but its result could not be masked or redacted, so the model never saw it
-    | "not-run";   // the call never reached the tool (unknown tool, invalid arguments, aborted)
+    | "denied" // a rule, the table or the tool's declaration said deny
+    | "no-screen" // the call needed approval and there was no screen
+    | "declined" // the user said no
+    | "invalid" // the tool's preview said the input is invalid, so nobody was asked
+    | "dismissed" // the question was closed without an answer
+    | "internal" // jig-core could not decide, so it blocked the call
+    | "tool" // the tool ran and failed
+    | "withheld" // the tool ran, but its result could not be masked or redacted, so the model never saw it
+    | "not-run"; // the call never reached the tool (unknown tool, invalid arguments, aborted)
 
 export type Answer = NonNullable<DecisionEvent["answer"]>;
 
@@ -148,13 +156,20 @@ const MAX_FACTS = 50;
 /** The first non-empty line of a text, with runs of white space collapsed, at most 200 characters. The caller has
  *  masked and redacted the text first. */
 export function oneLine(text: string, max: number = MAX_ERROR_CHARS): string {
-    const first = text.split(/\r?\n/).map((line) => line.replace(/\s+/g, " ").trim()).find((line) => line !== "") ?? "";
+    const first =
+        text
+            .split(/\r?\n/)
+            .map((line) => line.replace(/\s+/g, " ").trim())
+            .find((line) => line !== "") ?? "";
     return first.length <= max ? first : `${first.slice(0, max - 1)}…`;
 }
 
 /** Facts are a few named numbers, flags or short codes. Anything else is dropped: strings over 64 characters, values
  *  that are not plain, and everything past 50 entries. String facts are redacted, in case a code is a secret. */
-export function cleanFacts(raw: Readonly<Record<string, unknown>>, redact: (text: string) => string): Facts | undefined {
+export function cleanFacts(
+    raw: Readonly<Record<string, unknown>>,
+    redact: (text: string) => string,
+): Facts | undefined {
     const kept: Record<string, number | boolean | string> = {};
     for (const [key, value] of Object.entries(raw)) {
         if (Object.keys(kept).length >= MAX_FACTS) break;
@@ -227,7 +242,16 @@ export interface Summary {
 /** Counts what today's file holds. Lines that are not complete JSON are skipped. */
 export function summarize(now: Date): Summary {
     const file = recordsFile(now);
-    const summary: Summary = { file, exists: false, calls: 0, errors: 0, blocked: 0, turns: 0, questions: 0, waitedMs: 0 };
+    const summary: Summary = {
+        file,
+        exists: false,
+        calls: 0,
+        errors: 0,
+        blocked: 0,
+        turns: 0,
+        questions: 0,
+        waitedMs: 0,
+    };
     let text: string;
     try {
         if (statSync(file).size > 200 * 1024 * 1024) return { ...summary, exists: true };

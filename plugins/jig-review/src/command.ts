@@ -21,7 +21,10 @@ export function parseCodeReviewCommand(args: string): CodeReviewCommand {
     const target = parts.find((part) => !part.startsWith("--"));
     const scoped = parts.some((part) => SCOPE_FLAGS.includes(part));
     if (target !== undefined && isTicketKey(target)) {
-        return { selection: { scope: scoped ? requestedScope(parts) : "branch", ticket: target.toUpperCase() }, subcommand: "review" };
+        return {
+            selection: { scope: scoped ? requestedScope(parts) : "branch", ticket: target.toUpperCase() },
+            subcommand: "review",
+        };
     }
     const scope = requestedScope(parts);
     return { selection: target ? { scope, folder: target } : { scope }, subcommand: "review" };

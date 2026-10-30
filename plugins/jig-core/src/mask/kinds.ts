@@ -8,18 +8,47 @@ import { MaskError } from "./error.ts";
  * kept, but still checked for credential shapes. `other` is scanned as text.
  */
 export type Kind =
-    | "email" | "phone" | "name" | "user" | "personal" | "card" | "cardSecret" | "ip"
-    | "address" | "geo" | "government" | "bank" | "credential" | "identifier"
-    | "birth" | "sensitive" | "safe" | "other";
+    | "email"
+    | "phone"
+    | "name"
+    | "user"
+    | "personal"
+    | "card"
+    | "cardSecret"
+    | "ip"
+    | "address"
+    | "geo"
+    | "government"
+    | "bank"
+    | "credential"
+    | "identifier"
+    | "birth"
+    | "sensitive"
+    | "safe"
+    | "other";
 
 /** Judges one field name. `parent` is the name of the enclosing field, which only matters for ambiguous names. */
 export type KindOf = (key: string, parent: string) => Kind;
 
 const LABELS: Readonly<Record<Kind, string>> = {
-    email: "email", phone: "phone", name: "name", user: "user", personal: "personal", card: "card", cardSecret: "card",
-    ip: "ip", address: "address", geo: "geo", government: "government", bank: "bank",
-    credential: "credential", identifier: "id", birth: "birth", sensitive: "sensitive",
-    safe: "other", other: "other",
+    email: "email",
+    phone: "phone",
+    name: "name",
+    user: "user",
+    personal: "personal",
+    card: "card",
+    cardSecret: "card",
+    ip: "ip",
+    address: "address",
+    geo: "geo",
+    government: "government",
+    bank: "bank",
+    credential: "credential",
+    identifier: "id",
+    birth: "birth",
+    sensitive: "sensitive",
+    safe: "other",
+    other: "other",
 };
 
 /** The category name used in tokens and removal markers. */
@@ -28,9 +57,16 @@ export function label(kind: Kind): string {
 }
 
 /** Kinds whose values are dropped entirely, replaced by a removal marker. */
-const REMOVED: ReadonlySet<Kind> = new Set<Kind>(
-    ["cardSecret", "address", "geo", "government", "bank", "credential", "birth", "sensitive"],
-);
+const REMOVED: ReadonlySet<Kind> = new Set<Kind>([
+    "cardSecret",
+    "address",
+    "geo",
+    "government",
+    "bank",
+    "credential",
+    "birth",
+    "sensitive",
+]);
 
 export function isRemoved(kind: Kind): boolean {
     return REMOVED.has(kind);
@@ -52,13 +88,80 @@ export function isTokenised(kind: Kind): boolean {
 // (where `crmaccountid` contains `mac`). Lowercase compounds (`ipaddress`) are split into the words below.
 
 const COMPOUND_PIECES: ReadonlySet<string> = new Set([
-    "email", "mail", "phone", "number", "num", "address", "name", "first", "last", "full", "sur", "given", "family",
-    "middle", "display", "nick", "user", "username", "login", "card", "bank", "account", "ip", "security", "answer",
-    "credit", "debit", "payment", "holder", "date", "of", "birth", "tax", "id", "government", "social", "api", "key",
-    "password", "passwd", "passphrase", "passport", "secret", "token", "access", "refresh", "client", "source", "peer",
-    "remote", "license", "licence", "driver", "routing", "street", "postal", "code", "zip", "city", "line", "calling",
-    "called", "health", "note", "device", "contact", "billing", "shipping", "mailing", "work", "home", "service",
-    "customer", "primary",
+    "email",
+    "mail",
+    "phone",
+    "number",
+    "num",
+    "address",
+    "name",
+    "first",
+    "last",
+    "full",
+    "sur",
+    "given",
+    "family",
+    "middle",
+    "display",
+    "nick",
+    "user",
+    "username",
+    "login",
+    "card",
+    "bank",
+    "account",
+    "ip",
+    "security",
+    "answer",
+    "credit",
+    "debit",
+    "payment",
+    "holder",
+    "date",
+    "of",
+    "birth",
+    "tax",
+    "id",
+    "government",
+    "social",
+    "api",
+    "key",
+    "password",
+    "passwd",
+    "passphrase",
+    "passport",
+    "secret",
+    "token",
+    "access",
+    "refresh",
+    "client",
+    "source",
+    "peer",
+    "remote",
+    "license",
+    "licence",
+    "driver",
+    "routing",
+    "street",
+    "postal",
+    "code",
+    "zip",
+    "city",
+    "line",
+    "calling",
+    "called",
+    "health",
+    "note",
+    "device",
+    "contact",
+    "billing",
+    "shipping",
+    "mailing",
+    "work",
+    "home",
+    "service",
+    "customer",
+    "primary",
 ]);
 
 /** Splits a lowercase run such as `ipaddress` into known words; anything else stays whole. */
@@ -93,9 +196,25 @@ function squash(text: string): string {
 
 // Diagnostic fields that carry no personal data, never scanned. Only exact names, never a prefix or suffix.
 const SAFE_FIELDS: ReadonlySet<string> = new Set([
-    "accountid", "accountnumber", "orderid", "invoiceid", "callid", "traceid", "spanid", "sku", "productname",
-    "companyname", "version", "build", "timestamp", "createdat", "starttime", "status", "durationseconds",
-    "totaldurationseconds", "totalcalls",
+    "accountid",
+    "accountnumber",
+    "orderid",
+    "invoiceid",
+    "callid",
+    "traceid",
+    "spanid",
+    "sku",
+    "productname",
+    "companyname",
+    "version",
+    "build",
+    "timestamp",
+    "createdat",
+    "starttime",
+    "status",
+    "durationseconds",
+    "totaldurationseconds",
+    "totalcalls",
 ]);
 
 // Identifiers are kept readable so tickets stay debuggable, but are still checked for credential shapes.
@@ -105,22 +224,118 @@ const DEVICE_WORDS = ["mac", "imei", "iccid", "imsi", "meid", "esn"];
 // A trailing word that says the field describes a value rather than holding one: `phoneType`, `emailVerified`,
 // `passwordLength`, `userNameFormat`.
 const DESCRIPTORS: ReadonlySet<string> = new Set([
-    "format", "formats", "type", "types", "kind", "count", "counts", "total", "flag", "enabled", "disabled",
-    "verified", "validated", "valid", "confirmed", "required", "version", "length", "size", "pattern", "regex",
-    "label", "status", "mode", "policy", "schema", "provider", "rate", "limit", "max", "min", "date", "time",
-    "timestamp", "at",
+    "format",
+    "formats",
+    "type",
+    "types",
+    "kind",
+    "count",
+    "counts",
+    "total",
+    "flag",
+    "enabled",
+    "disabled",
+    "verified",
+    "validated",
+    "valid",
+    "confirmed",
+    "required",
+    "version",
+    "length",
+    "size",
+    "pattern",
+    "regex",
+    "label",
+    "status",
+    "mode",
+    "policy",
+    "schema",
+    "provider",
+    "rate",
+    "limit",
+    "max",
+    "min",
+    "date",
+    "time",
+    "timestamp",
+    "at",
 ]);
 
 // With `name`, these say the field names a thing, not a person (`hostName`, `serviceName`, `bankName`). Account and
 // location names are business names; `customerName` and contact names stay masked. The same words, as the enclosing
 // field, say that a bare `name` inside it names a thing too (`plans[].name`, `products[].name`).
 const NOT_A_PERSON: readonly string[] = [
-    "company", "account", "location", "product", "service", "host", "file", "class", "table", "column", "field",
-    "queue", "topic", "package", "app", "application", "plan", "carrier", "brand", "model", "index", "cluster", "node",
-    "pod", "container", "job", "task", "event", "api", "endpoint", "domain", "env", "environment", "region", "org",
-    "organization", "tenant", "bank", "schema", "tag", "label", "key", "method", "path", "type", "script", "process",
-    "rule", "template", "workflow", "flow", "route", "device", "interface", "group", "role", "zone", "site", "trunk",
-    "feature", "metric", "logger", "thread", "cache", "database", "bucket", "stage", "step", "sheet", "report", "view",
+    "company",
+    "account",
+    "location",
+    "product",
+    "service",
+    "host",
+    "file",
+    "class",
+    "table",
+    "column",
+    "field",
+    "queue",
+    "topic",
+    "package",
+    "app",
+    "application",
+    "plan",
+    "carrier",
+    "brand",
+    "model",
+    "index",
+    "cluster",
+    "node",
+    "pod",
+    "container",
+    "job",
+    "task",
+    "event",
+    "api",
+    "endpoint",
+    "domain",
+    "env",
+    "environment",
+    "region",
+    "org",
+    "organization",
+    "tenant",
+    "bank",
+    "schema",
+    "tag",
+    "label",
+    "key",
+    "method",
+    "path",
+    "type",
+    "script",
+    "process",
+    "rule",
+    "template",
+    "workflow",
+    "flow",
+    "route",
+    "device",
+    "interface",
+    "group",
+    "role",
+    "zone",
+    "site",
+    "trunk",
+    "feature",
+    "metric",
+    "logger",
+    "thread",
+    "cache",
+    "database",
+    "bucket",
+    "stage",
+    "step",
+    "sheet",
+    "report",
+    "view",
     "page",
 ];
 // More enclosing fields whose bare `name` names a thing (`charges[].name`). Kept apart from the list above because a
@@ -128,12 +343,40 @@ const NOT_A_PERSON: readonly string[] = [
 // only for words that are common.
 const THING_PARENTS: readonly string[] = ["charge", "trigger", "sku", "catalog", "rate", "amendment"];
 const NETWORK_WORDS = [
-    "remote", "client", "source", "src", "peer", "dest", "destination", "host", "server", "proxy", "forwarded",
+    "remote",
+    "client",
+    "source",
+    "src",
+    "peer",
+    "dest",
+    "destination",
+    "host",
+    "server",
+    "proxy",
+    "forwarded",
 ];
 // An expiry that belongs to something other than a payment card.
 const NOT_CARD_EXPIRY = [
-    "subscription", "contract", "trial", "promo", "offer", "license", "licence", "token", "session", "cert",
-    "certificate", "password", "key", "order", "quote", "invoice", "plan", "service", "support", "account",
+    "subscription",
+    "contract",
+    "trial",
+    "promo",
+    "offer",
+    "license",
+    "licence",
+    "token",
+    "session",
+    "cert",
+    "certificate",
+    "password",
+    "key",
+    "order",
+    "quote",
+    "invoice",
+    "plan",
+    "service",
+    "support",
+    "account",
 ];
 
 const cache = new Map<string, Kind>();
@@ -198,14 +441,17 @@ function classify(key: string, parent: string): Kind {
 
     if (value && (has("email", "emails") || sequence("e", "mail") || last === "mail")) return "email";
     if (
-        value && (
-            has("phone", "phones", "telephone", "msisdn") ||
+        value &&
+        (has("phone", "phones", "telephone", "msisdn") ||
             // Telephony names for a number, too short to be matched inside a longer name.
-            joined === "tn" || joined === "did" || joined === "called" ||
-            sequence("calling", "number") || sequence("called", "number") ||
-            (callRecord && (joined === "from" || joined === "to"))
-        )
-    ) return "phone";
+            joined === "tn" ||
+            joined === "did" ||
+            joined === "called" ||
+            sequence("calling", "number") ||
+            sequence("called", "number") ||
+            (callRecord && (joined === "from" || joined === "to")))
+    )
+        return "phone";
     if (value && (has("username", "login", "logins") || sequence("user", "name"))) return "user";
     if (value && (sequence("tax", "id") || sequence("government", "id"))) return "government";
     if (IDENTIFIER_SUFFIXES.has(last)) return "identifier";
@@ -214,42 +460,63 @@ function classify(key: string, parent: string): Kind {
         return "ip";
     }
     if (
-        value && (
-            /^(?:credit|debit|payment)?card(?:number|num|no)?$/.test(joined) ||
-            joined === "pan" || joined === "pannumber" || sequence("card", "number") || sequence("card", "num")
-        )
-    ) return "card";
+        value &&
+        (/^(?:credit|debit|payment)?card(?:number|num|no)?$/.test(joined) ||
+            joined === "pan" ||
+            joined === "pannumber" ||
+            sequence("card", "number") ||
+            sequence("card", "num"))
+    )
+        return "card";
     if (has("cvv", "cvc", "cvv2", "cvc2") || (has("expiry", "expiration") && !has(...NOT_CARD_EXPIRY))) {
         return "cardSecret";
     }
     if (
-        value && (
-            has(
-                "password", "passwd", "pwd", "passphrase", "secret", "secrets", "token", "tokens", "authorization",
-                "apikey", "credential", "credentials", "pin", "pincode",
-            ) ||
-            sequence("api", "key") || sequence("security", "answer")
-        )
-    ) return "credential";
+        value &&
+        (has(
+            "password",
+            "passwd",
+            "pwd",
+            "passphrase",
+            "secret",
+            "secrets",
+            "token",
+            "tokens",
+            "authorization",
+            "apikey",
+            "credential",
+            "credentials",
+            "pin",
+            "pincode",
+        ) ||
+            sequence("api", "key") ||
+            sequence("security", "answer"))
+    )
+        return "credential";
     if (
         has("health", "biometric", "biometrics", "demographic", "demographics") &&
         !has("check", "checks", "endpoint", "probe", "url", "path")
-    ) return "sensitive";
+    )
+        return "sensitive";
     if (has("dob", "birth", "birthday", "birthdate")) return "birth";
     if (
-        has("ssn", "itin", "ein", "passport", "passports") || sequence("social", "security") ||
+        has("ssn", "itin", "ein", "passport", "passports") ||
+        sequence("social", "security") ||
         (value && has("license", "licence") && last !== "state")
-    ) return "government";
+    )
+        return "government";
     if (joined === "iban" || has("iban", "routing") || sequence("bank", "account")) return "bank";
     if (has("latitude", "longitude", "lat", "lon", "lng", "gps", "geo", "geolocation", "coordinate", "coordinates")) {
         return "geo";
     }
     if (
-        value && (
-            has("address", "addresses", "street", "streets", "postal", "postcode", "zip", "zipcode", "city") ||
-            joined === "line1" || joined === "line2" || joined === "unit"
-        )
-    ) return "address";
+        value &&
+        (has("address", "addresses", "street", "streets", "postal", "postcode", "zip", "zipcode", "city") ||
+            joined === "line1" ||
+            joined === "line2" ||
+            joined === "unit")
+    )
+        return "address";
     // A bare `name` takes its meaning from the parent: `plans[].name` or `charges[].name` name things.
     const isThing = (word: string): boolean => NOT_A_PERSON.includes(word) || THING_PARENTS.includes(word);
     const namesAThing = w.length === 1 && parentWords.some((p) => isThing(p) || isThing(p.replace(/s$/, "")));

@@ -135,6 +135,7 @@ export function fixtureResponder(streams: readonly Stream[], options: FakeLokiOp
             for (const [stamp, text] of candidate.lines) {
                 const ns = BigInt(stamp);
                 if (ns < from || ns >= to) continue;
+                // biome-ignore lint/suspicious/useIterableCallbackReturn: the switch covers every filter operator
                 const kept = parsed.filters.every((filter) => {
                     switch (filter.op) {
                         case "|=":

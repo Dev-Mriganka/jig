@@ -8,7 +8,16 @@ import { METHODS } from "./engine/plan.ts";
 import { InputError, isObject, shown } from "./engine/values.ts";
 
 export type Param =
-    | "collection" | "folder" | "request" | "text" | "environment" | "variables" | "method" | "url" | "body" | "headers"
+    | "collection"
+    | "folder"
+    | "request"
+    | "text"
+    | "environment"
+    | "variables"
+    | "method"
+    | "url"
+    | "body"
+    | "headers"
     | "timeoutSec";
 
 interface ActionSpec {
@@ -44,41 +53,81 @@ function describeActions(): string {
 
 export const parameters = Type.Object({
     action: StringEnum(ACTION_NAMES, { description: `What to do. Needs: ${describeActions()}` }),
-    collection: Type.Optional(Type.String({ description: "A collection's name, to narrow a request or folder, or to call as one" })),
-    folder: Type.Optional(Type.String({ description: "A folder's path, such as Orders or Orders/Smoke, to narrow a request or to run" })),
+    collection: Type.Optional(
+        Type.String({ description: "A collection's name, to narrow a request or folder, or to call as one" }),
+    ),
+    folder: Type.Optional(
+        Type.String({ description: "A folder's path, such as Orders or Orders/Smoke, to narrow a request or to run" }),
+    ),
     request: Type.Optional(Type.String({ description: "A saved request's name, from list" })),
-    text: Type.Optional(Type.String({ description: "List only requests whose name, folder or address holds this text" })),
-    environment: Type.Optional(Type.String({ description: "The collection's name for the environment, such as Staging" })),
-    variables: Type.Optional(Type.Object({}, {
-        additionalProperties: Type.String(),
-        description: 'Values for the variables the request uses, such as {"orderId": "123"}. Never secrets or the host',
-    })),
+    text: Type.Optional(
+        Type.String({ description: "List only requests whose name, folder or address holds this text" }),
+    ),
+    environment: Type.Optional(
+        Type.String({ description: "The collection's name for the environment, such as Staging" }),
+    ),
+    variables: Type.Optional(
+        Type.Object(
+            {},
+            {
+                additionalProperties: Type.String(),
+                description:
+                    'Values for the variables the request uses, such as {"orderId": "123"}. Never secrets or the host',
+            },
+        ),
+    ),
     method: Type.Optional(StringEnum(METHODS, { description: "call: GET, HEAD and OPTIONS read; the others write" })),
     url: Type.Optional(Type.String({ description: "call: the whole address, on a host of the environment" })),
     body: Type.Optional(Type.Unknown({ description: "call: a JSON body, at most 256 KiB. Not for GET" })),
-    headers: Type.Optional(Type.Object({}, {
-        additionalProperties: Type.String(),
-        description: 'call: extra headers, at most 10, such as {"X-Request-Id": "t1"}. The tool adds the sign-in',
-    })),
-    timeoutSec: Type.Optional(Type.Integer({
-        minimum: 1,
-        maximum: MAX_TIMEOUT_SEC,
-        description: "Seconds to wait for the answer (default 30)",
-    })),
+    headers: Type.Optional(
+        Type.Object(
+            {},
+            {
+                additionalProperties: Type.String(),
+                description:
+                    'call: extra headers, at most 10, such as {"X-Request-Id": "t1"}. The tool adds the sign-in',
+            },
+        ),
+    ),
+    timeoutSec: Type.Optional(
+        Type.Integer({
+            minimum: 1,
+            maximum: MAX_TIMEOUT_SEC,
+            description: "Seconds to wait for the answer (default 30)",
+        }),
+    ),
 });
 
 export type Call =
     | { action: "list"; collection?: string; folder?: string; text?: string }
     | { action: "show"; request: string; collection?: string; folder?: string; environment?: string }
     | {
-        action: "run"; request: string; environment: string; collection?: string; folder?: string;
-        variables?: Record<string, unknown>; timeoutSec?: number;
-    }
-    | { action: "run-folder"; folder: string; environment: string; collection?: string; variables?: Record<string, unknown>; timeoutSec?: number }
+          action: "run";
+          request: string;
+          environment: string;
+          collection?: string;
+          folder?: string;
+          variables?: Record<string, unknown>;
+          timeoutSec?: number;
+      }
     | {
-        action: "call"; environment: string; method: string; url: string; collection?: string; body?: unknown;
-        headers?: unknown; timeoutSec?: unknown;
-    };
+          action: "run-folder";
+          folder: string;
+          environment: string;
+          collection?: string;
+          variables?: Record<string, unknown>;
+          timeoutSec?: number;
+      }
+    | {
+          action: "call";
+          environment: string;
+          method: string;
+          url: string;
+          collection?: string;
+          body?: unknown;
+          headers?: unknown;
+          timeoutSec?: unknown;
+      };
 
 const TEXT_PARAMS: readonly Param[] = ["collection", "folder", "request", "text", "environment", "method", "url"];
 

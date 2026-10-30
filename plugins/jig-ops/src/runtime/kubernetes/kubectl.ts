@@ -18,7 +18,9 @@ export const READS = ["get", "logs", "exec"] as const;
 
 /** The two commands that change the cluster. Only the deploy methods build them, and only the deploy tool runs them. */
 export const WRITES = [
+    // biome-ignore lint/suspicious/noThenProperty: a table row, not a promise: the word after the verb
     { verb: "set", then: "image" },
+    // biome-ignore lint/suspicious/noThenProperty: a table row, not a promise: the word after the verb
     { verb: "rollout", then: "undo" },
 ] as const;
 

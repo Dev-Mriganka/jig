@@ -1,13 +1,28 @@
 // The eight read actions. Each is a request or two, shaped into compact text by format.ts.
 import {
-    assignableUsers, commentOf, commentPage, fieldList, getIssue, newestComments, search, transitionsOf,
+    assignableUsers,
+    commentOf,
+    commentPage,
+    fieldList,
+    getIssue,
+    newestComments,
+    search,
+    transitionsOf,
 } from "./api.ts";
 import type { Env, FieldInfo } from "./api.ts";
 import { didYouMean, missingField } from "./field-hint.ts";
 import { knownFieldId } from "./fields.ts";
 import {
-    formatAttachments, formatChangelog, formatComments, formatFields, formatIssue, formatSearch, formatTransitions,
-    formatUsers, ISSUE_FIELDS, LATEST_COMMENTS,
+    formatAttachments,
+    formatChangelog,
+    formatComments,
+    formatFields,
+    formatIssue,
+    formatSearch,
+    formatTransitions,
+    formatUsers,
+    ISSUE_FIELDS,
+    LATEST_COMMENTS,
 } from "./format.ts";
 import { JiraError } from "./http.ts";
 import type { Call } from "./params.ts";
@@ -30,9 +45,8 @@ async function resolveInclude(env: Env, refs: readonly string[]): Promise<Array<
         const named = list.filter((field) => field.id === ref || field.name.toLowerCase() === ref.toLowerCase());
         const [only] = named;
         if (named.length !== 1 || only === undefined) {
-            const problem = named.length > 1
-                ? `several fields are named "${ref}"; use the id`
-                : `no field is named "${ref}"`;
+            const problem =
+                named.length > 1 ? `several fields are named "${ref}"; use the id` : `no field is named "${ref}"`;
             const hint = didYouMean(ref, list) ?? "find_field looks fields up by name.";
             throw new InputError(`jira: ${problem}. ${hint}`);
         }
@@ -60,9 +74,10 @@ export async function runRead(env: Env, call: Call): Promise<string> {
             const listed = arr(embedded.comments).map(commentOf);
             const total = Math.max(int(embedded.total), listed.length);
             // Jira may send only the first part of a long thread with the issue; the newest comments are then asked for.
-            const comments = listed.length < total
-                ? (await commentPage(env, call.key, Math.max(0, total - LATEST_COMMENTS), LATEST_COMMENTS)).comments
-                : listed.slice(-LATEST_COMMENTS);
+            const comments =
+                listed.length < total
+                    ? (await commentPage(env, call.key, Math.max(0, total - LATEST_COMMENTS), LATEST_COMMENTS)).comments
+                    : listed.slice(-LATEST_COMMENTS);
             const shown = extra.map(({ id, label }) => ({ label, value: fields[id] }));
             return formatIssue(issue, { comments, commentTotal: total, full: call.full, extra: shown });
         }
@@ -94,10 +109,12 @@ export async function runRead(env: Env, call: Call): Promise<string> {
             return formatUsers(call.key, await assignableUsers(env, { key: call.key }, call.query, call.limit), userId);
         case "find_field": {
             const needle = call.query.toLowerCase();
-            const fields = (await fieldList(env))
-                .filter((field) => field.name.toLowerCase().includes(needle) || field.id.toLowerCase() === needle);
-            const aliases = Object.entries(env.settings.fields)
-                .filter(([name, id]) => name.toLowerCase().includes(needle) || id.toLowerCase() === needle);
+            const fields = (await fieldList(env)).filter(
+                (field) => field.name.toLowerCase().includes(needle) || field.id.toLowerCase() === needle,
+            );
+            const aliases = Object.entries(env.settings.fields).filter(
+                ([name, id]) => name.toLowerCase().includes(needle) || id.toLowerCase() === needle,
+            );
             return formatFields(call.query, fields.slice(0, MAX_FIELD_MATCHES), aliases);
         }
         default:

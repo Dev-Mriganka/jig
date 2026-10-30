@@ -76,6 +76,7 @@ function interpolate(sql: string, range = { from: FROM, to: TO }, session = "s1"
     const text = sql
         .replaceAll("$__from", String(range.from))
         .replaceAll("$__to", String(range.to))
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: a Grafana variable, not a template
         .replaceAll("${session:singlequote}", `'${session}'`);
     // A variable that is not one of those is a mistake: Grafana would send it to SQLite as it is. A JSON path (`$.x`)
     // is not a variable.
@@ -348,6 +349,7 @@ describe("the links between dashboards", () => {
                     "session",
                     `${file}: ${panel.title} links from the session column`,
                 );
+                // biome-ignore lint/suspicious/noTemplateCurlyInString: a Grafana variable, not a template
                 assert.equal(url, "/d/jig-session?var-session=${__value.raw}");
                 // The column the link is on is a column of the query.
                 const { columns } = run(interpolate(panel.targets[0]?.rawQueryText ?? ""));

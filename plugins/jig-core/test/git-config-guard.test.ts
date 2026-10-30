@@ -17,7 +17,13 @@ const DANGEROUS: Array<{ key: string; section: string; variable: string; subsect
     { key: "core.hookspath", section: "core", variable: "hooksPath", value: "/tmp/evil-hooks" },
     { key: "core.gitproxy", section: "core", variable: "gitProxy", value: "evil" },
     { key: "credential.helper", section: "credential", variable: "helper", value: "!evil" },
-    { key: "credential.https://github.com.helper", section: "credential", subsection: "https://github.com", variable: "helper", value: "!evil" },
+    {
+        key: "credential.https://github.com.helper",
+        section: "credential",
+        subsection: "https://github.com",
+        variable: "helper",
+        value: "!evil",
+    },
     { key: "filter.lfs.clean", section: "filter", subsection: "lfs", variable: "clean", value: "evil" },
     { key: "filter.lfs.smudge", section: "filter", subsection: "lfs", variable: "smudge", value: "evil" },
     { key: "filter.lfs.process", section: "filter", subsection: "lfs", variable: "process", value: "evil" },
@@ -25,8 +31,20 @@ const DANGEROUS: Array<{ key: string; section: string; variable: string; subsect
     { key: "diff.pdf.command", section: "diff", subsection: "pdf", variable: "command", value: "evil" },
     { key: "diff.external", section: "diff", variable: "external", value: "evil" },
     { key: "merge.ours.driver", section: "merge", subsection: "ours", variable: "driver", value: "evil" },
-    { key: "url.https://evil.example/.insteadof", section: "url", subsection: "https://evil.example/", variable: "insteadOf", value: "https://github.com/" },
-    { key: "url.https://evil.example/.pushinsteadof", section: "url", subsection: "https://evil.example/", variable: "pushInsteadOf", value: "https://github.com/" },
+    {
+        key: "url.https://evil.example/.insteadof",
+        section: "url",
+        subsection: "https://evil.example/",
+        variable: "insteadOf",
+        value: "https://github.com/",
+    },
+    {
+        key: "url.https://evil.example/.pushinsteadof",
+        section: "url",
+        subsection: "https://evil.example/",
+        variable: "pushInsteadOf",
+        value: "https://github.com/",
+    },
     { key: "protocol.ext.allow", section: "protocol", subsection: "ext", variable: "allow", value: "always" },
     { key: "protocol.allow", section: "protocol", variable: "allow", value: "always" },
     { key: "uploadpack.packobjectshook", section: "uploadpack", variable: "packObjectsHook", value: "evil" },
@@ -34,10 +52,29 @@ const DANGEROUS: Array<{ key: string; section: string; variable: string; subsect
     { key: "gpg.ssh.program", section: "gpg", subsection: "ssh", variable: "program", value: "evil" },
     { key: "sequence.editor", section: "sequence", variable: "editor", value: "evil" },
     { key: "include.path", section: "include", variable: "path", value: "../elsewhere.cfg" },
-    { key: "includeif.gitdir:/.path", section: "includeIf", subsection: "gitdir:/", variable: "path", value: "../elsewhere.cfg" },
+    {
+        key: "includeif.gitdir:/.path",
+        section: "includeIf",
+        subsection: "gitdir:/",
+        variable: "path",
+        value: "../elsewhere.cfg",
+    },
 ];
 
-const SAFE = ["remote.origin.url", "remote.origin.fetch", "branch.main.remote", "branch.main.merge", "user.name", "user.email", "core.bare", "core.autocrlf", "pull.rebase", "push.default", "alias.st", "core.filemode"];
+const SAFE = [
+    "remote.origin.url",
+    "remote.origin.fetch",
+    "branch.main.remote",
+    "branch.main.merge",
+    "user.name",
+    "user.email",
+    "core.bare",
+    "core.autocrlf",
+    "pull.rebase",
+    "push.default",
+    "alias.st",
+    "core.filemode",
+];
 
 describe("which keys are dangerous", () => {
     for (const entry of DANGEROUS) {
@@ -61,38 +98,57 @@ describe("which keys are dangerous", () => {
             // A bare key (no value) is true in git, so it is the one that is not safe.
             assert.equal(isDangerousKey("core.fsmonitor", value), value === undefined, String(value));
         }
-        for (const value of ["true", "yes", "on", "1", "/path/to/hook"]) assert.equal(isDangerousKey("core.fsmonitor", value), true, value);
+        for (const value of ["true", "yes", "on", "1", "/path/to/hook"])
+            assert.equal(isDangerousKey("core.fsmonitor", value), true, value);
     });
 });
 
 describe("reading the listing of `git config --list --null --show-origin --show-scope`", () => {
-    const entry = (scope: string, origin: string, key: string, value?: string) => `${scope}\0${origin}\0${key}${value === undefined ? "" : `\n${value}`}\0`;
+    const entry = (scope: string, origin: string, key: string, value?: string) =>
+        `${scope}\0${origin}\0${key}${value === undefined ? "" : `\n${value}`}\0`;
 
     test("a dangerous local key is refused in one line that names the file and the key", () => {
-        const listing = entry("global", "file:/home/u/.gitconfig", "user.name", "u") + entry("local", "file:.git/config", "core.sshCommand", "evil");
+        const listing =
+            entry("global", "file:/home/u/.gitconfig", "user.name", "u") +
+            entry("local", "file:.git/config", "core.sshCommand", "evil");
         const refusal = refusalFromList(listing, "/work/repo");
-        assert.equal(refusal, "/work/repo/.git/config sets core.sshCommand, which would run with your credentials: remove it (git config --unset core.sshCommand) or ask the user");
+        assert.equal(
+            refusal,
+            "/work/repo/.git/config sets core.sshCommand, which would run with your credentials: remove it (git config --unset core.sshCommand) or ask the user",
+        );
         assert.equal(refusal?.split("\n").length, 1);
     });
 
     test("a per-worktree key is refused too", () => {
-        assert.match(refusalFromList(entry("worktree", "file:.git/config.worktree", "core.hooksPath", "/x"), "/r") ?? "", /config\.worktree sets core\.hooksPath/);
+        assert.match(
+            refusalFromList(entry("worktree", "file:.git/config.worktree", "core.hooksPath", "/x"), "/r") ?? "",
+            /config\.worktree sets core\.hooksPath/,
+        );
     });
 
     test("keys from the global and system configuration and the command line are not the repository's", () => {
-        const listing = entry("global", "file:/home/u/.gitconfig", "core.sshCommand", "my-ssh")
-            + entry("system", "file:/etc/gitconfig", "credential.helper", "store")
-            + entry("command", "command line:", "core.hooksPath", "/dev/null");
+        const listing =
+            entry("global", "file:/home/u/.gitconfig", "core.sshCommand", "my-ssh") +
+            entry("system", "file:/etc/gitconfig", "credential.helper", "store") +
+            entry("command", "command line:", "core.hooksPath", "/dev/null");
         assert.equal(refusalFromList(listing, "/r"), undefined);
     });
 
     test("a key with odd characters is quoted in the hint", () => {
-        const refusal = refusalFromList(entry("local", "file:.git/config", "url.https://evil.example/.insteadOf", "x"), "/r") ?? "";
+        const refusal =
+            refusalFromList(entry("local", "file:.git/config", "url.https://evil.example/.insteadOf", "x"), "/r") ?? "";
         assert.match(refusal, /git config --unset 'url\.https:\/\/evil\.example\/\.insteadOf'/);
     });
 
     test("a clean listing is fine", () => {
-        assert.equal(refusalFromList(entry("local", "file:.git/config", "remote.origin.url", "git@example.com:x/y.git") + entry("local", "file:.git/config", "core.fsmonitor", "false"), "/r"), undefined);
+        assert.equal(
+            refusalFromList(
+                entry("local", "file:.git/config", "remote.origin.url", "git@example.com:x/y.git") +
+                    entry("local", "file:.git/config", "core.fsmonitor", "false"),
+                "/r",
+            ),
+            undefined,
+        );
         assert.equal(refusalFromList("", "/r"), undefined);
     });
 });
@@ -102,7 +158,9 @@ describe("checking a repository on disk", () => {
     const git = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8", env });
     let root: string;
     let counter = 0;
-    before(() => { root = mkdtempSync(path.join(tmpdir(), "jig-guard-")); });
+    before(() => {
+        root = mkdtempSync(path.join(tmpdir(), "jig-guard-"));
+    });
     after(() => rmSync(root, { recursive: true, force: true }));
     beforeEach(() => forgetCheckedConfigs());
 
@@ -113,7 +171,8 @@ describe("checking a repository on disk", () => {
         return dir;
     }
     const list = (cwd: string) => git(cwd, "config", "--list", "--null", "--show-origin", "--show-scope");
-    const plant = (repo: string, header: string, variable: string, value: string) => appendFileSync(path.join(repo, ".git", "config"), `${header}\n\t${variable} = ${value}\n`);
+    const plant = (repo: string, header: string, variable: string, value: string) =>
+        appendFileSync(path.join(repo, ".git", "config"), `${header}\n\t${variable} = ${value}\n`);
 
     test("a normal configuration passes", () => {
         const repo = repository();
@@ -128,7 +187,12 @@ describe("checking a repository on disk", () => {
     for (const entry of DANGEROUS) {
         test(`${entry.key} planted in .git/config is refused`, () => {
             const repo = repository();
-            plant(repo, entry.subsection === undefined ? `[${entry.section}]` : `[${entry.section} "${entry.subsection}"]`, entry.variable, entry.value);
+            plant(
+                repo,
+                entry.subsection === undefined ? `[${entry.section}]` : `[${entry.section} "${entry.subsection}"]`,
+                entry.variable,
+                entry.value,
+            );
             const refusal = gitConfigRefusal(repo, list) ?? "";
             assert.ok(refusal.startsWith(`${path.join(repo, ".git", "config")} sets ${entry.key},`), refusal);
             assert.ok(refusal.endsWith(") or ask the user"), refusal);
@@ -154,17 +218,28 @@ describe("checking a repository on disk", () => {
     test("outside any repository there is nothing to refuse", () => {
         const elsewhere = path.join(root, `plain${counter++}`);
         mkdirSync(elsewhere);
-        assert.equal(gitConfigRefusal(elsewhere, () => { throw new Error("must not be asked"); }), undefined);
+        assert.equal(
+            gitConfigRefusal(elsewhere, () => {
+                throw new Error("must not be asked");
+            }),
+            undefined,
+        );
     });
 
     test("when the configuration cannot be listed, the real call fails for the same reason", () => {
-        assert.equal(gitConfigRefusal(repository(), () => undefined), undefined);
+        assert.equal(
+            gitConfigRefusal(repository(), () => undefined),
+            undefined,
+        );
     });
 
     test("the answer is remembered until the configuration changes", () => {
         const repo = repository();
         let asked = 0;
-        const counted = (cwd: string) => { asked++; return list(cwd); };
+        const counted = (cwd: string) => {
+            asked++;
+            return list(cwd);
+        };
         assert.equal(gitConfigRefusal(repo, counted), undefined);
         assert.equal(gitConfigRefusal(repo, counted), undefined);
         assert.equal(asked, 1, "the second call came from the cache");

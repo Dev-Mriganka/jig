@@ -18,7 +18,15 @@ import type { Auth, Body, Collection, Environment, Problem, SavedRequest, Variab
 import { unsupportedVariable, variablesIn } from "../template.ts";
 import * as bru from "./bruno-bru.ts";
 import * as opencollection from "./bruno-yaml.ts";
-import type { AuthSetting, Pairs, ParsedDefaults, ParsedEnvironment, ParsedRequest, ParsedVariable, Report } from "./bruno-types.ts";
+import type {
+    AuthSetting,
+    Pairs,
+    ParsedDefaults,
+    ParsedEnvironment,
+    ParsedRequest,
+    ParsedVariable,
+    Report,
+} from "./bruno-types.ts";
 import { expandHome, readFailure, readText, whyNotRead } from "./files.ts";
 import type { Source } from "./source.ts";
 import { authTexts, bodyTexts } from "./texts.ts";
@@ -97,7 +105,12 @@ const extensionOf = (format: Format): readonly string[] => (format === "yaml" ? 
 const folderFileOf = (format: Format): string => (format === "yaml" ? "folder.yml" : "folder.bru");
 /** The files of a folder that are not requests. */
 const NOT_REQUESTS: ReadonlySet<string> = new Set([
-    "folder.yml", "folder.yaml", "folder.bru", "collection.bru", "opencollection.yml", "opencollection.yaml",
+    "folder.yml",
+    "folder.yaml",
+    "folder.bru",
+    "collection.bru",
+    "opencollection.yml",
+    "opencollection.yaml",
 ]);
 
 // Environments --------------------------------------------------------------------------------------------------------
@@ -142,7 +155,12 @@ function readEnvironmentFiles(reading: Reading): EnvironmentFile[] {
         if (parsed === undefined) continue;
         const name = parsed.name ?? entry.slice(0, entry.length - extension.length);
         if (found.some((each) => each.name === name)) {
-            problems.push({ file: relative, key: "", message: `names the environment ${name} again; the later file wins`, level: "warning" });
+            problems.push({
+                file: relative,
+                key: "",
+                message: `names the environment ${name} again; the later file wins`,
+                level: "warning",
+            });
         }
         found.push({ name, file: relative, parsed });
     }
@@ -177,9 +195,19 @@ function mergedVariables(
     for (const parent of start.parsed.extends) {
         const found = all.find((each) => each.name === parent);
         if (found === undefined) {
-            problems.push({ file: start.file, key: "extends", message: `names the environment ${parent}, which does not exist`, level: "warning" });
+            problems.push({
+                file: start.file,
+                key: "extends",
+                message: `names the environment ${parent}, which does not exist`,
+                level: "warning",
+            });
         } else if (seen.includes(found.name) || found.name === start.name) {
-            problems.push({ file: start.file, key: "extends", message: `extends ${parent}, which extends it back`, level: "warning" });
+            problems.push({
+                file: start.file,
+                key: "extends",
+                message: `extends ${parent}, which extends it back`,
+                level: "warning",
+            });
         } else {
             for (const [name, variable] of mergedVariables(found, all, problems, [...seen, start.name])) {
                 const before = merged.get(name);
@@ -200,7 +228,8 @@ function environmentsOf(reading: Reading): Map<string, Environment> {
             problems.push({
                 file: file.file,
                 key: "dotEnvFilePath",
-                message: "points at a .env file, which is never read: give those values in api.secrets as process.env.NAME",
+                message:
+                    "points at a .env file, which is never read: give those values in api.secrets as process.env.NAME",
                 level: "warning",
             });
         }
@@ -214,7 +243,7 @@ function environmentsOf(reading: Reading): Map<string, Environment> {
                         key: name,
                         message:
                             `is a secret with a value in the file. The value is ignored and never sent; ` +
-                                `give the secret in api.secrets as "${name}"`,
+                            `give the secret in api.secrets as "${name}"`,
                         level: "warning",
                     });
                 }
@@ -253,14 +282,18 @@ interface Level {
     vars: ReadonlyMap<string, string>;
 }
 
-function headerMap(base: ReadonlyMap<string, readonly [string, string]>, headers: Pairs): Map<string, readonly [string, string]> {
+function headerMap(
+    base: ReadonlyMap<string, readonly [string, string]>,
+    headers: Pairs,
+): Map<string, readonly [string, string]> {
     const merged = new Map(base);
     for (const [name, value] of headers) merged.set(name.toLowerCase(), [name, value]);
     return merged;
 }
 
 function belowCollection(defaults: ParsedDefaults): Level {
-    const auth: AuthSetting = defaults.auth.kind === "set" || defaults.auth.kind === "refused" ? defaults.auth : { kind: "none" };
+    const auth: AuthSetting =
+        defaults.auth.kind === "set" || defaults.auth.kind === "refused" ? defaults.auth : { kind: "none" };
     return {
         folder: [],
         headers: headerMap(new Map(), defaults.headers),
@@ -289,7 +322,10 @@ function escaped(name: string): string {
 function withPathParameters(url: string, parameters: Pairs): string {
     let out = url;
     for (const [name, value] of parameters) {
-        out = out.replace(new RegExp(`/:${escaped(name)}(?=[/?#]|$)`, "g"), () => `/${value === "" ? `{{${name}}}` : value}`);
+        out = out.replace(
+            new RegExp(`/:${escaped(name)}(?=[/?#]|$)`, "g"),
+            () => `/${value === "" ? `{{${name}}}` : value}`,
+        );
     }
     return out;
 }
@@ -406,7 +442,13 @@ function readDefaultsFile(file: string, relative: string, reading: Reading): Par
 }
 
 const EMPTY_DEFAULTS: ParsedDefaults = {
-    name: undefined, seq: undefined, headers: [], auth: { kind: "none" }, vars: new Map(), prerequest: false, docs: undefined,
+    name: undefined,
+    seq: undefined,
+    headers: [],
+    auth: { kind: "none" },
+    vars: new Map(),
+    prerequest: false,
+    docs: undefined,
 };
 
 /** The requests and folders in a directory of the collection. */
@@ -429,12 +471,19 @@ function entriesOfDirectory(directory: string, depth: number, reading: Reading):
         } else if (entry.isDirectory()) {
             if (relativeDirectory === "" && entry.name === "environments") continue;
             if (depth >= MAX_DEPTH) {
-                problems.push({ file: relative, key: "", message: `is more than ${MAX_DEPTH} folders deep, so it is not read`, level: "warning" });
+                problems.push({
+                    file: relative,
+                    key: "",
+                    message: `is more than ${MAX_DEPTH} folders deep, so it is not read`,
+                    level: "warning",
+                });
                 continue;
             }
             const sub = path.join(directory, entry.name);
             const folderFile = folderFileOf(format);
-            const defaults = readDefaultsFile(path.join(sub, folderFile), path.join(relative, folderFile), reading) ?? EMPTY_DEFAULTS;
+            const defaults =
+                readDefaultsFile(path.join(sub, folderFile), path.join(relative, folderFile), reading) ??
+                EMPTY_DEFAULTS;
             entries.push({
                 kind: "folder",
                 seq: defaults.seq,
@@ -442,7 +491,11 @@ function entriesOfDirectory(directory: string, depth: number, reading: Reading):
                 defaults: { ...defaults, name: defaults.name ?? entry.name },
                 children: () => entriesOfDirectory(sub, depth + 1, reading),
             });
-        } else if (entry.isFile() && extensionOf(format).some((extension) => entry.name.endsWith(extension)) && !NOT_REQUESTS.has(entry.name)) {
+        } else if (
+            entry.isFile() &&
+            extensionOf(format).some((extension) => entry.name.endsWith(extension)) &&
+            !NOT_REQUESTS.has(entry.name)
+        ) {
             if (++reading.files > MAX_FILES) {
                 if (reading.files === MAX_FILES + 1) {
                     const message = `is past the first ${MAX_FILES} files, so it and the rest are not read`;
@@ -451,7 +504,14 @@ function entriesOfDirectory(directory: string, depth: number, reading: Reading):
                 continue;
             }
             const parsed = readRequestFile(path.join(directory, entry.name), relative, reading);
-            if (parsed !== undefined) entries.push({ kind: "request", seq: parsed.seq, name: parsed.name ?? entry.name, parsed, file: relative });
+            if (parsed !== undefined)
+                entries.push({
+                    kind: "request",
+                    seq: parsed.seq,
+                    name: parsed.name ?? entry.name,
+                    parsed,
+                    file: relative,
+                });
         }
     }
     return entries;
@@ -467,7 +527,9 @@ function entriesOfItems(items: unknown, prefix: string, reading: Reading): Entry
         const kind = opencollection.itemKind(item);
         if (!isObject(item) || kind === "other") return;
         if (kind === "folder") {
-            const defaults = opencollection.readDefaults(item, (inner, message, level) => report(`${key}.${inner}`, message, level));
+            const defaults = opencollection.readDefaults(item, (inner, message, level) =>
+                report(`${key}.${inner}`, message, level),
+            );
             entries.push({
                 kind: "folder",
                 seq: defaults.seq,
@@ -476,8 +538,16 @@ function entriesOfItems(items: unknown, prefix: string, reading: Reading): Entry
                 children: () => entriesOfItems(item.items, `${key}.items`, reading),
             });
         } else {
-            const parsed = opencollection.readRequest(item, (inner, message, level) => report(`${key}.${inner}`, message, level));
-            entries.push({ kind: "request", seq: parsed.seq, name: parsed.name ?? "(unnamed)", parsed, file: `opencollection.yml: ${key}` });
+            const parsed = opencollection.readRequest(item, (inner, message, level) =>
+                report(`${key}.${inner}`, message, level),
+            );
+            entries.push({
+                kind: "request",
+                seq: parsed.seq,
+                name: parsed.name ?? "(unnamed)",
+                parsed,
+                file: `opencollection.yml: ${key}`,
+            });
         }
     });
     return entries;
@@ -512,18 +582,39 @@ function ignoredBy(root: string, problems: Problem[]): Set<string> {
 function load(config: BrunoConfig, name: string): Collection {
     const problems: Problem[] = [];
     const root = config.folder;
-    const empty = (): Collection => ({ name, root, requests: [], environments: new Map(), variables: new Map(), auth: { kind: "none" }, problems });
+    const empty = (): Collection => ({
+        name,
+        root,
+        requests: [],
+        environments: new Map(),
+        variables: new Map(),
+        auth: { kind: "none" },
+        problems,
+    });
     if (!fs.existsSync(root)) {
         problems.push({ file: ".", key: "", message: "the folder does not exist", level: "error" });
         return empty();
     }
     const format = formatOf(root);
     if (format === undefined) {
-        problems.push({ file: ".", key: "", message: "is not a Bruno collection: it has neither opencollection.yml nor bruno.json", level: "error" });
+        problems.push({
+            file: ".",
+            key: "",
+            message: "is not a Bruno collection: it has neither opencollection.yml nor bruno.json",
+            level: "error",
+        });
         return empty();
     }
     const reading: Reading = {
-        collection: name, root, format, problems, secretNames: new Set(), ignored: new Set(), files: 0, processEnv: new Set(), values: [],
+        collection: name,
+        root,
+        format,
+        problems,
+        secretNames: new Set(),
+        ignored: new Set(),
+        files: 0,
+        processEnv: new Set(),
+        values: [],
     };
 
     // Environments first: which variables are secret decides how the requests are read.
@@ -539,7 +630,8 @@ function load(config: BrunoConfig, name: string): Collection {
             defaults = opencollection.readDefaults(raw, reporter(problems, "opencollection.yml"));
             if (isObject(raw)) {
                 bundled = raw.items;
-                const extensions = isObject(raw.extensions) && isObject(raw.extensions.bruno) ? raw.extensions.bruno : {};
+                const extensions =
+                    isObject(raw.extensions) && isObject(raw.extensions.bruno) ? raw.extensions.bruno : {};
                 reading.ignored = namesIn(extensions.ignore);
                 const inline = isObject(raw.config) ? raw.config.environments : undefined;
                 if (Array.isArray(inline) && inline.length > 0) {
@@ -560,7 +652,12 @@ function load(config: BrunoConfig, name: string): Collection {
     reading.secretNames = declaredSecrets(environments.values());
     const top = belowCollection(defaults);
     const requests: SavedRequest[] = [];
-    build([...entriesOfDirectory(root, 0, reading), ...entriesOfItems(bundled, "items", reading)], top, reading, requests);
+    build(
+        [...entriesOfDirectory(root, 0, reading), ...entriesOfItems(bundled, "items", reading)],
+        top,
+        reading,
+        requests,
+    );
 
     // The collection's variables are the weakest values.
     const variables = new Map<string, Variable>();
@@ -571,7 +668,8 @@ function load(config: BrunoConfig, name: string): Collection {
 
     // `{{process.env.NAME}}` anywhere, even inside the value of another variable, is a secret in every environment.
     for (const value of reading.values) {
-        for (const variable of variablesIn(value)) if (variable.startsWith(PROCESS_ENV)) reading.processEnv.add(variable);
+        for (const variable of variablesIn(value))
+            if (variable.startsWith(PROCESS_ENV)) reading.processEnv.add(variable);
     }
     for (const environment of environments.values()) {
         const declared = environment.variables as Map<string, Variable>;

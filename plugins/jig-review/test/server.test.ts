@@ -128,15 +128,29 @@ test("the link is for localhost on this server's own random port, and carries th
 
 test("it listens on 127.0.0.1 only", async () => {
     // Reachable by its loopback address; the server was started with that host, so no other interface answers.
-    assert.equal((await request("/", { host: `127.0.0.1:${port}` })).status, 403, "reachable, and refused without the cookie");
+    assert.equal(
+        (await request("/", { host: `127.0.0.1:${port}` })).status,
+        403,
+        "reachable, and refused without the cookie",
+    );
     const node = (server as unknown as { server: http.Server }).server;
-    assert.deepEqual({ address: (node.address() as { address: string }).address, family: (node.address() as { family: string }).family }, { address: "127.0.0.1", family: "IPv4" });
+    assert.deepEqual(
+        {
+            address: (node.address() as { address: string }).address,
+            family: (node.address() as { family: string }).family,
+        },
+        { address: "127.0.0.1", family: "IPv4" },
+    );
 });
 
 test("without the session cookie every route is refused, writes included", async () => {
     for (const [method, route] of ROUTES) {
         const body = method === "POST" || method === "PATCH" ? "{}" : undefined;
-        assert.equal((await request(route, { method, body, origin: `http://localhost:${port}` })).status, 403, `${method} ${route}`);
+        assert.equal(
+            (await request(route, { method, body, origin: `http://localhost:${port}` })).status,
+            403,
+            `${method} ${route}`,
+        );
     }
     assert.deepEqual(submitted, []);
     assert.deepEqual(asked, []);
@@ -150,7 +164,11 @@ test("a wrong secret is refused and sets no cookie", async () => {
 
 test("a cookie of the right shape but another secret is refused", async () => {
     assert.equal((await request("/api/reviews", { cookie: "jig_review=wrong" })).status, 403);
-    assert.equal((await request("/api/reviews", { cookie: "other=" + new URL(link).searchParams.get("k") })).status, 403, "a different cookie name");
+    assert.equal(
+        (await request("/api/reviews", { cookie: `other=${new URL(link).searchParams.get("k")}` })).status,
+        403,
+        "a different cookie name",
+    );
 });
 
 test("the printed link gives this browser a cookie; then the API answers", async () => {
@@ -162,7 +180,14 @@ test("the printed link gives this browser a cookie; then the API answers", async
 
 test("a foreign Host is refused even with the cookie (DNS rebinding)", async () => {
     const session = await cookie();
-    for (const host of ["attacker.example:80", `attacker.example:${port}`, "localhost", `localhost.attacker.example:${port}`, `127.0.0.1.attacker.example:${port}`, "[::1]:" + port]) {
+    for (const host of [
+        "attacker.example:80",
+        `attacker.example:${port}`,
+        "localhost",
+        `localhost.attacker.example:${port}`,
+        `127.0.0.1.attacker.example:${port}`,
+        `[::1]:${port}`,
+    ]) {
         assert.equal((await request("/api/reviews", { cookie: session, host })).status, 403, host);
     }
     assert.equal((await request("/api/reviews", { cookie: session, host: `localhost:${port}` })).status, 200);
@@ -180,15 +205,45 @@ test("writes need a same-origin page: another site's post is refused, on every w
     const session = await cookie();
     const body = JSON.stringify({ comments: [{ body: "please delete everything" }] });
     for (const [method, route] of ROUTES.filter(([m]) => m !== "GET")) {
-        for (const origin of ["https://evil.example", "http://evil.example", `http://localhost:${port + 1}`, `https://localhost:${port}`, "null"]) {
+        for (const origin of [
+            "https://evil.example",
+            "http://evil.example",
+            `http://localhost:${port + 1}`,
+            `https://localhost:${port}`,
+            "null",
+        ]) {
             const sent = method === "POST" || method === "PATCH" ? body : undefined;
-            assert.equal((await request(route, { method, cookie: session, origin, body: sent })).status, 403, `${method} ${route} from ${origin}`);
+            assert.equal(
+                (await request(route, { method, cookie: session, origin, body: sent })).status,
+                403,
+                `${method} ${route} from ${origin}`,
+            );
         }
     }
     assert.deepEqual(submitted, []);
     assert.deepEqual(asked, [], "a refused page's request never reached a question in Pi");
-    assert.equal((await request("/api/ask", { method: "POST", cookie: session, origin: `http://127.0.0.1:${port}`, body: JSON.stringify({ comments: [{ body: "fix the null check" }] }) })).status, 200);
-    assert.equal((await request("/api/ask", { method: "POST", cookie: session, origin: `http://localhost:${port}`, body: JSON.stringify({ comments: [{ body: "and the other one" }] }) })).status, 200);
+    assert.equal(
+        (
+            await request("/api/ask", {
+                method: "POST",
+                cookie: session,
+                origin: `http://127.0.0.1:${port}`,
+                body: JSON.stringify({ comments: [{ body: "fix the null check" }] }),
+            })
+        ).status,
+        200,
+    );
+    assert.equal(
+        (
+            await request("/api/ask", {
+                method: "POST",
+                cookie: session,
+                origin: `http://localhost:${port}`,
+                body: JSON.stringify({ comments: [{ body: "and the other one" }] }),
+            })
+        ).status,
+        200,
+    );
     assert.deepEqual(submitted, ["fix the null check", "and the other one"]);
 });
 
@@ -196,12 +251,16 @@ test("a request body that is not JSON is a 400, and one that is too big is a 413
     const session = await cookie();
     const origin = `http://localhost:${port}`;
     assert.equal((await request("/api/ask", { method: "POST", cookie: session, origin, body: "{ no" })).status, 400);
-    assert.equal((await request("/api/passkeys", { method: "POST", cookie: session, origin, body: "{ no" })).status, 400);
+    assert.equal(
+        (await request("/api/passkeys", { method: "POST", cookie: session, origin, body: "{ no" })).status,
+        400,
+    );
     // The server may answer 413 and hang up before the client has sent it all: either way the body was not taken.
     const big = JSON.stringify({ comments: [{ body: "x".repeat(1024 * 1024 + 1024) }] });
     const outcome = await request("/api/ask", { method: "POST", cookie: session, origin, body: big }).then(
         (response) => response.status,
-        (error: NodeJS.ErrnoException) => (error.code === "EPIPE" || error.code === "ECONNRESET" ? 413 : Promise.reject(error)),
+        (error: NodeJS.ErrnoException) =>
+            error.code === "EPIPE" || error.code === "ECONNRESET" ? 413 : Promise.reject(error),
     );
     assert.equal(outcome, 413);
     assert.ok(!submitted.some((body) => body.length > 1000));
@@ -215,7 +274,8 @@ test("responses are not cached, are not sniffed and send no referrer; the page c
     assert.equal(api.headers["referrer-policy"], "no-referrer");
     // A file and the event stream are built by their handlers, and carry the same headers.
     const page = await request("/", { cookie: session });
-    for (const header of ["x-content-type-options", "referrer-policy", "content-security-policy"]) assert.ok(page.headers[header], `the page has ${header}`);
+    for (const header of ["x-content-type-options", "referrer-policy", "content-security-policy"])
+        assert.ok(page.headers[header], `the page has ${header}`);
     assert.equal(page.headers["x-content-type-options"], "nosniff");
     const policy = String(page.headers["content-security-policy"]);
     assert.match(policy, /default-src 'self'/);
@@ -226,7 +286,12 @@ test("responses are not cached, are not sniffed and send no referrer; the page c
 
 test("a path that leaves the page's folder is not served", async () => {
     const session = await cookie();
-    for (const route of ["/%2e%2e/package.json", "/..%2f..%2fpackage.json", "/assets/%2e%2e/%2e%2e/package.json", "/%2e%2e%2f%2e%2e%2f%2e%2e%2fpackage.json"]) {
+    for (const route of [
+        "/%2e%2e/package.json",
+        "/..%2f..%2fpackage.json",
+        "/assets/%2e%2e/%2e%2e/package.json",
+        "/%2e%2e%2f%2e%2e%2f%2e%2e%2fpackage.json",
+    ]) {
         const res = await request(route, { cookie: session });
         assert.ok(!res.body.includes('"name": "jig"'), `${route} must not reach package.json`);
         assert.ok(!res.body.includes('"hono"'), route);
@@ -235,24 +300,43 @@ test("a path that leaves the page's folder is not served", async () => {
 
 test("a handler that refuses answers with the reason as JSON, and nothing else", async () => {
     const session = await cookie();
-    const res = await request("/api/approve/options", { method: "POST", cookie: session, origin: `http://localhost:${port}` });
+    const res = await request("/api/approve/options", {
+        method: "POST",
+        cookie: session,
+        origin: `http://localhost:${port}`,
+    });
     assert.equal(res.status, 409, "no review is open: the approval service says so");
     assert.deepEqual(JSON.parse(res.body), { error: "No review is open." });
 });
 
 test("stopping closes the port, even with an event stream open", async () => {
-    const other = new ReviewServer((server as unknown as { handlers: ConstructorParameters<typeof ReviewServer>[0] }).handlers);
+    const other = new ReviewServer(
+        (server as unknown as { handlers: ConstructorParameters<typeof ReviewServer>[0] }).handlers,
+    );
     const otherBase = await other.start();
     const otherPort = Number(new URL(otherBase).port);
     const secretLink = other.authorize(otherBase);
     const url = new URL(secretLink);
     const visit = await new Promise<string>((resolve, reject) => {
-        http.get({ host: "127.0.0.1", port: otherPort, path: `/?k=${url.searchParams.get("k")}`, headers: { host: `localhost:${otherPort}` } }, (res) => {
-            res.resume();
-            resolve(String(res.headers["set-cookie"]).split(";")[0]!);
-        }).on("error", reject);
+        http.get(
+            {
+                host: "127.0.0.1",
+                port: otherPort,
+                path: `/?k=${url.searchParams.get("k")}`,
+                headers: { host: `localhost:${otherPort}` },
+            },
+            (res) => {
+                res.resume();
+                resolve(String(res.headers["set-cookie"]).split(";")[0]!);
+            },
+        ).on("error", reject);
     });
-    const stream = http.get({ host: "127.0.0.1", port: otherPort, path: "/api/events", headers: { host: `localhost:${otherPort}`, cookie: visit } });
+    const stream = http.get({
+        host: "127.0.0.1",
+        port: otherPort,
+        path: "/api/events",
+        headers: { host: `localhost:${otherPort}`, cookie: visit },
+    });
     stream.on("error", () => {});
     await new Promise((resolve) => stream.once("response", resolve));
     other.stop();
@@ -267,12 +351,21 @@ test("stopping closes the port, even with an event stream open", async () => {
 test("the event stream carries the security headers too, and starts with its first event", async () => {
     const session = await cookie();
     const first = await new Promise<{ headers: http.IncomingHttpHeaders; text: string }>((resolve, reject) => {
-        const req = http.get({ host: "127.0.0.1", port, path: "/api/events", agent: false, headers: { host: `localhost:${port}`, cookie: session } }, (res) => {
-            res.once("data", (chunk) => {
-                req.destroy();
-                resolve({ headers: res.headers, text: String(chunk) });
-            });
-        });
+        const req = http.get(
+            {
+                host: "127.0.0.1",
+                port,
+                path: "/api/events",
+                agent: false,
+                headers: { host: `localhost:${port}`, cookie: session },
+            },
+            (res) => {
+                res.once("data", (chunk) => {
+                    req.destroy();
+                    resolve({ headers: res.headers, text: String(chunk) });
+                });
+            },
+        );
         req.on("error", reject);
     });
     assert.match(String(first.headers["content-type"]), /^text\/event-stream/);

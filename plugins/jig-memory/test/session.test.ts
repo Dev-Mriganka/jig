@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
-import type { TestContext } from "node:test";
 import factory from "../src/index.ts";
 import { NOTES_MESSAGE, TICKET_ENTRY } from "../src/session.ts";
 import { ticketPaths } from "../src/store.ts";
@@ -38,14 +37,23 @@ test("a message that names a ticket activates it: folder, jig-core, a recorded e
 
     assert.deepEqual(jig.tickets, ["ACME-12"]);
     assert.ok(existsSync(path.join(folder, "ACME-12", "notes.md")));
-    assert.deepEqual(pi.log.filter((entry) => entry.type === "custom"), [{ type: "custom", customType: TICKET_ENTRY, data: { key: "ACME-12" } }]);
+    assert.deepEqual(
+        pi.log.filter((entry) => entry.type === "custom"),
+        [{ type: "custom", customType: TICKET_ENTRY, data: { key: "ACME-12" } }],
+    );
     assert.equal(pi.sent.length, 1);
     const [sent] = pi.sent;
     assert.deepEqual(sent?.options, { triggerTurn: false }, "appended, no model turn started");
     assert.equal(sent?.message.customType, NOTES_MESSAGE);
     assert.deepEqual(sent?.message.details, { key: "ACME-12" });
-    assert.match(sent?.message.content ?? "", /^\[ticket ACME-12\] Active\. Folder: .*ACME-12\/ \(notes\.md, evidence\/index\.md\)\.\n\n# ACME-12\n/);
-    assert.equal(pi.notices.at(-1)?.text, `Ticket ACME-12 active (named in your message). Folder: ${path.join(folder, "ACME-12")}/`);
+    assert.match(
+        sent?.message.content ?? "",
+        /^\[ticket ACME-12\] Active\. Folder: .*ACME-12\/ \(notes\.md, evidence\/index\.md\)\.\n\n# ACME-12\n/,
+    );
+    assert.equal(
+        pi.notices.at(-1)?.text,
+        `Ticket ACME-12 active (named in your message). Folder: ${path.join(folder, "ACME-12")}/`,
+    );
 });
 
 test("text that names no ticket, or a key glued to a letter, activates nothing", (t) => {
@@ -117,7 +125,10 @@ test("/ticket shows the active ticket, sets one explicitly, and off clears it; a
     assert.equal(pi.notices.at(-1)?.text, `Ticket ACME-1: notes ${tickets(folder).notes}, 0 saved results.`);
     await pi.command("off");
     assert.deepEqual(jig.tickets, ["ACME-1", undefined]);
-    assert.deepEqual(pi.log.filter((entry) => entry.type === "custom").map((entry) => entry.data), [{ key: "ACME-1" }, { key: null }]);
+    assert.deepEqual(
+        pi.log.filter((entry) => entry.type === "custom").map((entry) => entry.data),
+        [{ key: "ACME-1" }, { key: null }],
+    );
     pi.input("ACME-2 next");
     assert.deepEqual(jig.tickets, ["ACME-1", undefined, "ACME-2"]);
 });
@@ -199,7 +210,10 @@ test("the fifteenth tool result carries a reminder to update ## Now, and the cou
     const fifteenth = changed(pi.result("bash", "r15"));
     assert.ok(fifteenth, "the reminder");
     assert.equal(fifteenth.content[0]?.text, "r15", "the tool's own text is kept");
-    assert.match(fifteenth.content.at(-1)?.text ?? "", /^\[ticket ACME-3\] 15 tool results since notes\.md last changed: update the ## Now block in .*ACME-3\/notes\.md/);
+    assert.match(
+        fifteenth.content.at(-1)?.text ?? "",
+        /^\[ticket ACME-3\] 15 tool results since notes\.md last changed: update the ## Now block in .*ACME-3\/notes\.md/,
+    );
     for (let n = 16; n < 30; n++) assert.equal(changed(pi.result("bash", `r${n}`)), undefined, `result ${n}`);
     assert.ok(changed(pi.result("bash", "r30")), "the next reminder, fifteen results later");
 });
@@ -214,7 +228,8 @@ test("a change to notes.md restarts the count, and the edit that made it does no
     for (let n = 0; n < 10; n++) pi.result("bash", "output");
     writeFileSync(notes, read(notes).replace("Status: new", "Status: reproduced"));
     assert.equal(changed(pi.result("edit", "Edited.", { path: notes })), undefined, "the edit is not counted");
-    for (let n = 1; n < 15; n++) assert.equal(changed(pi.result("bash", "output")), undefined, `after the edit, result ${n}`);
+    for (let n = 1; n < 15; n++)
+        assert.equal(changed(pi.result("bash", "output")), undefined, `after the edit, result ${n}`);
     assert.ok(changed(pi.result("bash", "output")), "the fifteenth result after the edit");
 });
 
@@ -240,7 +255,8 @@ test("Pi's file tools add no evidence, but a secret in a tool's arguments is nev
     const pi = loadPlugin("/work");
     pi.start();
     pi.input("look at ACME-1");
-    for (const tool of ["read", "ls", "find", "grep", "write", "edit"]) pi.result(tool, "file text", { path: "notes.md" });
+    for (const tool of ["read", "ls", "find", "grep", "write", "edit"])
+        pi.result(tool, "file text", { path: "notes.md" });
     const paths = tickets(folder);
     assert.equal(readdirSync(paths.evidence).filter((name) => name.endsWith(".txt")).length, 0);
     assert.doesNotMatch(read(paths.index), /\n- /);
@@ -277,7 +293,10 @@ test("after a compaction the current notes come back as a message, and the syste
     assert.equal(pi.sent.length, 2);
     const [, sent] = pi.sent;
     assert.deepEqual(sent?.options, { triggerTurn: false });
-    assert.match(sent?.message.content ?? "", /^\[ticket ACME-7\] Still active after compaction; current notes follow\. Folder: .*ACME-7\/ \(notes\.md, evidence\/index\.md\)\.\n\n# ACME-7\n\n## Now\nStatus: root cause found/);
+    assert.match(
+        sent?.message.content ?? "",
+        /^\[ticket ACME-7\] Still active after compaction; current notes follow\. Folder: .*ACME-7\/ \(notes\.md, evidence\/index\.md\)\.\n\n# ACME-7\n\n## Now\nStatus: root cause found/,
+    );
     assert.equal(pi.events.has("before_agent_start"), false, "no hook changes the system prompt");
     assert.deepEqual(jig.tickets, ["ACME-7"], "a compaction does not change the ticket");
 });

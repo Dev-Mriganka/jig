@@ -41,17 +41,33 @@ const EXPECTED: Row[] = [
 describe("classification", () => {
     for (const [action, effect, approval] of EXPECTED) {
         test(`${action} is an external ${effect}${approval === undefined ? "" : ` on the ${approval === "review" ? "review screen" : "dialog"}`}`, () => {
-            assert.deepEqual(classify({ action }), { action, environment: "external", effect, ...(approval === undefined ? {} : { approval }) });
+            assert.deepEqual(classify({ action }), {
+                action,
+                environment: "external",
+                effect,
+                ...(approval === undefined ? {} : { approval }),
+            });
         });
     }
 
     test("the actions above are exactly the actions of the tool", () => {
-        assert.deepEqual(EXPECTED.map((row) => row[0]), ACTION_NAMES);
+        assert.deepEqual(
+            EXPECTED.map((row) => row[0]),
+            ACTION_NAMES,
+        );
         for (const [action, effect] of EXPECTED) assert.equal(ACTIONS[action as keyof typeof ACTIONS].kind, effect);
     });
 
     test("an action nobody declared is unknown, so jig-core asks", () => {
-        for (const input of [{ action: "link" }, { action: "" }, { action: "__proto__" }, { action: "constructor" }, { action: 5 }, { action: ["get"] }, {}]) {
+        for (const input of [
+            { action: "link" },
+            { action: "" },
+            { action: "__proto__" },
+            { action: "constructor" },
+            { action: 5 },
+            { action: ["get"] },
+            {},
+        ]) {
             assert.equal(classify(input), undefined, JSON.stringify(input));
         }
     });
@@ -60,7 +76,11 @@ describe("classification", () => {
         assert.equal(classify({ action: "update", fields: { summary: "x" } })?.approval, "dialog");
         assert.equal(classify({ action: "update", fields: { labels: ["a"], priority: "High" } })?.approval, "dialog");
         for (const name of ["description", "Description", " DESCRIPTION "]) {
-            assert.equal(classify({ action: "update", fields: { summary: "x", [name]: "text" } })?.approval, "review", name);
+            assert.equal(
+                classify({ action: "update", fields: { summary: "x", [name]: "text" } })?.approval,
+                "review",
+                name,
+            );
         }
         assert.equal(classify({ action: "update", fields: null })?.approval, "dialog");
         assert.equal(classify({ action: "update", fields: "description" })?.approval, "dialog");
@@ -71,7 +91,10 @@ describe("classification", () => {
         const withText = classify({ action: "comment", key: "PROJ-1", text: secret });
         assert.ok(!JSON.stringify(withText).includes(secret));
         assert.deepEqual(withText, classify({ action: "comment" }));
-        assert.deepEqual(classify({ action: "update", fields: { summary: secret } }), classify({ action: "update", fields: { summary: "other" } }));
+        assert.deepEqual(
+            classify({ action: "update", fields: { summary: secret } }),
+            classify({ action: "update", fields: { summary: "other" } }),
+        );
     });
 
     test("the environment is the one in the configuration, external by default", () => {
@@ -83,14 +106,23 @@ describe("classification", () => {
 
     test("with no section, or one with errors, the default environment is used and nothing else changes", () => {
         h.jig.reset();
-        assert.deepEqual(classify({ action: "comment" }), { action: "comment", environment: "external", effect: "write", approval: "review" });
+        assert.deepEqual(classify({ action: "comment" }), {
+            action: "comment",
+            environment: "external",
+            effect: "write",
+            approval: "review",
+        });
         h.configure({ site: "http://not-https.test", auth: { token: "pass:jira/token" }, environment: "staging" });
         assert.equal(classify({ action: "comment" })?.environment, "external");
         h.reset();
     });
 
     test("classifyCall is pure: no settings needed", () => {
-        assert.deepEqual(classifyCall({ action: "get" }, undefined), { action: "get", environment: "external", effect: "read" });
+        assert.deepEqual(classifyCall({ action: "get" }, undefined), {
+            action: "get",
+            environment: "external",
+            effect: "read",
+        });
     });
 
     test("the tool is declared to jig-core as a jig-jira tool, with a preview, and does not mask its own results", () => {
@@ -116,17 +148,26 @@ function table(header: string, document: string = README): string[][] {
     const rows: string[][] = [];
     for (const line of lines.slice(start + 2)) {
         if (!line.startsWith("|")) break;
-        rows.push(line.split("|").slice(1, -1).map((cell) => cell.trim()));
+        rows.push(
+            line
+                .split("|")
+                .slice(1, -1)
+                .map((cell) => cell.trim()),
+        );
     }
     return rows;
 }
 
-const names = (cell: string | undefined): string[] => [...(cell ?? "").matchAll(/`([^`]+)`/g)].map((match) => match[1] as string);
+const names = (cell: string | undefined): string[] =>
+    [...(cell ?? "").matchAll(/`([^`]+)`/g)].map((match) => match[1] as string);
 
 describe("the README", () => {
     test("its action table lists every action with its kind and screen", () => {
         const rows = table("| Action | Kind |");
-        assert.deepEqual(rows.map((row) => names(row[0])[0]), ACTION_NAMES);
+        assert.deepEqual(
+            rows.map((row) => names(row[0])[0]),
+            ACTION_NAMES,
+        );
         for (const row of rows) {
             const action = names(row[0])[0] as string;
             const kind = (row[1] ?? "").replace(/\*\*/g, "");
@@ -136,12 +177,18 @@ describe("the README", () => {
                 assert.match(kind, approval === "review" ? /review screen/ : /dialog/, `${action}: ${kind}`);
             }
         }
-        assert.match(table("| Action | Kind |").find((row) => row[0] === "`update`")?.[1] ?? "", /dialog; review screen when it sets the description/);
+        assert.match(
+            table("| Action | Kind |").find((row) => row[0] === "`update`")?.[1] ?? "",
+            /dialog; review screen when it sets the description/,
+        );
     });
 
     test("its parameter table agrees with the table of the code", () => {
         const rows = table("| Action | Needs |", PARAMETERS);
-        assert.deepEqual(rows.map((row) => names(row[0])[0]), ACTION_NAMES);
+        assert.deepEqual(
+            rows.map((row) => names(row[0])[0]),
+            ACTION_NAMES,
+        );
         for (const row of rows) {
             const action = names(row[0])[0] as keyof typeof ACTIONS;
             assert.deepEqual(names(row[1]), [...ACTIONS[action].required], `${action} needs`);
@@ -154,7 +201,12 @@ describe("the README", () => {
         assert.deepEqual(documented, ["site", "auth", "updateFields", "fields", "privateNames", "environment"]);
         const valid = { site: "https://example.test", auth: { token: "pass:x/y" } };
         for (const field of documented) {
-            assert.ok(!validateJira({ ...valid, [field]: valid[field as keyof typeof valid] }).some((error) => error.endsWith("unknown field")), field);
+            assert.ok(
+                !validateJira({ ...valid, [field]: valid[field as keyof typeof valid] }).some((error) =>
+                    error.endsWith("unknown field"),
+                ),
+                field,
+            );
         }
         assert.deepEqual(validateJira({ ...valid, other: 1 }), ["jira.other: unknown field"]);
     });

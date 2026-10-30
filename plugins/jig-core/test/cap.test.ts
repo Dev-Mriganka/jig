@@ -8,13 +8,19 @@ import type { Content } from "../src/cap.ts";
 import { tempState } from "./support/state.ts";
 
 const state = tempState();
-before(() => { state.start(); });
+before(() => {
+    state.start();
+});
 after(() => state.stop());
 
 const text = (value: string): Content[] => [{ type: "text", text: value }];
 const mode = (file: string) => statSync(file).mode & 0o777;
 /** A text of exactly this many characters in which every stretch is different, so a cut can be told by position. */
-const long = (length: number) => Array.from({ length: Math.ceil(length / 3) }, (_, index) => `${index},`).join("").padEnd(length, "~").slice(0, length);
+const long = (length: number) =>
+    Array.from({ length: Math.ceil(length / 3) }, (_, index) => `${index},`)
+        .join("")
+        .padEnd(length, "~")
+        .slice(0, length);
 
 describe("when a result is cut", () => {
     test("the limits are 50 000 characters, of which 8 000 are kept", () => {
@@ -30,14 +36,29 @@ describe("when a result is cut", () => {
 
     test("Pi's own tools that cut their output themselves are skipped", () => {
         for (const tool of ["read", "bash", "powershell", "grep", "find", "ls"]) {
-            assert.equal(capContent({ tool, toolCallId: "c2", sessionId: "s1", content: text(long(80_000)) }), undefined, tool);
+            assert.equal(
+                capContent({ tool, toolCallId: "c2", sessionId: "s1", content: text(long(80_000)) }),
+                undefined,
+                tool,
+            );
         }
         assert.deepEqual([...SELF_TRUNCATING_TOOLS].sort(), ["bash", "find", "grep", "ls", "powershell", "read"]);
-        assert.notEqual(capContent({ tool: "write", toolCallId: "c2", sessionId: "s1", content: text(long(80_000)) }), undefined);
+        assert.notEqual(
+            capContent({ tool: "write", toolCallId: "c2", sessionId: "s1", content: text(long(80_000)) }),
+            undefined,
+        );
     });
 
     test("a result that holds no text is left alone", () => {
-        assert.equal(capContent({ tool: "shot", toolCallId: "c3", sessionId: "s1", content: [{ type: "image", data: "AAAA", mimeType: "image/png" }] }), undefined);
+        assert.equal(
+            capContent({
+                tool: "shot",
+                toolCallId: "c3",
+                sessionId: "s1",
+                content: [{ type: "image", data: "AAAA", mimeType: "image/png" }],
+            }),
+            undefined,
+        );
     });
 });
 
@@ -67,23 +88,46 @@ describe("what the model gets and what is saved", () => {
     });
 
     test("a nested call id has its slash replaced", () => {
-        const nested = capContent({ tool: "mongo", toolCallId: "call_abc/2", sessionId: "session-1", content: text(full) });
+        const nested = capContent({
+            tool: "mongo",
+            toolCallId: "call_abc/2",
+            sessionId: "session-1",
+            content: text(full),
+        });
         assert.equal(path.basename(nested?.spill ?? ""), "call_abc_2.txt");
     });
 
     test("an id that tries to leave the folder stays inside it", () => {
-        const sneaky = capContent({ tool: "mongo", toolCallId: "../../escape", sessionId: "../other", content: text(full) });
+        const sneaky = capContent({
+            tool: "mongo",
+            toolCallId: "../../escape",
+            sessionId: "../other",
+            content: text(full),
+        });
         const spill = sneaky?.spill ?? "";
         // One folder for the session below the spill folder, and the file in it: the slashes became underscores.
         assert.equal(path.dirname(path.dirname(spill)), path.join(state.dir, "spill"));
         const dots = capContent({ tool: "mongo", toolCallId: "..", sessionId: ".", content: text(full) })?.spill ?? "";
         assert.equal(path.dirname(path.dirname(dots)), path.join(state.dir, "spill"));
-        assert.ok(![".", ".."].includes(path.basename(path.dirname(dots))) && ![".", ".."].includes(path.basename(dots)), dots);
+        assert.ok(
+            ![".", ".."].includes(path.basename(path.dirname(dots))) && ![".", ".."].includes(path.basename(dots)),
+            dots,
+        );
     });
 
     test("the same id twice gets a second file, and the first is not overwritten", () => {
-        const first = capContent({ tool: "mongo", toolCallId: "dup", sessionId: "session-2", content: text(`first ${full}`) });
-        const second = capContent({ tool: "mongo", toolCallId: "dup", sessionId: "session-2", content: text(`second ${full}`) });
+        const first = capContent({
+            tool: "mongo",
+            toolCallId: "dup",
+            sessionId: "session-2",
+            content: text(`first ${full}`),
+        });
+        const second = capContent({
+            tool: "mongo",
+            toolCallId: "dup",
+            sessionId: "session-2",
+            content: text(`second ${full}`),
+        });
         assert.notEqual(first?.spill, second?.spill);
         assert.ok(readFileSync(first?.spill ?? "", "utf8").startsWith("first "));
         assert.ok(readFileSync(second?.spill ?? "", "utf8").startsWith("second "));
@@ -91,7 +135,12 @@ describe("what the model gets and what is saved", () => {
 
     test("several text blocks are joined, and images stay after the text", () => {
         const image: Content = { type: "image", data: "AAAA", mimeType: "image/png" };
-        const result = capContent({ tool: "mongo", toolCallId: "multi", sessionId: "session-3", content: [...text(long(30_000)), image, ...text(long(30_000))] });
+        const result = capContent({
+            tool: "mongo",
+            toolCallId: "multi",
+            sessionId: "session-3",
+            content: [...text(long(30_000)), image, ...text(long(30_000))],
+        });
         assert.equal(result?.content.length, 2);
         assert.equal(result?.content[0]?.type, "text");
         assert.deepEqual(result?.content[1], image);
@@ -115,7 +164,12 @@ describe("when the file cannot be written", () => {
         writeFileSync(blocker, "not a folder");
         process.env.JIG_STATE_DIR = path.join(blocker, "inside");
         try {
-            const result = capContent({ tool: "mongo", toolCallId: "nope", sessionId: "s", content: text(long(60_000)) });
+            const result = capContent({
+                tool: "mongo",
+                toolCallId: "nope",
+                sessionId: "s",
+                content: text(long(60_000)),
+            });
             assert.ok(result !== undefined);
             assert.equal(result.spill, undefined);
             const shown = textOf(result.content);

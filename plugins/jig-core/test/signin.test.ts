@@ -20,7 +20,10 @@ function make() {
 }
 
 /** A service that answers with fixed headers and notes what it was asked. */
-function service(headers: Record<string, string>, seen: Array<{ request: SignInRequest; signal?: AbortSignal }> = []): SignInService {
+function service(
+    headers: Record<string, string>,
+    seen: Array<{ request: SignInRequest; signal?: AbortSignal }> = [],
+): SignInService {
     return {
         async headers(request, signal) {
             seen.push({ request, ...(signal === undefined ? {} : { signal }) });
@@ -71,7 +74,9 @@ describe("asking for headers", () => {
         signIn.register("corp", service(held));
         const headers = await signIn.headers("corp", REQUEST);
         assert.notEqual(headers, held);
-        assert.throws(() => { (headers as Record<string, string>).Authorization = "other"; }, TypeError);
+        assert.throws(() => {
+            (headers as Record<string, string>).Authorization = "other";
+        }, TypeError);
         assert.equal(held.Authorization, "Bearer tok-77aa11bb");
     });
 });
@@ -89,13 +94,18 @@ describe("a name nobody registered", () => {
 
     test("says that none are registered when none are", async () => {
         const { signIn } = make();
-        await assert.rejects(signIn.headers("corp", REQUEST), /no sign-in service is named "corp".*\(none are registered\)/);
+        await assert.rejects(
+            signIn.headers("corp", REQUEST),
+            /no sign-in service is named "corp".*\(none are registered\)/,
+        );
     });
 
     test("is a rejection, not a throw, because the caller awaits it", async () => {
         const { signIn } = make();
         let promise: Promise<unknown> | undefined;
-        assert.doesNotThrow(() => { promise = signIn.headers("corp", REQUEST); });
+        assert.doesNotThrow(() => {
+            promise = signIn.headers("corp", REQUEST);
+        });
         await assert.rejects(promise as Promise<unknown>);
     });
 
@@ -110,10 +120,20 @@ describe("a name nobody registered", () => {
 describe("hiding the values", () => {
     test("each header value is removed from text from the moment the headers are returned", async () => {
         const { redactor, signIn } = make();
-        signIn.register("corp", service({ Authorization: "Bearer tok-4f9a2c7e", Cookie: "SESSION=abc123def456; theme=dark" }));
-        assert.equal(redactor.text("before: Bearer tok-4f9a2c7e"), "before: Bearer tok-4f9a2c7e", "nothing is hidden before it is asked for");
+        signIn.register(
+            "corp",
+            service({ Authorization: "Bearer tok-4f9a2c7e", Cookie: "SESSION=abc123def456; theme=dark" }),
+        );
+        assert.equal(
+            redactor.text("before: Bearer tok-4f9a2c7e"),
+            "before: Bearer tok-4f9a2c7e",
+            "nothing is hidden before it is asked for",
+        );
         const headers = await signIn.headers("corp", REQUEST);
-        assert.equal(redactor.text(`sent ${headers.Authorization} and ${headers.Cookie}`), `sent ${REDACTED} and ${REDACTED}`);
+        assert.equal(
+            redactor.text(`sent ${headers.Authorization} and ${headers.Cookie}`),
+            `sent ${REDACTED} and ${REDACTED}`,
+        );
     });
 
     test("with the encodings a secret has: base64, URL-encoded and hex", async () => {
@@ -127,7 +147,10 @@ describe("hiding the values", () => {
 
     test("the token of an Authorization header is hidden on its own, because a server may echo it without the scheme", async () => {
         const { redactor, signIn } = make();
-        signIn.register("corp", service({ Authorization: "Bearer tok-9d2e51aa", "Proxy-Authorization": "Basic dXNlcjpwYXNzd29yZA==" }));
+        signIn.register(
+            "corp",
+            service({ Authorization: "Bearer tok-9d2e51aa", "Proxy-Authorization": "Basic dXNlcjpwYXNzd29yZA==" }),
+        );
         await signIn.headers("corp", REQUEST);
         assert.equal(redactor.text("invalid token tok-9d2e51aa"), `invalid token ${REDACTED}`);
         assert.equal(redactor.text("proxy said dXNlcjpwYXNzd29yZA=="), `proxy said ${REDACTED}`);
@@ -160,13 +183,24 @@ describe("hiding the values", () => {
 describe("a service that misbehaves", () => {
     test("that throws is an error naming the service and carrying its message", async () => {
         const { signIn } = make();
-        signIn.register("corp", { headers: async () => { throw new Error("the login expired: sign in again"); } });
-        await assert.rejects(signIn.headers("corp", REQUEST), /sign-in service "corp" failed: the login expired: sign in again/);
+        signIn.register("corp", {
+            headers: async () => {
+                throw new Error("the login expired: sign in again");
+            },
+        });
+        await assert.rejects(
+            signIn.headers("corp", REQUEST),
+            /sign-in service "corp" failed: the login expired: sign in again/,
+        );
     });
 
     test("that throws a string is still an error", async () => {
         const { signIn } = make();
-        signIn.register("corp", { headers: () => { throw "plain text"; } });
+        signIn.register("corp", {
+            headers: () => {
+                throw "plain text";
+            },
+        });
         await assert.rejects(signIn.headers("corp", REQUEST), /sign-in service "corp" failed: plain text/);
     });
 
@@ -174,7 +208,11 @@ describe("a service that misbehaves", () => {
         const { signIn } = make();
         for (const answer of [undefined, null, "Bearer x", ["a"], 42]) {
             signIn.register("corp", { headers: async () => answer as never });
-            await assert.rejects(signIn.headers("corp", REQUEST), /sign-in service "corp" must return an object of headers/, String(answer));
+            await assert.rejects(
+                signIn.headers("corp", REQUEST),
+                /sign-in service "corp" must return an object of headers/,
+                String(answer),
+            );
         }
     });
 
@@ -199,8 +237,19 @@ describe("what the caller gives", () => {
     test("the request needs a system and a url", async () => {
         const { signIn } = make();
         signIn.register("corp", service({}));
-        for (const request of [undefined, {}, { system: "jira" }, { url: "https://x" }, { system: "", url: "https://x" }, { system: 1, url: "https://x" }]) {
-            await assert.rejects(signIn.headers("corp", request as never), /the request needs a system and a url/, JSON.stringify(request));
+        for (const request of [
+            undefined,
+            {},
+            { system: "jira" },
+            { url: "https://x" },
+            { system: "", url: "https://x" },
+            { system: 1, url: "https://x" },
+        ]) {
+            await assert.rejects(
+                signIn.headers("corp", request as never),
+                /the request needs a system and a url/,
+                JSON.stringify(request),
+            );
         }
     });
 });
@@ -209,7 +258,9 @@ describe("what the caller gives", () => {
 
 describe("in a Pi session", () => {
     const state = tempState();
-    beforeEach(() => { state.start(); });
+    beforeEach(() => {
+        state.start();
+    });
 
     let world: World | undefined;
     afterEach(async () => {
@@ -246,12 +297,19 @@ describe("in a Pi session", () => {
         jig().signIn.register("corp", service({ "X-Who": "someone" }));
         const result = await w.call("fake_tool", { env: "local", signIn: "nope" });
         assert.equal(result.isError, true);
-        assert.match(result.text, /no sign-in service is named "nope": a company plugin registers one with signIn\.register \(registered: corp\)/);
+        assert.match(
+            result.text,
+            /no sign-in service is named "nope": a company plugin registers one with signIn\.register \(registered: corp\)/,
+        );
     });
 
     test("a service that fails gives the tool an error that names it", async () => {
         const w = await begin();
-        jig().signIn.register("corp", { headers: async () => { throw new Error("the gateway is down"); } });
+        jig().signIn.register("corp", {
+            headers: async () => {
+                throw new Error("the gateway is down");
+            },
+        });
         const result = await w.call("fake_tool", { env: "local", signIn: "corp" });
         assert.equal(result.isError, true);
         assert.match(result.text, /sign-in service "corp" failed: the gateway is down/);
@@ -260,8 +318,12 @@ describe("in a Pi session", () => {
 
 describe("across loads", () => {
     const state = tempState();
-    beforeEach(() => { state.start(); });
-    afterEach(() => { state.stop(); });
+    beforeEach(() => {
+        state.start();
+    });
+    afterEach(() => {
+        state.stop();
+    });
 
     test("a reload starts with no services, because each load makes its own state", async () => {
         const first = fakePi();

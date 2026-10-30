@@ -191,11 +191,13 @@ export const loki: LogBackend = {
             total: entries.length,
             // A reply that filled its limit may have left lines behind.
             relation: entries.length >= Number(limit) ? "gte" : "eq",
-            hits: entries.map(({ ns, line, labels }): Source => ({
-                ...labels,
-                [TIME_FIELD]: isoOfNanos(ns),
-                [MESSAGE_FIELD]: line,
-            })),
+            hits: entries.map(
+                ({ ns, line, labels }): Source => ({
+                    ...labels,
+                    [TIME_FIELD]: isoOfNanos(ns),
+                    [MESSAGE_FIELD]: line,
+                }),
+            ),
         };
     },
 

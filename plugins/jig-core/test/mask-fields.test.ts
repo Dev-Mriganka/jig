@@ -28,8 +28,11 @@ describe("token format", () => {
 });
 
 describe("field-name corpus", () => {
-    const rows = JSON.parse(readFileSync(new URL("./mask-corpus/field-names.json", import.meta.url), "utf8")) as
-        { field: string; sensitive: boolean; value: unknown }[];
+    const rows = JSON.parse(readFileSync(new URL("./mask-corpus/field-names.json", import.meta.url), "utf8")) as {
+        field: string;
+        sensitive: boolean;
+        value: unknown;
+    }[];
 
     it("has 51 rows", () => assert.equal(rows.length, 51));
 
@@ -46,9 +49,17 @@ describe("field-name corpus", () => {
 describe("field rules", () => {
     it("does not treat numeric token units as credentials", () => {
         const result = maskValue({
-            input_count: 42, tokens_used: 3, available_tokens_estimate: 123, context_estimate: 123,
-            refresh_token: "secret", access_token: "secret", api_key: "secret", input_tokens: "secret",
-            token: 123, password_tokens: 123, api_key_tokens: 123,
+            input_count: 42,
+            tokens_used: 3,
+            available_tokens_estimate: 123,
+            context_estimate: 123,
+            refresh_token: "secret",
+            access_token: "secret",
+            api_key: "secret",
+            input_tokens: "secret",
+            token: 123,
+            password_tokens: 123,
+            api_key_tokens: 123,
         });
         assert.equal(result.input_tokens, "[removed:credential]");
         assert.equal(result.tokens_used, 3);
@@ -74,13 +85,16 @@ describe("field rules", () => {
     });
 
     it("applies field precedence, and removes an address whole", () => {
-        const masked = maskValue({
-            emailAddress: "person@example.com",
-            macAddress: "02:00:00:00:00:01",
-            shippingAddress: { street: "4 Test Lane", state: "NJ", country: "US" },
-            licenseState: "CA",
-            orderId: "ord-12",
-        }, 1);
+        const masked = maskValue(
+            {
+                emailAddress: "person@example.com",
+                macAddress: "02:00:00:00:00:01",
+                shippingAddress: { street: "4 Test Lane", state: "NJ", country: "US" },
+                licenseState: "CA",
+                orderId: "ord-12",
+            },
+            1,
+        );
         assert.ok(String(masked.emailAddress).startsWith("email#"));
         assert.equal(masked.macAddress, "02:00:00:00:00:01"); // a device identifier is an id
         assert.equal(masked.shippingAddress, "[removed:address]"); // not even the state or country is kept
@@ -89,11 +103,18 @@ describe("field rules", () => {
     });
 
     it("masks numeric and nested sensitive values", () => {
-        const masked = maskValue({
-            phone: 2025550123, cardNumber: 4111111111111111, imei: 123456789012345, // an imei is an id
-            password: { nested: "secret-value" }, firstName: { display: "Taylor" },
-            healthNote: ["private-note"], bank: { account: 123456789 },
-        }, 2);
+        const masked = maskValue(
+            {
+                phone: 2025550123,
+                cardNumber: 4111111111111111,
+                imei: 123456789012345, // an imei is an id
+                password: { nested: "secret-value" },
+                firstName: { display: "Taylor" },
+                healthNote: ["private-note"],
+                bank: { account: 123456789 },
+            },
+            2,
+        );
         const text = JSON.stringify(masked);
         for (const leaked of ["secret-value", "private-note"]) assert.ok(!text.includes(leaked), leaked);
         assert.equal(masked.password, "[removed:credential]");
@@ -110,7 +131,8 @@ describe("field rules", () => {
             "WARN password=abc123 routingNumber=000000000 version=1.2.3.4 orderId=ord-44 GET /?pass%77ord=hidden&tn=%252B442079460958",
             4,
         );
-        for (const leaked of ["abc123", "000000000", "hidden", "%252B442079460958"]) assert.ok(!value.includes(leaked), leaked);
+        for (const leaked of ["abc123", "000000000", "hidden", "%252B442079460958"])
+            assert.ok(!value.includes(leaked), leaked);
         assert.ok(value.includes("version=1.2.3.4"));
         assert.ok(value.includes("orderId=ord-44"));
         assert.ok(value.includes("0958"));
@@ -129,17 +151,22 @@ describe("field rules", () => {
     });
 
     it("gives one phone one token across formats and records", () => {
-        const value = maskValue({
-            contactPhone: "(202) 555-0123 ext. 99",
-            usage: [{ from: "+12025550123", to: "202-555-0123" }],
-        }, 1);
+        const value = maskValue(
+            {
+                contactPhone: "(202) 555-0123 ext. 99",
+                usage: [{ from: "+12025550123", to: "202-555-0123" }],
+            },
+            1,
+        );
         assert.equal(value.contactPhone, value.usage[0].from);
         assert.equal(value.contactPhone, value.usage[0].to);
         assert.ok(value.contactPhone.endsWith("-0123"));
     });
 
     it("keeps versions around embedded JSON and queries", () => {
-        const value = maskText('INFO payload={"version":"1.2.3.4","email":"x@example.com"} GET /?version=1.2.3.4&phone=%2B12025550123');
+        const value = maskText(
+            'INFO payload={"version":"1.2.3.4","email":"x@example.com"} GET /?version=1.2.3.4&phone=%2B12025550123',
+        );
         assert.equal(occurrences(value, "1.2.3.4"), 2);
         assert.ok(!value.includes("x@example.com"));
         assert.ok(!value.includes("%2B12025550123"));
@@ -157,15 +184,20 @@ describe("field rules", () => {
 
 describe("bare name fields inside things", () => {
     it("keeps the names of plans, charges, triggers and products; masks people's names", () => {
-        const text = JSON.stringify(maskValue({
-            plans: [{ name: "Standard Plan", sku: "PLAN-001", charges: [{ name: "Per Unit Charge", price: "14.98" }] }],
-            triggers: [{ name: "ContractEffective", triggerDate: "2026-09-21" }],
-            products: [{ name: "Standard Pricebook" }],
-            contact: { name: "Jane Customer", firstName: "Jane" },
-            users: [{ name: "John Customer" }],
-        }));
-        for (const kept of ["Standard Plan", "Per Unit Charge", "ContractEffective", "Standard Pricebook"]) assert.ok(text.includes(kept), kept);
-        for (const masked of ["Jane Customer", "John Customer", "\"Jane\""]) assert.ok(!text.includes(masked), masked);
+        const text = JSON.stringify(
+            maskValue({
+                plans: [
+                    { name: "Standard Plan", sku: "PLAN-001", charges: [{ name: "Per Unit Charge", price: "14.98" }] },
+                ],
+                triggers: [{ name: "ContractEffective", triggerDate: "2026-09-21" }],
+                products: [{ name: "Standard Pricebook" }],
+                contact: { name: "Jane Customer", firstName: "Jane" },
+                users: [{ name: "John Customer" }],
+            }),
+        );
+        for (const kept of ["Standard Plan", "Per Unit Charge", "ContractEffective", "Standard Pricebook"])
+            assert.ok(text.includes(kept), kept);
+        for (const masked of ["Jane Customer", "John Customer", '"Jane"']) assert.ok(!text.includes(masked), masked);
     });
 });
 
@@ -173,9 +205,17 @@ describe("fields a company plugin adds", () => {
     const options = { extraFields: ["subscriberAlias", "contact_ref"] };
 
     it("tokenises the value of a named field, whatever the case or separators of its spelling", () => {
-        const out = maskValue({
-            subscriberAlias: "Bobby", subscriber_alias: "Bobby", "SUBSCRIBER-ALIAS": "Bobby", contactRef: "c-42", orderId: "ord-1",
-        }, 7, options);
+        const out = maskValue(
+            {
+                subscriberAlias: "Bobby",
+                subscriber_alias: "Bobby",
+                "SUBSCRIBER-ALIAS": "Bobby",
+                contactRef: "c-42",
+                orderId: "ord-1",
+            },
+            7,
+            options,
+        );
         for (const key of ["subscriberAlias", "subscriber_alias", "SUBSCRIBER-ALIAS", "contactRef"]) {
             assert.match(out[key], /^personal#[0-9a-f]{6}$/, key);
         }
@@ -185,24 +225,32 @@ describe("fields a company plugin adds", () => {
     });
 
     it("reaches numbers, nested values, dotted keys, log fields, embedded JSON and query strings", () => {
-        const out = maskValue({
-            subscriberAlias: { display: "Bobby", id: 5 },
-            "customer.contact_ref": "c-42",
-            list: [{ contactRef: 987654 }],
-        }, 7, options);
+        const out = maskValue(
+            {
+                subscriberAlias: { display: "Bobby", id: 5 },
+                "customer.contact_ref": "c-42",
+                list: [{ contactRef: 987654 }],
+            },
+            7,
+            options,
+        );
         assert.match(out.subscriberAlias.display, /^personal#/);
         assert.equal(out.subscriberAlias.id, 5, "an identifier inside keeps its own rule");
         assert.match(out["customer.contact_ref"], /^personal#/);
         assert.match(out.list[0].contactRef, /^personal#/);
 
-        const text = masker(7, options).text('INFO subscriber_alias=Bobby GET /x?contactRef=c-42&orderId=o-1 payload={"subscriberAlias":"Bobby"}');
+        const text = masker(7, options).text(
+            'INFO subscriber_alias=Bobby GET /x?contactRef=c-42&orderId=o-1 payload={"subscriberAlias":"Bobby"}',
+        );
         assert.ok(!text.includes("Bobby") && !text.includes("c-42"), text);
         assert.equal(occurrences(text, "personal#"), 3);
         assert.ok(text.includes("orderId=o-1"));
     });
 
     it("wins over the built-in rules, because an entry can only mean mask this", () => {
-        const out = maskValue({ accountName: "Example Telecom LLC", status: "ACTIVE" }, 7, { extraFields: ["accountName", "status"] });
+        const out = maskValue({ accountName: "Example Telecom LLC", status: "ACTIVE" }, 7, {
+            extraFields: ["accountName", "status"],
+        });
         assert.match(out.accountName, /^personal#/);
         assert.match(out.status, /^personal#/);
     });
@@ -216,7 +264,14 @@ describe("fields a company plugin adds", () => {
     });
 
     it("refuses a name that could never match, rather than leaving the field unmasked", () => {
-        for (const extraFields of [[""], [" "], ["---"], ["ok", ""], [42 as unknown as string], "subscriberAlias" as unknown as string[]]) {
+        for (const extraFields of [
+            [""],
+            [" "],
+            ["---"],
+            ["ok", ""],
+            [42 as unknown as string],
+            "subscriberAlias" as unknown as string[],
+        ]) {
             assertFailsClosed(() => masker(7, { extraFields }), JSON.stringify(extraFields));
         }
         assert.doesNotThrow(() => masker(7, { extraFields: [] }));

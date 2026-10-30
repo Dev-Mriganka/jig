@@ -33,7 +33,16 @@ function aReview(): ReviewRecord {
         updatedAt: "2026-10-30T10:00:00.000Z",
         comments: [],
         resolutions: [],
-        iterations: [{ id: 1, createdAt: "2026-10-30T10:00:00.000Z", diff: "diff --git a/A.ts b/A.ts\n", diffHash: "hash-one", submittedCommentIds: [], resolutionIds: [] }],
+        iterations: [
+            {
+                id: 1,
+                createdAt: "2026-10-30T10:00:00.000Z",
+                diff: "diff --git a/A.ts b/A.ts\n",
+                diffHash: "hash-one",
+                submittedCommentIds: [],
+                resolutionIds: [],
+            },
+        ],
     };
 }
 
@@ -67,7 +76,12 @@ function rig() {
     };
     const file = path.join(dir, "jig-review", "passkeys.json");
     const store = new PasskeyStore(file);
-    const service = new ApprovalService(host, store, () => [ORIGIN, "http://127.0.0.1:4321"], () => now);
+    const service = new ApprovalService(
+        host,
+        store,
+        () => [ORIGIN, "http://127.0.0.1:4321"],
+        () => now,
+    );
     return { state, service, store, file };
 }
 
@@ -84,7 +98,9 @@ async function approveKey(r: Rig, auth: FakeAuthenticator, faults: Faults = {}) 
     const options = r.service.approvalOptions();
     assert.equal(options.method, "passkey");
     if (options.method !== "passkey") throw new Error("unreachable");
-    return r.service.approveWithPasskey(auth.get({ challenge: fromBase64Url(options.publicKey.challenge), origin: ORIGIN }, faults));
+    return r.service.approveWithPasskey(
+        auth.get({ challenge: fromBase64Url(options.publicKey.challenge), origin: ORIGIN }, faults),
+    );
 }
 
 /** A registered authenticator in a rig where the user said yes. */
@@ -98,7 +114,11 @@ async function withKey(algorithm: "ES256" | "RS256" = "ES256") {
 }
 
 async function refuses(promise: Promise<unknown>, status: number, message: RegExp): Promise<void> {
-    await assert.rejects(promise, (error) => error instanceof ApprovalError && error.status === status && message.test(error.message), `expected ${status} ${message}`);
+    await assert.rejects(
+        promise,
+        (error) => error instanceof ApprovalError && error.status === status && message.test(error.message),
+        `expected ${status} ${message}`,
+    );
 }
 
 // ---- registration ------------------------------------------------------------------------------------------------------
@@ -115,7 +135,10 @@ for (const algorithm of ["ES256", "RS256"] as const) {
         assert.equal(summary.algorithm, algorithm);
         assert.equal(r.state.questions.length, 1);
         assert.equal(r.state.questions[0]!.title, "Register this passkey?");
-        assert.ok(r.state.questions[0]!.message.includes(formatFingerprint(fingerprint)), "the question shows the SHA-256 fingerprint");
+        assert.ok(
+            r.state.questions[0]!.message.includes(formatFingerprint(fingerprint)),
+            "the question shows the SHA-256 fingerprint",
+        );
         const [stored] = r.store.read().passkeys;
         assert.equal(stored?.fingerprint, fingerprint);
         assert.equal(stored?.credentialId, toBase64Url(auth.credentialId));
@@ -139,7 +162,14 @@ test("a registration with nobody to ask in Pi stores nothing", async () => {
 });
 
 test("a registration is checked before the user is asked: the wrong challenge, origin, rp id, flags never reach Pi", async () => {
-    for (const faults of [{ challenge: Buffer.alloc(32, 9) }, { origin: "http://evil.example" }, { rpId: "example.com" }, { userPresent: false }, { userVerified: false }, { type: "webauthn.get" }] satisfies Faults[]) {
+    for (const faults of [
+        { challenge: Buffer.alloc(32, 9) },
+        { origin: "http://evil.example" },
+        { rpId: "example.com" },
+        { userPresent: false },
+        { userVerified: false },
+        { type: "webauthn.get" },
+    ] satisfies Faults[]) {
         const r = rig();
         r.state.answers.push("yes");
         await refuses(registerKey(r, new FakeAuthenticator(), faults), 403, /Not accepted|not current/);
@@ -162,7 +192,11 @@ test("a registration challenge is used once, and expires after two minutes", asy
     const late = r.service.registrationOptions();
     now += 120_000;
     r.state.answers.push("yes");
-    await refuses(r.service.register(auth.create({ challenge: fromBase64Url(late.publicKey.challenge), origin: ORIGIN })), 403, /not current/);
+    await refuses(
+        r.service.register(auth.create({ challenge: fromBase64Url(late.publicKey.challenge), origin: ORIGIN })),
+        403,
+        /not current/,
+    );
 });
 
 test("the credential id must be the one in the attestation, and a passkey is registered once", async () => {
@@ -171,7 +205,11 @@ test("the credential id must be the one in the attestation, and a passkey is reg
     const { publicKey } = r.service.registrationOptions();
     const created = auth.create({ challenge: fromBase64Url(publicKey.challenge), origin: ORIGIN });
     r.state.answers.push("yes");
-    await refuses(r.service.register({ ...created, id: toBase64Url(Buffer.from("another id")) }), 403, /does not match/);
+    await refuses(
+        r.service.register({ ...created, id: toBase64Url(Buffer.from("another id")) }),
+        403,
+        /does not match/,
+    );
 
     r.state.answers.push("yes");
     await registerKey(r, auth);
@@ -187,14 +225,24 @@ test("registration options exclude the keys already registered, and ask for user
     assert.equal(publicKey.rp.id, "localhost");
     assert.equal(publicKey.attestation, "none");
     assert.equal(publicKey.authenticatorSelection.userVerification, "required");
-    assert.deepEqual(publicKey.pubKeyCredParams.map((param) => param.alg), [-7, -257]);
+    assert.deepEqual(
+        publicKey.pubKeyCredParams.map((param) => param.alg),
+        [-7, -257],
+    );
     assert.equal(fromBase64Url(publicKey.challenge).length, 32);
     assert.equal(publicKey.timeout, 120_000);
 });
 
 test("a malformed registration is refused as a bad request", async () => {
     const r = rig();
-    for (const body of [null, 5, {}, { id: "x" }, { id: "x", response: {} }, { id: "!!", response: { clientDataJSON: "a", attestationObject: "a" } }]) {
+    for (const body of [
+        null,
+        5,
+        {},
+        { id: "x" },
+        { id: "x", response: {} },
+        { id: "!!", response: { clientDataJSON: "a", attestationObject: "a" } },
+    ]) {
         await refuses(r.service.register(body), 400, /malformed|not a WebAuthn/);
     }
 });
@@ -206,7 +254,9 @@ for (const algorithm of ["ES256", "RS256"] as const) {
         const { r, auth } = await withKey(algorithm);
         const result = await approveKey(r, auth);
         assert.deepEqual(result, { ok: true, method: "passkey" });
-        assert.deepEqual(r.state.approvals, [{ method: "passkey", fingerprint: fingerprintOf(auth.publicKey.export({ type: "spki", format: "der" })) }]);
+        assert.deepEqual(r.state.approvals, [
+            { method: "passkey", fingerprint: fingerprintOf(auth.publicKey.export({ type: "spki", format: "der" })) },
+        ]);
         assert.deepEqual(r.state.questions, [], "a passkey proves the user is present: there is no question to answer");
         assert.equal(r.store.read().passkeys[0]?.signCount, 1, "the counter is stored");
         assert.ok(r.store.read().passkeys[0]?.lastUsedAt);
@@ -221,7 +271,11 @@ test("with no passkey registered, the options say so and offer to register", () 
 test("a wrong challenge approves nothing", async () => {
     const { r, auth } = await withKey();
     r.service.approvalOptions();
-    await refuses(r.service.approveWithPasskey(auth.get({ challenge: Buffer.alloc(32, 1), origin: ORIGIN })), 403, /not current/);
+    await refuses(
+        r.service.approveWithPasskey(auth.get({ challenge: Buffer.alloc(32, 1), origin: ORIGIN })),
+        403,
+        /not current/,
+    );
     assert.deepEqual(r.state.approvals, []);
 });
 
@@ -249,7 +303,11 @@ test("an expired challenge approves nothing", async () => {
 test("a registration challenge cannot approve a review", async () => {
     const { r, auth } = await withKey();
     const { publicKey } = r.service.registrationOptions();
-    await refuses(r.service.approveWithPasskey(auth.get({ challenge: fromBase64Url(publicKey.challenge), origin: ORIGIN })), 403, /not current/);
+    await refuses(
+        r.service.approveWithPasskey(auth.get({ challenge: fromBase64Url(publicKey.challenge), origin: ORIGIN })),
+        403,
+        /not current/,
+    );
 });
 
 test("the wrong origin, the wrong rp id hash and a user who was not present or verified approve nothing", async () => {
@@ -312,7 +370,14 @@ test("approving what the user did not see: the review changed after the challeng
     const options = r.service.approvalOptions();
     if (options.method !== "passkey") throw new Error("unreachable");
     const body = auth.get({ challenge: fromBase64Url(options.publicKey.challenge), origin: ORIGIN });
-    r.state.review!.iterations.push({ id: 2, createdAt: "x", diff: "newer", diffHash: "hash-two", submittedCommentIds: [], resolutionIds: [] });
+    r.state.review!.iterations.push({
+        id: 2,
+        createdAt: "x",
+        diff: "newer",
+        diffHash: "hash-two",
+        submittedCommentIds: [],
+        resolutionIds: [],
+    });
     await refuses(r.service.approveWithPasskey(body), 409, /changed while you were approving/);
     assert.deepEqual(r.state.approvals, []);
 
@@ -327,18 +392,38 @@ test("approving what the user did not see: the review changed after the challeng
 test("only a review that is waiting for the user can be approved", async () => {
     const { r, auth } = await withKey();
     r.state.review!.status = "awaiting-agent";
-    await refuses(Promise.resolve().then(() => r.service.approvalOptions()), 409, /waiting for the agent/);
+    await refuses(
+        Promise.resolve().then(() => r.service.approvalOptions()),
+        409,
+        /waiting for the agent/,
+    );
     r.state.review!.status = "approved";
-    await refuses(Promise.resolve().then(() => r.service.approvalOptions()), 409, /already approved/);
+    await refuses(
+        Promise.resolve().then(() => r.service.approvalOptions()),
+        409,
+        /already approved/,
+    );
     r.state.review = undefined;
-    await refuses(Promise.resolve().then(() => r.service.approvalOptions()), 409, /No review is open/);
+    await refuses(
+        Promise.resolve().then(() => r.service.approvalOptions()),
+        409,
+        /No review is open/,
+    );
     assert.deepEqual(r.state.approvals, []);
     void auth;
 });
 
 test("a malformed approval is a bad request, and an oversized field too", async () => {
     const { r } = await withKey();
-    for (const body of [null, {}, { id: "x", response: { clientDataJSON: "e30", authenticatorData: "a", signature: "" } }, { id: "x", response: { clientDataJSON: toBase64Url(Buffer.alloc(5000)), authenticatorData: "AA", signature: "AA" } }]) {
+    for (const body of [
+        null,
+        {},
+        { id: "x", response: { clientDataJSON: "e30", authenticatorData: "a", signature: "" } },
+        {
+            id: "x",
+            response: { clientDataJSON: toBase64Url(Buffer.alloc(5000)), authenticatorData: "AA", signature: "AA" },
+        },
+    ]) {
         await refuses(r.service.approveWithPasskey(body), 400, /malformed|not a WebAuthn/);
     }
 });
@@ -365,7 +450,10 @@ test("the list shows fingerprints and never the key; removing one is confirmed i
     assert.equal(passkeys[0]?.fingerprint, fingerprint);
 
     r.state.answers.push("no");
-    assert.deepEqual(await r.service.removePasskey(fingerprint), { ok: false, message: "Not removed: you declined in Pi." });
+    assert.deepEqual(await r.service.removePasskey(fingerprint), {
+        ok: false,
+        message: "Not removed: you declined in Pi.",
+    });
     assert.equal(r.store.read().passkeys.length, 1);
 
     r.state.answers.push("yes");
@@ -385,8 +473,15 @@ test("a store that cannot be read: no passkey approves, registration is refused,
     (await import("node:fs")).writeFileSync(r.file, "{ not json");
 
     await refuses(r.service.approveWithPasskey(body), 403, /not registered/);
-    assert.deepEqual(r.service.approvalOptions(), { method: "none", canRegister: false, problem: "passkeys.json is not valid JSON" });
-    assert.throws(() => r.service.registrationOptions(), (error) => error instanceof ApprovalError && /passkeys\.json is not valid JSON/.test(error.message));
+    assert.deepEqual(r.service.approvalOptions(), {
+        method: "none",
+        canRegister: false,
+        problem: "passkeys.json is not valid JSON",
+    });
+    assert.throws(
+        () => r.service.registrationOptions(),
+        (error) => error instanceof ApprovalError && /passkeys\.json is not valid JSON/.test(error.message),
+    );
     assert.deepEqual(r.service.passkeys().passkeys, []);
 
     r.state.answers.push("yes");
@@ -450,7 +545,14 @@ test("the fallback does not approve a review that changed while the user decided
     const r = rig();
     r.state.answers.push("yes");
     r.state.whileAsking = () => {
-        r.state.review!.iterations.push({ id: 2, createdAt: "x", diff: "newer", diffHash: "hash-two", submittedCommentIds: [], resolutionIds: [] });
+        r.state.review!.iterations.push({
+            id: 2,
+            createdAt: "x",
+            diff: "newer",
+            diffHash: "hash-two",
+            submittedCommentIds: [],
+            resolutionIds: [],
+        });
     };
     const result = await r.service.approveInPage();
     assert.equal(result.ok, false);

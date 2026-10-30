@@ -51,7 +51,8 @@ export function toBase64Url(bytes: Uint8Array): string {
 
 /** The bytes of a base64url string. Anything but base64url characters is refused, not skipped. */
 export function fromBase64Url(text: unknown, what = "value"): Buffer {
-    if (typeof text !== "string" || !/^[A-Za-z0-9_-]*$/.test(text)) throw new WebAuthnError("malformed", `${what} is not base64url`);
+    if (typeof text !== "string" || !/^[A-Za-z0-9_-]*$/.test(text))
+        throw new WebAuthnError("malformed", `${what} is not base64url`);
     return Buffer.from(text, "base64url");
 }
 
@@ -192,8 +193,10 @@ function checkedKey(key: KeyObject): PublicKey {
         algorithm = "ES256";
     } else if (key.asymmetricKeyType === "rsa") {
         const exponent = details?.publicExponent ?? 0n;
-        if ((details?.modulusLength ?? 0) < 2048) throw new WebAuthnError("key", "the RSA key is shorter than 2048 bits");
-        if (exponent < 65537n || exponent % 2n === 0n) throw new WebAuthnError("key", "the RSA exponent is not accepted");
+        if ((details?.modulusLength ?? 0) < 2048)
+            throw new WebAuthnError("key", "the RSA key is shorter than 2048 bits");
+        if (exponent < 65537n || exponent % 2n === 0n)
+            throw new WebAuthnError("key", "the RSA exponent is not accepted");
         algorithm = "RS256";
     } else {
         throw new WebAuthnError("key", "only ES256 (P-256) and RS256 (RSA) keys are accepted");
@@ -222,7 +225,8 @@ function parseClientData(clientDataJSON: Buffer): ClientData {
     } catch {
         throw new WebAuthnError("malformed", "clientDataJSON is not JSON");
     }
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) throw new WebAuthnError("malformed", "clientDataJSON is not an object");
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))
+        throw new WebAuthnError("malformed", "clientDataJSON is not an object");
     return parsed as ClientData;
 }
 
@@ -248,9 +252,11 @@ function checkClientData(input: CeremonyInput, type: "webauthn.create" | "webaut
 }
 
 function checkAuthenticatorData(auth: AuthenticatorData): void {
-    if (!auth.rpIdHash.equals(sha256(Buffer.from(RP_ID)))) throw new WebAuthnError("rp-id", "the relying party id is not localhost");
+    if (!auth.rpIdHash.equals(sha256(Buffer.from(RP_ID))))
+        throw new WebAuthnError("rp-id", "the relying party id is not localhost");
     if (!auth.userPresent) throw new WebAuthnError("user-present", "the user was not present");
-    if (!auth.userVerified) throw new WebAuthnError("user-verified", "the user was not verified (PIN, fingerprint or face)");
+    if (!auth.userVerified)
+        throw new WebAuthnError("user-verified", "the user was not verified (PIN, fingerprint or face)");
 }
 
 // ---- registration ------------------------------------------------------------------------------------------------------
@@ -271,7 +277,8 @@ export function verifyRegistration(input: RegistrationInput): Registration {
     let attestation: Cbor;
     try {
         const decoded = decodeCbor(input.attestationObject);
-        if (decoded.end !== input.attestationObject.length) throw new WebAuthnError("malformed", "attestation has trailing bytes");
+        if (decoded.end !== input.attestationObject.length)
+            throw new WebAuthnError("malformed", "attestation has trailing bytes");
         attestation = decoded.value;
     } catch (error) {
         if (error instanceof CborError) throw new WebAuthnError("malformed", `attestation: ${error.message}`);
@@ -282,7 +289,11 @@ export function verifyRegistration(input: RegistrationInput): Registration {
     const auth = parseAuthenticatorData(Buffer.from(authData));
     checkAuthenticatorData(auth);
     if (auth.credential === undefined) throw new WebAuthnError("malformed", "the attestation carries no credential");
-    return { credentialId: auth.credential.id, key: publicKeyFromCose(auth.credential.publicKey), signCount: auth.signCount };
+    return {
+        credentialId: auth.credential.id,
+        key: publicKeyFromCose(auth.credential.publicKey),
+        signCount: auth.signCount,
+    };
 }
 
 // ---- assertion ---------------------------------------------------------------------------------------------------------

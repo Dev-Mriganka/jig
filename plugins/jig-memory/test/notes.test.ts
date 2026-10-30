@@ -24,7 +24,11 @@ test("over the limit, the top of the block stays, the rest moves, and a pointer 
     const block = tidied.notes.slice(tidied.notes.indexOf("## Now"), tidied.notes.indexOf("## Decisions"));
     assert.ok(Buffer.byteLength(block) < NOW_LIMIT, `${Buffer.byteLength(block)} bytes`);
     assert.match(block, /^## Now\nStatus: root cause found\nNext: check the queue\nOpen questions:\n- finding 0: /);
-    assert.match(block, /\n\(older lines moved to history\/2026-10-30T10-15-00\.123Z\.md\)\n\n$/, "a blank line separates the block from the next heading");
+    assert.match(
+        block,
+        /\n\(older lines moved to history\/2026-10-30T10-15-00\.123Z\.md\)\n\n$/,
+        "a blank line separates the block from the next heading",
+    );
     assert.match(tidied.notes, /\n\n## Decisions\n- Use the queue\.\n$/, "the decisions after the block are untouched");
     assert.match(tidied.moved, /^- finding \d+: /);
     assert.match(tidied.moved, /- finding 39: /, "the last finding moved");
@@ -35,7 +39,10 @@ test("over the limit, the top of the block stays, the rest moves, and a pointer 
 test("a second move replaces the pointer rather than adding one", () => {
     const once = tidyNow(longNow(40), "first.md");
     assert.ok(once !== undefined);
-    const grown = once.notes.replace("## Decisions", `${Array.from({ length: 30 }, (_, n) => `- later ${n}: ${"y".repeat(45)}`).join("\n")}\n\n## Decisions`);
+    const grown = once.notes.replace(
+        "## Decisions",
+        `${Array.from({ length: 30 }, (_, n) => `- later ${n}: ${"y".repeat(45)}`).join("\n")}\n\n## Decisions`,
+    );
     const twice = tidyNow(grown, "second.md");
     assert.ok(twice !== undefined);
     assert.equal(twice.notes.match(/\(older lines moved to history\//g)?.length, 1);

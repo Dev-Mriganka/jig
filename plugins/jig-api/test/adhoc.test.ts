@@ -18,7 +18,13 @@ beforeEach(() => {
     useAcme(h);
 });
 
-const call = (extra: Record<string, unknown> = {}) => ({ action: "call", environment: "Staging", method: "GET", url: `${h.api.origin}/v1/orders/1`, ...extra });
+const call = (extra: Record<string, unknown> = {}) => ({
+    action: "call",
+    environment: "Staging",
+    method: "GET",
+    url: `${h.api.origin}/v1/orders/1`,
+    ...extra,
+});
 /** The class jig-core would get for a call, which must be one. */
 function classify(input: Record<string, unknown>): CallClass {
     const found = h.declaration.classify(input);
@@ -37,7 +43,10 @@ describe("where a call is allowed", () => {
     test("not in an environment that adHoc does not list: the reason says what to add", async () => {
         h.configure(acmeSection(h, { adHoc: [] }));
         const result = await h.call(call());
-        assert.equal(result.blocked, 'jig-core could not decide: call is not allowed in Staging: add "staging" to api.adHoc to allow it');
+        assert.equal(
+            result.blocked,
+            'jig-core could not decide: call is not allowed in Staging: add "staging" to api.adHoc to allow it',
+        );
         assert.equal(result.preview, undefined, "nobody was asked");
         assert.equal(h.api.requests.length, 0);
     });
@@ -45,8 +54,13 @@ describe("where a call is allowed", () => {
     test("never in production, though the configuration lists it", async () => {
         h.configure(acmeSection(h, { adHoc: ["staging", "production"] }));
         for (const method of ["GET", "POST"]) {
-            const result = await h.call(call({ environment: "Production", method, url: `${h.prod.origin}/v1/orders/1` }));
-            assert.equal(result.blocked, "jig-core could not decide: call is never allowed in production, and Production counts as production");
+            const result = await h.call(
+                call({ environment: "Production", method, url: `${h.prod.origin}/v1/orders/1` }),
+            );
+            assert.equal(
+                result.blocked,
+                "jig-core could not decide: call is never allowed in production, and Production counts as production",
+            );
         }
         assert.equal(h.prod.requests.length, 0);
     });
@@ -54,9 +68,15 @@ describe("where a call is allowed", () => {
     test("never in an environment that nobody mapped, which counts as production", async () => {
         h.configure(acmeSection(h, { environments: { Staging: "staging" }, adHoc: ["staging"] }));
         const result = await h.call(call({ environment: "Production", url: `${h.prod.origin}/x` }));
-        assert.equal(result.blocked, "jig-core could not decide: call is never allowed in production, and Production counts as production because api.environments does not map it");
+        assert.equal(
+            result.blocked,
+            "jig-core could not decide: call is never allowed in production, and Production counts as production because api.environments does not map it",
+        );
         h.configure(acmeSection(h, { environments: {}, adHoc: [] }));
-        assert.match((await h.call(call())).blocked ?? "", /call is never allowed in production, and Staging counts as production because api\.environments does not map it/);
+        assert.match(
+            (await h.call(call())).blocked ?? "",
+            /call is never allowed in production, and Staging counts as production because api\.environments does not map it/,
+        );
         assert.equal(h.api.requests.length + h.prod.requests.length, 0);
     });
 
@@ -73,7 +93,10 @@ describe("where a call is allowed", () => {
 
     test("an environment that no collection has is invalid input that lists the ones there are", async () => {
         const result = await h.call(call({ environment: "Qa" }));
-        assert.equal(result.blocked, "jig-core could not decide: no environment named \"Qa\"; known: Staging, Production, staging, production");
+        assert.equal(
+            result.blocked,
+            'jig-core could not decide: no environment named "Qa"; known: Staging, Production, staging, production',
+        );
         const narrowed = await h.call(call({ environment: "staging", collection: "acme" }));
         assert.match(narrowed.blocked ?? "", /no environment named "staging"; known: Staging, Production$/);
     });
@@ -87,9 +110,19 @@ describe("where a call is allowed", () => {
 
 describe("what a call is classified as", () => {
     test("by its method alone: a GET, HEAD or OPTIONS reads, every other method writes", () => {
-        for (const method of ["GET", "HEAD", "OPTIONS"]) assert.equal(classify(call({ method })).effect, "read", method);
-        for (const method of ["POST", "PUT", "PATCH", "DELETE"]) assert.equal(classify(call({ method, ...(method === "DELETE" ? {} : { body: { a: 1 } }) })).effect, "write", method);
-        assert.deepEqual(classify(call({ method: "POST" })), { action: "call", environment: "staging", effect: "write" });
+        for (const method of ["GET", "HEAD", "OPTIONS"])
+            assert.equal(classify(call({ method })).effect, "read", method);
+        for (const method of ["POST", "PUT", "PATCH", "DELETE"])
+            assert.equal(
+                classify(call({ method, ...(method === "DELETE" ? {} : { body: { a: 1 } }) })).effect,
+                "write",
+                method,
+            );
+        assert.deepEqual(classify(call({ method: "POST" })), {
+            action: "call",
+            environment: "staging",
+            effect: "write",
+        });
     });
 
     test("a name in `reads` cannot turn calls into reads, whether the name is `call` or a request's", () => {
@@ -101,7 +134,10 @@ describe("what a call is classified as", () => {
     test("a write asks first and shows the request", async () => {
         const result = await h.call(call({ method: "POST", url: `${h.api.origin}/v1/orders`, body: { sku: "W-1" } }));
         assert.equal(result.cls?.effect, "write");
-        assert.match(result.preview?.body ?? "", /^Request: call in Staging \(staging\)\nSign-in: none\nMethod: POST\nURL: \S+\/v1\/orders\nHeaders:\n {2}Content-Type: application\/json\nBody \(JSON, 13 bytes\):/);
+        assert.match(
+            result.preview?.body ?? "",
+            /^Request: call in Staging \(staging\)\nSign-in: none\nMethod: POST\nURL: \S+\/v1\/orders\nHeaders:\n {2}Content-Type: application\/json\nBody \(JSON, 13 bytes\):/,
+        );
         ok(result);
         assert.equal(h.api.requests[0]?.body, '{"sku":"W-1"}');
     });
@@ -109,9 +145,18 @@ describe("what a call is classified as", () => {
 
 describe("the host of a call", () => {
     test("is one of the environment's hosts: any other is refused, and nothing is sent", async () => {
-        for (const url of [h.prod.origin, "https://api.other.example.test", "https://api.staging.acme.example.test.evil.example.test", "http://127.0.0.1:1"]) {
+        for (const url of [
+            h.prod.origin,
+            "https://api.other.example.test",
+            "https://api.staging.acme.example.test.evil.example.test",
+            "http://127.0.0.1:1",
+        ]) {
             const result = await h.call(call({ url: `${url}/v1/x` }));
-            assert.match(result.blocked ?? "", /^jig-core could not decide: the address goes to \S+, which is not a host of Staging \(/, url);
+            assert.match(
+                result.blocked ?? "",
+                /^jig-core could not decide: the address goes to \S+, which is not a host of Staging \(/,
+                url,
+            );
         }
         assert.equal(h.api.requests.length + h.prod.requests.length + h.auth.requests.length, 0);
     });
@@ -124,8 +169,11 @@ describe("the host of a call", () => {
     test("cannot be changed by the way the address is written", async () => {
         const host = new URL(h.api.origin).host;
         const tricks = [
-            `https://${host}@evil.example.test/x`, `${h.api.origin}@evil.example.test/x`, `https://evil.example.test\\@${host}/x`,
-            `http://evil.example.test#@${host}/x`, `http://evil.example.test?@${host}/x`,
+            `https://${host}@evil.example.test/x`,
+            `${h.api.origin}@evil.example.test/x`,
+            `https://evil.example.test\\@${host}/x`,
+            `http://evil.example.test#@${host}/x`,
+            `http://evil.example.test?@${host}/x`,
         ];
         for (const url of tricks) {
             const result = await h.call(call({ url }));
@@ -136,7 +184,15 @@ describe("the host of a call", () => {
     });
 
     test("a path that looks like another host is only a path on this one", async () => {
-        const paths = ["//other.example.test/x", "/@other.example.test/x", "/x@other.example.test", "/:8080/x", "///", "/x?@other.example.test", "/x?u=http://other.example.test/"];
+        const paths = [
+            "//other.example.test/x",
+            "/@other.example.test/x",
+            "/x@other.example.test",
+            "/:8080/x",
+            "///",
+            "/x?@other.example.test",
+            "/x?u=http://other.example.test/",
+        ];
         for (const path of paths) {
             h.api.requests.length = 0;
             const text = ok(await h.call(call({ url: `${h.api.origin}${path}` })));
@@ -147,7 +203,13 @@ describe("the host of a call", () => {
     });
 
     test("a path cannot climb: a .. is refused, plain or encoded, once or twice", async () => {
-        for (const path of ["/../tenant-b/x", "/%2e%2e/tenant-b/x", "/%252e%252e/tenant-b/x", "/a/../../x", "/a/..%2f..%2fx"]) {
+        for (const path of [
+            "/../tenant-b/x",
+            "/%2e%2e/tenant-b/x",
+            "/%252e%252e/tenant-b/x",
+            "/a/../../x",
+            "/a/..%2f..%2fx",
+        ]) {
             const result = await h.call(call({ url: `${h.api.origin}${path}` }));
             assert.match(result.blocked ?? "", /the path must hold only letters/, path);
         }
@@ -173,33 +235,68 @@ describe("how a call signs in", () => {
         assert.equal(h.api.requests[0]?.headers.authorization, `Bearer ${TOKENS.staging.value}`);
         const none = await h.call(call({ collection: "ledger", environment: "staging" }));
         ok(none);
-        assert.equal(h.api.requests[1]?.headers.authorization, undefined, ".http files sign in in their requests, not for the collection");
+        assert.equal(
+            h.api.requests[1]?.headers.authorization,
+            undefined,
+            ".http files sign in in their requests, not for the collection",
+        );
     });
 
     test("a collection whose own sign-in is not sent refuses the call by name", async () => {
-        const file = (h.jig.api.config.section("api") as { collections: { acme: { postman: string } } }).collections.acme.postman;
+        const file = (h.jig.api.config.section("api") as { collections: { acme: { postman: string } } }).collections
+            .acme.postman;
         const { readFileSync, writeFileSync } = await import("node:fs");
         const collection = JSON.parse(readFileSync(file, "utf8")) as { auth: unknown };
         collection.auth = { type: "digest", digest: [] };
         writeFileSync(file, JSON.stringify(collection));
         const result = await h.call(call({ collection: "acme" }));
-        assert.match(result.blocked ?? "", /^jig-core could not decide: the sign-in of acme cannot be sent: the sign-in type "digest" is not sent/);
+        assert.match(
+            result.blocked ?? "",
+            /^jig-core could not decide: the sign-in of acme cannot be sent: the sign-in type "digest" is not sent/,
+        );
     });
 
     test("through the sign-in service or the transport that the environment names, in place of the collection's own", async () => {
         h.jig.signIn.set("company-sso", () => ({ "X-Sso-Session": "sess-4711-abcdef" }));
-        h.configure(acmeSection(h, { environments: { Staging: { environment: "staging", signIn: "company-sso" }, Production: "production" } }));
+        h.configure(
+            acmeSection(h, {
+                environments: { Staging: { environment: "staging", signIn: "company-sso" }, Production: "production" },
+            }),
+        );
         ok(await h.call(call({ collection: "acme" })));
         assert.equal(h.api.requests[0]?.headers["x-sso-session"], "sess-4711-abcdef");
         assert.equal(h.api.requests[0]?.headers.authorization, undefined);
-        assert.deepEqual(h.jig.signInCalls, [{ name: "company-sso", request: { system: "api:acme", url: `${h.api.origin}/v1/orders/1` } }]);
+        assert.deepEqual(h.jig.signInCalls, [
+            { name: "company-sso", request: { system: "api:acme", url: `${h.api.origin}/v1/orders/1` } },
+        ]);
         assert.deepEqual(h.jig.secretCalls, []);
     });
 
     test("a saved request in that environment goes through it too, with the sign-in it names in place of its own", async () => {
-        h.jig.transports.set("company-proxy", { request: async (request) => ({ status: 200, headers: {}, body: JSON.stringify({ via: "proxy", url: request.url, auth: request.headers?.Authorization ?? null }) }) });
-        h.configure(acmeSection(h, { environments: { Staging: { environment: "staging", transport: "company-proxy" }, Production: "production" } }));
-        const text = ok(await h.call({ action: "run", request: "Get order", collection: "acme", environment: "Staging", variables: { orderId: "5" } }));
+        h.jig.transports.set("company-proxy", {
+            request: async (request) => ({
+                status: 200,
+                headers: {},
+                body: JSON.stringify({ via: "proxy", url: request.url, auth: request.headers?.Authorization ?? null }),
+            }),
+        });
+        h.configure(
+            acmeSection(h, {
+                environments: {
+                    Staging: { environment: "staging", transport: "company-proxy" },
+                    Production: "production",
+                },
+            }),
+        );
+        const text = ok(
+            await h.call({
+                action: "run",
+                request: "Get order",
+                collection: "acme",
+                environment: "Staging",
+                variables: { orderId: "5" },
+            }),
+        );
         assert.match(text, /"via": "proxy"/);
         assert.match(text, /"auth": null/);
         assert.equal(h.api.requests.length, 0, "the tool did not call the network itself");
@@ -217,9 +314,20 @@ describe("the limits of what the agent writes", () => {
     });
 
     test("headers that carry a sign-in or control the connection are refused", async () => {
-        for (const name of ["Authorization", "Cookie", "Host", "Content-Length", "Transfer-Encoding", "X-HTTP-Method-Override"]) {
+        for (const name of [
+            "Authorization",
+            "Cookie",
+            "Host",
+            "Content-Length",
+            "Transfer-Encoding",
+            "X-HTTP-Method-Override",
+        ]) {
             const result = await h.call(call({ headers: { [name]: "x" } }));
-            assert.match(result.blocked ?? "", new RegExp(`header ${name} is set by the tool or controls the connection`), name);
+            assert.match(
+                result.blocked ?? "",
+                new RegExp(`header ${name} is set by the tool or controls the connection`),
+                name,
+            );
         }
         assert.equal(h.api.requests.length, 0);
     });

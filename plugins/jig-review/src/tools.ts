@@ -61,7 +61,8 @@ export function registerReviewTools(pi: ExtensionAPI, handlers: ReviewToolHandle
             beforeAfter: Type.Optional(
                 Type.String({
                     maxLength: 20_000,
-                    description: "Small unified diff snippet for code changes. Do not use prose like 'Before:'/'After:' explanations.",
+                    description:
+                        "Small unified diff snippet for code changes. Do not use prose like 'Before:'/'After:' explanations.",
                 }),
             ),
         }),
@@ -76,7 +77,10 @@ export function registerReviewTools(pi: ExtensionAPI, handlers: ReviewToolHandle
                 addressedLocations: params.addressedLocations,
                 beforeAfter: params.beforeAfter,
             });
-            return { content: [{ type: "text", text: "Recorded interactive review resolution." }], details: { reviewId: review.id } };
+            return {
+                content: [{ type: "text", text: "Recorded interactive review resolution." }],
+                details: { reviewId: review.id },
+            };
         },
     });
 }

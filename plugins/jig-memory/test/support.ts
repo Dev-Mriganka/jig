@@ -85,7 +85,8 @@ export class FakePi {
     readonly cwd: string;
     readonly log: LogEntry[];
     readonly notices: Notice[] = [];
-    readonly sent: Array<{ message: { customType: string; content: string; details?: unknown }; options: unknown }> = [];
+    readonly sent: Array<{ message: { customType: string; content: string; details?: unknown }; options: unknown }> =
+        [];
     readonly events = new Map<string, Handler[]>();
     readonly commands = new Map<string, (args: string, ctx: ExtensionContext) => Promise<void>>();
     readonly ctx: ExtensionContext;
@@ -122,9 +123,17 @@ export class FakePi {
         this.log.push({ type: "custom", customType, data });
     }
 
-    sendMessage(message: { customType: string; content: string; display: boolean; details?: unknown }, options?: unknown): void {
+    sendMessage(
+        message: { customType: string; content: string; display: boolean; details?: unknown },
+        options?: unknown,
+    ): void {
         this.sent.push({ message, options });
-        this.log.push({ type: "custom_message", customType: message.customType, content: message.content, details: message.details });
+        this.log.push({
+            type: "custom_message",
+            customType: message.customType,
+            content: message.content,
+            details: message.details,
+        });
     }
 
     /** Runs every handler of an event in registration order, and returns what each one returned. */

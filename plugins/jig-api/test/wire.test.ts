@@ -38,7 +38,9 @@ function stubFetch(t: TestContext, behave: Behaviour = async () => new Response(
 
 /** The failure `fetch` gives: `fetch failed`, with the reason in the cause. */
 const failing = (code?: string, message = "connect failed"): TypeError =>
-    Object.assign(new TypeError("fetch failed"), { cause: Object.assign(new Error(message), code === undefined ? {} : { code }) });
+    Object.assign(new TypeError("fetch failed"), {
+        cause: Object.assign(new Error(message), code === undefined ? {} : { code }),
+    });
 
 async function failureOf(work: Promise<unknown>): Promise<Error> {
     try {
@@ -51,10 +53,20 @@ async function failureOf(work: Promise<unknown>): Promise<Error> {
 }
 
 describe("what means nothing was sent", () => {
-    const beforeSending = ["ERR_INVALID_URL", "ENOTFOUND", "EAI_AGAIN", "ECONNREFUSED", "EHOSTUNREACH", "ENETUNREACH", "UND_ERR_CONNECT_TIMEOUT"];
+    const beforeSending = [
+        "ERR_INVALID_URL",
+        "ENOTFOUND",
+        "EAI_AGAIN",
+        "ECONNREFUSED",
+        "EHOSTUNREACH",
+        "ENETUNREACH",
+        "UND_ERR_CONNECT_TIMEOUT",
+    ];
     for (const code of beforeSending) {
         test(`${code}: the server could not have read the request`, async (t) => {
-            stubFetch(t, async () => { throw failing(code); });
+            stubFetch(t, async () => {
+                throw failing(code);
+            });
             const error = await failureOf(exchange(wire({ method: "POST", body: "{}" }), signal()));
             assert.ok(error instanceof NotSentError, String(error));
             assert.equal(error.message, `could not connect (${code})`);
@@ -63,33 +75,67 @@ describe("what means nothing was sent", () => {
 
     test("the code is found in a cause of a cause, and in the errors of an aggregate", async (t) => {
         const stub = stubFetch(t);
-        stub.will(async () => { throw Object.assign(new TypeError("fetch failed"), { cause: { cause: { code: "ENOTFOUND" } } }); });
+        stub.will(async () => {
+            throw Object.assign(new TypeError("fetch failed"), { cause: { cause: { code: "ENOTFOUND" } } });
+        });
         assert.ok((await failureOf(exchange(wire(), signal()))) instanceof NotSentError);
-        stub.will(async () => { throw Object.assign(new TypeError("fetch failed"), { cause: new AggregateError([{ code: "ECONNREFUSED" }]) }); });
+        stub.will(async () => {
+            throw Object.assign(new TypeError("fetch failed"), {
+                cause: new AggregateError([{ code: "ECONNREFUSED" }]),
+            });
+        });
         assert.ok((await failureOf(exchange(wire(), signal()))) instanceof NotSentError);
     });
 
     test("a certificate that is not accepted is a failure before the request, and certificate checks stay on", async (t) => {
         const stub = stubFetch(t);
-        for (const code of ["DEPTH_ZERO_SELF_SIGNED_CERT", "SELF_SIGNED_CERT_IN_CHAIN", "UNABLE_TO_VERIFY_LEAF_SIGNATURE", "CERT_HAS_EXPIRED", "ERR_TLS_CERT_ALTNAME_INVALID", "CERT_NOT_YET_VALID"]) {
-            stub.will(async () => { throw failing(code); });
+        for (const code of [
+            "DEPTH_ZERO_SELF_SIGNED_CERT",
+            "SELF_SIGNED_CERT_IN_CHAIN",
+            "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+            "CERT_HAS_EXPIRED",
+            "ERR_TLS_CERT_ALTNAME_INVALID",
+            "CERT_NOT_YET_VALID",
+        ]) {
+            stub.will(async () => {
+                throw failing(code);
+            });
             const error = await failureOf(exchange(wire({ method: "PUT", body: "{}" }), signal()));
             assert.ok(error instanceof NotSentError, code);
-            assert.equal(error.message, `the TLS certificate was not accepted (${code}); certificate checks are never turned off`);
+            assert.equal(
+                error.message,
+                `the TLS certificate was not accepted (${code}); certificate checks are never turned off`,
+            );
         }
     });
 
     test("a port that fetch does not connect to is refused before the request, for any method", async () => {
-        const error = await failureOf(exchange(wire({ method: "POST", body: "{}", url: "http://127.0.0.1:1/x", allowPlainLocal: true }), signal()));
+        const error = await failureOf(
+            exchange(
+                wire({ method: "POST", body: "{}", url: "http://127.0.0.1:1/x", allowPlainLocal: true }),
+                signal(),
+            ),
+        );
         assert.ok(error instanceof NotSentError, String(error));
         assert.equal(error.message, "the port is one that fetch does not connect to");
     });
 });
 
 describe("what leaves the outcome unknown", () => {
-    for (const code of ["ECONNRESET", "UND_ERR_SOCKET", "EPIPE", "ETIMEDOUT", "UND_ERR_HEADERS_TIMEOUT", "UND_ERR_BODY_TIMEOUT", "HPE_INVALID_CONSTANT", "ERR_SSL_WRONG_VERSION_NUMBER"]) {
+    for (const code of [
+        "ECONNRESET",
+        "UND_ERR_SOCKET",
+        "EPIPE",
+        "ETIMEDOUT",
+        "UND_ERR_HEADERS_TIMEOUT",
+        "UND_ERR_BODY_TIMEOUT",
+        "HPE_INVALID_CONSTANT",
+        "ERR_SSL_WRONG_VERSION_NUMBER",
+    ]) {
         test(`${code}: the request may have arrived`, async (t) => {
-            stubFetch(t, async () => { throw failing(code); });
+            stubFetch(t, async () => {
+                throw failing(code);
+            });
             const error = await failureOf(exchange(wire({ method: "POST", body: "{}" }), signal()));
             assert.ok(error instanceof LostReplyError, String(error));
             assert.equal(error.reason, "failed");
@@ -98,7 +144,9 @@ describe("what leaves the outcome unknown", () => {
     }
 
     test("a failure without a code is unknown too, and Node's own words are never repeated", async (t) => {
-        stubFetch(t, async () => { throw failing(undefined, "connect to https://user:secret-token-123@api.example.test failed"); });
+        stubFetch(t, async () => {
+            throw failing(undefined, "connect to https://user:secret-token-123@api.example.test failed");
+        });
         const error = await failureOf(exchange(wire({ method: "DELETE" }), signal()));
         assert.ok(error instanceof LostReplyError);
         assert.equal(error.message, "the connection failed");
@@ -107,12 +155,20 @@ describe("what leaves the outcome unknown", () => {
     });
 
     test("a body that breaks off after the status is a lost reply too", async (t) => {
-        stubFetch(t, async () => new Response(new ReadableStream({
-            start(controller) {
-                controller.enqueue(new TextEncoder().encode("partial"));
-                controller.error(Object.assign(new TypeError("terminated"), { cause: { code: "UND_ERR_SOCKET" } }));
-            },
-        })));
+        stubFetch(
+            t,
+            async () =>
+                new Response(
+                    new ReadableStream({
+                        start(controller) {
+                            controller.enqueue(new TextEncoder().encode("partial"));
+                            controller.error(
+                                Object.assign(new TypeError("terminated"), { cause: { code: "UND_ERR_SOCKET" } }),
+                            );
+                        },
+                    }),
+                ),
+        );
         const error = await failureOf(exchange(wire({ method: "POST", body: "{}" }), signal()));
         assert.ok(error instanceof LostReplyError);
         assert.equal(error.message, "the connection failed (UND_ERR_SOCKET)");
@@ -122,7 +178,14 @@ describe("what leaves the outcome unknown", () => {
 describe("what is refused before a request is made", () => {
     test("an address that is not https is never called, whatever the settings say", async (t) => {
         const { seen } = stubFetch(t);
-        for (const url of ["http://api.example.test/x", "ftp://api.example.test/x", "http://127.0.0.1.example.test/x", "http://10.0.0.1/x", "file:///etc/hosts", "not a url"]) {
+        for (const url of [
+            "http://api.example.test/x",
+            "ftp://api.example.test/x",
+            "http://127.0.0.1.example.test/x",
+            "http://10.0.0.1/x",
+            "file:///etc/hosts",
+            "not a url",
+        ]) {
             for (const allowPlainLocal of [false, true]) {
                 const error = await failureOf(exchange(wire({ url, allowPlainLocal }), signal()));
                 assert.ok(error instanceof NotSentError, url);
@@ -144,7 +207,9 @@ describe("what is refused before a request is made", () => {
 
     test("a header the platform cannot send is refused without repeating its value", async (t) => {
         const { seen } = stubFetch(t);
-        const error = await failureOf(exchange(wire({ headers: { Authorization: "Bearer abc\r\nX-Injected: yes" } }), signal()));
+        const error = await failureOf(
+            exchange(wire({ headers: { Authorization: "Bearer abc\r\nX-Injected: yes" } }), signal()),
+        );
         assert.ok(error instanceof NotSentError);
         assert.equal(error.message, "a header holds a character that cannot be sent");
         assert.deepEqual(seen, []);
@@ -157,7 +222,9 @@ describe("what is refused before a request is made", () => {
         const first = await failureOf(exchange(wire({ method: "POST" }), cancelled.signal));
         assert.ok(first instanceof NotSentError);
         assert.equal(first.message, "it was cancelled before it was sent");
-        const late = await failureOf(exchange(wire({ method: "POST" }), AbortSignal.abort(new DOMException("too slow", "TimeoutError"))));
+        const late = await failureOf(
+            exchange(wire({ method: "POST" }), AbortSignal.abort(new DOMException("too slow", "TimeoutError"))),
+        );
         assert.ok(late instanceof NotSentError);
         assert.equal(late.message, "the time ran out before it was sent");
         assert.deepEqual(seen, []);
@@ -166,7 +233,10 @@ describe("what is refused before a request is made", () => {
 
 describe("the request that is made", () => {
     test("a redirect is asked to be handed back, never followed", async (t) => {
-        const { seen } = stubFetch(t, async () => new Response("", { status: 302, headers: { location: "http://plain.example.test/login" } }));
+        const { seen } = stubFetch(
+            t,
+            async () => new Response("", { status: 302, headers: { location: "http://plain.example.test/login" } }),
+        );
         const answer = await exchange(wire(), signal());
         assert.equal(seen[0]?.init.redirect, "manual");
         assert.equal(answer.status, 302);
@@ -176,7 +246,10 @@ describe("the request that is made", () => {
 
     test("the method, the headers, the body and the signal go to fetch as given, and a read has no body", async (t) => {
         const { seen } = stubFetch(t);
-        await exchange(wire({ method: "PATCH", body: '{"a":1}', headers: { "Content-Type": "application/json", "X-A": "1" } }), signal());
+        await exchange(
+            wire({ method: "PATCH", body: '{"a":1}', headers: { "Content-Type": "application/json", "X-A": "1" } }),
+            signal(),
+        );
         await exchange(wire(), signal());
         const [write, read] = seen;
         assert.equal(write?.url, "https://api.example.test/v1/x");
@@ -189,7 +262,10 @@ describe("the request that is made", () => {
     });
 
     test("the headers of the answer have lower-case names", async (t) => {
-        stubFetch(t, async () => new Response("{}", { headers: { "Content-Type": "application/json", "X-Request-Id": "r1" } }));
+        stubFetch(
+            t,
+            async () => new Response("{}", { headers: { "Content-Type": "application/json", "X-Request-Id": "r1" } }),
+        );
         const answer = await exchange(wire(), signal());
         assert.deepEqual(answer.headers, { "content-type": "application/json", "x-request-id": "r1" });
     });
@@ -216,7 +292,17 @@ describe("time and cancellation", () => {
     });
 
     test("a body that never finishes is cut off by the time too", async (t) => {
-        stubFetch(t, async () => new Response(new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode("a")); } })));
+        stubFetch(
+            t,
+            async () =>
+                new Response(
+                    new ReadableStream({
+                        start(controller) {
+                            controller.enqueue(new TextEncoder().encode("a"));
+                        },
+                    }),
+                ),
+        );
         const error = await failureOf(exchange(wire(), AbortSignal.timeout(30)));
         assert.ok(error instanceof LostReplyError);
         assert.equal(error.reason, "timeout");
@@ -226,13 +312,19 @@ describe("time and cancellation", () => {
 describe("the answer", () => {
     test("a body longer than the limit is cut at it, and the rest is not read", async (t) => {
         let pulled = 0;
-        stubFetch(t, async () => new Response(new ReadableStream({
-            pull(controller) {
-                pulled++;
-                controller.enqueue(new Uint8Array(512 * 1024).fill(97));
-                if (pulled > 100) controller.close();
-            },
-        })));
+        stubFetch(
+            t,
+            async () =>
+                new Response(
+                    new ReadableStream({
+                        pull(controller) {
+                            pulled++;
+                            controller.enqueue(new Uint8Array(512 * 1024).fill(97));
+                            if (pulled > 100) controller.close();
+                        },
+                    }),
+                ),
+        );
         const answer = await exchange(wire(), signal());
         assert.equal(answer.bytes, MAX_ANSWER_BYTES);
         assert.equal(answer.cut, true);
@@ -270,6 +362,9 @@ describe("the answer", () => {
     test("a response without a body is an empty answer", async (t) => {
         stubFetch(t, async () => new Response(null, { status: 204 }));
         const answer = await exchange(wire({ method: "DELETE" }), signal());
-        assert.deepEqual([answer.status, answer.text, answer.bytes, answer.cut, answer.binary], [204, "", 0, false, false]);
+        assert.deepEqual(
+            [answer.status, answer.text, answer.bytes, answer.cut, answer.binary],
+            [204, "", 0, false, false],
+        );
     });
 });

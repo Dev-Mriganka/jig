@@ -114,7 +114,10 @@ export function kubectlImageDeployer(config: KubectlImageDeploy): Deployer {
             const containers = containersOf(templateContainers(await getJson(kube, config.workload)));
             const current = containers.find((container) => container.name === config.container);
             if (current === undefined) {
-                const have = shortList(containers.map((container) => container.name), 120);
+                const have = shortList(
+                    containers.map((container) => container.name),
+                    120,
+                );
                 throw new Error(
                     `${config.workload} has no container ${config.container} (it has ${have}): ` +
                         'fix "container" in the ops catalog of jig.json (deploy)',

@@ -48,7 +48,7 @@ describe("limits", () => {
 
     it("refuses cyclic values instead of looping", () => {
         const cycle: Record<string, unknown> = {};
-        cycle["self"] = cycle;
+        cycle.self = cycle;
         assertFailsClosed(() => maskValue(cycle));
     });
 
@@ -58,7 +58,7 @@ describe("limits", () => {
     });
 
     it("bounds JSON nested inside strings by the same depth limit", () => {
-        const json = (levels: number): string => '{"a":'.repeat(levels) + "1" + "}".repeat(levels);
+        const json = (levels: number): string => `${'{"a":'.repeat(levels)}1${"}".repeat(levels)}`;
         assert.doesNotThrow(() => maskText(`payload=${json(30)}`));
         assertFailsClosed(() => maskText(`payload=${json(80)}`));
         // JSON inside a string inside JSON: each layer is one more level of decoding.
@@ -72,19 +72,32 @@ describe("limits", () => {
         assertWithheld(() => maskText('INFO payload={"email":"a@example.com"'));
         assertWithheld(() => maskText('INFO payload={"email":"a@example.com", "x": ]'));
         // One bad log line in a result: that line is withheld, the others are masked as usual.
-        const value = maskValue({ hits: [{ message: "INFO ok for account 42" }, { message: 'INFO payload={"email":"a@example.com"' }] });
-        assert.deepEqual(value, { hits: [{ message: "INFO ok for account 42" }, { message: "[removed:unparseable]" }] });
+        const value = maskValue({
+            hits: [{ message: "INFO ok for account 42" }, { message: 'INFO payload={"email":"a@example.com"' }],
+        });
+        assert.deepEqual(value, {
+            hits: [{ message: "INFO ok for account 42" }, { message: "[removed:unparseable]" }],
+        });
     });
 
     describe("a text of several lines", () => {
         const good = ["INFO ok for account 42", "INFO contact alice@example.com", "INFO done"];
 
         it("withholds only the lines that fail, and masks the others as usual", () => {
-            const text = [good[0], 'WARN payload={"email":"bad@example.com"', good[1], "GET /?email=someone%XXexample.com", good[2]].join("\n");
+            const text = [
+                good[0],
+                'WARN payload={"email":"bad@example.com"',
+                good[1],
+                "GET /?email=someone%XXexample.com",
+                good[2],
+            ].join("\n");
             const value = maskText(text);
             const lines = value.split("\n");
             assert.equal(lines.length, 5);
-            assert.deepEqual([lines[0], lines[1], lines[3], lines[4]], [good[0], "[removed:unparseable]", "[removed:unparseable]", good[2]]);
+            assert.deepEqual(
+                [lines[0], lines[1], lines[3], lines[4]],
+                [good[0], "[removed:unparseable]", "[removed:unparseable]", good[2]],
+            );
             assert.match(lines[2] ?? "", /^INFO contact email#[0-9a-f]{6}$/);
             assert.ok(!value.includes("example.com"), "nothing of a failing line or a masked email survives");
         });
@@ -122,7 +135,15 @@ describe("limits", () => {
     });
 
     it("refuses values that are not JSON-like", () => {
-        for (const value of [() => 1, Symbol("s"), new Date(), new Map(), new Set(), new (class Box {})(), { nested: [() => 1] }]) {
+        for (const value of [
+            () => 1,
+            Symbol("s"),
+            new Date(),
+            new Map(),
+            new Set(),
+            new (class Box {})(),
+            { nested: [() => 1] },
+        ]) {
             assertFailsClosed(() => maskValue(value));
         }
         assertFailsClosed(() => maskText(42 as unknown as string));
@@ -152,12 +173,30 @@ describe("limits", () => {
             }
             return undefined;
         };
-        assert.equal(failure(() => maskText("x".repeat(LIMIT + 1))), "limit");
-        assert.equal(failure(() => maskValue(nestedArrays(70))), "limit");
-        assert.equal(failure(() => maskValue(new Date())), "unsupported");
-        assert.equal(failure(() => maskText(`a ${SENTINEL} b`)), "unsupported");
-        assert.equal(failure(() => createMasker(new Uint8Array(3))), "internal");
-        assert.equal(failure(() => maskText("fine")), undefined);
+        assert.equal(
+            failure(() => maskText("x".repeat(LIMIT + 1))),
+            "limit",
+        );
+        assert.equal(
+            failure(() => maskValue(nestedArrays(70))),
+            "limit",
+        );
+        assert.equal(
+            failure(() => maskValue(new Date())),
+            "unsupported",
+        );
+        assert.equal(
+            failure(() => maskText(`a ${SENTINEL} b`)),
+            "unsupported",
+        );
+        assert.equal(
+            failure(() => createMasker(new Uint8Array(3))),
+            "internal",
+        );
+        assert.equal(
+            failure(() => maskText("fine")),
+            undefined,
+        );
     });
 
     it("exposes the same failures through createMasker", () => {

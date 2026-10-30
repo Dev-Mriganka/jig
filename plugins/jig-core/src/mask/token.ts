@@ -13,9 +13,12 @@ function asciiLower(text: string): string {
 /** The same value in different spellings must give the same token, or the model cannot correlate it. */
 function canonical(kind: Kind, value: string): string {
     switch (kind) {
-        case "email": return asciiLower(value.trim());
-        case "ip": return canonicalIp(value) ?? asciiLower(value);
-        default: return value;
+        case "email":
+            return asciiLower(value.trim());
+        case "ip":
+            return canonicalIp(value) ?? asciiLower(value);
+        default:
+            return value;
     }
 }
 

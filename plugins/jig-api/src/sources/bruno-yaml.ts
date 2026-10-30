@@ -5,20 +5,39 @@
 // Format: https://github.com/opencollection-dev/opencollection (schema: packages/oc-schema/src/opencollection.schema.json)
 import { isObject } from "../engine/values.ts";
 import type { FormField } from "../model.ts";
-import { apiKeyAuth, fileBody, hasText, noBody, oauth2Auth, refusedAuth, textBody, urlencodedBody } from "./bruno-types.ts";
-import type { AuthSetting, Pairs, ParsedBody, ParsedDefaults, ParsedEnvironment, ParsedRequest, ParsedVariable, Report } from "./bruno-types.ts";
+import {
+    apiKeyAuth,
+    fileBody,
+    hasText,
+    noBody,
+    oauth2Auth,
+    refusedAuth,
+    textBody,
+    urlencodedBody,
+} from "./bruno-types.ts";
+import type {
+    AuthSetting,
+    Pairs,
+    ParsedBody,
+    ParsedDefaults,
+    ParsedEnvironment,
+    ParsedRequest,
+    ParsedVariable,
+    Report,
+} from "./bruno-types.ts";
 
 const text = (value: unknown): string =>
     typeof value === "string" ? value : typeof value === "number" || typeof value === "boolean" ? String(value) : "";
 
-const list = (value: unknown): Array<Record<string, unknown>> => (Array.isArray(value) ? (value as unknown[]).filter(isObject) : []);
+const list = (value: unknown): Array<Record<string, unknown>> =>
+    Array.isArray(value) ? (value as unknown[]).filter(isObject) : [];
 
 /** A value that is text, or `{ type, data }`, or a list of variants of which one is selected. */
-function valueOf(value: unknown): string {
+function valueText(value: unknown): string {
     if (Array.isArray(value)) {
         const variants = list(value);
         const chosen = variants.find((variant) => variant.selected === true) ?? variants[0];
-        return chosen === undefined ? "" : valueOf(chosen.value);
+        return chosen === undefined ? "" : valueText(chosen.value);
     }
     return isObject(value) ? text(value.data) : text(value);
 }
@@ -26,7 +45,7 @@ function valueOf(value: unknown): string {
 /** The enabled `{ name, value }` entries of a list. */
 function pairsOf(entries: unknown): Pairs {
     const enabled = list(entries).filter((entry) => entry.disabled !== true && text(entry.name) !== "");
-    return enabled.map((entry) => [text(entry.name), valueOf(entry.value)] as const);
+    return enabled.map((entry) => [text(entry.name), valueText(entry.value)] as const);
 }
 
 /** The description of an item: text, or `{ content }`. */
@@ -58,7 +77,8 @@ function authOf(raw: unknown): AuthSetting {
         case "oauth2": {
             const credentials = isObject(raw.credentials) ? raw.credentials : {};
             const owner = isObject(raw.resourceOwner) ? raw.resourceOwner : {};
-            const token = isObject(raw.tokenConfig) && isObject(raw.tokenConfig.placement) ? raw.tokenConfig.placement : {};
+            const token =
+                isObject(raw.tokenConfig) && isObject(raw.tokenConfig.placement) ? raw.tokenConfig.placement : {};
             return oauth2Auth({
                 grant: get("flow") || get("grantType"),
                 accessTokenUrl: get("accessTokenUrl"),
@@ -101,8 +121,11 @@ function bodyOf(raw: unknown): ParsedBody {
                 const name = text(entry.name);
                 const typed = text(entry.contentType) === "" ? {} : { contentType: text(entry.contentType) };
                 if (entry.type === "file") {
-                    const files = (Array.isArray(entry.value) ? (entry.value as unknown[]) : [entry.value]).map(text).filter((file) => file !== "");
-                    if (files.length === 0) notes.push(`the file field "${name}" has no file chosen, so it is left out`);
+                    const files = (Array.isArray(entry.value) ? (entry.value as unknown[]) : [entry.value])
+                        .map(text)
+                        .filter((file) => file !== "");
+                    if (files.length === 0)
+                        notes.push(`the file field "${name}" has no file chosen, so it is left out`);
                     for (const file of files) fields.push({ kind: "file", name, file: { path: file }, ...typed });
                 } else {
                     fields.push({ kind: "text", name, value: text(entry.value), ...typed });
@@ -114,7 +137,8 @@ function bodyOf(raw: unknown): ParsedBody {
             const files = list(data);
             const chosen = files.find((file) => file.selected === true) ?? files[0];
             const path = chosen === undefined ? "" : text(chosen.filePath);
-            if (chosen === undefined || path === "") return { notes: ["its body is a file, but no file is chosen, so it has no body"] };
+            if (chosen === undefined || path === "")
+                return { notes: ["its body is a file, but no file is chosen, so it has no body"] };
             return fileBody(path, text(chosen.contentType));
         }
         case "sparql":
@@ -131,7 +155,11 @@ function graphqlBody(raw: Record<string, unknown>): ParsedBody {
     const query = text(raw.query);
     if (!hasText(query)) return noBody();
     const variables = text(raw.variables);
-    return { body: { kind: "graphql", query, ...(hasText(variables) ? { variables } : {}) }, contentType: "application/json", notes: [] };
+    return {
+        body: { kind: "graphql", query, ...(hasText(variables) ? { variables } : {}) },
+        contentType: "application/json",
+        notes: [],
+    };
 }
 
 interface Scripts {
@@ -165,7 +193,12 @@ function varsOf(variables: unknown): Map<string, string> {
     return found;
 }
 
-const kinds: Readonly<Record<string, string>> = { http: "http", graphql: "graphql", websocket: "websocket", grpc: "grpc" };
+const kinds: Readonly<Record<string, string>> = {
+    http: "http",
+    graphql: "graphql",
+    websocket: "websocket",
+    grpc: "grpc",
+};
 
 /** What kind of item an object is: a request of some protocol, a folder, or something else (a script file, an app). */
 export function itemKind(raw: unknown): "request" | "folder" | "other" {
@@ -197,7 +230,9 @@ export function readRequest(raw: Record<string, unknown>, report: Report): Parse
         method,
         url: text(details.url),
         headers: pairsOf(details.headers),
-        pathParams: params.filter((param) => text(param.type) === "path").map((param) => [text(param.name), text(param.value)] as const),
+        pathParams: params
+            .filter((param) => text(param.type) === "path")
+            .map((param) => [text(param.name), text(param.value)] as const),
         body: bodyOf(details.body),
         auth: authOf(details.auth),
         vars: varsOf(runtime.variables),
@@ -205,7 +240,9 @@ export function readRequest(raw: Record<string, unknown>, report: Report): Parse
         notes,
         assertions: list(runtime.assertions)
             .filter((assertion) => assertion.disabled !== true)
-            .map((each) => [text(each.expression), text(each.operator), text(each.value)].filter((part) => part !== "").join(" ")),
+            .map((each) =>
+                [text(each.expression), text(each.operator), text(each.value)].filter((part) => part !== "").join(" "),
+            ),
         docs: describedBy(raw.docs),
     };
 }
@@ -241,7 +278,11 @@ export function readEnvironment(raw: unknown, report: Report): ParsedEnvironment
             return;
         }
         // A secret may carry a value in the file if someone typed one: it is kept here only so that it can be refused.
-        variables.push({ name, value: entry.secret === true ? text(entry.value) : valueOf(entry.value), secret: entry.secret === true });
+        variables.push({
+            name,
+            value: entry.secret === true ? text(entry.value) : valueText(entry.value),
+            secret: entry.secret === true,
+        });
     });
     const external = isObject(file.externalSecrets) ? file.externalSecrets : undefined;
     for (const entry of list(external?.variables)) {
@@ -252,7 +293,13 @@ export function readEnvironment(raw: unknown, report: Report): ParsedEnvironment
     return {
         name: text(file.name) || undefined,
         variables,
-        extends: text(file.extends) === "" ? [] : text(file.extends).split(",").map((part) => part.trim()).filter((part) => part !== ""),
+        extends:
+            text(file.extends) === ""
+                ? []
+                : text(file.extends)
+                      .split(",")
+                      .map((part) => part.trim())
+                      .filter((part) => part !== ""),
         dotEnv: text(file.dotEnvFilePath) !== "",
     };
 }

@@ -1,91 +1,67 @@
 {
-  "category": "bank_account_routing",
-  "cases": [
-    {
-      "id": "bank-structured",
-      "input": {
-        "bankAccountNumber": "000123456789",
-        "routingNumber": "000000000",
-        "orderId": "ord-7801"
-      },
-      "must_not_contain": [
-        "000123456789",
-        "000000000"
-      ],
-      "must_keep": [
-        "ord-7801"
-      ],
-      "expect_tags": [],
-      "notes": "Constructed account number and routing-shaped test value."
-    },
-    {
-      "id": "bank-nested-mongo",
-      "input": {
-        "payouts": [
-          {
-            "bank": {
-              "account": "000987654321",
-              "routing": "999999999"
+    "category": "bank_account_routing",
+    "cases": [
+        {
+            "id": "bank-structured",
+            "input": {
+                "bankAccountNumber": "000123456789",
+                "routingNumber": "000000000",
+                "orderId": "ord-7801"
             },
-            "status": "PENDING"
-          }
-        ],
-        "accountId": "acct-demo-802"
-      },
-      "must_not_contain": [
-        "000987654321",
-        "999999999"
-      ],
-      "must_keep": [
-        "PENDING",
-        "acct-demo-802"
-      ],
-      "expect_tags": [],
-      "notes": "Bank details nested in an array."
-    },
-    {
-      "id": "bank-iban-field",
-      "input": {
-        "iban": "GB00 TEST 0000 0000 0000 00",
-        "invoiceId": "inv-demo-803"
-      },
-      "must_not_contain": [
-        "GB00 TEST 0000 0000 0000 00"
-      ],
-      "must_keep": [
-        "inv-demo-803"
-      ],
-      "expect_tags": [],
-      "notes": "Deliberately invalid example IBAN in a named field."
-    },
-    {
-      "id": "bank-log",
-      "input": "WARN payload={\"routingNumber\":\"000000000\",\"accountNumber\":\"000123456789\",\"orderId\":\"ord-7804\"}",
-      "must_not_contain": [
-        "000000000"
-      ],
-      "must_keep": [
-        "000123456789",
-        "ord-7804"
-      ],
-      "expect_tags": [],
-      "notes": "Bank fields inside JSON-encoded log text."
-    },
-    {
-      "id": "bank-negative-controls",
-      "input": {
-        "accountId": "acct-000123456789",
-        "orderId": "000000000-ORDER",
-        "sku": "ROUTING-BOARD-5"
-      },
-      "must_not_contain": [],
-      "must_keep": [
-        "acct-000123456789",
-        "000000000-ORDER",
-        "ROUTING-BOARD-5"
-      ],
-      "expect_tags": [],
-      "notes": "Account IDs, order IDs, and SKUs remain intact."
-    }
-  ]
+            "must_not_contain": ["000123456789", "000000000"],
+            "must_keep": ["ord-7801"],
+            "expect_tags": [],
+            "notes": "Constructed account number and routing-shaped test value."
+        },
+        {
+            "id": "bank-nested-mongo",
+            "input": {
+                "payouts": [
+                    {
+                        "bank": {
+                            "account": "000987654321",
+                            "routing": "999999999"
+                        },
+                        "status": "PENDING"
+                    }
+                ],
+                "accountId": "acct-demo-802"
+            },
+            "must_not_contain": ["000987654321", "999999999"],
+            "must_keep": ["PENDING", "acct-demo-802"],
+            "expect_tags": [],
+            "notes": "Bank details nested in an array."
+        },
+        {
+            "id": "bank-iban-field",
+            "input": {
+                "iban": "GB00 TEST 0000 0000 0000 00",
+                "invoiceId": "inv-demo-803"
+            },
+            "must_not_contain": ["GB00 TEST 0000 0000 0000 00"],
+            "must_keep": ["inv-demo-803"],
+            "expect_tags": [],
+            "notes": "Deliberately invalid example IBAN in a named field."
+        },
+        {
+            "id": "bank-log",
+            "input": "WARN payload={\"routingNumber\":\"000000000\",\"accountNumber\":\"000123456789\",\"orderId\":\"ord-7804\"}",
+            "must_not_contain": ["000000000"],
+            "must_keep": ["000123456789", "ord-7804"],
+            "expect_tags": [],
+            "notes": "Bank fields inside JSON-encoded log text."
+        },
+        {
+            "id": "bank-negative-controls",
+            "input": {
+                "accountId": "acct-000123456789",
+                "orderId": "000000000-ORDER",
+                "sku": "ROUTING-BOARD-5"
+            },
+            "must_not_contain": [],
+            "must_keep": ["acct-000123456789", "000000000-ORDER", "ROUTING-BOARD-5"],
+            "expect_tags": [],
+            "notes": "Account IDs, order IDs, and SKUs remain intact."
+        }
+    ]
 }

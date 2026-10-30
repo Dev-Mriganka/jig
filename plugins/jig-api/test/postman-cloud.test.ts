@@ -29,18 +29,26 @@ let saved: Record<string, string | undefined>;
 let collection: Record<string, unknown>;
 let environments: Record<string, Record<string, unknown>>;
 
-const fixture = (file: string): Record<string, unknown> => JSON.parse(fs.readFileSync(path.join(FIXTURES, "postman", file), "utf8")) as Record<string, unknown>;
+const fixture = (file: string): Record<string, unknown> =>
+    JSON.parse(fs.readFileSync(path.join(FIXTURES, "postman", file), "utf8")) as Record<string, unknown>;
 
 /** The fixtures with their example addresses pointing at the fake API of this test. */
 function served(): void {
     const replace = (value: unknown): unknown =>
-        JSON.parse(JSON.stringify(value).split("https://api.staging.acme.example.test").join(h.api.origin).split("https://api.acme.example.test").join(h.prod.origin)) as unknown;
+        JSON.parse(
+            JSON.stringify(value)
+                .split("https://api.staging.acme.example.test")
+                .join(h.api.origin)
+                .split("https://api.acme.example.test")
+                .join(h.prod.origin),
+        ) as unknown;
     collection = replace(fixture("acme-orders.postman_collection.json")) as Record<string, unknown>;
     const staging = replace(fixture("acme-staging.postman_environment.json")) as Record<string, unknown>;
     const production = replace(fixture("acme-production.postman_environment.json")) as Record<string, unknown>;
     // In the cloud, a secret may carry its value.
     for (const environment of [staging, production]) {
-        for (const item of environment.values as Array<Record<string, unknown>>) if (item.key === "token") item.value = SECRET_IN_POSTMAN;
+        for (const item of environment.values as Array<Record<string, unknown>>)
+            if (item.key === "token") item.value = SECRET_IN_POSTMAN;
     }
     environments = { [STAGING_ID]: staging, [PRODUCTION_ID]: production };
 }
@@ -48,10 +56,21 @@ function served(): void {
 /** The Postman API as far as these tests need it. */
 function answer(request: Recorded): Reply {
     if (request.headers["x-api-key"] !== KEY) {
-        return { status: 401, body: JSON.stringify({ error: { name: "AuthenticationError", message: `Invalid API Key: ${request.headers["x-api-key"] ?? "none"}. Every request requires a valid API Key.` } }) };
+        return {
+            status: 401,
+            body: JSON.stringify({
+                error: {
+                    name: "AuthenticationError",
+                    message: `Invalid API Key: ${request.headers["x-api-key"] ?? "none"}. Every request requires a valid API Key.`,
+                },
+            }),
+        };
     }
     const collectionMatch = /^\/collections\/(.+)$/.exec(request.path);
-    if (collectionMatch !== null) return collectionMatch[1] === COLLECTION_ID ? { body: JSON.stringify({ collection }) } : { status: 400, body: '{"error":{"name":"collectionNotFoundError"}}' };
+    if (collectionMatch !== null)
+        return collectionMatch[1] === COLLECTION_ID
+            ? { body: JSON.stringify({ collection }) }
+            : { status: 400, body: '{"error":{"name":"collectionNotFoundError"}}' };
     const environmentMatch = /^\/environments\/(.+)$/.exec(request.path);
     const environment = environmentMatch === null ? undefined : environments[environmentMatch[1] as string];
     return environment === undefined ? { status: 404, body: "{}" } : { body: JSON.stringify({ environment }) };
@@ -78,7 +97,14 @@ function configure(cloud: Record<string, unknown> = {}, extra: Record<string, un
     h.jig.secrets.set("pass:acme/production-token", "prd-token-8e1b6c05a9d2");
     h.configure({
         collections: {
-            cloud: { postman: { cloud: COLLECTION_ID, apiKey: KEY_REFERENCE, environments: { Staging: STAGING_ID, Production: PRODUCTION_ID }, ...cloud } },
+            cloud: {
+                postman: {
+                    cloud: COLLECTION_ID,
+                    apiKey: KEY_REFERENCE,
+                    environments: { Staging: STAGING_ID, Production: PRODUCTION_ID },
+                    ...cloud,
+                },
+            },
             ledger: { http: path.join(h.dir, "ledger") },
         },
         environments: { Staging: "staging", Production: "production" },
@@ -108,12 +134,20 @@ describe("before anything is fetched", () => {
     test("the collection is listed with one problem that says what to run, and it has no requests", async () => {
         const list = ok(await h.call({ action: "list", collection: "cloud" }));
         assert.match(list, /^cloud \(postman, 0 requests; environments: none\)$/m);
-        assert.match(list, new RegExp(`error: ${COLLECTION_ID}\\.json: has not been fetched yet: run /api refresh cloud`));
+        assert.match(
+            list,
+            new RegExp(`error: ${COLLECTION_ID}\\.json: has not been fetched yet: run /api refresh cloud`),
+        );
         assert.equal(postman.requests.length, 0, "reading touches no network");
     });
 
     test("a request of it is not found, and the other collections are not affected", async () => {
-        const result = await h.call({ action: "run", request: "Get order", collection: "cloud", environment: "Staging" });
+        const result = await h.call({
+            action: "run",
+            request: "Get order",
+            collection: "cloud",
+            environment: "Staging",
+        });
         assert.match(result.blocked ?? "", /no request named "Get order"/);
         assert.match(ok(await h.call({ action: "list", collection: "ledger" })), /^ledger \(http, 0 requests/m);
     });
@@ -124,24 +158,40 @@ describe("/api refresh", () => {
         const notices = await h.command("/api refresh cloud");
         assert.equal(notices.length, 1);
         assert.equal(notices[0]?.level, "info");
-        assert.equal(notices[0]?.text, [
-            "cloud: fetched the collection and 2 environments",
-            "  25 requests, no copy before",
-            "  Staging: new",
-            `  Staging: token is a secret with a value in Postman; the value is not kept, so give it in api.secrets`,
-            "  Production: new",
-            `  Production: token is a secret with a value in Postman; the value is not kept, so give it in api.secrets`,
-        ].join("\n"));
-        assert.deepEqual(postman.requests.map((request) => request.target), [`/collections/${COLLECTION_ID}`, `/environments/${STAGING_ID}`, `/environments/${PRODUCTION_ID}`]);
-        assert.ok(postman.requests.every((request) => request.method === "GET" && request.headers["x-api-key"] === KEY));
-        assert.ok(h.jig.secretCalls.every((reference) => reference === KEY_REFERENCE), "the key is read through jig-core, by its reference");
+        assert.equal(
+            notices[0]?.text,
+            [
+                "cloud: fetched the collection and 2 environments",
+                "  25 requests, no copy before",
+                "  Staging: new",
+                `  Staging: token is a secret with a value in Postman; the value is not kept, so give it in api.secrets`,
+                "  Production: new",
+                `  Production: token is a secret with a value in Postman; the value is not kept, so give it in api.secrets`,
+            ].join("\n"),
+        );
+        assert.deepEqual(
+            postman.requests.map((request) => request.target),
+            [`/collections/${COLLECTION_ID}`, `/environments/${STAGING_ID}`, `/environments/${PRODUCTION_ID}`],
+        );
+        assert.ok(
+            postman.requests.every((request) => request.method === "GET" && request.headers["x-api-key"] === KEY),
+        );
+        assert.ok(
+            h.jig.secretCalls.every((reference) => reference === KEY_REFERENCE),
+            "the key is read through jig-core, by its reference",
+        );
     });
 
     test("writes the copy where the state folder rule says, readable by its owner only", async () => {
         await h.command("/api refresh cloud");
         assert.equal(fs.statSync(copyPath()).mode & 0o777, 0o600);
-        for (const folder of [path.join(state, "api"), path.join(state, "api", "postman-cloud")]) assert.equal(fs.statSync(folder).mode & 0o777, 0o700, folder);
-        assert.deepEqual(fs.readdirSync(path.dirname(copyPath())), [`${COLLECTION_ID}.json`], "no temporary file is left");
+        for (const folder of [path.join(state, "api"), path.join(state, "api", "postman-cloud")])
+            assert.equal(fs.statSync(folder).mode & 0o777, 0o700, folder);
+        assert.deepEqual(
+            fs.readdirSync(path.dirname(copyPath())),
+            [`${COLLECTION_ID}.json`],
+            "no temporary file is left",
+        );
     });
 
     test("the state folder is $JIG_STATE_DIR, else jig under $XDG_STATE_HOME", async () => {
@@ -160,7 +210,10 @@ describe("/api refresh", () => {
         await h.command("/api refresh cloud");
         const list = ok(await h.call({ action: "list", collection: "cloud" }));
         assert.match(list, /^cloud \(postman, 25 requests; environments: Staging, Production\)$/m);
-        assert.match(list, /Orders\/Get order {2}GET \{\{baseUrl\}\}\/\{\{apiVersion\}\}\/orders\/\{\{orderId\}\} {2}\[reads; needs orderId\]/);
+        assert.match(
+            list,
+            /Orders\/Get order {2}GET \{\{baseUrl\}\}\/\{\{apiVersion\}\}\/orders\/\{\{orderId\}\} {2}\[reads; needs orderId\]/,
+        );
         const stored = fs.readFileSync(copyPath(), "utf8");
         assert.doesNotMatch(stored, new RegExp(SECRET_IN_POSTMAN), "the value of a secret variable is not kept");
         assert.match(stored, /"key":"token","value":"","type":"secret"/);
@@ -170,7 +223,15 @@ describe("/api refresh", () => {
 
     test("a request of the copy runs like one of an exported file: the host is the environment's, the token comes from api.secrets", async () => {
         await h.command("/api refresh cloud");
-        ok(await h.call({ action: "run", request: "Get order", collection: "cloud", environment: "Staging", variables: { orderId: "7" } }));
+        ok(
+            await h.call({
+                action: "run",
+                request: "Get order",
+                collection: "cloud",
+                environment: "Staging",
+                variables: { orderId: "7" },
+            }),
+        );
         const sent = h.api.requests.at(-1);
         assert.equal(sent?.path, "/v1/orders/7");
         assert.equal(sent?.headers.authorization, "Bearer stg-token-4f9c2a71d3e8");
@@ -179,7 +240,10 @@ describe("/api refresh", () => {
     test("a request that uploads a file is refused: a cloud collection has no folder for files", async () => {
         await h.command("/api refresh cloud");
         const list = ok(await h.call({ action: "list", collection: "cloud", folder: "Orders" }));
-        assert.match(list, /Upload receipt .*refused: it uploads a file, and a Postman cloud collection has no folder to keep files in/);
+        assert.match(
+            list,
+            /Upload receipt .*refused: it uploads a file, and a Postman cloud collection has no folder to keep files in/,
+        );
         assert.match(list, /Import orders .*refused: it uploads a file/);
     });
 
@@ -199,7 +263,7 @@ describe("/api refresh", () => {
 
     test("says what changed since the last copy: requests added, removed and changed, and variables by name", async () => {
         await h.command("/api refresh cloud");
-        const items = (collection.item as Array<Record<string, unknown>>);
+        const items = collection.item as Array<Record<string, unknown>>;
         const orders = items.find((item) => item.name === "Orders") as { item: Array<Record<string, unknown>> };
         orders.item.pop();
         (orders.item[0] as { request: { url: { raw: string } } }).request.url.raw += "?expand=items";
@@ -209,14 +273,17 @@ describe("/api refresh", () => {
         staging.values.push({ key: "region", value: "eu", type: "default", enabled: true });
         staging.values = staging.values.filter((item) => item.key !== "unused");
         const notices = await h.command("/api refresh cloud");
-        assert.equal(notices[0]?.text, [
-            "cloud: fetched the collection and 2 environments",
-            "  25 requests; added: Orders/Refund order; removed: Orders/Place order (form); changed: Orders/Get order",
-            "  Staging: added region; changed customerId",
-            "  Staging: token is a secret with a value in Postman; the value is not kept, so give it in api.secrets",
-            "  Production: no change",
-            "  Production: token is a secret with a value in Postman; the value is not kept, so give it in api.secrets",
-        ].join("\n"));
+        assert.equal(
+            notices[0]?.text,
+            [
+                "cloud: fetched the collection and 2 environments",
+                "  25 requests; added: Orders/Refund order; removed: Orders/Place order (form); changed: Orders/Get order",
+                "  Staging: added region; changed customerId",
+                "  Staging: token is a secret with a value in Postman; the value is not kept, so give it in api.secrets",
+                "  Production: no change",
+                "  Production: token is a secret with a value in Postman; the value is not kept, so give it in api.secrets",
+            ].join("\n"),
+        );
     });
 });
 
@@ -230,7 +297,10 @@ describe("when the fetch goes wrong", () => {
     test("a key the service does not accept is reported in the service's status, and nothing is saved", async () => {
         h.jig.secrets.set(KEY_REFERENCE, ["PMAK", "not-the-key-0000000000000000"].join("-"));
         const said = await refreshed();
-        assert.equal(said, "cloud: could not fetch the collection: the API key was not accepted (HTTP 401). Nothing was saved.");
+        assert.equal(
+            said,
+            "cloud: could not fetch the collection: the API key was not accepted (HTTP 401). Nothing was saved.",
+        );
         assert.equal(fs.existsSync(copyPath()), false);
         assert.doesNotMatch(said, /Invalid API Key/, "the service's own words are not repeated");
     });
@@ -239,14 +309,24 @@ describe("when the fetch goes wrong", () => {
         await h.command("/api refresh cloud");
         const before = fs.readFileSync(copyPath(), "utf8");
         postman.respond = () => ({ status: 500, body: "boom" });
-        assert.equal(await refreshed(), "cloud: could not fetch the collection: the service failed (HTTP 500). The local copy was not changed.");
+        assert.equal(
+            await refreshed(),
+            "cloud: could not fetch the collection: the service failed (HTTP 500). The local copy was not changed.",
+        );
         assert.equal(fs.readFileSync(copyPath(), "utf8"), before);
-        assert.match(ok(await h.call({ action: "list", collection: "cloud" })), /25 requests/, "the old copy still serves");
+        assert.match(
+            ok(await h.call({ action: "list", collection: "cloud" })),
+            /25 requests/,
+            "the old copy still serves",
+        );
     });
 
     test("an unknown collection, a rate limit, and an answer that is not a collection each have their own words", async () => {
         postman.respond = () => ({ status: 400, body: '{"error":{"name":"collectionNotFoundError"}}' });
-        assert.match(await refreshed(), /the service does not know it \(HTTP 400\): check the id, and that the key can see it/);
+        assert.match(
+            await refreshed(),
+            /the service does not know it \(HTTP 400\): check the id, and that the key can see it/,
+        );
         postman.respond = () => ({ status: 429, body: "{}" });
         assert.match(await refreshed(), /the service asked for fewer requests \(HTTP 429\): try again in a minute/);
         postman.respond = () => ({ body: "<html>sign in</html>" });
@@ -258,7 +338,10 @@ describe("when the fetch goes wrong", () => {
     test("a service that cannot be reached, and one that does not answer in time", async () => {
         h.options.postmanApi = `http://127.0.0.1:${await closedPort()}`;
         // ECONNREFUSED is the kernel's answer; ECONNRESET is what a forwarder in front of the port may make of it.
-        assert.match(await refreshed(), /^cloud: could not fetch the collection: (could not connect \(ECONNREFUSED\) \(nothing was sent\)|no answer \(the connection failed \(ECONNRESET\)\))\. Nothing was saved\.$/);
+        assert.match(
+            await refreshed(),
+            /^cloud: could not fetch the collection: (could not connect \(ECONNREFUSED\) \(nothing was sent\)|no answer \(the connection failed \(ECONNRESET\)\))\. Nothing was saved\.$/,
+        );
         h.options.postmanApi = postman.origin;
         h.configure({ ...(h.jig.api.config.section("api") as object), timeoutSec: 1 });
         postman.respond = () => ({ hang: true });
@@ -267,25 +350,38 @@ describe("when the fetch goes wrong", () => {
 
     test("a key that cannot be read stops the fetch before anything is sent, without naming the key", async () => {
         h.jig.secrets.delete(KEY_REFERENCE);
-        assert.equal(await refreshed(), "cloud: could not fetch the collection: could not sign in (the secret could not be read: no such entry) (nothing was sent). Nothing was saved.");
+        assert.equal(
+            await refreshed(),
+            "cloud: could not fetch the collection: could not sign in (the secret could not be read: no such entry) (nothing was sent). Nothing was saved.",
+        );
         assert.equal(postman.requests.length, 0);
     });
 
     test("an environment that fails keeps its earlier copy, the rest is saved, and the command says it did not all work", async () => {
         await h.command("/api refresh cloud");
-        const items = (collection.item as Array<Record<string, unknown>>);
+        const items = collection.item as Array<Record<string, unknown>>;
         items.pop();
-        postman.respond = (request) => (request.path === `/environments/${STAGING_ID}` ? { status: 500, body: "{}" } : answer(request));
+        postman.respond = (request) =>
+            request.path === `/environments/${STAGING_ID}` ? { status: 500, body: "{}" } : answer(request);
         const said = await refreshed();
         assert.match(said, /^cloud: fetched the collection and 2 environments\n {2}\d+ requests; .*removed: /);
-        assert.match(said, /\n {2}Staging: could not fetch the environment: the service failed \(HTTP 500\)\. The earlier copy is kept\./);
+        assert.match(
+            said,
+            /\n {2}Staging: could not fetch the environment: the service failed \(HTTP 500\)\. The earlier copy is kept\./,
+        );
         assert.match(said, /\n {2}Production: no change/);
         const stored = JSON.parse(fs.readFileSync(copyPath(), "utf8")) as { environments: Record<string, unknown> };
         assert.deepEqual(Object.keys(stored.environments), ["Staging", "Production"]);
     });
 
     test("a collection larger than an ordinary answer is fetched whole", async () => {
-        (collection.item as unknown[]).push({ name: "Big", item: Array.from({ length: 3000 }, (_, index) => ({ name: `R${index}`, request: { method: "GET", url: "{{baseUrl}}/x", description: "d".repeat(1000) } })) });
+        (collection.item as unknown[]).push({
+            name: "Big",
+            item: Array.from({ length: 3000 }, (_, index) => ({
+                name: `R${index}`,
+                request: { method: "GET", url: "{{baseUrl}}/x", description: "d".repeat(1000) },
+            })),
+        });
         const notices = await h.command("/api refresh cloud");
         assert.equal(notices[0]?.level, "info");
         assert.ok(fs.statSync(copyPath()).size > 3 * 1024 * 1024);
@@ -295,7 +391,12 @@ describe("when the fetch goes wrong", () => {
     test("a file in the state folder that is not one of ours is a problem, not a crash", async () => {
         fs.mkdirSync(path.dirname(copyPath()), { recursive: true });
         fs.writeFileSync(copyPath(), '{"hello":1}');
-        assert.match(ok(await h.call({ action: "list", collection: "cloud" })), new RegExp(`error: ${COLLECTION_ID}\\.json: is not a copy that this plugin made: run /api refresh to fetch it again`));
+        assert.match(
+            ok(await h.call({ action: "list", collection: "cloud" })),
+            new RegExp(
+                `error: ${COLLECTION_ID}\\.json: is not a copy that this plugin made: run /api refresh to fetch it again`,
+            ),
+        );
         fs.writeFileSync(copyPath(), "{ not json");
         assert.match(ok(await h.call({ action: "list", collection: "cloud" })), /is not a copy that this plugin made/);
         assert.equal((await h.command("/api refresh cloud"))[0]?.level, "info", "and a refresh replaces it");
@@ -307,8 +408,15 @@ describe("through a transport or a sign-in service", () => {
         configure({ transport: "company-proxy" });
         h.jig.transports.set("company-proxy", {
             request: async (request) => {
-                const response = await fetch(request.url, { method: request.method, headers: { ...request.headers, "x-proxy-session": "p-1" } });
-                return { status: response.status, headers: Object.fromEntries(response.headers), body: await response.text() };
+                const response = await fetch(request.url, {
+                    method: request.method,
+                    headers: { ...request.headers, "x-proxy-session": "p-1" },
+                });
+                return {
+                    status: response.status,
+                    headers: Object.fromEntries(response.headers),
+                    body: await response.text(),
+                };
             },
         });
         const notices = await h.command("/api refresh cloud");
@@ -319,7 +427,11 @@ describe("through a transport or a sign-in service", () => {
         assert.equal(first?.request.system, "api:cloud");
         assert.equal(first?.request.method, "GET");
         assert.equal(first?.request.url, `${postman.origin}/collections/${COLLECTION_ID}`);
-        assert.equal(first?.request.headers?.["X-API-Key"], KEY, "the key is a header of the request, as the service wants it");
+        assert.equal(
+            first?.request.headers?.["X-API-Key"],
+            KEY,
+            "the key is a header of the request, as the service wants it",
+        );
         assert.equal(postman.requests[0]?.headers["x-proxy-session"], "p-1");
         assert.ok(fs.existsSync(copyPath()));
         assert.doesNotMatch(fs.readFileSync(copyPath(), "utf8") + text(notices), new RegExp(KEY.slice(0, 20)));
@@ -327,16 +439,26 @@ describe("through a transport or a sign-in service", () => {
 
     test("a transport that fails is reported in its own words with a key's shape removed, and the copy is untouched", async () => {
         configure({ transport: "company-proxy" });
-        h.jig.transports.set("company-proxy", { request: async (request) => { throw new Error(`proxy refused ${request.headers?.["X-API-Key"] ?? ""} for ${request.url}`); } });
+        h.jig.transports.set("company-proxy", {
+            request: async (request) => {
+                throw new Error(`proxy refused ${request.headers?.["X-API-Key"] ?? ""} for ${request.url}`);
+            },
+        });
         const said = text(await h.command("/api refresh cloud"));
-        assert.match(said, /^cloud: could not fetch the collection: no answer \(transport "company-proxy" failed: proxy refused \[redacted\] for /);
+        assert.match(
+            said,
+            /^cloud: could not fetch the collection: no answer \(transport "company-proxy" failed: proxy refused \[redacted\] for /,
+        );
         assert.doesNotMatch(said, new RegExp(KEY.slice(0, 20)));
         assert.equal(fs.existsSync(copyPath()), false);
     });
 
     test("a name no company plugin registered means nothing was sent", async () => {
         configure({ transport: "missing-proxy" });
-        assert.match(text(await h.command("/api refresh cloud")), /no transport named "missing-proxy" \(none is registered\); a company plugin registers it \(nothing was sent\)/);
+        assert.match(
+            text(await h.command("/api refresh cloud")),
+            /no transport named "missing-proxy" \(none is registered\); a company plugin registers it \(nothing was sent\)/,
+        );
         assert.equal(postman.requests.length, 0);
     });
 
@@ -344,32 +466,68 @@ describe("through a transport or a sign-in service", () => {
         configure({ signIn: "company-sso" });
         h.jig.signIn.set("company-sso", () => ({ "X-Company-Session": "sess-9" }));
         await h.command("/api refresh cloud");
-        assert.deepEqual(h.jig.signInCalls.map((call) => [call.name, call.request.system]), [["company-sso", "api:cloud"], ["company-sso", "api:cloud"], ["company-sso", "api:cloud"]]);
-        assert.ok(postman.requests.every((request) => request.headers["x-company-session"] === "sess-9" && request.headers["x-api-key"] === KEY));
+        assert.deepEqual(
+            h.jig.signInCalls.map((call) => [call.name, call.request.system]),
+            [
+                ["company-sso", "api:cloud"],
+                ["company-sso", "api:cloud"],
+                ["company-sso", "api:cloud"],
+            ],
+        );
+        assert.ok(
+            postman.requests.every(
+                (request) => request.headers["x-company-session"] === "sess-9" && request.headers["x-api-key"] === KEY,
+            ),
+        );
         h.jig.signIn.set("company-sso", () => ({ "x-api-key": "other" }));
-        assert.match(text(await h.command("/api refresh cloud")), /header x-api-key is set by the sign-in, so the request cannot have it too/);
+        assert.match(
+            text(await h.command("/api refresh cloud")),
+            /header x-api-key is set by the sign-in, so the request cannot have it too/,
+        );
     });
 });
 
 describe("the command", () => {
     test("without refresh, or with too much, it says how it is used", async () => {
         for (const line of ["/api", "/api list", "/api refresh a b"]) {
-            assert.deepEqual(await h.command(line), [{ text: "Usage: /api refresh [collection]: fetch the Postman cloud collections to their local copy", level: "warning" }], line);
+            assert.deepEqual(
+                await h.command(line),
+                [
+                    {
+                        text: "Usage: /api refresh [collection]: fetch the Postman cloud collections to their local copy",
+                        level: "warning",
+                    },
+                ],
+                line,
+            );
         }
     });
 
     test("an unknown collection, a collection that is files, and a configuration with nothing to fetch are each said", async () => {
-        assert.match(text(await h.command("/api refresh nope")), /^No collection is named nope\. Known: cloud, ledger$/);
-        assert.match(text(await h.command("/api refresh ledger")), /^ledger is read from files, so there is nothing to fetch\. Collections that can be fetched: cloud$/);
+        assert.match(
+            text(await h.command("/api refresh nope")),
+            /^No collection is named nope\. Known: cloud, ledger$/,
+        );
+        assert.match(
+            text(await h.command("/api refresh ledger")),
+            /^ledger is read from files, so there is nothing to fetch\. Collections that can be fetched: cloud$/,
+        );
         h.configure({ collections: { ledger: { http: path.join(h.dir, "ledger") } } });
-        assert.match(text(await h.command("/api refresh")), /^No collection is a Postman cloud collection: add one under api\.collections/);
+        assert.match(
+            text(await h.command("/api refresh")),
+            /^No collection is a Postman cloud collection: add one under api\.collections/,
+        );
         h.jig.reset();
         assert.match(text(await h.command("/api refresh")), /^api is not set up: add an "api" section/);
     });
 
     test("without a name it refreshes every cloud collection", async () => {
         h.configure({
-            collections: { one: { postman: { cloud: COLLECTION_ID, apiKey: KEY_REFERENCE } }, two: { postman: { cloud: COLLECTION_ID, apiKey: KEY_REFERENCE } }, ledger: { http: path.join(h.dir, "ledger") } },
+            collections: {
+                one: { postman: { cloud: COLLECTION_ID, apiKey: KEY_REFERENCE } },
+                two: { postman: { cloud: COLLECTION_ID, apiKey: KEY_REFERENCE } },
+                ledger: { http: path.join(h.dir, "ledger") },
+            },
             allowPlainLocal: true,
         });
         h.jig.secrets.set(KEY_REFERENCE, KEY);
@@ -384,7 +542,8 @@ describe("the command", () => {
 });
 
 describe("the configuration", () => {
-    const errorsOf = (cloud: unknown, extra: Record<string, unknown> = {}): string[] => readApi({ collections: { c: { postman: cloud, ...extra } } }).errors;
+    const errorsOf = (cloud: unknown, extra: Record<string, unknown> = {}): string[] =>
+        readApi({ collections: { c: { postman: cloud, ...extra } } }).errors;
     const good = { cloud: COLLECTION_ID, apiKey: KEY_REFERENCE };
 
     test("a collection and the reference of the key are all it needs", () => {
@@ -392,28 +551,54 @@ describe("the configuration", () => {
         assert.deepEqual(errors, []);
         assert.equal(settings?.collections.get("c")?.kind, "postman");
         assert.ok(settings?.collections.get("c")?.refresher);
-        assert.equal(readApi({ collections: { c: { postman: "/work/p.json" } } }).settings?.collections.get("c")?.refresher, undefined);
+        assert.equal(
+            readApi({ collections: { c: { postman: "/work/p.json" } } }).settings?.collections.get("c")?.refresher,
+            undefined,
+        );
     });
 
     test("the key is a reference, never the key: a pasted key is refused without being repeated", () => {
-        assert.deepEqual(errorsOf({ cloud: COLLECTION_ID }), ["api.collections.c.postman.apiKey: required, a secret reference such as pass:postman/api-key"]);
+        assert.deepEqual(errorsOf({ cloud: COLLECTION_ID }), [
+            "api.collections.c.postman.apiKey: required, a secret reference such as pass:postman/api-key",
+        ]);
         const errors = errorsOf({ ...good, apiKey: KEY });
-        assert.deepEqual(errors, ["api.collections.c.postman.apiKey: must be a secret reference such as pass:work/api-token, not the secret itself"]);
+        assert.deepEqual(errors, [
+            "api.collections.c.postman.apiKey: must be a secret reference such as pass:work/api-token, not the secret itself",
+        ]);
         assert.doesNotMatch(errors.join(), new RegExp(KEY.slice(0, 20)));
     });
 
     test("ids are letters, digits and dashes, so that they cannot reach another path", () => {
-        assert.deepEqual(errorsOf({ ...good, cloud: "../../etc/passwd" }), ["api.collections.c.postman.cloud: must be the id of a Postman collection (letters, digits and -)"]);
-        assert.deepEqual(errorsOf({ ...good, environments: { Staging: "a/b" } }), ["api.collections.c.postman.environments.Staging: must be the id of a Postman environment (letters, digits and -)"]);
-        assert.deepEqual(errorsOf({ ...good, cloud: undefined }), ["api.collections.c.postman.cloud: required, the id of the collection"]);
+        assert.deepEqual(errorsOf({ ...good, cloud: "../../etc/passwd" }), [
+            "api.collections.c.postman.cloud: must be the id of a Postman collection (letters, digits and -)",
+        ]);
+        assert.deepEqual(errorsOf({ ...good, environments: { Staging: "a/b" } }), [
+            "api.collections.c.postman.environments.Staging: must be the id of a Postman environment (letters, digits and -)",
+        ]);
+        assert.deepEqual(errorsOf({ ...good, cloud: undefined }), [
+            "api.collections.c.postman.cloud: required, the id of the collection",
+        ]);
     });
 
     test("environments belong inside postman, other fields are unknown, and a transport and a sign-in service are exclusive", () => {
-        assert.deepEqual(errorsOf(good, { environments: { Staging: STAGING_ID } }), ['api.collections.c.environments: for a Postman cloud collection this belongs inside postman, as { "Staging": "<environment id>" }']);
-        assert.deepEqual(errorsOf({ ...good, region: "asia" }), ['api.collections.c.postman.region: must be "us" or "eu", the region of your Postman data']);
-        assert.deepEqual(errorsOf({ ...good, accessKey: "PMAT-1" }), ["api.collections.c.postman.accessKey: unknown field"]);
-        assert.deepEqual(errorsOf({ ...good, transport: "t", signIn: "s" }), ["api.collections.c.postman: use signIn or transport, not both"]);
-        assert.deepEqual(errorsOf({ ...good, transport: 5 }), ["api.collections.c.postman.transport: must be the name of a transport"]);
-        assert.deepEqual(errorsOf({ ...good, region: "eu", transport: "t", environments: { Staging: STAGING_ID } }), []);
+        assert.deepEqual(errorsOf(good, { environments: { Staging: STAGING_ID } }), [
+            'api.collections.c.environments: for a Postman cloud collection this belongs inside postman, as { "Staging": "<environment id>" }',
+        ]);
+        assert.deepEqual(errorsOf({ ...good, region: "asia" }), [
+            'api.collections.c.postman.region: must be "us" or "eu", the region of your Postman data',
+        ]);
+        assert.deepEqual(errorsOf({ ...good, accessKey: "PMAT-1" }), [
+            "api.collections.c.postman.accessKey: unknown field",
+        ]);
+        assert.deepEqual(errorsOf({ ...good, transport: "t", signIn: "s" }), [
+            "api.collections.c.postman: use signIn or transport, not both",
+        ]);
+        assert.deepEqual(errorsOf({ ...good, transport: 5 }), [
+            "api.collections.c.postman.transport: must be the name of a transport",
+        ]);
+        assert.deepEqual(
+            errorsOf({ ...good, region: "eu", transport: "t", environments: { Staging: STAGING_ID } }),
+            [],
+        );
     });
 });

@@ -18,7 +18,8 @@ beforeEach(() => {
 });
 afterEach(() => h.close());
 
-const watch = (more: Record<string, unknown> = {}, where: Record<string, unknown> = ORDERS) => h.deploy.call({ action: "watch", ...where, version: "1.4.3", ...more });
+const watch = (more: Record<string, unknown> = {}, where: Record<string, unknown> = ORDERS) =>
+    h.deploy.call({ action: "watch", ...where, version: "1.4.3", ...more });
 
 describe("starting a watch", () => {
     test("starts the kind with the names of the service, its environment and the version, and returns its id at once", async () => {
@@ -31,7 +32,13 @@ describe("starting a watch", () => {
         const [started] = h.jig.watches;
         assert.equal(started?.kind, "ops-rollout");
         assert.equal(started?.title, "rollout of orders-api to 1.4.3 in staging");
-        assert.deepEqual(started?.spec, { service: "orders-api", environment: "staging", version: "1.4.3", startedAt: NOW, deadline: NOW + 15 * 60_000 - 5_000 });
+        assert.deepEqual(started?.spec, {
+            service: "orders-api",
+            environment: "staging",
+            version: "1.4.3",
+            startedAt: NOW,
+            deadline: NOW + 15 * 60_000 - 5_000,
+        });
         assert.equal(started?.timeoutMinutes, 15);
         assert.equal(started?.stallMinutes, 8);
         assert.deepEqual(h.jig.facts.get(result.id), [{ watch: "started" }]);
@@ -39,7 +46,13 @@ describe("starting a watch", () => {
 
     test("saves names and no more: no context, no namespace, no selector, nothing that could point it elsewhere", async () => {
         await watch();
-        assert.deepEqual(Object.keys(h.jig.watches[0]?.spec as object).sort(), ["deadline", "environment", "service", "startedAt", "version"]);
+        assert.deepEqual(Object.keys(h.jig.watches[0]?.spec as object).sort(), [
+            "deadline",
+            "environment",
+            "service",
+            "startedAt",
+            "version",
+        ]);
         assert.equal(JSON.stringify(h.jig.watches[0]?.spec).includes("cluster"), false);
     });
 
@@ -60,17 +73,20 @@ describe("starting a watch", () => {
         const [started] = h.jig.watches;
         assert.equal(started?.timeoutMinutes, 40);
         assert.equal(started?.stallMinutes, 20);
-        assert.equal((started?.spec as RolloutSpec).deadline, NOW + 40 * 60_000 - 5_000);
+        assert.equal((started!.spec as RolloutSpec).deadline, NOW + 40 * 60_000 - 5_000);
         assert.match(ok(result), /or after 40 minutes\./);
         await watch({ timeoutMinutes: 1, version: "1.4.4" });
         assert.equal(h.jig.watches[1]?.stallMinutes, 1);
-        assert.equal((h.jig.watches[1]?.spec as RolloutSpec).deadline, NOW + 55_000);
+        assert.equal((h.jig.watches[1]!.spec as RolloutSpec).deadline, NOW + 55_000);
     });
 
     test("watching what is already watched returns the watch there is, and starts no second", async () => {
         await watch();
         const again = await watch();
-        assert.equal(ok(again), "Already watching the rollout of orders-api to 1.4.3 in staging as watch-1. One message arrives when it ends.");
+        assert.equal(
+            ok(again),
+            "Already watching the rollout of orders-api to 1.4.3 in staging as watch-1. One message arrives when it ends.",
+        );
         assert.equal(h.jig.watches.length, 1);
         assert.deepEqual(h.jig.facts.get(again.id), [{ watch: "existing" }]);
     });
@@ -90,7 +106,7 @@ describe("starting a watch", () => {
         const result = await watch({}, { service: "orders-api", environment: "production" });
         assert.equal(result.blocked, undefined);
         assert.equal(result.cls?.environment, "local");
-        assert.equal((h.jig.watches[0]?.spec as RolloutSpec).environment, "production");
+        assert.equal((h.jig.watches[0]!.spec as RolloutSpec).environment, "production");
     });
 
     test("a version that is not an image tag is blocked before a watch is started", async () => {
@@ -114,13 +130,24 @@ describe("the watch kind", () => {
             plugin: string;
             intervalMs: number;
             describe(spec: RolloutSpec): string;
-            poll(spec: RolloutSpec, state: RolloutState | undefined, signal: AbortSignal): Promise<PollOutcome<RolloutState>>;
+            poll(
+                spec: RolloutSpec,
+                state: RolloutState | undefined,
+                signal: AbortSignal,
+            ): Promise<PollOutcome<RolloutState>>;
         };
         assert.ok(found, "the kind is registered");
         return found;
     };
-    const SPEC: RolloutSpec = { service: "orders-api", environment: "staging", version: "1.4.3", startedAt: NOW, deadline: NOW + 15 * 60_000 - 5_000 };
-    const poll = (spec: RolloutSpec = SPEC, state?: RolloutState) => kind().poll(spec, state, new AbortController().signal);
+    const SPEC: RolloutSpec = {
+        service: "orders-api",
+        environment: "staging",
+        version: "1.4.3",
+        startedAt: NOW,
+        deadline: NOW + 15 * 60_000 - 5_000,
+    };
+    const poll = (spec: RolloutSpec = SPEC, state?: RolloutState) =>
+        kind().poll(spec, state, new AbortController().signal);
     /** Moves the clock the kind reads, as the minutes of a rollout pass. */
     const later = (ms: number) => h.clock.deps.sleep(ms, undefined);
 
@@ -140,7 +167,11 @@ describe("the watch kind", () => {
     });
 
     test("goes on while a pod is not ready yet, or fewer pods than wanted run", async () => {
-        h.cluster.answer(orders("1.4.3", { pods: list(pod("orders-api-0", { tag: "1.4.3" }), pod("orders-api-1", { tag: "1.4.3", ready: false })) }));
+        h.cluster.answer(
+            orders("1.4.3", {
+                pods: list(pod("orders-api-0", { tag: "1.4.3" }), pod("orders-api-1", { tag: "1.4.3", ready: false })),
+            }),
+        );
         assert.equal((await poll()).done, undefined);
         h.cluster.answer(orders("1.4.3", { pods: list(pod("orders-api-0", { tag: "1.4.3" })) }));
         assert.equal((await poll()).done, undefined);
@@ -157,7 +188,10 @@ describe("the watch kind", () => {
         assert.deepEqual(outcome.state, { polls: 5 });
         assert.equal(outcome.done?.outcome, "passed");
         assert.equal(outcome.done?.summary, "orders-api in staging: Running: 2 of 2 pods ready on 1.4.3.");
-        assert.match(outcome.done?.details ?? "", /^Workload: StatefulSet orders-api, 2\/2 ready, 2 updated, revision orders-api-5d9f, image 1\.4\.3\.\n- orders-api-0: 1\/1 ready, Running, 0 restarts, 60m, image 1\.4\.3\n- orders-api-1: /);
+        assert.match(
+            outcome.done?.details ?? "",
+            /^Workload: StatefulSet orders-api, 2\/2 ready, 2 updated, revision orders-api-5d9f, image 1\.4\.3\.\n- orders-api-0: 1\/1 ready, Running, 0 restarts, 60m, image 1\.4\.3\n- orders-api-1: /,
+        );
         assert.deepEqual(outcome.done?.facts, { verdict: "running", pods: 2, ready: 2, polls: 5 });
     });
 
@@ -168,12 +202,20 @@ describe("the watch kind", () => {
     });
 
     test("fails when a pod cannot come up, whatever the other pods do, and says which and where to read why", async () => {
-        h.cluster.answer(orders("1.4.3", {
-            pods: list(pod("orders-api-0", { tag: "1.4.3" }), pod("orders-api-1", { tag: "1.4.3", ready: false, waiting: "CrashLoopBackOff", restarts: 3 })),
-        }));
+        h.cluster.answer(
+            orders("1.4.3", {
+                pods: list(
+                    pod("orders-api-0", { tag: "1.4.3" }),
+                    pod("orders-api-1", { tag: "1.4.3", ready: false, waiting: "CrashLoopBackOff", restarts: 3 }),
+                ),
+            }),
+        );
         const outcome = await poll();
         assert.equal(outcome.done?.outcome, "failed");
-        assert.equal(outcome.done?.summary, "orders-api in staging: Failing: pod orders-api-1 is CrashLoopBackOff (3 restarts). Read why with runtime logs (pod: orders-api-1, previous: true).");
+        assert.equal(
+            outcome.done?.summary,
+            "orders-api in staging: Failing: pod orders-api-1 is CrashLoopBackOff (3 restarts). Read why with runtime logs (pod: orders-api-1, previous: true).",
+        );
         assert.match(outcome.done?.details ?? "", /- orders-api-1: 0\/1 ready, CrashLoopBackOff, 3 restarts/);
         assert.equal(outcome.done?.facts?.verdict, "failing");
         for (const waiting of ["ImagePullBackOff", "ErrImagePull"]) {
@@ -189,7 +231,10 @@ describe("the watch kind", () => {
         await later(60_000);
         const outcome = await poll();
         assert.equal(outcome.done?.outcome, "timed-out");
-        assert.equal(outcome.done?.summary, "orders-api in staging: Still rolling after waiting 15m00s: 0 of 2 pods ready on 1.4.3; pods run 1.4.2.");
+        assert.equal(
+            outcome.done?.summary,
+            "orders-api in staging: Still rolling after waiting 15m00s: 0 of 2 pods ready on 1.4.3; pods run 1.4.2.",
+        );
         assert.match(outcome.done?.details ?? "", /image 1\.4\.2 {2}<- not ready on 1\.4\.3/);
         assert.equal(outcome.done?.facts?.verdict, "rolling");
     });
@@ -201,17 +246,29 @@ describe("the watch kind", () => {
         assert.ok(spec.deadline < engineDeadline && spec.deadline >= engineDeadline - 10_000);
         h.cluster.answer(orders("1.4.2"));
         await later(15 * 60_000 - 3_000);
-        assert.equal((await poll(spec)).done?.outcome, "timed-out", "a poll a few seconds before the engine's deadline already ends it");
+        assert.equal(
+            (await poll(spec)).done?.outcome,
+            "timed-out",
+            "a poll a few seconds before the engine's deadline already ends it",
+        );
     });
 
     test("reads the cluster the catalog names for the service, not one the saved watch names", async () => {
         h.cluster.answer(orders("1.4.2"));
-        const sneaky = { ...SPEC, context: "prod-cluster", namespace: "kube-system", selector: "app=other" } as RolloutSpec;
+        const sneaky = {
+            ...SPEC,
+            context: "prod-cluster",
+            namespace: "kube-system",
+            selector: "app=other",
+        } as RolloutSpec;
         await poll(sneaky);
-        assert.deepEqual(h.cluster.calls().map((call) => call.argv.slice(1, 3)), [
-            ["--context=test-cluster", "--namespace=orders-staging"],
-            ["--context=test-cluster", "--namespace=orders-staging"],
-        ]);
+        assert.deepEqual(
+            h.cluster.calls().map((call) => call.argv.slice(1, 3)),
+            [
+                ["--context=test-cluster", "--namespace=orders-staging"],
+                ["--context=test-cluster", "--namespace=orders-staging"],
+            ],
+        );
         assert.equal(h.cluster.calls()[0]?.argv[5], "--selector=app=orders-api");
     });
 
@@ -220,13 +277,25 @@ describe("the watch kind", () => {
         await poll();
         h.configure(withEntry("orders-api", "staging", { namespace: "moved" }));
         await poll();
-        assert.deepEqual(h.cluster.calls().map((call) => call.argv[2]).filter((_, at) => at % 2 === 0), ["--namespace=orders-staging", "--namespace=moved"]);
+        assert.deepEqual(
+            h.cluster
+                .calls()
+                .map((call) => call.argv[2])
+                .filter((_, at) => at % 2 === 0),
+            ["--namespace=orders-staging", "--namespace=moved"],
+        );
     });
 
     test("only reads: kubectl gets pods and workloads, nothing is changed, and helm is never started", async () => {
         h.cluster.answer(orders("1.4.2"));
         await poll();
-        assert.deepEqual(h.cluster.calls().map((call) => call.argv.slice(3, 5)), [["get", "pods"], ["get", "deployments,statefulsets"]]);
+        assert.deepEqual(
+            h.cluster.calls().map((call) => call.argv.slice(3, 5)),
+            [
+                ["get", "pods"],
+                ["get", "deployments,statefulsets"],
+            ],
+        );
         assert.deepEqual(h.cluster.helmCalls(), []);
     });
 
@@ -240,18 +309,36 @@ describe("the watch kind", () => {
 
     test("a cluster that cannot be read is a failed poll, which the engine counts, and not an end", async () => {
         h.cluster.answer({ pods: { code: 1, stderr: "Unable to connect to the server: dial tcp: i/o timeout" } });
-        await assert.rejects(poll(), /^Error: Cannot reach the cluster of context test-cluster for orders-api in staging/);
+        await assert.rejects(
+            poll(),
+            /^Error: Cannot reach the cluster of context test-cluster for orders-api in staging/,
+        );
     });
 
     test("a catalog without the service is a failed poll too, with the names there are", async () => {
-        await assert.rejects(poll({ ...SPEC, service: "gone" }), (error: unknown) => error instanceof TypeError && /^ops-rollout: no service named "gone"\. Known services: orders-api/.test(error.message));
-        await assert.rejects(poll({ ...SPEC, environment: "gone" }), (error: unknown) => error instanceof TypeError && /^ops-rollout: orders-api has no environment "gone"/.test(error.message));
+        await assert.rejects(
+            poll({ ...SPEC, service: "gone" }),
+            (error: unknown) =>
+                error instanceof TypeError &&
+                /^ops-rollout: no service named "gone"\. Known services: orders-api/.test(error.message),
+        );
+        await assert.rejects(
+            poll({ ...SPEC, environment: "gone" }),
+            (error: unknown) =>
+                error instanceof TypeError && /^ops-rollout: orders-api has no environment "gone"/.test(error.message),
+        );
         h.jig.reset();
         await assert.rejects(poll(), /^InputError: ops is not set up: add an "ops" section/);
     });
 
     test("an environment that has lost its Kubernetes runtime is a failed poll", async () => {
-        h.configure(withEnvironment("orders-api", "staging", { deploy: undefined, runtime: undefined, health: "https://orders.staging.example.com/health" }));
+        h.configure(
+            withEnvironment("orders-api", "staging", {
+                deploy: undefined,
+                runtime: undefined,
+                health: "https://orders.staging.example.com/health",
+            }),
+        );
         await assert.rejects(poll(), /^Error: orders-api in staging has no Kubernetes runtime in the catalog/);
     });
 

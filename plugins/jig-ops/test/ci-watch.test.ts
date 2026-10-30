@@ -422,7 +422,7 @@ describe("Jenkins: the stages that must pass", () => {
         const g = await jenkins(t, world, { ops: { artifacts: [{ kind: "image", check: "build-image" }] } });
         const { done } = await poll(g, { ...stages("build-image"), sha: SHA });
         assert.equal(done?.details, `Ready: image ${SHA.slice(0, 7)}`);
-        assert.equal((g.h.bus.emitted[0]?.payload as { repo: string }).repo, "orders/build");
+        assert.equal((g.h.bus.emitted[0]!.payload as { repo: string }).repo, "orders/build");
         const none = await jenkins(t, world, { ops: { artifacts: [{ kind: "image", check: "build-image" }] } });
         await poll(none, stages("build-image"));
         assert.deepEqual(none.h.bus.emitted, [], "without a commit there is nothing to tie a rule to");

@@ -125,7 +125,12 @@ export function installFakeJig(): FakeJig {
             env.PATH = [programs.bin, process.env.PATH ?? ""].filter(Boolean).join(path.delimiter);
             Object.assign(env, programs.env, options.env);
 
-            const child = spawn(file, [...args], { env, shell: false, stdio: ["pipe", "pipe", "pipe"], detached: true });
+            const child = spawn(file, [...args], {
+                env,
+                shell: false,
+                stdio: ["pipe", "pipe", "pipe"],
+                detached: true,
+            });
             const limit = options.maxOutputBytes ?? 10 * 1024 * 1024;
             const timeoutMs = options.timeoutMs ?? 60_000;
             const out = { stdout: [] as Buffer[], stderr: [] as Buffer[], size: { stdout: 0, stderr: 0 }, cut: false };
@@ -161,16 +166,22 @@ export function installFakeJig(): FakeJig {
 
             child.once("error", (error: NodeJS.ErrnoException) => {
                 clearTimeout(timer);
-                reject(new Error(error.code === "ENOENT" ? `${file} is not installed or not on PATH` : `${file} could not start`));
+                reject(
+                    new Error(
+                        error.code === "ENOENT" ? `${file} is not installed or not on PATH` : `${file} could not start`,
+                    ),
+                );
             });
             child.once("close", (code) => {
                 clearTimeout(timer);
                 options.signal?.removeEventListener("abort", onAbort);
                 // Like jig-core, a cut stream ends with a marker, so a caller can tell that the end is missing.
                 const text = (stream: "stdout" | "stderr") =>
-                    Buffer.concat(out[stream]).toString("utf8") + (out.cut && stream === "stdout" ? `\n[output cut at ${limit} bytes]\n` : "");
+                    Buffer.concat(out[stream]).toString("utf8") +
+                    (out.cut && stream === "stdout" ? `\n[output cut at ${limit} bytes]\n` : "");
                 if (stop === "aborted") return reject(new Error(`${file} was aborted`));
-                if (stop === "timeout") return resolve({ code: 124, stdout: text("stdout"), stderr: text("stderr"), timedOut: true });
+                if (stop === "timeout")
+                    return resolve({ code: 124, stdout: text("stdout"), stderr: text("stderr"), timedOut: true });
                 resolve({ code: code ?? 1, stdout: text("stdout"), stderr: text("stderr"), timedOut: false });
             });
             child.stdin.on("error", () => {});
@@ -196,7 +207,8 @@ export function installFakeJig(): FakeJig {
         },
         environments: {
             // As in jig-core: a name nobody defined counts as production.
-            kindOf: (name) => (Object.hasOwn(environments, name) ? (environments[name] as EnvironmentKind) : "production"),
+            kindOf: (name) =>
+                Object.hasOwn(environments, name) ? (environments[name] as EnvironmentKind) : "production",
         },
         tunnels: {
             register: () => {},
@@ -214,7 +226,9 @@ export function installFakeJig(): FakeJig {
                     const response = await transport.request(request, signal);
                     return { ...response, headers: response.headers ?? {} };
                 } catch (error) {
-                    throw new Error(`transport "${name}" failed: ${error instanceof Error ? error.message : String(error)}`);
+                    throw new Error(
+                        `transport "${name}" failed: ${error instanceof Error ? error.message : String(error)}`,
+                    );
                 }
             },
         },
@@ -264,7 +278,9 @@ export function installFakeJig(): FakeJig {
                 const value = values.get(name);
                 const validate = sections.get(name);
                 // As in jig-core: a section with errors is reported at start-up, and then reads as absent.
-                return value !== undefined && (validate === undefined || validate(value).length === 0) ? value : undefined;
+                return value !== undefined && (validate === undefined || validate(value).length === 0)
+                    ? value
+                    : undefined;
             },
         },
         exec: {

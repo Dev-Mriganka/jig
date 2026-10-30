@@ -58,7 +58,10 @@ function eligible(hits: Source[], view: View, fields: Fields): number[] {
     const unwanted = lower(view.exclude);
     const positions: number[] = [];
     hits.forEach((hit, position) => {
-        if (needles.length === 0 && unwanted.length === 0) return void positions.push(position);
+        if (needles.length === 0 && unwanted.length === 0) {
+            positions.push(position);
+            return;
+        }
         const message = rawMessage(hit, fields).toLowerCase();
         const passes =
             needles.every((needle) => message.includes(needle)) && !unwanted.some((term) => message.includes(term));

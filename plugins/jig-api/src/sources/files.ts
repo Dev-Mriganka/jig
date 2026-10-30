@@ -11,13 +11,19 @@ export function expandHome(file: string): string {
 
 /** The reason a file could not be read, in words that do not repeat the path. */
 export function readFailure(error: unknown): string {
-    const code = typeof error === "object" && error !== null && "code" in error ? String((error as { code: unknown }).code) : "";
+    const code =
+        typeof error === "object" && error !== null && "code" in error ? String((error as { code: unknown }).code) : "";
     switch (code) {
-        case "ENOENT": return "no such file";
-        case "EACCES": return "permission denied";
-        case "EISDIR": return "is a folder, not a file";
-        case "ENOTDIR": return "is not a folder";
-        default: return code === "" ? "could not be read" : `could not be read (${code})`;
+        case "ENOENT":
+            return "no such file";
+        case "EACCES":
+            return "permission denied";
+        case "EISDIR":
+            return "is a folder, not a file";
+        case "ENOTDIR":
+            return "is not a folder";
+        default:
+            return code === "" ? "could not be read" : `could not be read (${code})`;
     }
 }
 
@@ -34,7 +40,10 @@ export function readText(file: string, maxBytes: number): string {
 }
 
 /** The file's path with every link followed, if that lies inside `root`; else the reason it does not. */
-export function confined(root: string, file: string): { path: string; problem?: undefined } | { path?: undefined; problem: string } {
+export function confined(
+    root: string,
+    file: string,
+): { path: string; problem?: undefined } | { path?: undefined; problem: string } {
     let base: string;
     let real: string;
     try {
@@ -48,7 +57,10 @@ export function confined(root: string, file: string): { path: string; problem?: 
         return { problem: readFailure(error) };
     }
     if (real !== base && !real.startsWith(base + path.sep)) {
-        return { problem: "is outside the collection's folder (after following links), and a request may only use files inside it" };
+        return {
+            problem:
+                "is outside the collection's folder (after following links), and a request may only use files inside it",
+        };
     }
     return { path: real };
 }

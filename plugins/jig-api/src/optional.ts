@@ -20,10 +20,13 @@ function isUnset(text: string, unset: ReadonlySet<string>): boolean {
 function prunedUrl(url: string, unset: ReadonlySet<string>): string {
     const mark = url.indexOf("?");
     if (mark < 0) return url;
-    const pairs = url.slice(mark + 1).split("&").filter((pair) => {
-        const equals = pair.indexOf("=");
-        return equals < 0 || !isUnset(pair.slice(equals + 1), unset);
-    });
+    const pairs = url
+        .slice(mark + 1)
+        .split("&")
+        .filter((pair) => {
+            const equals = pair.indexOf("=");
+            return equals < 0 || !isUnset(pair.slice(equals + 1), unset);
+        });
     return pairs.length === 0 ? url.slice(0, mark) : `${url.slice(0, mark)}?${pairs.join("&")}`;
 }
 
@@ -63,7 +66,8 @@ export interface Pruned {
 /** The request's address, headers and body without what hangs on the optional variables in `unset`. */
 export function pruned(request: SavedRequest, unset: ReadonlySet<string>): Pruned {
     if (unset.size === 0) return { url: request.url, headers: request.headers, body: request.body };
-    const body = request.body?.kind === "json" ? { ...request.body, text: prunedJson(request.body.text, unset) } : request.body;
+    const body =
+        request.body?.kind === "json" ? { ...request.body, text: prunedJson(request.body.text, unset) } : request.body;
     return {
         url: prunedUrl(request.url, unset),
         headers: request.headers.filter(([, value]) => !isUnset(value, unset)),

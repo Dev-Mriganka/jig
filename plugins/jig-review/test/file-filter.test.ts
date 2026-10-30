@@ -12,6 +12,9 @@ describe("filterReviewableFiles", () => {
     });
 
     it("applies project gitignore rules in addition to defaults", () => {
-        assert.deepEqual(filterReviewableFiles(["src/index.ts", "coverage/report.json", "tmp/output.log"], "coverage/\ntmp/*.log\n"), ["src/index.ts"]);
+        assert.deepEqual(
+            filterReviewableFiles(["src/index.ts", "coverage/report.json", "tmp/output.log"], "coverage/\ntmp/*.log\n"),
+            ["src/index.ts"],
+        );
     });
 });

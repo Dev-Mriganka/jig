@@ -143,7 +143,7 @@ test("deleting the index removes the files beside it, and a missing index is not
     const where = paths(tempState(t));
     const db = openIndex(where.index);
     db.exec("INSERT INTO imported (file, bytes, skipped, at) VALUES ('x', 1, 0, 1)");
-    assert.ok(existsSync(where.index + "-wal"));
+    assert.ok(existsSync(`${where.index}-wal`));
     deleteIndex(where.index);
     db.close();
     for (const suffix of ["", "-wal", "-shm"]) assert.equal(existsSync(where.index + suffix), false, suffix);

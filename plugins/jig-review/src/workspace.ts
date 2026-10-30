@@ -58,7 +58,11 @@ export function normalizeFolder(cwd: string, folder: string | undefined): string
 function within(repos: Repository[], folder: string | undefined): Repository[] {
     if (!folder) return repos;
     return repos.filter(
-        (repo) => !repo.prefix || repo.prefix === folder || repo.prefix.startsWith(`${folder}/`) || folder.startsWith(`${repo.prefix}/`),
+        (repo) =>
+            !repo.prefix ||
+            repo.prefix === folder ||
+            repo.prefix.startsWith(`${folder}/`) ||
+            folder.startsWith(`${repo.prefix}/`),
     );
 }
 
@@ -132,10 +136,14 @@ export class WorkspaceReviewSource {
     public async requireGitRepo(target: Target = {}): Promise<void> {
         if (this.sources(target).length > 0) return;
         if (target.ticket) {
-            throw new Error(`No repositories for ${target.ticket}: none is bound to it (${bindingPath(target.ticket, this.env)}).`);
+            throw new Error(
+                `No repositories for ${target.ticket}: none is bound to it (${bindingPath(target.ticket, this.env)}).`,
+            );
         }
         throw new Error(
-            target.folder ? `No git repositories found in ${target.folder}.` : `No git repositories found in ${this.cwd} or the folders inside it.`,
+            target.folder
+                ? `No git repositories found in ${target.folder}.`
+                : `No git repositories found in ${this.cwd} or the folders inside it.`,
         );
     }
 
@@ -178,7 +186,8 @@ export class WorkspaceReviewSource {
             const scoped = this.scoped(repo, selection);
             if (!scoped) continue;
             try {
-                for (const file of await repo.git.getChangedFiles(scoped)) files.push(repo.prefix ? `${repo.prefix}/${file}` : file);
+                for (const file of await repo.git.getChangedFiles(scoped))
+                    files.push(repo.prefix ? `${repo.prefix}/${file}` : file);
             } catch {
                 // a repository git cannot read is left out rather than failing the whole review
             }

@@ -19,7 +19,10 @@ function bodyLines(body: Text): string[] {
     const text = displayOf(body);
     const lines = (prettyJson(text) ?? text).split("\n");
     if (lines.length <= SHOWN_LINES) return lines;
-    return [...lines.slice(0, SHOWN_LINES), `[${lines.length - SHOWN_LINES} more lines not shown; the whole body is sent]`];
+    return [
+        ...lines.slice(0, SHOWN_LINES),
+        `[${lines.length - SHOWN_LINES} more lines not shown; the whole body is sent]`,
+    ];
 }
 
 function truncated(summary: string): string {
@@ -29,20 +32,23 @@ function truncated(summary: string): string {
 /** The lines that describe one plan. */
 export function planLines(plan: Plan): string[] {
     const signIn = plan.signIn.kind === "none" ? "none" : `${describeSignIn(plan.signIn)}, added by the tool`;
-    const lines = [
-        `Request: ${whereOf(plan)}`,
-        `Sign-in: ${signIn}`,
-        `Method: ${plan.method}`,
-        `URL: ${plan.url}`,
-    ];
-    if (plan.headers.length > 0) lines.push("Headers:", ...plan.headers.map(([name, value]) => `  ${name}: ${displayOf(value)}`));
+    const lines = [`Request: ${whereOf(plan)}`, `Sign-in: ${signIn}`, `Method: ${plan.method}`, `URL: ${plan.url}`];
+    if (plan.headers.length > 0)
+        lines.push("Headers:", ...plan.headers.map(([name, value]) => `  ${name}: ${displayOf(value)}`));
     if (plan.body !== undefined) {
-        const kind = plan.body.some(isUpload) ? "with a file" : prettyJson(displayOf(plan.body)) === undefined ? "text" : "JSON";
+        const kind = plan.body.some(isUpload)
+            ? "with a file"
+            : prettyJson(displayOf(plan.body)) === undefined
+              ? "text"
+              : "JSON";
         lines.push(`Body (${kind}, ${byteLengthOf(plan.body)} bytes):`, ...bodyLines(plan.body));
     }
     const secrets = secretsOf(plan).map((secret) => secret.name);
     if (secrets.length > 0) lines.push(`Secrets, read when it is sent and never shown: ${secrets.join(", ")}`);
-    const generated = [...plan.headers.map(([, value]) => value), ...(plan.body === undefined ? [] : [plan.body])].flatMap(generatedIn);
+    const generated = [
+        ...plan.headers.map(([, value]) => value),
+        ...(plan.body === undefined ? [] : [plan.body]),
+    ].flatMap(generatedIn);
     if (generated.length > 0) lines.push(`Made when it is sent: ${[...new Set(generated)].join(", ")}`);
     return lines;
 }
@@ -58,7 +64,9 @@ export function previewOf(plan: Plan): Preview {
 
 /** One preview for several requests that are approved together, such as a folder: each request in order. */
 export function previewOfAll(title: string, plans: readonly Plan[]): Preview {
-    const blocks = plans.map((plan, index) => [`${index + 1}. ${plan.request}`, ...planLines(plan).map((line) => `   ${line}`)].join("\n"));
+    const blocks = plans.map((plan, index) =>
+        [`${index + 1}. ${plan.request}`, ...planLines(plan).map((line) => `   ${line}`)].join("\n"),
+    );
     return {
         summary: truncated(`${title}: ${plans.length} request${plans.length === 1 ? "" : "s"}, in order`),
         body: [title, "", ...blocks.flatMap((block) => [block, ""])].join("\n").trimEnd(),

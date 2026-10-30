@@ -24,7 +24,9 @@ export function pickTransition(transitions: Transition[], wanted: string, key: s
     if (matches.length === 1 && only !== undefined) return only;
     if (matches.length > 1) {
         const choices = shortList(matches.map(transitionLine), "; ", 80);
-        throw new InputError(`jira transition: "${wanted}" matches several transitions on ${key} (${choices}); pass the id`);
+        throw new InputError(
+            `jira transition: "${wanted}" matches several transitions on ${key} (${choices}); pass the id`,
+        );
     }
     // A model often names the status it wants. Say which transition leads there, but do not pick it: the call must name one.
     const leading = transitions.filter((transition) => transition.to.toLowerCase() === wanted.toLowerCase());
@@ -47,7 +49,11 @@ export async function planTransition(env: Env, call: CallOf<"transition">): Prom
         shown: {
             summary: `Move ${about(head)} from ${head.status} to ${chosen.to} (transition "${chosen.name}")`,
             flags: [],
-            rows: [["From", head.status], ["To", chosen.to], ["Transition", `${chosen.name} [${chosen.id}]`]],
+            rows: [
+                ["From", head.status],
+                ["To", chosen.to],
+                ["Transition", `${chosen.name} [${chosen.id}]`],
+            ],
             notes: [],
             texts: [],
         },
@@ -109,7 +115,7 @@ export async function planUpdate(env: Env, call: CallOf<"update">): Promise<Plan
     }
 
     // The current values are read now: the preview shows what changes, and a change in them voids the approval.
-    let issue;
+    let issue: Awaited<ReturnType<typeof getIssue>>;
     try {
         issue = await getIssue(env, call.key, ["summary", "status", ...wanted.map((entry) => entry.id)]);
     } catch (error) {
@@ -120,9 +126,8 @@ export async function planUpdate(env: Env, call: CallOf<"update">): Promise<Plan
     const changes: Change[] = [];
     for (const { name, id, raw } of wanted) {
         try {
-            const converted = id === "assignee"
-                ? await assigneeValue(env, { key: call.key }, raw)
-                : convertField(id, raw);
+            const converted =
+                id === "assignee" ? await assigneeValue(env, { key: call.key }, raw) : convertField(id, raw);
             changes.push({ name, id, converted, before: current[id] });
         } catch (error) {
             throw error instanceof InputError ? new InputError(`jira update: ${error.message}`) : error;
@@ -132,10 +137,12 @@ export async function planUpdate(env: Env, call: CallOf<"update">): Promise<Plan
 
     // A text field such as the description is shown as text, the others as `before → after`.
     const asText = (change: Change): boolean => isWikiField(change.id) && typeof change.converted.send === "string";
-    const rows = changes.filter((change) => !asText(change)).map((change): [string, string] => [
-        change.name,
-        `${oneLine(describeValue(change.before), 150)} → ${oneLine(change.converted.shown, 150)}`,
-    ]);
+    const rows = changes
+        .filter((change) => !asText(change))
+        .map((change): [string, string] => [
+            change.name,
+            `${oneLine(describeValue(change.before), 150)} → ${oneLine(change.converted.shown, 150)}`,
+        ]);
     const texts = changes.filter(asText).map((change) => ({
         label: `${change.name.charAt(0).toUpperCase()}${change.name.slice(1)}`,
         source: String(change.converted.send),
@@ -155,8 +162,18 @@ export async function planUpdate(env: Env, call: CallOf<"update">): Promise<Plan
         send: { method: "PUT", path: `/issue/${call.key}`, body },
         basis: { before: Object.fromEntries(changes.map((change) => [change.id, comparable(change.before)])) },
         async check() {
-            const now = obj((await getIssue(env, call.key, changes.map((change) => change.id))).fields);
-            const applied = changes.filter((change) => comparable(now[change.id]) === comparable(change.converted.send));
+            const now = obj(
+                (
+                    await getIssue(
+                        env,
+                        call.key,
+                        changes.map((change) => change.id),
+                    )
+                ).fields,
+            );
+            const applied = changes.filter(
+                (change) => comparable(now[change.id]) === comparable(change.converted.send),
+            );
             if (applied.length === changes.length) {
                 return { happened: true, text: `${call.key} holds the new value of ${names(applied)}` };
             }

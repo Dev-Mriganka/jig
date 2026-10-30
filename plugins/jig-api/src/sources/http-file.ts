@@ -44,13 +44,20 @@ function check(entry: Readonly<Record<string, unknown>>, at: string, errors: str
 // Environments
 
 /** Nested objects become dotted names (`{ "client": { "host": "x" } }` is `client.host`), as `{{client.host}}` reads them. */
-function flatten(value: unknown, prefix: string, into: Map<string, string>, report: (key: string, message: string) => void): void {
+function flatten(
+    value: unknown,
+    prefix: string,
+    into: Map<string, string>,
+    report: (key: string, message: string) => void,
+): void {
     if (!isObject(value)) return;
     for (const [key, item] of Object.entries(value)) {
         const name = prefix === "" ? key : `${prefix}.${key}`;
         if (isObject(item)) flatten(item, name, into, report);
-        else if (Array.isArray(item)) report(name, "is a list, which would send one request per element, and that is not supported");
-        else if (typeof item === "string" || typeof item === "number" || typeof item === "boolean") into.set(name, String(item));
+        else if (Array.isArray(item))
+            report(name, "is a list, which would send one request per element, and that is not supported");
+        else if (typeof item === "string" || typeof item === "number" || typeof item === "boolean")
+            into.set(name, String(item));
         else if (item === null) into.set(name, "");
     }
 }
@@ -86,10 +93,15 @@ function readEnvFile(root: string, name: string, problems: Problem[]): EnvFile |
         const { Security: security, ...rest } = values;
         if (security !== undefined) {
             problems.push({
-                file: name, key: `${environment}.Security`, message: "is not read: {{$auth.token(...)}} is not supported", level: "warning",
+                file: name,
+                key: `${environment}.Security`,
+                message: "is not read: {{$auth.token(...)}} is not supported",
+                level: "warning",
             });
         }
-        flatten(rest, "", variables, (key, message) => problems.push({ file: name, key: `${environment}.${key}`, message, level: "warning" }));
+        flatten(rest, "", variables, (key, message) =>
+            problems.push({ file: name, key: `${environment}.${key}`, message, level: "warning" }),
+        );
         if (environment === "$shared") for (const [key, value] of variables) found.shared.set(key, value);
         else found.byName.set(environment, variables);
     }
@@ -133,14 +145,24 @@ function findFiles(root: string, problems: Problem[]): string[] {
         try {
             entries = fs.readdirSync(directory, { withFileTypes: true });
         } catch (error) {
-            problems.push({ file: path.relative(root, directory) || ".", key: "", message: readFailure(error), level: "error" });
+            problems.push({
+                file: path.relative(root, directory) || ".",
+                key: "",
+                message: readFailure(error),
+                level: "error",
+            });
             return;
         }
         for (const entry of entries.sort((a, b) => (a.name < b.name ? -1 : 1))) {
             if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
             const full = path.join(directory, entry.name);
             if (entry.isSymbolicLink()) {
-                problems.push({ file: path.relative(root, full), key: "", message: "is a link, and links are not followed", level: "warning" });
+                problems.push({
+                    file: path.relative(root, full),
+                    key: "",
+                    message: "is a link, and links are not followed",
+                    level: "warning",
+                });
             } else if (entry.isDirectory()) {
                 visit(full);
             } else if (entry.isFile() && /\.(?:http|rest)$/i.test(entry.name)) {
@@ -260,8 +282,19 @@ function parseBlock(block: Block, variables: Map<string, string>): Parsed | unde
     const parts = /^([A-Za-z]+)\s+(\S.*)$/.exec(requestLine);
     const hasMethod = parts !== null && parts[1] === parts[1]?.toUpperCase();
     const method = hasMethod ? (parts?.[1] as string) : "GET";
-    const url = (hasMethod ? (parts?.[2] as string) : requestLine).replace(/\s+HTTP\/[\d.]+$/i, "").trim();
-    return { name, heading: block.heading, line: block.line, method, url, headers, bodyLines, prerequest, handler, saved };
+    const url = (hasMethod ? (parts![2] as string) : requestLine).replace(/\s+HTTP\/[\d.]+$/i, "").trim();
+    return {
+        name,
+        heading: block.heading,
+        line: block.line,
+        method,
+        url,
+        headers,
+        bodyLines,
+        prerequest,
+        handler,
+        saved,
+    };
 }
 
 const contentTypeOf = (headers: ReadonlyArray<readonly [string, string]>): string =>
@@ -278,10 +311,12 @@ function multipartOf(lines: readonly string[], boundary: string): BodyResult {
     let current: { head: string[]; content: string[]; inHead: boolean } | undefined;
     const finish = (): string | undefined => {
         if (current === undefined) return undefined;
-        const head = new Map<string, string>(current.head.flatMap((line): Array<[string, string]> => {
-            const match = HEADER.exec(line);
-            return match === null ? [] : [[(match[1] as string).toLowerCase(), (match[2] as string).trim()]];
-        }));
+        const head = new Map<string, string>(
+            current.head.flatMap((line): Array<[string, string]> => {
+                const match = HEADER.exec(line);
+                return match === null ? [] : [[(match[1] as string).toLowerCase(), (match[2] as string).trim()]];
+            }),
+        );
         const disposition = head.get("content-disposition") ?? "";
         const field = /\bname="([^"]*)"/.exec(disposition)?.[1];
         if (field === undefined) return "a part of the multipart body has no name";
@@ -292,11 +327,19 @@ function multipartOf(lines: readonly string[], boundary: string): BodyResult {
         const filename = /\bfilename="([^"]*)"/.exec(disposition)?.[1];
         if (include !== null) {
             fields.push({
-                kind: "file", name: field, file: { path: include[1] as string },
-                ...(filename === undefined ? {} : { filename }), ...(contentType === undefined ? {} : { contentType }),
+                kind: "file",
+                name: field,
+                file: { path: include[1] as string },
+                ...(filename === undefined ? {} : { filename }),
+                ...(contentType === undefined ? {} : { contentType }),
             });
         } else {
-            fields.push({ kind: "text", name: field, value: content.join("\r\n"), ...(contentType === undefined ? {} : { contentType }) });
+            fields.push({
+                kind: "text",
+                name: field,
+                value: content.join("\r\n"),
+                ...(contentType === undefined ? {} : { contentType }),
+            });
         }
         return undefined;
     };
@@ -319,12 +362,17 @@ function multipartOf(lines: readonly string[], boundary: string): BodyResult {
     return { body: { kind: "form", encoding: "multipart", fields, boundary } };
 }
 
-function bodyOf(lines: readonly string[], headers: ReadonlyArray<readonly [string, string]>, graphql: boolean): BodyResult {
+function bodyOf(
+    lines: readonly string[],
+    headers: ReadonlyArray<readonly [string, string]>,
+    graphql: boolean,
+): BodyResult {
     if (lines.length === 0) return {};
     const text = lines.join("\n");
     const include = /^<(@?)\s+(\S.*)$/.exec(text.trim());
     if (include !== null && !text.includes("\n")) {
-        if (include[1] === "@") return { unsupported: "`<@` (variables inside the included file) is not supported; use `<`" };
+        if (include[1] === "@")
+            return { unsupported: "`<@` (variables inside the included file) is not supported; use `<`" };
         return { body: { kind: "file", file: { path: include[2] as string } } };
     }
     if (graphql) {
@@ -332,16 +380,27 @@ function bodyOf(lines: readonly string[], headers: ReadonlyArray<readonly [strin
         // splits them, because a query may have blank lines in it.
         let at = -1;
         lines.forEach((line, index) => {
-            const after = lines.slice(index + 1).join("\n").trim();
+            const after = lines
+                .slice(index + 1)
+                .join("\n")
+                .trim();
             if (index > 0 && line.trim() === "" && after.startsWith("{") && after.endsWith("}")) at = index;
         });
         const query = (at < 0 ? lines : lines.slice(0, at)).join("\n").trim();
-        const variables = at < 0 ? "" : lines.slice(at + 1).join("\n").trim();
+        const variables =
+            at < 0
+                ? ""
+                : lines
+                      .slice(at + 1)
+                      .join("\n")
+                      .trim();
         return { body: { kind: "graphql", query, ...(variables === "" ? {} : { variables }) } };
     }
     const type = contentTypeOf(headers);
     if (type.startsWith("multipart/")) {
-        const boundary = /boundary="?([^";\s]+)"?/i.exec(headers.find(([name]) => name.toLowerCase() === "content-type")?.[1] ?? "")?.[1];
+        const boundary = /boundary="?([^";\s]+)"?/i.exec(
+            headers.find(([name]) => name.toLowerCase() === "content-type")?.[1] ?? "",
+        )?.[1];
         if (boundary === undefined) return { unsupported: "its multipart body names no boundary in Content-Type" };
         return multipartOf(lines, boundary);
     }
@@ -359,10 +418,14 @@ function bodyTexts(body: Body | undefined): string[] {
     if (body === undefined) return [];
     switch (body.kind) {
         case "raw":
-        case "json": return [body.text];
-        case "file": return [];
-        case "graphql": return [body.query, ...(body.variables === undefined ? [] : [body.variables])];
-        case "form": return body.fields.flatMap((field) => (field.kind === "text" ? [field.value] : []));
+        case "json":
+            return [body.text];
+        case "file":
+            return [];
+        case "graphql":
+            return [body.query, ...(body.variables === undefined ? [] : [body.variables])];
+        case "form":
+            return body.fields.flatMap((field) => (field.kind === "text" ? [field.value] : []));
     }
 }
 
@@ -372,14 +435,29 @@ interface Reading {
 }
 
 /** The user name and password of `Basic user password` or `Basic user:password`; none for an encoded credential. */
-function basicCredentials(first: string, second: string | undefined): { username: string; password: string } | undefined {
+function basicCredentials(
+    first: string,
+    second: string | undefined,
+): { username: string; password: string } | undefined {
     if (second !== undefined) return { username: first, password: second };
     const colon = first.indexOf(":");
     return colon < 0 ? undefined : { username: first.slice(0, colon), password: first.slice(colon + 1) };
 }
 
-function requestOf(parsed: Parsed, file: string, position: number, fileVariables: ReadonlyMap<string, string>, reading: Reading): SavedRequest {
-    const folder = [...path.dirname(file).split(path.sep).filter((part) => part !== "." && part !== ""), path.basename(file)];
+function requestOf(
+    parsed: Parsed,
+    file: string,
+    position: number,
+    fileVariables: ReadonlyMap<string, string>,
+    reading: Reading,
+): SavedRequest {
+    const folder = [
+        ...path
+            .dirname(file)
+            .split(path.sep)
+            .filter((part) => part !== "." && part !== ""),
+        path.basename(file),
+    ];
     const notes: string[] = [];
     let headers = [...parsed.headers];
     let method = parsed.method;
@@ -410,8 +488,16 @@ function requestOf(parsed: Parsed, file: string, position: number, fileVariables
 
     const body = bodyOf(parsed.bodyLines, headers, graphql);
     const authTexts = auth.kind === "basic" ? [auth.username, auth.password] : [];
-    const variables = variablesIn(parsed.url, ...headers.map(([, value]) => value), ...bodyTexts(body.body), ...authTexts);
-    const signsIn = variablesIn(...authTexts, ...headers.filter(([name]) => CREDENTIAL_HEADERS.has(name.toLowerCase())).map(([, value]) => value));
+    const variables = variablesIn(
+        parsed.url,
+        ...headers.map(([, value]) => value),
+        ...bodyTexts(body.body),
+        ...authTexts,
+    );
+    const signsIn = variablesIn(
+        ...authTexts,
+        ...headers.filter(([name]) => CREDENTIAL_HEADERS.has(name.toLowerCase())).map(([, value]) => value),
+    );
 
     const scheme = /^([a-z][a-z0-9+.-]*):\/\//i.exec(parsed.url)?.[1]?.toLowerCase();
     if (method === "WEBSOCKET" || method === "GRPC") {
@@ -471,7 +557,9 @@ function load(config: HttpConfig, name: string): Collection {
             // The variables a file defines with `@name = value` belong to every request in it.
             const fileVariables = new Map<string, string>();
             const parsed = splitBlocks(text).flatMap((block) => parseBlock(block, fileVariables) ?? []);
-            parsed.forEach((request, index) => requests.push(requestOf(request, relative, index + 1, fileVariables, reading)));
+            parsed.forEach((request, index) => {
+                requests.push(requestOf(request, relative, index + 1, fileVariables, reading));
+            });
         }
     }
     return { name, root, requests, environments, variables: new Map(), auth: { kind: "none" }, problems };

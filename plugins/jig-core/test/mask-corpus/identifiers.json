@@ -1,28 +1,26 @@
 {
-  "category": "identifiers",
-  "cases": [
-    {
-      "id": "identifiers-and-credentials",
-      "input": {
-        "OriginId": "abcdef0123456789abcdef01",
-        "_id": {
-          "$oid": "abcdef0123456789abcdef01"
-        },
-        "provisionId": "abcdef0123456789abcdef02",
-        "password": "fixture-credential-canary",
-        "message": "operational reference aaaaaaaa.bbbbbbbb.cccccccc"
-      },
-      "must_not_contain": [
-        "fixture-credential-canary"
-      ],
-      "must_keep": [
-        "[removed:credential]",
-        "aaaaaaaa.bbbbbbbb.cccccccc",
-        "abcdef0123456789abcdef01",
-        "abcdef0123456789abcdef02"
-      ],
-      "expect_tags": [],
-      "notes": "Structured identifiers stay usable across JSON, logs and sessions. Credential fields and high-confidence credential shapes are still removed."
-    }
-  ]
+    "category": "identifiers",
+    "cases": [
+        {
+            "id": "identifiers-and-credentials",
+            "input": {
+                "OriginId": "abcdef0123456789abcdef01",
+                "_id": {
+                    "$oid": "abcdef0123456789abcdef01"
+                },
+                "provisionId": "abcdef0123456789abcdef02",
+                "password": "fixture-credential-canary",
+                "message": "operational reference aaaaaaaa.bbbbbbbb.cccccccc"
+            },
+            "must_not_contain": ["fixture-credential-canary"],
+            "must_keep": [
+                "[removed:credential]",
+                "aaaaaaaa.bbbbbbbb.cccccccc",
+                "abcdef0123456789abcdef01",
+                "abcdef0123456789abcdef02"
+            ],
+            "expect_tags": [],
+            "notes": "Structured identifiers stay usable across JSON, logs and sessions. Credential fields and high-confidence credential shapes are still removed."
+        }
+    ]
 }

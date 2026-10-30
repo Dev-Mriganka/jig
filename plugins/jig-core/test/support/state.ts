@@ -38,14 +38,21 @@ export function readRecords(stateDir: string): Array<Record<string, unknown>> {
     } catch {
         return [];
     }
-    return names.flatMap((name) => readFileSync(path.join(folder, name), "utf8").split("\n").filter((line) => line !== "").map((line) => JSON.parse(line) as Record<string, unknown>));
+    return names.flatMap((name) =>
+        readFileSync(path.join(folder, name), "utf8")
+            .split("\n")
+            .filter((line) => line !== "")
+            .map((line) => JSON.parse(line) as Record<string, unknown>),
+    );
 }
 
 /** The raw text of every record file, for tests that look for text that must not be there. */
 export function rawRecords(stateDir: string): string {
     const folder = path.join(stateDir, "records");
     try {
-        return readdirSync(folder).map((name) => readFileSync(path.join(folder, name), "utf8")).join("\n");
+        return readdirSync(folder)
+            .map((name) => readFileSync(path.join(folder, name), "utf8"))
+            .join("\n");
     } catch {
         return "";
     }

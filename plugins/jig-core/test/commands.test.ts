@@ -9,7 +9,9 @@ import { tempState } from "./support/state.ts";
 import { rig, scripted } from "./support/watches.ts";
 
 const state = tempState();
-beforeEach(() => { state.start(); });
+beforeEach(() => {
+    state.start();
+});
 
 let h: Harness | undefined;
 afterEach(async () => {
@@ -34,7 +36,16 @@ async function jigCommand(harness: Harness, args = ""): Promise<string> {
     ].join("\n");
 }
 
-const gitSchema = { properties: { action: { anyOf: [{ const: "status", type: "string" }, { const: "push", type: "string" }] } } };
+const gitSchema = {
+    properties: {
+        action: {
+            anyOf: [
+                { const: "status", type: "string" },
+                { const: "push", type: "string" },
+            ],
+        },
+    },
+};
 
 function declareGit(api: JigApi): void {
     api.declareTool({
@@ -53,14 +64,22 @@ describe("/jig", () => {
         const harness = await begin();
         const command = harness.host.commands.get("jig");
         assert.ok(command?.description);
-        assert.deepEqual(command.getArgumentCompletions?.("r"), [{ value: "rules", label: "rules" }, { value: "records", label: "records" }]);
+        assert.deepEqual(command.getArgumentCompletions?.("r"), [
+            { value: "rules", label: "rules" },
+            { value: "records", label: "records" },
+        ]);
         assert.deepEqual(command.getArgumentCompletions?.("rec"), [{ value: "records", label: "records" }]);
         assert.equal(command.getArgumentCompletions?.("x"), null);
     });
 
     test("shows the status: tools governed, plugins, tools on the unknown default, watches and the configuration", async () => {
         const harness = await begin({
-            tools: [{ name: "read" }, { name: "mystery" }, { name: "viewer", annotations: { readOnlyHint: true } }, { name: "git" }],
+            tools: [
+                { name: "read" },
+                { name: "mystery" },
+                { name: "viewer", annotations: { readOnlyHint: true } },
+                { name: "git" },
+            ],
             plugins: declareGit,
         });
         const status = await jigCommand(harness);
@@ -85,7 +104,11 @@ describe("/jig", () => {
             clock,
             plugins: (api) => {
                 api.watches.registerKind(scripted(clock, "ok", (n) => ({ state: n })).kind);
-                api.watches.registerKind(scripted(clock, "broken", () => { throw new Error("down"); }).kind);
+                api.watches.registerKind(
+                    scripted(clock, "broken", () => {
+                        throw new Error("down");
+                    }).kind,
+                );
             },
         });
         assert.match(await jigCommand(harness), /Open watches: 1 \(1 waiting for its plugin\)\n/);
@@ -100,17 +123,32 @@ describe("/jig", () => {
 
         // The watch tool shows the same three states in its lines.
         const tool = harness.host.registered.get("watch");
-        const listed = await tool?.execute("call-1", { action: "list" } as never, undefined, undefined, harness.ctx as never);
-        const lines = (listed?.content[0] as { text: string }).text.split("\n");
+        const listed = await tool?.execute(
+            "call-1",
+            { action: "list" } as never,
+            undefined,
+            undefined,
+            harness.ctx as never,
+        );
+        const lines = (listed!.content[0] as { text: string }).text.split("\n");
         assert.equal(lines.length, 4);
-        assert.match(lines.find((line) => line.startsWith(waiting)) ?? "", /\| from the plugin that is not loaded \| waiting for its plugin \(jig-test\) \| (?:\d+ s|\d+ min)$/);
+        assert.match(
+            lines.find((line) => line.startsWith(waiting)) ?? "",
+            /\| from the plugin that is not loaded \| waiting for its plugin \(jig-test\) \| (?:\d+ s|\d+ min)$/,
+        );
         assert.match(lines.find((line) => line.startsWith(one)) ?? "", /\| one \| open \| 5 min$/);
         assert.match(lines.find((line) => line.startsWith(broken)) ?? "", /\| three \| paused \| 5 min$/);
     });
 
     test("a watch that has finished is not counted as open", async () => {
         const clock = fakeClock();
-        const harness = await begin({ clock, plugins: (api) => api.watches.registerKind(scripted(clock, "ok", () => ({ state: 1, done: { outcome: "passed", summary: "ok" } })).kind) });
+        const harness = await begin({
+            clock,
+            plugins: (api) =>
+                api.watches.registerKind(
+                    scripted(clock, "ok", () => ({ state: 1, done: { outcome: "passed", summary: "ok" } })).kind,
+                ),
+        });
         harness.api.watches.start({ kind: "ok", spec: {}, title: "one" });
         assert.match(await jigCommand(harness), /Open watches: 1\n/);
         await clock.advance(5_000);
@@ -119,7 +157,10 @@ describe("/jig", () => {
 
     test("shows a problem with the saved watches", async () => {
         const clock = fakeClock();
-        const harness = await begin({ clock, plugins: (api) => api.watches.registerKind(scripted(clock, "ok", (n) => ({ state: n })).kind) });
+        const harness = await begin({
+            clock,
+            plugins: (api) => api.watches.registerKind(scripted(clock, "ok", (n) => ({ state: n })).kind),
+        });
         assert.ok(!/Watches:/.test(await jigCommand(harness)));
         // A file in the folder that no version of Jig wrote.
         const { mkdirSync, writeFileSync } = await import("node:fs");
@@ -155,12 +196,17 @@ describe("/jig", () => {
             config: { git: { timeout: 5 }, lens: { port: "high" } },
             plugins: (api) => {
                 api.config.registerSection("git", () => []);
-                api.config.registerSection("lens", (raw) => (typeof (raw as { port?: unknown }).port === "number" ? [] : ["lens.port must be a number"]));
+                api.config.registerSection("lens", (raw) =>
+                    typeof (raw as { port?: unknown }).port === "number" ? [] : ["lens.port must be a number"],
+                );
                 api.config.registerSection("flow", () => []);
             },
         });
         const status = await jigCommand(harness);
-        assert.match(status, /Plugin sections in the file: git \(loaded\), lens \(not set or invalid\), flow \(not set or invalid\)/);
+        assert.match(
+            status,
+            /Plugin sections in the file: git \(loaded\), lens \(not set or invalid\), flow \(not set or invalid\)/,
+        );
         assert.match(status, /jig\.json: lens: lens\.port must be a number/);
     });
 
@@ -191,7 +237,10 @@ describe("/jig rules", () => {
     test("flags a tool still on the unknown default, so the user can classify it", async () => {
         const harness = await begin({ tools });
         const rules = await jigCommand(harness, "rules");
-        assert.match(rules, /^mystery: external write -> ask \(decision: unknown; classified by: default, not classified\)  <- not classified: add a classify rule, or a rule that names it$/m);
+        assert.match(
+            rules,
+            /^mystery: external write -> ask \(decision: unknown; classified by: default, not classified\)  <- not classified: add a classify rule, or a rule that names it$/m,
+        );
     });
 
     test("gives a line per action for a tool whose schema lists its actions", async () => {
@@ -202,21 +251,48 @@ describe("/jig rules", () => {
     });
 
     test("shows the effect of a rule in configuration", async () => {
-        const harness = await begin({ tools, config: { rules: [{ tool: "git", action: "status", decision: "deny" }, { tool: "read", decision: "ask" }] }, plugins: declareGit });
+        const harness = await begin({
+            tools,
+            config: {
+                rules: [
+                    { tool: "git", action: "status", decision: "deny" },
+                    { tool: "read", decision: "ask" },
+                ],
+            },
+            plugins: declareGit,
+        });
         const rules = await jigCommand(harness, "rules");
         assert.match(rules, /^git status: local read -> deny \(decision: rule; classified by: declaration\)$/m);
         assert.match(rules, /^read: local read -> ask \(decision: rule; classified by: default\)$/m);
     });
 
     test("a classification rule that needs a parameter does not match a call with none", async () => {
-        const config = { environments: { live: { kind: "production" } }, classify: [{ tool: "other_db", param: "x", value: "y", environment: "live", effect: "write" }] };
+        const config = {
+            environments: { live: { kind: "production" } },
+            classify: [{ tool: "other_db", param: "x", value: "y", environment: "live", effect: "write" }],
+        };
         const harness = await begin({ tools, config });
-        assert.match(await jigCommand(harness, "rules other_db"), /^other_db: external write -> ask \(decision: unknown/m);
+        assert.match(
+            await jigCommand(harness, "rules other_db"),
+            /^other_db: external write -> ask \(decision: unknown/m,
+        );
     });
 
     test("a declared tool that cannot be classified without a call says it decides per call", async () => {
-        const harness = await begin({ tools: [{ name: "fake" }], plugins: (api) => api.declareTool({ tool: "fake", plugin: "jig-test", classify: (input) => (input.env === undefined ? undefined : { environment: String(input.env), effect: "read" }) }) });
-        assert.match(await jigCommand(harness, "rules fake"), /^fake: decided per call by its declaration \(jig-test\)$/m);
+        const harness = await begin({
+            tools: [{ name: "fake" }],
+            plugins: (api) =>
+                api.declareTool({
+                    tool: "fake",
+                    plugin: "jig-test",
+                    classify: (input) =>
+                        input.env === undefined ? undefined : { environment: String(input.env), effect: "read" },
+                }),
+        });
+        assert.match(
+            await jigCommand(harness, "rules fake"),
+            /^fake: decided per call by its declaration \(jig-test\)$/m,
+        );
     });
 
     test("lists jig-core's own watch tool: list reads and stop writes, both on this machine", async () => {
@@ -232,11 +308,18 @@ describe("/jig rules", () => {
     });
 
     test("a long list is shown in a scrollable selector, a short one as a notice", async () => {
-        const many = Array.from({ length: 30 }, (_, index) => ({ name: `tool_${String(index).padStart(2, "0")}`, annotations: { readOnlyHint: true } }));
+        const many = Array.from({ length: 30 }, (_, index) => ({
+            name: `tool_${String(index).padStart(2, "0")}`,
+            annotations: { readOnlyHint: true },
+        }));
         const harness = await begin({ tools: many });
         await jigCommand(harness, "rules");
         assert.equal(harness.ui.selects.length, 1);
-        assert.equal(harness.ui.selects[0]?.options.length, 32, "the 30 tools, and a line for each of the two actions of jig-core's own `watch`");
+        assert.equal(
+            harness.ui.selects[0]?.options.length,
+            32,
+            "the 30 tools, and a line for each of the two actions of jig-core's own `watch`",
+        );
         await jigCommand(harness, "rules tool_03");
         assert.equal(harness.ui.selects.length, 1, "one line is a notice");
     });
@@ -246,20 +329,42 @@ describe("/jig records", () => {
     test("says where today's records are, and that there are none yet", async () => {
         const harness = await begin();
         const records = await jigCommand(harness, "records");
-        assert.match(records, new RegExp(`Today's records: ${state.dir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/records/\\d{4}-\\d{2}-\\d{2}\\.jsonl`));
+        assert.match(
+            records,
+            new RegExp(
+                `Today's records: ${state.dir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/records/\\d{4}-\\d{2}-\\d{2}\\.jsonl`,
+            ),
+        );
         assert.match(records, /Nothing recorded yet today\./);
     });
 
     test("summarises calls, errors, questions asked and time waited", async () => {
         const harness = await begin({
             ui: { select: () => "Allow" },
-            plugins: (api) => api.declareTool({ tool: "fake", plugin: "jig-test", classify: (input): CallClass => ({ environment: String(input.env ?? "local"), effect: input.effect === "write" ? "write" : "read" }) }),
+            plugins: (api) =>
+                api.declareTool({
+                    tool: "fake",
+                    plugin: "jig-test",
+                    classify: (input): CallClass => ({
+                        environment: String(input.env ?? "local"),
+                        effect: input.effect === "write" ? "write" : "read",
+                    }),
+                }),
         });
         await harness.call({ tool: "fake", input: { env: "local" }, result: text("ok") });
-        await harness.call({ tool: "fake", input: { env: "local" }, run: () => { throw new Error("broke"); } });
+        await harness.call({
+            tool: "fake",
+            input: { env: "local" },
+            run: () => {
+                throw new Error("broke");
+            },
+        });
         await harness.call({ tool: "fake", input: { env: "external", effect: "write" } });
         await harness.call({ tool: "fake", input: { env: "elsewhere", effect: "write" } });
         const records = await jigCommand(harness, "records");
-        assert.match(records, /4 calls \(1 errors, 1 blocked\), 1 questions asked, \d+ ms waited for you, 0 model turns/);
+        assert.match(
+            records,
+            /4 calls \(1 errors, 1 blocked\), 1 questions asked, \d+ ms waited for you, 0 model turns/,
+        );
     });
 });

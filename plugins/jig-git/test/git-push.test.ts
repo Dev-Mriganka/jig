@@ -248,14 +248,15 @@ test("push, a refusal that is not a lost reply is reported as failed, with no ch
 // ---- the announcement after a push --------------------------------------------------------------------------------
 
 /** What the plugin published on the event bus as `jig-git:pushed`. */
-const pushedEvents = () => h.announced.filter((entry) => entry.event === "jig-git:pushed").map((entry) => entry.payload);
+const pushedEvents = () =>
+    h.announced.filter((entry) => entry.event === "jig-git:pushed").map((entry) => entry.payload);
 
 test("push announces jig-git:pushed with the repository, the branch and the full head, and nothing about CI", async () => {
     const r = unpushed("feature/w1", 1, "acme");
     h.gh.on("pr list", { json: [] });
     const text = ok(await h.call("git", { action: "push", repo: r.name }));
     const head = git(r.dir, "rev-parse", "HEAD");
-    assert.deepEqual(pushedEvents(), [{ repo: "acme/" + r.name, branch: "feature/w1", sha: head }]);
+    assert.deepEqual(pushedEvents(), [{ repo: `acme/${r.name}`, branch: "feature/w1", sha: head }]);
     assert.equal(h.jig.started.length, 0, "jig-git starts no watch: whoever listens does");
     assert.doesNotMatch(text, /Watching/);
     assert.match(text, /^Pushed feature\/w1 \(/);

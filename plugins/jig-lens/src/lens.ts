@@ -135,8 +135,8 @@ export function registerLens(pi: ExtensionAPI, deps: Deps): void {
         const state = await deps.probe(viewer, settings.port);
         if (state === "busy") {
             lines.push(
-                `Port ${settings.port} on 127.0.0.1 is taken by something that is not ${viewer}. `
-                    + `Choose another with "port" under "lens" in jig.json.`,
+                `Port ${settings.port} on 127.0.0.1 is taken by something that is not ${viewer}. ` +
+                    `Choose another with "port" under "lens" in jig.json.`,
             );
             tell(ctx, lines.join("\n"), "warning");
             return;
@@ -166,10 +166,11 @@ export function registerLens(pi: ExtensionAPI, deps: Deps): void {
         } catch {
             // The import has just succeeded, so the counts are a courtesy.
         }
-        const held = status === undefined
-            ? "Rebuilt the index."
-            : `Rebuilt the index from ${plural(status.files, "record file")}: `
-                + `${plural(status.calls, "call")} and ${plural(status.turns, "turn")}.`;
+        const held =
+            status === undefined
+                ? "Rebuilt the index."
+                : `Rebuilt the index from ${plural(status.files, "record file")}: ` +
+                  `${plural(status.calls, "call")} and ${plural(status.turns, "turn")}.`;
         const skipped = outcome.result.skipped > 0 ? ` ${skippedLine(outcome.result.skipped)}` : "";
         tell(ctx, held + skipped, outcome.problem === undefined ? "info" : "warning");
     }
@@ -192,11 +193,12 @@ export function registerLens(pi: ExtensionAPI, deps: Deps): void {
         const paths = deps.paths();
         const { viewer, state } = await answering(settings.port);
         const url = viewerUrl(settings);
-        const viewerLine = state === "running"
-            ? `Viewer: ${viewer} at ${url}, running`
-            : state === "stopped"
-                ? `Viewer: none running at ${url} (/lens grafana or /lens datasette starts one)`
-                : `Viewer: the port is taken by something that is neither Grafana nor Datasette (${url})`;
+        const viewerLine =
+            state === "running"
+                ? `Viewer: ${viewer} at ${url}, running`
+                : state === "stopped"
+                  ? `Viewer: none running at ${url} (/lens grafana or /lens datasette starts one)`
+                  : `Viewer: the port is taken by something that is neither Grafana nor Datasette (${url})`;
         const lines = [viewerLine, ...indexLines(paths.index, () => readStatus(paths.index))];
         const problem = importer.problem();
         if (problem !== undefined) lines.push(`Latest import in this session: ${problem}`);
@@ -204,8 +206,9 @@ export function registerLens(pi: ExtensionAPI, deps: Deps): void {
     }
 
     pi.registerCommand("lens", {
-        description: "Jig summary of cost, failures and your waiting time: /lens, ticket KEY, session, days N; "
-            + "grafana or datasette for a dashboard; rebuild, status",
+        description:
+            "Jig summary of cost, failures and your waiting time: /lens, ticket KEY, session, days N; " +
+            "grafana or datasette for a dashboard; rebuild, status",
         getArgumentCompletions: completions,
         handler: async (args, ctx) => {
             const command = parseCommand(args);

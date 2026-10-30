@@ -1,147 +1,103 @@
 {
-  "category": "physical_address",
-  "cases": [
-    {
-      "id": "address-billing-structured",
-      "input": {
-        "billingAddress": {
-          "street1": "123 Example Lane",
-          "city": "Sample City",
-          "state": "CA",
-          "postalCode": "00000",
-          "country": "US"
+    "category": "physical_address",
+    "cases": [
+        {
+            "id": "address-billing-structured",
+            "input": {
+                "billingAddress": {
+                    "street1": "123 Example Lane",
+                    "city": "Sample City",
+                    "state": "CA",
+                    "postalCode": "00000",
+                    "country": "US"
+                },
+                "orderId": "ord-7401"
+            },
+            "must_not_contain": ["123 Example Lane", "Sample City", "00000", "CA", "US"],
+            "must_keep": ["[removed:address]", "ord-7401"],
+            "expect_tags": [],
+            "notes": "Nothing of a structured billing address is kept, not even state or country."
         },
-        "orderId": "ord-7401"
-      },
-      "must_not_contain": [
-        "123 Example Lane",
-        "Sample City",
-        "00000",
-        "CA",
-        "US"
-      ],
-      "must_keep": [
-        "[removed:address]",
-        "ord-7401"
-      ],
-      "expect_tags": [],
-      "notes": "Nothing of a structured billing address is kept, not even state or country."
-    },
-    {
-      "id": "address-e911-mongo-array",
-      "input": {
-        "accountId": "acct-demo-402",
-        "services": [
-          {
-            "e911Address": {
-              "line1": "456 Demo Street",
-              "line2": "Suite 9",
-              "city": "Testville",
-              "state": "NY",
-              "zip": "00000",
-              "country": "US"
-            }
-          },
-          {
-            "serviceAddress": {
-              "street": "789 Fiction Road",
-              "city": "Placeholder",
-              "state": "TX",
-              "zip": "00000",
-              "country": "US"
-            }
-          }
-        ]
-      },
-      "must_not_contain": [
-        "456 Demo Street",
-        "Suite 9",
-        "Testville",
-        "789 Fiction Road",
-        "Placeholder",
-        "00000",
-        "NY",
-        "TX",
-        "US"
-      ],
-      "must_keep": [
-        "acct-demo-402",
-        "[removed:address]"
-      ],
-      "expect_tags": [],
-      "notes": "Emergency-service and service locations in nested documents and arrays."
-    },
-    {
-      "id": "address-shipping",
-      "input": {
-        "shippingAddress": "321 Sample Avenue, Demo Town, WA 00000, US",
-        "sku": "DEVICE-DEMO-3"
-      },
-      "must_not_contain": [
-        "321 Sample Avenue",
-        "Demo Town",
-        "00000",
-        "WA",
-        "US"
-      ],
-      "must_keep": [
-        "[removed:address]",
-        "DEVICE-DEMO-3"
-      ],
-      "expect_tags": [],
-      "notes": "Unstructured shipping address."
-    },
-    {
-      "id": "address-free-text-note",
-      "input": "WARN order=ord-7404 note=Install at 654 Example Blvd, Test City, OR 00000, US before Friday",
-      "must_not_contain": [
-        "654 Example Blvd",
-        "Test City",
-        "00000",
-        "OR 00000",
-        ", US"
-      ],
-      "must_keep": [
-        "[removed:address]",
-        "ord-7404",
-        "before Friday"
-      ],
-      "expect_tags": [],
-      "notes": "Street address inside a free-text log note."
-    },
-    {
-      "id": "address-json-encoded-log",
-      "input": "INFO payload={\"e911Address\":\"987 Fiction St, Sample City, FL 00000, US\",\"orderId\":\"ord-7405\"}",
-      "must_not_contain": [
-        "987 Fiction St",
-        "Sample City",
-        "00000",
-        "FL 00000"
-      ],
-      "must_keep": [
-        "[removed:address]",
-        "ord-7405"
-      ],
-      "expect_tags": [],
-      "notes": "Emergency-service address inside JSON-encoded log text."
-    },
-    {
-      "id": "address-negative-controls",
-      "input": {
-        "orderId": "ADDR-7406",
-        "sku": "STREET-SWITCH-6",
-        "region": "US",
-        "state": "CA"
-      },
-      "must_not_contain": [],
-      "must_keep": [
-        "ADDR-7406",
-        "STREET-SWITCH-6",
-        "US",
-        "CA"
-      ],
-      "expect_tags": [],
-      "notes": "State and country codes and address-like SKU words are safe to keep."
-    }
-  ]
+        {
+            "id": "address-e911-mongo-array",
+            "input": {
+                "accountId": "acct-demo-402",
+                "services": [
+                    {
+                        "e911Address": {
+                            "line1": "456 Demo Street",
+                            "line2": "Suite 9",
+                            "city": "Testville",
+                            "state": "NY",
+                            "zip": "00000",
+                            "country": "US"
+                        }
+                    },
+                    {
+                        "serviceAddress": {
+                            "street": "789 Fiction Road",
+                            "city": "Placeholder",
+                            "state": "TX",
+                            "zip": "00000",
+                            "country": "US"
+                        }
+                    }
+                ]
+            },
+            "must_not_contain": [
+                "456 Demo Street",
+                "Suite 9",
+                "Testville",
+                "789 Fiction Road",
+                "Placeholder",
+                "00000",
+                "NY",
+                "TX",
+                "US"
+            ],
+            "must_keep": ["acct-demo-402", "[removed:address]"],
+            "expect_tags": [],
+            "notes": "Emergency-service and service locations in nested documents and arrays."
+        },
+        {
+            "id": "address-shipping",
+            "input": {
+                "shippingAddress": "321 Sample Avenue, Demo Town, WA 00000, US",
+                "sku": "DEVICE-DEMO-3"
+            },
+            "must_not_contain": ["321 Sample Avenue", "Demo Town", "00000", "WA", "US"],
+            "must_keep": ["[removed:address]", "DEVICE-DEMO-3"],
+            "expect_tags": [],
+            "notes": "Unstructured shipping address."
+        },
+        {
+            "id": "address-free-text-note",
+            "input": "WARN order=ord-7404 note=Install at 654 Example Blvd, Test City, OR 00000, US before Friday",
+            "must_not_contain": ["654 Example Blvd", "Test City", "00000", "OR 00000", ", US"],
+            "must_keep": ["[removed:address]", "ord-7404", "before Friday"],
+            "expect_tags": [],
+            "notes": "Street address inside a free-text log note."
+        },
+        {
+            "id": "address-json-encoded-log",
+            "input": "INFO payload={\"e911Address\":\"987 Fiction St, Sample City, FL 00000, US\",\"orderId\":\"ord-7405\"}",
+            "must_not_contain": ["987 Fiction St", "Sample City", "00000", "FL 00000"],
+            "must_keep": ["[removed:address]", "ord-7405"],
+            "expect_tags": [],
+            "notes": "Emergency-service address inside JSON-encoded log text."
+        },
+        {
+            "id": "address-negative-controls",
+            "input": {
+                "orderId": "ADDR-7406",
+                "sku": "STREET-SWITCH-6",
+                "region": "US",
+                "state": "CA"
+            },
+            "must_not_contain": [],
+            "must_keep": ["ADDR-7406", "STREET-SWITCH-6", "US", "CA"],
+            "expect_tags": [],
+            "notes": "State and country codes and address-like SKU words are safe to keep."
+        }
+    ]
 }

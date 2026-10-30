@@ -55,7 +55,8 @@ test("a folder setting replaces the default, and ~/ means the home folder", () =
 });
 
 test("the ticket pattern finds whole keys only: a key must not touch a letter or digit", () => {
-    const keysIn = (text: string) => [...text.matchAll(ticketRegex({ ticketPattern: PATTERN })!)].map((match) => match[0]);
+    const keysIn = (text: string) =>
+        [...text.matchAll(ticketRegex({ ticketPattern: PATTERN })!)].map((match) => match[0]);
     assert.deepEqual(keysIn("debug ACME-12 and ACME-7."), ["ACME-12", "ACME-7"]);
     assert.deepEqual(keysIn("aACME-12 and ACME-12b"), [], "glued to a letter before or after");
 });

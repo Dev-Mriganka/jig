@@ -98,7 +98,11 @@ export function setupHarness(options: OpsOptions = {}): Harness {
     const bus: FakeBus = {
         emitted: [],
         listening: [],
-        publish: (event, payload) => void listeners.get(event)?.forEach((listener) => listener(payload)),
+        publish: (event, payload) => {
+            listeners.get(event)?.forEach((listener) => {
+                listener(payload);
+            });
+        },
     };
     const pi = {
         registerTool: (tool: ToolDefinition) => void tools.set(tool.name, tool),
@@ -121,7 +125,8 @@ export function setupHarness(options: OpsOptions = {}): Harness {
     function harnessOf(name: string): ToolHarness {
         const tool = tools.get(name);
         const declaration = jig.declared.get(name);
-        if (tool === undefined || declaration === undefined) throw new Error(`the plugin did not register the ${name} tool`);
+        if (tool === undefined || declaration === undefined)
+            throw new Error(`the plugin did not register the ${name} tool`);
         return {
             tool,
             declaration,
@@ -131,7 +136,12 @@ export function setupHarness(options: OpsOptions = {}): Harness {
                 const blockedBy = (error: unknown): CallResult => {
                     // What jig-core does when a tool says its input is invalid: it blocks, and nobody is asked.
                     const reason = error instanceof Error ? error.message : String(error);
-                    if (error instanceof TypeError) return { id, text: "", blocked: `Blocked by jig-core: ${name} cannot run with this input: ${reason}` };
+                    if (error instanceof TypeError)
+                        return {
+                            id,
+                            text: "",
+                            blocked: `Blocked by jig-core: ${name} cannot run with this input: ${reason}`,
+                        };
                     return { id, text: "", blocked: `jig-core could not decide: ${reason}` };
                 };
 
@@ -145,7 +155,8 @@ export function setupHarness(options: OpsOptions = {}): Harness {
                 if (cls === undefined) return { id, text: "", blocked: "the tool did not classify the call" };
 
                 const decision = decide(cls, jig.api.environments.kindOf(cls.environment));
-                if (decision === "deny") return { id, text: "", cls, blocked: "Denied by the floor: a write to production" };
+                if (decision === "deny")
+                    return { id, text: "", cls, blocked: "Denied by the floor: a write to production" };
 
                 let preview: Preview | undefined;
                 if (decision === "ask" && callOptions.allowed !== true && declaration.preview !== undefined) {
@@ -163,9 +174,21 @@ export function setupHarness(options: OpsOptions = {}): Harness {
                     callOptions.updates?.push(partial.content[0]?.text ?? "");
                 };
                 try {
-                    const result = await tool.execute(id, given as never, callOptions.signal, onUpdate as never, {} as ExtensionToolContext);
+                    const result = await tool.execute(
+                        id,
+                        given as never,
+                        callOptions.signal,
+                        onUpdate as never,
+                        {} as ExtensionToolContext,
+                    );
                     const first = result.content[0];
-                    return { id, text: first !== undefined && first.type === "text" ? first.text : "", cls, preview, details: result.details };
+                    return {
+                        id,
+                        text: first !== undefined && first.type === "text" ? first.text : "",
+                        cls,
+                        preview,
+                        details: result.details,
+                    };
                 } catch (error) {
                     return { id, text: "", error: error as Error, cls, preview };
                 }
@@ -193,7 +216,9 @@ export function setupHarness(options: OpsOptions = {}): Harness {
 
 /** The text of a call that must have worked; a failure or a block fails the test with the message. */
 export function ok(result: CallResult): string {
-    if (result.blocked !== undefined) throw new Error(`expected the call to work, but it was blocked: ${result.blocked}`);
-    if (result.error !== undefined) throw new Error(`expected the call to work, but it failed: ${result.error.message}`);
+    if (result.blocked !== undefined)
+        throw new Error(`expected the call to work, but it was blocked: ${result.blocked}`);
+    if (result.error !== undefined)
+        throw new Error(`expected the call to work, but it failed: ${result.error.message}`);
     return result.text;
 }

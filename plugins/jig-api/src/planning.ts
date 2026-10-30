@@ -53,11 +53,23 @@ const quoted = (name: string): string => JSON.stringify(name);
  * the addresses that take their host from a variable. A request names its host through the environment (`{{baseUrl}}`),
  * so a request that has a host of its own written out is refused unless the environment holds the same one.
  */
-export function environmentHosts(ctx: PlanContext, collection: Collection, environment: Environment, label: string): Set<string> {
+export function environmentHosts(
+    ctx: PlanContext,
+    collection: Collection,
+    environment: Environment,
+    label: string,
+): Set<string> {
     const hosts = new Set<string>();
     const add = (template: string, request: SavedRequest | undefined): void => {
         try {
-            const resolver = createResolver({ collection, environment, label, request, secrets: ctx.settings.secrets, agent: new Map() });
+            const resolver = createResolver({
+                collection,
+                environment,
+                label,
+                request,
+                secrets: ctx.settings.secrets,
+                agent: new Map(),
+            });
             const found = resolver.origin(template);
             if (found?.fromVariables === true) hosts.add(new URL(found.origin).host);
         } catch {
@@ -74,7 +86,13 @@ export function environmentHosts(ctx: PlanContext, collection: Collection, envir
 }
 
 /** The address, checked: a web address, not a blocked one, and on one of the environment's hosts. */
-function destination(ctx: PlanContext, address: string, hosts: ReadonlySet<string>, label: string, what: string): string {
+function destination(
+    ctx: PlanContext,
+    address: string,
+    hosts: ReadonlySet<string>,
+    label: string,
+    what: string,
+): string {
     let url: URL;
     try {
         url = new URL(address);
@@ -82,13 +100,18 @@ function destination(ctx: PlanContext, address: string, hosts: ReadonlySet<strin
         throw new InputError(`${what} is not a valid address`);
     }
     if (url.protocol !== "http:" && url.protocol !== "https:") {
-        throw new InputError(`${what} uses ${url.protocol}//, and only http and https are sent (not WebSocket, gRPC or MQTT)`);
+        throw new InputError(
+            `${what} uses ${url.protocol}//, and only http and https are sent (not WebSocket, gRPC or MQTT)`,
+        );
     }
     url.hash = "";
     const problem = addressProblem(url.href, ctx.settings.allowPlainLocal);
     if (problem !== undefined) throw new InputError(`${what}: the address ${problem}`);
     if (!hosts.has(url.host)) {
-        const known = hosts.size === 0 ? "none (no request takes its host from a variable of the environment)" : shortList([...hosts], ", ", 70);
+        const known =
+            hosts.size === 0
+                ? "none (no request takes its host from a variable of the environment)"
+                : shortList([...hosts], ", ", 70);
         throw new InputError(
             `${what} goes to ${url.host}, which is not a host of ${label} (${known}); ` +
                 "a request takes its host from its environment, such as {{baseUrl}}",
@@ -100,13 +123,22 @@ function destination(ctx: PlanContext, address: string, hosts: ReadonlySet<strin
 // ---------------------------------------------------------------------------------------------------------------------
 // Headers, bodies and sign-in
 
-function checkedHeader(name: string, value: Text, refused: ReadonlySet<string>, request: string): readonly [string, Text] {
-    if (!HEADER_NAME.test(name)) throw new InputError(`${quoted(request)} has a header name that cannot be sent: ${shown(name, 30)}`);
+function checkedHeader(
+    name: string,
+    value: Text,
+    refused: ReadonlySet<string>,
+    request: string,
+): readonly [string, Text] {
+    if (!HEADER_NAME.test(name))
+        throw new InputError(`${quoted(request)} has a header name that cannot be sent: ${shown(name, 30)}`);
     if (refused.has(name.toLowerCase())) {
-        throw new InputError(`${quoted(request)} sets the header ${name}, which the tool sets or which controls the connection`);
+        throw new InputError(
+            `${quoted(request)} sets the header ${name}, which the tool sets or which controls the connection`,
+        );
     }
     const plain = plainOf(value);
-    if (plain !== undefined && !HEADER_VALUE.test(plain)) throw new InputError(`the header ${name} of ${quoted(request)} must be printable ASCII`);
+    if (plain !== undefined && !HEADER_VALUE.test(plain))
+        throw new InputError(`the header ${name} of ${quoted(request)} must be printable ASCII`);
     return [name, value];
 }
 
@@ -116,12 +148,20 @@ function uploadOf(collection: Collection, file: FileRef): Upload {
     if (found.problem !== undefined) throw new InputError(`the file ${shown(file.path, 60)} ${found.problem}`);
     try {
         const size = fs.statSync(found.path).size;
-        if (size > MAX_UPLOAD_BYTES) throw new InputError(`the file ${shown(file.path, 60)} is larger than ${MAX_UPLOAD_BYTES / (1024 * 1024)} MiB`);
+        if (size > MAX_UPLOAD_BYTES)
+            throw new InputError(
+                `the file ${shown(file.path, 60)} is larger than ${MAX_UPLOAD_BYTES / (1024 * 1024)} MiB`,
+            );
         return upload(path.basename(found.path), fs.readFileSync(found.path));
     } catch (error) {
         if (error instanceof InputError) throw error;
-        const code = typeof error === "object" && error !== null && "code" in error ? String((error as { code: unknown }).code) : "";
-        throw new InputError(`the file ${shown(file.path, 60)} ${code === "EISDIR" ? "is a folder, not a file" : "could not be read"}`);
+        const code =
+            typeof error === "object" && error !== null && "code" in error
+                ? String((error as { code: unknown }).code)
+                : "";
+        throw new InputError(
+            `the file ${shown(file.path, 60)} ${code === "EISDIR" ? "is a folder, not a file" : "could not be read"}`,
+        );
     }
 }
 
@@ -146,7 +186,10 @@ function slotOf(language: string | undefined, headers: ReadonlyArray<readonly [s
 }
 
 function boundaryOf(body: Extract<Body, { kind: "form" }>): string {
-    return body.boundary ?? `jig-api-${createHash("sha256").update(JSON.stringify(body.fields)).digest("hex").slice(0, 24)}`;
+    return (
+        body.boundary ??
+        `jig-api-${createHash("sha256").update(JSON.stringify(body.fields)).digest("hex").slice(0, 24)}`
+    );
 }
 
 function quotedParam(value: string): string {
@@ -154,7 +197,13 @@ function quotedParam(value: string): string {
 }
 
 /** The body as text, with the headers it needs added to `headers`. */
-function bodyOf(body: Body, resolver: Resolver, collection: Collection, headers: Array<readonly [string, Text]>, request: string): Text {
+function bodyOf(
+    body: Body,
+    resolver: Resolver,
+    collection: Collection,
+    headers: Array<readonly [string, Text]>,
+    request: string,
+): Text {
     switch (body.kind) {
         case "raw":
             return resolver.text(body.text, slotOf(body.language, headers));
@@ -165,7 +214,9 @@ function bodyOf(body: Body, resolver: Resolver, collection: Collection, headers:
         case "graphql": {
             const query = plainOf(resolver.text(body.query, "graphql"));
             if (query === undefined) {
-                throw new InputError(`the GraphQL query of ${quoted(request)} cannot hold a secret or a generated value: use a variable`);
+                throw new InputError(
+                    `the GraphQL query of ${quoted(request)} cannot hold a secret or a generated value: use a variable`,
+                );
             }
             const variables = body.variables === undefined ? undefined : resolver.text(body.variables, "json");
             const plain = variables === undefined ? undefined : plainOf(variables);
@@ -187,7 +238,9 @@ function bodyOf(body: Body, resolver: Resolver, collection: Collection, headers:
             if (body.encoding === "urlencoded") {
                 const pairs = body.fields.flatMap((field) => {
                     if (field.kind !== "text") return [];
-                    return [joined(`${encodeURIComponent(field.name)}=`, formEncoded(resolver.text(field.value, "plain")))];
+                    return [
+                        joined(`${encodeURIComponent(field.name)}=`, formEncoded(resolver.text(field.value, "plain"))),
+                    ];
                 });
                 return joined(...pairs.flatMap((pair, index) => (index === 0 ? [pair] : ["&", pair])));
             }
@@ -202,14 +255,21 @@ function bodyOf(body: Body, resolver: Resolver, collection: Collection, headers:
                     const value = resolver.text(field.value, "plain");
                     // A value that holds the boundary would end the part and start another that the request does not have.
                     if (displayOf(value).includes(`--${boundary}`)) {
-                        throw new InputError(`the field ${shown(field.name, 30)} of ${quoted(request)} holds the boundary of the form`);
+                        throw new InputError(
+                            `the field ${shown(field.name, 30)} of ${quoted(request)} holds the boundary of the form`,
+                        );
                     }
                     return joined(head, type, "\r\n\r\n", value, "\r\n");
                 }
                 const file = uploadOf(collection, field.file);
                 const filename = field.filename ?? file.upload;
                 const type = field.contentType ?? "application/octet-stream";
-                return joined(head, `; filename="${quotedParam(filename)}"\r\nContent-Type: ${type}\r\n\r\n`, [file], "\r\n");
+                return joined(
+                    head,
+                    `; filename="${quotedParam(filename)}"\r\nContent-Type: ${type}\r\n\r\n`,
+                    [file],
+                    "\r\n",
+                );
             });
             return joined(...parts, `--${boundary}--\r\n`);
         }
@@ -217,23 +277,35 @@ function bodyOf(body: Body, resolver: Resolver, collection: Collection, headers:
 }
 
 /** How the request signs in, from the sign-in its source found. Every address in it is checked like the request's own. */
-function signInOf(auth: Auth, resolver: Resolver, endpoint: (template: string, what: string) => string, request: string): SignIn {
+function signInOf(
+    auth: Auth,
+    resolver: Resolver,
+    endpoint: (template: string, what: string) => string,
+    request: string,
+): SignIn {
     switch (auth.kind) {
         case "none":
             return { kind: "none" };
         case "bearer":
             return { kind: "bearer", token: resolver.text(auth.token, "header") };
         case "basic":
-            return { kind: "basic", username: resolver.text(auth.username, "header"), password: resolver.text(auth.password, "header") };
+            return {
+                kind: "basic",
+                username: resolver.text(auth.username, "header"),
+                password: resolver.text(auth.password, "header"),
+            };
         case "apiKey": {
             const name = plainOf(resolver.text(auth.name, "plain"));
             if (name === undefined || !HEADER_NAME.test(name) || SAVED_REFUSED_HEADERS.has(name.toLowerCase())) {
-                throw new InputError(`the API key of ${quoted(request)} names a header that cannot be sent: ${shown(name ?? "", 30)}`);
+                throw new InputError(
+                    `the API key of ${quoted(request)} names a header that cannot be sent: ${shown(name ?? "", 30)}`,
+                );
             }
             return { kind: "apiKey", name, value: resolver.text(auth.value, "header") };
         }
         case "oauth2": {
-            const text = (template: string | undefined): Text | undefined => (template === undefined ? undefined : resolver.text(template, "plain"));
+            const text = (template: string | undefined): Text | undefined =>
+                template === undefined ? undefined : resolver.text(template, "plain");
             const scope = text(auth.scope);
             const clientSecret = text(auth.clientSecret);
             const username = text(auth.username);
@@ -292,25 +364,32 @@ export function planRequest(ctx: PlanContext, request: SavedRequest, input: RunI
     const name = quoted(request.name);
     const collection = ctx.catalog.collection(request.collection);
     if (request.scripts.prerequest) {
-        throw new InputError(`${name} is refused: it has a pre-request script (${request.scripts.where ?? "its own"}), and scripts never run`);
+        throw new InputError(
+            `${name} is refused: it has a pre-request script (${request.scripts.where ?? "its own"}), and scripts never run`,
+        );
     }
     if (request.unsupported !== undefined) throw new InputError(`${name} cannot be sent: ${request.unsupported}`);
-    if (!isMethod(request.method)) throw new InputError(`${name} cannot be sent: the method ${request.method} is not sent`);
+    if (!isMethod(request.method))
+        throw new InputError(`${name} cannot be sent: the method ${request.method} is not sent`);
 
     const environment = ctx.catalog.environment(collection, input.environment);
     const label = input.environment as string;
-    if (environment.unavailable !== undefined) throw new InputError(`${name} cannot run in ${label}: ${environment.unavailable}`);
+    if (environment.unavailable !== undefined)
+        throw new InputError(`${name} cannot run in ${label}: ${environment.unavailable}`);
     checkProduction(ctx, collection, name, label);
     const secretNames = secretNamesOf(collection, ctx.settings.secrets);
     const agent = agentValues(request, input.variables, secretNames);
     const resolver = createResolver({ collection, environment, label, request, secrets: ctx.settings.secrets, agent });
     const hosts = environmentHosts(ctx, collection, environment, label);
-    const endpoint = (template: string, what: string): string => destination(ctx, resolver.address(template).url, hosts, label, what);
+    const endpoint = (template: string, what: string): string =>
+        destination(ctx, resolver.address(template).url, hosts, label, what);
 
     // An optional variable that nobody gave a value is left out of the request, with whatever hangs on it.
     const given = (variable: string): boolean =>
-        agent.has(variable) || environment.variables.get(variable)?.secret === false || request.defaults.has(variable) ||
-            collection.variables.has(variable);
+        agent.has(variable) ||
+        environment.variables.get(variable)?.secret === false ||
+        request.defaults.has(variable) ||
+        collection.variables.has(variable);
     const left = pruned(request, new Set((request.optional ?? []).filter((variable) => !given(variable))));
 
     const url = endpoint(left.url, `the address of ${name}`);
@@ -341,7 +420,7 @@ export function planRequest(ctx: PlanContext, request: SavedRequest, input: RunI
         method: request.method,
         url,
         headers,
-        body: body === undefined || (body.length === 0) ? undefined : body,
+        body: body === undefined || body.length === 0 ? undefined : body,
         signIn,
         timeoutSec: checkTimeout(input.timeoutSec, ctx.settings.timeoutSec),
         allowPlainLocal: ctx.settings.allowPlainLocal,
@@ -363,7 +442,11 @@ export function planCall(ctx: PlanContext, input: CallInput): Plan {
     const label = typeof input.environment === "string" ? input.environment : "";
     const holders = ctx.catalog.selected(input.collection).filter((collection) => collection.environments.has(label));
     if (holders.length === 0) {
-        const names = [...new Set(ctx.catalog.selected(input.collection).flatMap((collection) => [...collection.environments.keys()]))];
+        const names = [
+            ...new Set(
+                ctx.catalog.selected(input.collection).flatMap((collection) => [...collection.environments.keys()]),
+            ),
+        ];
         const known = names.length === 0 ? "none" : shortList(names, ", ", 70);
         throw new InputError(`no environment named ${shown(input.environment, 30)}; known: ${known}`);
     }
@@ -396,16 +479,26 @@ export function planCall(ctx: PlanContext, input: CallInput): Plan {
     let signIn: SignIn = overrideOf(ctx, label) ?? { kind: "none" };
     if (signIn.kind === "none" && input.collection !== undefined) {
         const collection = holders[0] as Collection;
-        if (collection.authRefused !== undefined) throw new InputError(`the sign-in of ${collection.name} cannot be sent: ${collection.authRefused}`);
+        if (collection.authRefused !== undefined)
+            throw new InputError(`the sign-in of ${collection.name} cannot be sent: ${collection.authRefused}`);
         const environment = ctx.catalog.environment(collection, label);
-        const resolver = createResolver({ collection, environment, label, request: undefined, secrets: ctx.settings.secrets, agent: new Map() });
-        const endpoint = (template: string, what: string): string => destination(ctx, resolver.address(template).url, hosts, label, what);
+        const resolver = createResolver({
+            collection,
+            environment,
+            label,
+            request: undefined,
+            secrets: ctx.settings.secrets,
+            agent: new Map(),
+        });
+        const endpoint = (template: string, what: string): string =>
+            destination(ctx, resolver.address(template).url, hosts, label, what);
         signIn = signInOf(collection.auth, resolver, endpoint, collection.name);
         resolver.finish();
     }
 
     const headers: Array<readonly [string, Text]> = own.map(([name, value]) => [name, [value]] as const);
-    if (body !== undefined && !own.some(([name]) => name.toLowerCase() === "content-type")) headers.push(["Content-Type", ["application/json"]]);
+    if (body !== undefined && !own.some(([name]) => name.toLowerCase() === "content-type"))
+        headers.push(["Content-Type", ["application/json"]]);
     return sealed({
         label: `api call ${method} ${new URL(url).pathname}`,
         system: input.collection === undefined ? "api" : `api:${input.collection}`,

@@ -20,7 +20,7 @@ export interface CheckedPipeline {
     /** The stages to run. With an allow list a projection of the allowed fields comes after the leading `$match` stages. */
     stages: Doc[];
     /** The last stage, when it writes to a collection. */
-    output?: { stage: "$out" | "$merge"; target: Ns; /** The stage as given, to run last. */ doc: Doc };
+    output?: { stage: "$out" | "$merge"; target: Ns /** The stage as given, to run last. */; doc: Doc };
     /** The collections the pipeline reads: its own first. */
     reads: Ns[];
 }

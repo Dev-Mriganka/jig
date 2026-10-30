@@ -25,7 +25,13 @@ function choosePod(pods: readonly Pod[], given: string | undefined, target: Targ
     if (given !== undefined) {
         const found = pods.find((pod) => pod.name === given);
         if (found !== undefined) return found;
-        const offer = pods.length === 0 ? "it has no pods" : `use ${shortList(pods.map((pod) => pod.name), 120)}`;
+        const offer =
+            pods.length === 0
+                ? "it has no pods"
+                : `use ${shortList(
+                      pods.map((pod) => pod.name),
+                      120,
+                  )}`;
         throw new Error(
             `${given} is not a pod of ${target.service} in ${target.environment} (${offer}). Run pods to see them`,
         );
@@ -61,7 +67,10 @@ function chooseContainer(pod: Pod, given: string | undefined, target: Target): s
 function whose(pod: Pod, container: string | undefined): string {
     if (container !== undefined) return `${pod.name} (container ${container})`;
     if (pod.containers.length <= 1) return pod.name;
-    return `${pod.name} (kubectl chose the container; the pod has ${shortList(pod.containers.map((c) => c.name), 80)})`;
+    return `${pod.name} (kubectl chose the container; the pod has ${shortList(
+        pod.containers.map((c) => c.name),
+        80,
+    )})`;
 }
 
 export async function logsAction(kube: Kube, call: LogsAsk): Promise<Outcome> {

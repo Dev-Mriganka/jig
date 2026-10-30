@@ -8,14 +8,27 @@ import type { Answer } from "../src/records.ts";
 import { fakeTerminal } from "./support/fakes.ts";
 
 const ESC = "\u001b";
-const keys = { up: `${ESC}[A`, down: `${ESC}[B`, pageUp: `${ESC}[5~`, pageDown: `${ESC}[6~`, home: `${ESC}[H`, end: `${ESC}[F`, escape: ESC, ctrlC: "\u0003" };
+const keys = {
+    up: `${ESC}[A`,
+    down: `${ESC}[B`,
+    pageUp: `${ESC}[5~`,
+    pageDown: `${ESC}[6~`,
+    home: `${ESC}[H`,
+    end: `${ESC}[F`,
+    escape: ESC,
+    ctrlC: "\u0003",
+};
 
 /** A review screen with a plain theme, and what it did. */
 function screen(preview: Preview, options: { rows?: number; open?: () => Promise<string> } = {}) {
     const answers: Answer[] = [];
     const terminal = fakeTerminal(options.rows ?? 24);
     const component = createReviewScreen(
-        { header: "git · push · external · write", preview, openInBrowser: options.open ?? (async () => "opened in the browser") },
+        {
+            header: "git · push · external · write",
+            preview,
+            openInBrowser: options.open ?? (async () => "opened in the browser"),
+        },
         terminal.tui as never,
         terminal.theme as never,
         (answer) => answers.push(answer),
@@ -33,7 +46,8 @@ describe("what it shows", () => {
         assert.match(text, /git · push · external · write/);
         assert.match(text, /Push 2 commits to origin\/main/);
         assert.match(text, /first\n.*second/);
-        for (const key of ["y allow", "s allow for this session", "n/Esc decline", "o open in browser"]) assert.ok(text.includes(key), key);
+        for (const key of ["y allow", "s allow for this session", "n/Esc decline", "o open in browser"])
+            assert.ok(text.includes(key), key);
     });
 
     test("a preview with no body says there is no more detail", () => {
@@ -44,7 +58,8 @@ describe("what it shows", () => {
         const body = `${"word ".repeat(200)}\n${"x".repeat(500)}\n日本語のテキスト`.repeat(3);
         for (const width of [20, 40, 80, 200]) {
             const { component } = screen({ summary: "A long summary ".repeat(30), body });
-            for (const line of component.render(width)) assert.ok(visibleWidth(line) <= width, `${width}: ${visibleWidth(line)}`);
+            for (const line of component.render(width))
+                assert.ok(visibleWidth(line) <= width, `${width}: ${visibleWidth(line)}`);
         }
     });
 
@@ -90,7 +105,15 @@ describe("answering", () => {
 describe("opening the browser", () => {
     test("o opens the rendered preview, shows how it went, and does not answer", async () => {
         const opened: string[] = [];
-        const { component, answers, rendered } = screen({ summary: "s", body: "b" }, { open: async () => { opened.push("yes"); return "opened in the browser"; } });
+        const { component, answers, rendered } = screen(
+            { summary: "s", body: "b" },
+            {
+                open: async () => {
+                    opened.push("yes");
+                    return "opened in the browser";
+                },
+            },
+        );
         component.render(80);
         component.handleInput?.("o");
         assert.match(component.render(80).join("\n"), /opening the preview in the browser/);
@@ -102,7 +125,14 @@ describe("opening the browser", () => {
     });
 
     test("a page that cannot even be written is a failure too, not an unhandled error", async () => {
-        const { component, answers } = screen({ summary: "s" }, { open: async () => { throw new Error("no space left on device"); } });
+        const { component, answers } = screen(
+            { summary: "s" },
+            {
+                open: async () => {
+                    throw new Error("no space left on device");
+                },
+            },
+        );
         component.handleInput?.("o");
         await new Promise((resolve) => setImmediate(resolve));
         assert.match(component.render(80).join("\n"), /could not open the browser: no space left on device/);
@@ -110,7 +140,10 @@ describe("opening the browser", () => {
     });
 
     test("a failure is shown, and the question stays open", async () => {
-        const { component, answers } = screen({ summary: "s" }, { open: async () => "could not open the browser: nothing to open it with" });
+        const { component, answers } = screen(
+            { summary: "s" },
+            { open: async () => "could not open the browser: nothing to open it with" },
+        );
         component.handleInput?.("o");
         await new Promise((resolve) => setImmediate(resolve));
         assert.match(component.render(80).join("\n"), /could not open the browser/);
@@ -121,7 +154,11 @@ describe("opening the browser", () => {
 });
 
 describe("scrolling", () => {
-    const bodyLines = (component: { render(width: number): string[] }) => component.render(80).filter((line) => /body line \d+/.test(line)).map((line) => Number(/body line (\d+)/.exec(line)?.[1]));
+    const bodyLines = (component: { render(width: number): string[] }) =>
+        component
+            .render(80)
+            .filter((line) => /body line \d+/.test(line))
+            .map((line) => Number(/body line (\d+)/.exec(line)?.[1]));
 
     test("shows the start, and where the window is in a long body", () => {
         const { component } = screen({ summary: "s", body: numbered(100) }, { rows: 24 });
@@ -191,12 +228,26 @@ describe("colour", () => {
     /** A theme that tags what it colours, so the test can see which colour a line got. */
     function tagged(preview: Preview) {
         const terminal = fakeTerminal(40);
-        const theme = { fg: (color: string, text: string) => `<${color}>${text}</${color}>`, bold: (text: string) => `<b>${text}</b>` };
-        return createReviewScreen({ header: "h", preview, openInBrowser: async () => "" }, terminal.tui as never, theme as never, () => {}).render(80).join("\n");
+        const theme = {
+            fg: (color: string, text: string) => `<${color}>${text}</${color}>`,
+            bold: (text: string) => `<b>${text}</b>`,
+        };
+        return createReviewScreen(
+            { header: "h", preview, openInBrowser: async () => "" },
+            terminal.tui as never,
+            theme as never,
+            () => {},
+        )
+            .render(80)
+            .join("\n");
     }
 
     test("a diff shows additions, removals and hunks in their own colours", () => {
-        const text = tagged({ summary: "s", format: "diff", body: "--- a/x\n+++ b/x\n@@ -1 +1 @@\n-gone\n+added\n same" });
+        const text = tagged({
+            summary: "s",
+            format: "diff",
+            body: "--- a/x\n+++ b/x\n@@ -1 +1 @@\n-gone\n+added\n same",
+        });
         assert.match(text, /<error>-gone<\/error>/);
         assert.match(text, /<success>\+added<\/success>/);
         assert.match(text, /<accent>@@ -1 \+1 @@<\/accent>/);

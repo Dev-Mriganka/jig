@@ -14,7 +14,11 @@ test("only writes inside a git work tree, outside the agent's folders, count as 
         writeFileSync(path.join(root, "worktree", ".git"), "gitdir: elsewhere\n");
         assert.equal(isReviewableWrite(path.join(root, "repo", "src", "Main.java")), true);
         assert.equal(isReviewableWrite(path.join(root, "worktree", "a.ts")), true, "a worktree's .git file counts");
-        assert.equal(isReviewableWrite(path.join(root, "repo", ".pi", "notes.md")), false, "the agent's own folder is not code");
+        assert.equal(
+            isReviewableWrite(path.join(root, "repo", ".pi", "notes.md")),
+            false,
+            "the agent's own folder is not code",
+        );
         assert.equal(isReviewableWrite(path.join(root, "loose.md")), false, "outside any repository");
     } finally {
         rmSync(root, { recursive: true, force: true });
@@ -28,5 +32,9 @@ test("the active ticket is the latest ticket entry of the session", () => {
     assert.equal(activeTicket(ctx([entry("PROJ-1"), { type: "message" }, entry("PROJ-10877")])), "PROJ-10877");
     assert.equal(activeTicket(ctx([entry("PROJ-1"), entry(null)])), undefined, "cleared");
     assert.equal(activeTicket(ctx([entry("../../x")])), undefined, "not a ticket key");
-    assert.equal(activeTicket(ctx([{ type: "custom", customType: "another-plugin", data: { key: "PROJ-2" } }])), undefined, "another plugin's entry");
+    assert.equal(
+        activeTicket(ctx([{ type: "custom", customType: "another-plugin", data: { key: "PROJ-2" } }])),
+        undefined,
+        "another plugin's entry",
+    );
 });

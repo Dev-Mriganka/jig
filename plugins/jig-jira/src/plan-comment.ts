@@ -36,9 +36,13 @@ export async function planComment(env: Env, call: CallOf<"comment">): Promise<Pl
                     text: `the newest ${RECHECK_COMMENTS} comments on ${call.key} hold none by you with this text`,
                 };
             }
-            const several = mine.length > 1 ? `; ${mine.length} comments by you carry this text, so check the time` : "";
+            const several =
+                mine.length > 1 ? `; ${mine.length} comments by you carry this text, so check the time` : "";
             const created = `created ${minute(newest.created)}${several}`;
-            return { happened: true, text: `comment ${newest.id} by you with this text is on ${call.key} (${created})` };
+            return {
+                happened: true,
+                text: `comment ${newest.id} by you with this text is on ${call.key} (${created})`,
+            };
         },
         done(reply) {
             const id = str(obj(reply).id);
@@ -89,7 +93,8 @@ export async function planDeleteComment(env: Env, call: CallOf<"delete_comment">
     return {
         key: call.key,
         shown: {
-            summary: `Delete comment ${call.commentId} by ${old.author.displayName || "unknown"} on ${about(head)}. ` +
+            summary:
+                `Delete comment ${call.commentId} by ${old.author.displayName || "unknown"} on ${about(head)}. ` +
                 "This cannot be undone.",
             flags: [],
             rows: [],

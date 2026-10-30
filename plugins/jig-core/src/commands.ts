@@ -66,7 +66,8 @@ function actionsOf(tool: ToolInfo | undefined): string[] {
     if (Array.isArray(values)) return strings(values);
     const options = Array.isArray(anyOf) ? anyOf : Array.isArray(oneOf) ? oneOf : [];
     return options.flatMap((option: { const?: unknown; enum?: unknown }) =>
-        typeof option?.const === "string" ? [option.const] : strings(option?.enum));
+        typeof option?.const === "string" ? [option.const] : strings(option?.enum),
+    );
 }
 
 const CLASS_LABEL: Record<ClassSource, string> = {
@@ -83,7 +84,9 @@ export function statusLines(state: JigState): string[] {
     const tools = state.pi.getAllTools();
     const plugins = new Set<string>(["jig-core"]);
     for (const declaration of state.declarations.values()) plugins.add(declaration.plugin);
-    const unclassified = tools.filter((tool) => probe(state, tool.name, {})?.source === "unknown").map((tool) => tool.name);
+    const unclassified = tools
+        .filter((tool) => probe(state, tool.name, {})?.source === "unknown")
+        .map((tool) => tool.name);
     const problems = [...state.policy().problems.map(describeProblem), ...state.startupProblems];
 
     const lines = [
@@ -97,10 +100,13 @@ export function statusLines(state: JigState): string[] {
     ];
     const sections = [...state.sectionChecks.keys()];
     if (sections.length > 0) {
-        const shown = sections.map((name) => `${name} (${state.personal.sections.has(name) ? "loaded" : "not set or invalid"})`);
+        const shown = sections.map(
+            (name) => `${name} (${state.personal.sections.has(name) ? "loaded" : "not set or invalid"})`,
+        );
         lines.push(`Plugin sections in the file: ${shown.join(", ")}`);
     }
-    if (problems.length > 0) lines.push(`Configuration problems (${problems.length}):`, ...problems.map((problem) => `  ${problem}`));
+    if (problems.length > 0)
+        lines.push(`Configuration problems (${problems.length}):`, ...problems.map((problem) => `  ${problem}`));
     if (state.recordsProblem !== undefined) lines.push(`Records: the last write failed: ${state.recordsProblem}`);
     const watchProblem = state.watches.problem();
     if (watchProblem !== undefined) lines.push(`Watches: ${watchProblem}`);
@@ -135,7 +141,9 @@ export function ruleLines(state: JigState, only: string | undefined, hasUI: bool
             const classification = probe(state, name, action === undefined ? {} : { action });
             const label = action === undefined ? name : `${name} ${action}`;
             if (classification === undefined) {
-                lines.push(`${label}: decided per call by its declaration (${state.declarations.get(name)?.plugin ?? "unknown plugin"})`);
+                lines.push(
+                    `${label}: decided per call by its declaration (${state.declarations.get(name)?.plugin ?? "unknown plugin"})`,
+                );
                 continue;
             }
             const verdict = decide({
@@ -152,20 +160,25 @@ export function ruleLines(state: JigState, only: string | undefined, hasUI: bool
                 sessionAllows: state.sessionAllows,
                 hasUI,
             });
-            const flag = classification.source === "unknown" ? "  <- not classified: add a classify rule, or a rule that names it" : "";
+            const flag =
+                classification.source === "unknown"
+                    ? "  <- not classified: add a classify rule, or a rule that names it"
+                    : "";
             const where = `${classification.environment} ${classification.effect} -> ${verdict.decision}`;
             const because = `decision: ${verdict.source}; classified by: ${CLASS_LABEL[classification.source]}`;
             lines.push(`${label}: ${where} (${because})${flag}`);
         }
     }
     if (lines.length === 0) return [only === undefined ? "No tools are registered." : `No tool named ${only}.`];
-    return lines.length > MAX_RULE_LINES ? [...lines.slice(0, MAX_RULE_LINES), `... and ${lines.length - MAX_RULE_LINES} more`] : lines;
+    return lines.length > MAX_RULE_LINES
+        ? [...lines.slice(0, MAX_RULE_LINES), `... and ${lines.length - MAX_RULE_LINES} more`]
+        : lines;
 }
 
 // ---- /jig records ------------------------------------------------------------------------------------------------------
 
 export function recordsLines(state: JigState): string[] {
-    let summary;
+    let summary: ReturnType<typeof summarize>;
     try {
         summary = summarize(state.now());
     } catch (error) {

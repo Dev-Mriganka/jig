@@ -36,10 +36,14 @@ export function variablesIn(...templates: ReadonlyArray<string | undefined>): st
 export function generatedKind(name: string): Generated["generated"] | undefined {
     switch (name) {
         case "$uuid":
-        case "$guid": return "uuid";
-        case "$timestamp": return "timestamp";
-        case "$isoTimestamp": return "isoTimestamp";
-        default: return undefined;
+        case "$guid":
+            return "uuid";
+        case "$timestamp":
+            return "timestamp";
+        case "$isoTimestamp":
+            return "isoTimestamp";
+        default:
+            return undefined;
     }
 }
 

@@ -6,7 +6,13 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-works/pi-ai";
 import type { FauxProviderHandle, JsonObject } from "@earendil-works/pi-ai";
-import { createAgentSession, DefaultResourceLoader, ModelRuntime, SessionManager, SettingsManager } from "@earendil-works/pi-coding-agent";
+import {
+    createAgentSession,
+    DefaultResourceLoader,
+    ModelRuntime,
+    SessionManager,
+    SettingsManager,
+} from "@earendil-works/pi-coding-agent";
 import type { AgentSession, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { jig, withJig } from "../../src/client.ts";
@@ -54,8 +60,12 @@ const classifyByInput = (input: Readonly<Record<string, unknown>>): CallClass =>
 /** Registers the fake tools. `fake_tool` is a Jig tool: it declares itself to jig-core, with a preview. */
 export function fakePlugin(log: PluginLog): ExtensionFactory {
     return (pi) => {
-        pi.events.on(JIG_EVENTS.decision, (data) => { log.decisions.push(data as DecisionEvent); });
-        pi.events.on(JIG_EVENTS.watchDone, (data) => { log.watchDone.push(data as WatchDoneEvent); });
+        pi.events.on(JIG_EVENTS.decision, (data) => {
+            log.decisions.push(data as DecisionEvent);
+        });
+        pi.events.on(JIG_EVENTS.watchDone, (data) => {
+            log.watchDone.push(data as WatchDoneEvent);
+        });
 
         withJig((api) => {
             api.declareTool({
@@ -68,12 +78,27 @@ export function fakePlugin(log: PluginLog): ExtensionFactory {
                     fingerprint: "fp-test",
                 }),
             });
-            api.declareTool({ tool: "outer_tool", plugin: "jig-test", classify: () => ({ environment: "local", effect: "read" }) });
-            api.declareTool({ tool: "own_masker", plugin: "jig-test", masksOwnResults: true, classify: classifyByInput });
-            api.config.registerSection("fake", (raw) => (typeof raw === "object" && raw !== null && typeof (raw as { level?: unknown }).level === "number" ? [] : ["fake.level must be a number"]));
+            api.declareTool({
+                tool: "outer_tool",
+                plugin: "jig-test",
+                classify: () => ({ environment: "local", effect: "read" }),
+            });
+            api.declareTool({
+                tool: "own_masker",
+                plugin: "jig-test",
+                masksOwnResults: true,
+                classify: classifyByInput,
+            });
+            api.config.registerSection("fake", (raw) =>
+                typeof raw === "object" && raw !== null && typeof (raw as { level?: unknown }).level === "number"
+                    ? []
+                    : ["fake.level must be a number"],
+            );
         });
 
-        pi.on("session_start", () => { log.section = jig().config.section("fake"); });
+        pi.on("session_start", () => {
+            log.section = jig().config.section("fake");
+        });
 
         pi.registerTool({
             name: "fake_tool",
@@ -92,7 +117,10 @@ export function fakePlugin(log: PluginLog): ExtensionFactory {
                     details.echo = secret;
                 }
                 if (params.signIn !== undefined) {
-                    const headers = await jig().signIn.headers(params.signIn, { system: "fake", url: "https://fake.example/api" });
+                    const headers = await jig().signIn.headers(params.signIn, {
+                        system: "fake",
+                        url: "https://fake.example/api",
+                    });
                     text += ` headers=${JSON.stringify(headers)}`;
                     details.headers = headers;
                 }
@@ -119,9 +147,19 @@ export function fakePlugin(log: PluginLog): ExtensionFactory {
             parameters: outerParameters,
             async execute(toolCallId, params, _signal, _onUpdate, ctx) {
                 log.executed.push({ tool: "outer_tool", id: toolCallId, input: params });
-                const nested = await ctx.executeTool("fake_tool", { env: params.env, effect: params.effect, action: "inner", output: "nested output" });
-                const said = nested.result.content.flatMap((block) => (block.type === "text" ? [block.text] : [])).join("\n");
-                return { content: [{ type: "text", text: `outer saw: ${nested.isError ? "ERROR " : ""}${said}` }], details: {} };
+                const nested = await ctx.executeTool("fake_tool", {
+                    env: params.env,
+                    effect: params.effect,
+                    action: "inner",
+                    output: "nested output",
+                });
+                const said = nested.result.content
+                    .flatMap((block) => (block.type === "text" ? [block.text] : []))
+                    .join("\n");
+                return {
+                    content: [{ type: "text", text: `outer saw: ${nested.isError ? "ERROR " : ""}${said}` }],
+                    details: {},
+                };
             },
         });
 
@@ -169,7 +207,18 @@ export interface ToolOutcome {
     toolCallId: string;
     details: unknown;
     /** The result as `tool_execution_end` reported it, which is where `structuredContent` can be seen. */
-    ended: { result: { content: Array<{ type: string; text?: string }>; structuredContent?: unknown; details?: unknown }; isError: boolean; durationMs?: number; parentToolCallId?: string } | undefined;
+    ended:
+        | {
+              result: {
+                  content: Array<{ type: string; text?: string }>;
+                  structuredContent?: unknown;
+                  details?: unknown;
+              };
+              isError: boolean;
+              durationMs?: number;
+              parentToolCallId?: string;
+          }
+        | undefined;
 }
 
 type Mode = "tui" | "rpc" | "json" | "print";
@@ -229,24 +278,39 @@ export async function startWorld(options: WorldOptions = {}): Promise<World> {
     }
 
     const modelRuntime = await ModelRuntime.create({
-        authPath: path.join(root, "auth.json"), modelsPath: null, modelsStorePath: path.join(root, "store.json"),
-        allowModelNetwork: false, refreshOnCreate: false,
+        authPath: path.join(root, "auth.json"),
+        modelsPath: null,
+        modelsStorePath: path.join(root, "store.json"),
+        allowModelNetwork: false,
+        refreshOnCreate: false,
     });
     const faux = fauxProvider();
     modelRuntime.registerNativeProvider(faux.provider);
 
     const log: PluginLog = { executed: [], decisions: [], watchDone: [], section: undefined };
     const clock = options.clock === undefined ? {} : { now: options.clock.date, timers: options.clock.timers };
-    const jigFactory = options.realMasker === true ? jigCore(clock) : jigCore({ createMasker: () => options.masker ?? fakeMasker, ...clock });
+    const jigFactory =
+        options.realMasker === true
+            ? jigCore(clock)
+            : jigCore({ createMasker: () => options.masker ?? fakeMasker, ...clock });
     const plugin = fakePlugin(log);
     const resourceLoader = new DefaultResourceLoader({
-        cwd, agentDir,
+        cwd,
+        agentDir,
         extensionFactories: options.pluginFirst === true ? [plugin, jigFactory] : [jigFactory, plugin],
-        noExtensions: false, noSkills: true, noPromptTemplates: true, noThemes: true, noContextFiles: true,
+        noExtensions: false,
+        noSkills: true,
+        noPromptTemplates: true,
+        noThemes: true,
+        noContextFiles: true,
     });
     await resourceLoader.reload();
     const { session } = await createAgentSession({
-        cwd, agentDir, modelRuntime, model: faux.getModel(), resourceLoader,
+        cwd,
+        agentDir,
+        modelRuntime,
+        model: faux.getModel(),
+        resourceLoader,
         sessionManager: SessionManager.inMemory(cwd),
         settingsManager: SettingsManager.inMemory({ compaction: { enabled: false } }),
     });
@@ -262,14 +326,23 @@ export async function startWorld(options: WorldOptions = {}): Promise<World> {
         const before = session.messages.length;
         const ids = list.map((entry, index) => entry.id ?? `world${++worlds}-call${index}`);
         faux.setResponses([
-            fauxAssistantMessage(list.map((entry, index) => fauxToolCall(entry.name, entry.args, { id: ids[index] as string })), { stopReason: "toolUse" }),
+            fauxAssistantMessage(
+                list.map((entry, index) => fauxToolCall(entry.name, entry.args, { id: ids[index] as string })),
+                { stopReason: "toolUse" },
+            ),
             fauxAssistantMessage("done"),
         ]);
         await session.prompt(`use ${list.map((entry) => entry.name).join(", ")}`);
-        const results = session.messages.slice(before).filter((message) => message.role === "toolResult") as Array<{ toolCallId: string; content: Array<{ text?: string }>; isError: boolean; details: unknown }>;
+        const results = session.messages.slice(before).filter((message) => message.role === "toolResult") as Array<{
+            toolCallId: string;
+            content: Array<{ text?: string }>;
+            isError: boolean;
+            details: unknown;
+        }>;
         return ids.map((id) => {
             const message = results.find((result) => result.toolCallId === id);
-            if (message === undefined) throw new Error(`no result for ${id}: ${JSON.stringify(session.messages.slice(before)).slice(0, 500)}`);
+            if (message === undefined)
+                throw new Error(`no result for ${id}: ${JSON.stringify(session.messages.slice(before)).slice(0, 500)}`);
             return {
                 text: message.content.map((block) => block.text ?? "").join("\n"),
                 isError: message.isError === true,
@@ -281,13 +354,21 @@ export async function startWorld(options: WorldOptions = {}): Promise<World> {
     }
 
     return {
-        session, cwd, agentDir, log, faux,
+        session,
+        cwd,
+        agentDir,
+        log,
+        faux,
         stateDir: process.env.JIG_STATE_DIR ?? "",
         ui: screen?.log,
         calls,
-        call: async (name, args = {}, id) => (await calls([{ name, args, ...(id === undefined ? {} : { id }) }]))[0] as ToolOutcome,
+        call: async (name, args = {}, id) =>
+            (await calls([{ name, args, ...(id === undefined ? {} : { id }) }]))[0] as ToolOutcome,
         records: () => readRecords(process.env.JIG_STATE_DIR ?? "") as Array<Record<string, any>>,
-        callRecords: () => (readRecords(process.env.JIG_STATE_DIR ?? "") as Array<Record<string, any>>).filter((record) => record.kind === "call"),
+        callRecords: () =>
+            (readRecords(process.env.JIG_STATE_DIR ?? "") as Array<Record<string, any>>).filter(
+                (record) => record.kind === "call",
+            ),
         async close() {
             await session.extensionRunner.emit({ type: "session_shutdown", reason: "quit" });
             session.dispose();

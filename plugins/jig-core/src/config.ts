@@ -75,8 +75,13 @@ export interface LoadedConfig {
 /** Reads and checks the file. Never throws: every failure becomes a problem, and the defaults apply. `checks` holds the
  *  sections plugins registered, by name. */
 export function loadConfigFile(file: string, checks: ReadonlyMap<string, SectionCheck> = new Map()): LoadedConfig {
-    const failed = (problems: Problem[], found = true): LoadedConfig =>
-        ({ file, found, config: defaultConfig(), problems, sections: new Map() });
+    const failed = (problems: Problem[], found = true): LoadedConfig => ({
+        file,
+        found,
+        config: defaultConfig(),
+        problems,
+        sections: new Map(),
+    });
     let text: string;
     try {
         // A byte-order mark, which some editors add, is not part of the JSON.
@@ -126,7 +131,8 @@ export function parseConfig(
         if (messages.length === 0) sections.set(key, raw);
         else for (const message of messages) sectionProblems.push({ source, key: printable(key), message });
     }
-    if (value.environments !== undefined) config.environments = parseEnvironments(value.environments, "environments", fail);
+    if (value.environments !== undefined)
+        config.environments = parseEnvironments(value.environments, "environments", fail);
     if (value.rules !== undefined) config.rules = parseRules(value.rules, "rules", fail);
     if (value.classify !== undefined) config.classify = parseClassifyRules(value.classify, "classify", fail);
     if (value.secrets !== undefined) config.secrets = parseSecrets(value.secrets, fail);
@@ -145,7 +151,11 @@ function runSectionCheck(check: SectionCheck, raw: unknown): string[] {
     try {
         const messages: unknown = check(raw);
         if (!Array.isArray(messages)) return ["the plugin's check did not return a list of messages"];
-        return messages.map((message) => String(message).replace(/[\u0000-\u001f\u007f]/g, "?").slice(0, MAX_MESSAGE_CHARS));
+        return messages.map((message) =>
+            String(message)
+                .replace(/[\u0000-\u001f\u007f]/g, "?")
+                .slice(0, MAX_MESSAGE_CHARS),
+        );
     } catch (error) {
         return [`the plugin's check failed: ${errorMessage(error)}`];
     }
@@ -171,7 +181,13 @@ function knownFields(object: Record<string, unknown>, allowed: readonly string[]
     for (const key of Object.keys(object)) if (!allowed.includes(key)) fail(at(path, key), "is not a known field");
 }
 
-function text(object: Record<string, unknown>, key: string, path: string, fail: Fail, required: boolean): string | undefined {
+function text(
+    object: Record<string, unknown>,
+    key: string,
+    path: string,
+    fail: Fail,
+    required: boolean,
+): string | undefined {
     const value = object[key];
     if (value === undefined) {
         if (required) fail(at(path, key), "is required");
@@ -228,7 +244,8 @@ export function parseEnvironments(raw: unknown, path: string, fail: Fail): Recor
         const kind = choice(entry, "kind", ["test", "production"] as const, here, fail, true);
         const mask = entry.mask;
         if (mask !== undefined && typeof mask !== "boolean") fail(at(here, "mask"), "must be true or false");
-        else if (kind === "production" && mask === false) fail(at(here, "mask"), "production masking cannot be turned off");
+        else if (kind === "production" && mask === false)
+            fail(at(here, "mask"), "production masking cannot be turned off");
         if (kind !== undefined) out[name] = mask === undefined || typeof mask !== "boolean" ? { kind } : { kind, mask };
     }
     return out;
@@ -243,8 +260,14 @@ export function parseRules(raw: unknown, path: string, fail: Fail): Rule[] {
     raw.forEach((item, index) => {
         const here = `${path}[${index}]`;
         let valid = true;
-        const bad: Fail = (key, message) => { valid = false; fail(key, message); };
-        if (!isObject(item)) return bad(here, "must be an object");
+        const bad: Fail = (key, message) => {
+            valid = false;
+            fail(key, message);
+        };
+        if (!isObject(item)) {
+            bad(here, "must be an object");
+            return;
+        }
         knownFields(item, ["tool", "action", "environment", "effect", "decision", "approval"], here, bad);
         const tool = text(item, "tool", here, bad, true);
         const action = text(item, "action", here, bad, false);
@@ -254,7 +277,8 @@ export function parseRules(raw: unknown, path: string, fail: Fail): Rule[] {
         const approval = choice(item, "approval", APPROVALS, here, bad, false);
         if (valid && tool !== undefined && decision !== undefined) {
             rules.push({
-                tool, decision,
+                tool,
+                decision,
                 ...(action === undefined ? {} : { action }),
                 ...(environment === undefined ? {} : { environment }),
                 ...(effect === undefined ? {} : { effect }),
@@ -274,8 +298,14 @@ export function parseClassifyRules(raw: unknown, path: string, fail: Fail): Clas
     raw.forEach((item, index) => {
         const here = `${path}[${index}]`;
         let valid = true;
-        const bad: Fail = (key, message) => { valid = false; fail(key, message); };
-        if (!isObject(item)) return bad(here, "must be an object");
+        const bad: Fail = (key, message) => {
+            valid = false;
+            fail(key, message);
+        };
+        if (!isObject(item)) {
+            bad(here, "must be an object");
+            return;
+        }
         knownFields(item, ["tool", "action", "param", "value", "pattern", "environment", "effect"], here, bad);
         const tool = text(item, "tool", here, bad, true);
         const action = text(item, "action", here, bad, false);
@@ -284,8 +314,10 @@ export function parseClassifyRules(raw: unknown, path: string, fail: Fail): Clas
         const pattern = text(item, "pattern", here, bad, false);
         const environment = text(item, "environment", here, bad, true);
         const effect = choice(item, "effect", EFFECTS, here, bad, true);
-        if (item.value === undefined && item.pattern === undefined) bad(here, "needs a value or a pattern for the parameter");
-        else if (item.value !== undefined && item.pattern !== undefined) bad(here, "takes a value or a pattern, not both");
+        if (item.value === undefined && item.pattern === undefined)
+            bad(here, "needs a value or a pattern for the parameter");
+        else if (item.value !== undefined && item.pattern !== undefined)
+            bad(here, "takes a value or a pattern, not both");
         if (pattern !== undefined) {
             try {
                 new RegExp(pattern);
@@ -295,7 +327,10 @@ export function parseClassifyRules(raw: unknown, path: string, fail: Fail): Clas
         }
         if (valid && tool !== undefined && param !== undefined && environment !== undefined && effect !== undefined) {
             rules.push({
-                tool, param, environment, effect,
+                tool,
+                param,
+                environment,
+                effect,
                 ...(action === undefined ? {} : { action }),
                 ...(value === undefined ? {} : { value }),
                 ...(pattern === undefined ? {} : { pattern }),
@@ -319,13 +354,19 @@ function parseSecrets(raw: unknown, fail: Fail): { backends: SecretBackend[] } {
     }
     const backends: SecretBackend[] = [];
     raw.backends.forEach((name, index) => {
-        if (typeof name === "string" && (SECRET_BACKENDS as readonly string[]).includes(name)) backends.push(name as SecretBackend);
+        if (typeof name === "string" && (SECRET_BACKENDS as readonly string[]).includes(name))
+            backends.push(name as SecretBackend);
         else fail(`secrets.backends[${index}]`, `must be one of ${SECRET_BACKENDS.join(", ")}`);
     });
     return { backends };
 }
 
-function parseRetention(raw: unknown, path: string, fail: Fail, fallback: { retentionDays: number }): { retentionDays: number } {
+function parseRetention(
+    raw: unknown,
+    path: string,
+    fail: Fail,
+    fallback: { retentionDays: number },
+): { retentionDays: number } {
     if (!isObject(raw)) {
         fail(path, "must be an object");
         return fallback;
@@ -365,30 +406,38 @@ export function addCompanyEnvironments(additions: CompanyAdditions, raw: unknown
     for (const [name, config] of Object.entries(parseEnvironments(raw, "environments", fail))) {
         const before = additions.environments[name];
         // Two company plugins naming the same environment: production wins and a mask stays on, as everywhere else.
-        additions.environments[name] = before === undefined ? config : {
-            kind: before.kind === "production" || config.kind === "production" ? "production" : "test",
-            ...(before.mask === true || config.mask === true ? { mask: true } : {}),
-        };
+        additions.environments[name] =
+            before === undefined
+                ? config
+                : {
+                      kind: before.kind === "production" || config.kind === "production" ? "production" : "test",
+                      ...(before.mask === true || config.mask === true ? { mask: true } : {}),
+                  };
     }
 }
 
 export function addCompanyRules(additions: CompanyAdditions, raw: unknown): void {
     const offset = additions.received.rules;
-    const fail: Fail = (key, message) => additions.problems.push({ source: COMPANY, key: shiftIndex(key, "rules", offset), message });
+    const fail: Fail = (key, message) =>
+        additions.problems.push({ source: COMPANY, key: shiftIndex(key, "rules", offset), message });
     additions.rules.push(...parseRules(raw, "rules", fail));
     additions.received.rules += Array.isArray(raw) ? raw.length : 0;
 }
 
 export function addCompanyClassifyRules(additions: CompanyAdditions, raw: unknown): void {
     const offset = additions.received.classify;
-    const fail: Fail = (key, message) => additions.problems.push({ source: COMPANY, key: shiftIndex(key, "classify", offset), message });
+    const fail: Fail = (key, message) =>
+        additions.problems.push({ source: COMPANY, key: shiftIndex(key, "classify", offset), message });
     additions.classify.push(...parseClassifyRules(raw, "classify", fail));
     additions.received.classify += Array.isArray(raw) ? raw.length : 0;
 }
 
 /** `rules[1].tool` becomes `rules[4].tool` when three rules came before this call. */
 function shiftIndex(key: string, section: string, offset: number): string {
-    return key.replace(new RegExp(`^${section}\\[(\\d+)\\]`), (_, index: string) => `${section}[${Number(index) + offset}]`);
+    return key.replace(
+        new RegExp(`^${section}\\[(\\d+)\\]`),
+        (_, index: string) => `${section}[${Number(index) + offset}]`,
+    );
 }
 
 // ---- the policy: everything merged, with the floor applied ------------------------------------------------------------
@@ -416,8 +465,10 @@ export function floorViolation(rule: Rule, environments: Environments): string |
     const why = environments.isKnown(rule.environment)
         ? `"${rule.environment}" is production`
         : `"${rule.environment}" is not a defined environment, so it counts as production`;
-    return `"${rule.decision}" would let this rule decide production writes, which are always denied (${why}); ` +
-        `give the rule effect "read", or decision "deny"`;
+    return (
+        `"${rule.decision}" would let this rule decide production writes, which are always denied (${why}); ` +
+        `give the rule effect "read", or decision "deny"`
+    );
 }
 
 export function buildPolicy(personal: LoadedConfig, company: CompanyAdditions): Policy {
@@ -434,7 +485,12 @@ export function buildPolicy(personal: LoadedConfig, company: CompanyAdditions): 
         list.forEach((rule, index) => {
             const reason = floorViolation(rule, merged.environments);
             if (reason === undefined) rules.push(rule);
-            else problems.push({ source, key: `rules[${index}].decision`, message: `${reason} (the rule for tool "${rule.tool}")` });
+            else
+                problems.push({
+                    source,
+                    key: `rules[${index}].decision`,
+                    message: `${reason} (the rule for tool "${rule.tool}")`,
+                });
         });
     };
     keep(personal.file, personal.config.rules);

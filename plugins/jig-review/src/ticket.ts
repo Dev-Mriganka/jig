@@ -39,7 +39,8 @@ export function isTicketKey(text: string): boolean {
 /** The folder ticket folders live in, by the same rule as jig-memory: the section's `folder`, or the XDG data folder. */
 export function ticketFolder(env: NodeJS.ProcessEnv = process.env): string {
     const folder = memorySection().folder;
-    if (typeof folder === "string" && folder !== "") return folder.startsWith("~/") ? path.join(os.homedir(), folder.slice(2)) : folder;
+    if (typeof folder === "string" && folder !== "")
+        return folder.startsWith("~/") ? path.join(os.homedir(), folder.slice(2)) : folder;
     const home = env.XDG_DATA_HOME;
     const dataHome = home !== undefined && path.isAbsolute(home) ? home : path.join(os.homedir(), ".local", "share");
     return path.join(dataHome, "jig", "tickets");
@@ -75,7 +76,8 @@ export function readBinding(ticket: string, cwd: string, env: NodeJS.ProcessEnv 
     const used = new Set<string>();
     return (entries as string[]).map((entry) => {
         const root = path.resolve(cwd, entry);
-        if (!existsSync(path.join(root, ".git"))) throw new Error(`The binding for ${ticket} names ${entry}, which is not a git repository.`);
+        if (!existsSync(path.join(root, ".git")))
+            throw new Error(`The binding for ${ticket} names ${entry}, which is not a git repository.`);
         const relative = path.relative(cwd, root);
         const inside = !relative.startsWith("..") && !path.isAbsolute(relative);
         // "" is Pi's own folder, which is then the repository: its paths need no prefix.

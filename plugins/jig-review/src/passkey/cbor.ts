@@ -29,7 +29,8 @@ interface Reader {
 }
 
 function take(reader: Reader, length: number): Uint8Array {
-    if (length < 0 || reader.at + length > reader.bytes.length) throw new CborError("CBOR value runs past the end of the data");
+    if (length < 0 || reader.at + length > reader.bytes.length)
+        throw new CborError("CBOR value runs past the end of the data");
     const slice = reader.bytes.subarray(reader.at, reader.at + length);
     reader.at += length;
     return slice;
@@ -80,7 +81,8 @@ function readItem(reader: Reader, depth: number): Cbor {
             const map = new Map<number | string, Cbor>();
             for (let i = 0; i < count; i++) {
                 const key = readItem(reader, depth + 1);
-                if (typeof key !== "number" && typeof key !== "string") throw new CborError("CBOR map key is not an integer or text");
+                if (typeof key !== "number" && typeof key !== "string")
+                    throw new CborError("CBOR map key is not an integer or text");
                 if (map.has(key)) throw new CborError("CBOR map repeats a key");
                 map.set(key, readItem(reader, depth + 1));
             }

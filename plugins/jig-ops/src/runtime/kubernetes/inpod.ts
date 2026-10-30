@@ -80,7 +80,10 @@ export async function inPodHealth(kube: Kube): Promise<Outcome> {
         );
     }
     if (!pod.containers.some((one) => one.name === container)) {
-        const have = shortList(pod.containers.map((one) => one.name), 120);
+        const have = shortList(
+            pod.containers.map((one) => one.name),
+            120,
+        );
         throw new Error(
             `${pod.name} has no container ${container} (it has ${have}): ` +
                 'fix "container" in the ops catalog of jig.json (runtime.kubernetes)',

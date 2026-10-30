@@ -95,12 +95,21 @@ test("the roll-up of a pull request becomes the same four words, and counts into
         fromRollup({ __typename: "CheckRun", name: "a", status: "IN_PROGRESS", conclusion: "" }).bucket,
         "pending",
     );
-    assert.deepEqual(fromRollup({ __typename: "CheckRun", name: "lint", status: "COMPLETED", conclusion: "FAILURE", detailsUrl: "u" }), {
-        name: "lint",
-        bucket: "fail",
-        detail: "failure",
-        url: "u",
-    });
+    assert.deepEqual(
+        fromRollup({
+            __typename: "CheckRun",
+            name: "lint",
+            status: "COMPLETED",
+            conclusion: "FAILURE",
+            detailsUrl: "u",
+        }),
+        {
+            name: "lint",
+            bucket: "fail",
+            detail: "failure",
+            url: "u",
+        },
+    );
     const counts = count([
         { name: "a", bucket: "pass" },
         { name: "b", bucket: "fail" },

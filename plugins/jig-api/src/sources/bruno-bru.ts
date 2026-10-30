@@ -8,8 +8,27 @@
 //
 // A block ends at a `}` or `]` in the first column. Nothing here runs a script: a script block is only noticed.
 // Format: https://docs.usebruno.com/bru-lang/language
-import { apiKeyAuth, fileBody, filesOf, hasText, noBody, oauth2Auth, refusedAuth, textBody, urlencodedBody } from "./bruno-types.ts";
-import type { AuthSetting, ParsedBody, ParsedDefaults, ParsedEnvironment, ParsedRequest, ParsedVariable, Pairs, Report } from "./bruno-types.ts";
+import {
+    apiKeyAuth,
+    fileBody,
+    filesOf,
+    hasText,
+    noBody,
+    oauth2Auth,
+    refusedAuth,
+    textBody,
+    urlencodedBody,
+} from "./bruno-types.ts";
+import type {
+    AuthSetting,
+    ParsedBody,
+    ParsedDefaults,
+    ParsedEnvironment,
+    ParsedRequest,
+    ParsedVariable,
+    Pairs,
+    Report,
+} from "./bruno-types.ts";
 import type { FormField } from "../model.ts";
 
 interface Pair {
@@ -29,15 +48,27 @@ interface Block {
 
 /** Blocks whose lines are text and not pairs. */
 const TEXT_BLOCKS: ReadonlySet<string> = new Set([
-    "body", "body:json", "body:text", "body:xml", "body:sparql", "body:graphql", "body:graphql:vars", "tests", "docs",
-    "script:pre-request", "script:post-response", "script:grpc:before-call-start", "script:grpc:before-message-send",
-    "script:grpc:after-message-receive", "script:grpc:after-call-end",
+    "body",
+    "body:json",
+    "body:text",
+    "body:xml",
+    "body:sparql",
+    "body:graphql",
+    "body:graphql:vars",
+    "tests",
+    "docs",
+    "script:pre-request",
+    "script:post-response",
+    "script:grpc:before-call-start",
+    "script:grpc:before-message-send",
+    "script:grpc:after-message-receive",
+    "script:grpc:after-call-end",
 ]);
 
-const HEADER = /^([A-Za-z][\w:.\-]*)\s*([{[])\s*$/;
+const HEADER = /^([A-Za-z][\w:.-]*)\s*([{[])\s*$/;
 const SINGLE = /^(extends|color)\s*:\s*(.*)$/;
 /** An array block that opens and closes on one line: `vars:secret [token, apiKey]`. */
-const ONE_LINE_ARRAY = /^([A-Za-z][\w:.\-]*)\s*\[(.*)\]\s*$/;
+const ONE_LINE_ARRAY = /^([A-Za-z][\w:.-]*)\s*\[(.*)\]\s*$/;
 /** A pair: a key (quoted, or without spaces and colons), a colon, and the rest of the line. */
 const PAIR = /^\s*(~?"(?:[^"\\]|\\.)*"|[^\s:]+)\s*:\s?(.*)$/;
 /** `@description('''...''')` and the like, on a line of their own before a pair. A pair whose key starts with `@` has a colon. */
@@ -94,7 +125,10 @@ function pairsOf(body: readonly string[]): Pair[] {
                     }
                     lines.push(next);
                 }
-                value = lines.map((each) => each.slice(4)).join("\n").trim();
+                value = lines
+                    .map((each) => each.slice(4))
+                    .join("\n")
+                    .trim();
             }
         } else if (value.startsWith("[") && !value.includes("]")) {
             // A list value, such as the tags of a request: not used here.
@@ -120,7 +154,10 @@ export function readBlocks(source: string, report: Report): Block[] {
         }
         const list = ONE_LINE_ARRAY.exec(line);
         if (list !== null) {
-            const items = (list[2] as string).split(",").map((item) => item.trim()).filter((item) => item !== "");
+            const items = (list[2] as string)
+                .split(",")
+                .map((item) => item.trim())
+                .filter((item) => item !== "");
             blocks.push({ name: list[1] as string, pairs: [], text: "", items });
             at++;
             continue;
@@ -146,14 +183,18 @@ export function readBlocks(source: string, report: Report): Block[] {
         }
         at = found.next;
         if (opens === "[") {
-            const items = found.body.join("\n").split(/[,\n]/).map((item) => item.trim()).filter((item) => item !== "");
+            const items = found.body
+                .join("\n")
+                .split(/[,\n]/)
+                .map((item) => item.trim())
+                .filter((item) => item !== "");
             blocks.push({ name, pairs: [], text: "", items });
         } else if (TEXT_BLOCKS.has(name) || name.startsWith("script:")) {
             let body = found.body.map(outdent);
             while (body.length > 0 && (body[0] as string).trim() === "") body = body.slice(1);
             blocks.push({ name, pairs: [], text: body.join("\n"), items: [] });
         } else if (name.startsWith("example") || name === "app") {
-            continue;
+            // Examples and the app block are not read.
         } else {
             blocks.push({ name, pairs: pairsOf(found.body), text: "", items: [] });
         }
@@ -171,7 +212,7 @@ function enabledPairs(blocks: readonly Block[], ...names: string[]): Pairs {
     return pairs.filter((pair) => pair.enabled).map((pair) => [pair.key, pair.value] as const);
 }
 
-function valueOf(block: Block | undefined, key: string): string {
+function pairValue(block: Block | undefined, key: string): string {
     return block?.pairs.find((pair) => pair.key === key)?.value ?? "";
 }
 
@@ -184,18 +225,25 @@ function authOf(blocks: readonly Block[], mode: string): AuthSetting {
         case "inherit":
             return { kind: "inherit" };
         case "bearer":
-            return { kind: "set", auth: { kind: "bearer", token: valueOf(find(blocks, "auth:bearer"), "token") } };
+            return { kind: "set", auth: { kind: "bearer", token: pairValue(find(blocks, "auth:bearer"), "token") } };
         case "basic": {
             const block = find(blocks, "auth:basic");
-            return { kind: "set", auth: { kind: "basic", username: valueOf(block, "username"), password: valueOf(block, "password") } };
+            return {
+                kind: "set",
+                auth: { kind: "basic", username: pairValue(block, "username"), password: pairValue(block, "password") },
+            };
         }
         case "apikey": {
             const block = find(blocks, "auth:apikey");
-            return apiKeyAuth(valueOf(block, "key"), valueOf(block, "value"), valueOf(block, "placement").replace("queryparams", "query"));
+            return apiKeyAuth(
+                pairValue(block, "key"),
+                pairValue(block, "value"),
+                pairValue(block, "placement").replace("queryparams", "query"),
+            );
         }
         case "oauth2": {
             const block = find(blocks, "auth:oauth2");
-            const get = (key: string): string => valueOf(block, key);
+            const get = (key: string): string => pairValue(block, key);
             return oauth2Auth({
                 grant: get("grant_type"),
                 accessTokenUrl: get("access_token_url"),
@@ -243,7 +291,9 @@ function bodyFrom(blocks: readonly Block[], mode: string): ParsedBody {
             };
         }
         case "formUrlEncoded": {
-            return urlencodedBody(enabledPairs(blocks, "body:form-urlencoded").map(([name, value]) => ({ kind: "text", name, value })));
+            return urlencodedBody(
+                enabledPairs(blocks, "body:form-urlencoded").map(([name, value]) => ({ kind: "text", name, value })),
+            );
         }
         case "multipartForm": {
             const fields: FormField[] = [];
@@ -253,7 +303,8 @@ function bodyFrom(blocks: readonly Block[], mode: string): ParsedBody {
                 const typed = contentType === undefined ? {} : { contentType };
                 const files = filesOf(value);
                 if (files === undefined) fields.push({ kind: "text", name, value, ...typed });
-                else if (files.length === 0) notes.push(`the file field "${name}" has no file chosen, so it is left out`);
+                else if (files.length === 0)
+                    notes.push(`the file field "${name}" has no file chosen, so it is left out`);
                 else for (const file of files) fields.push({ kind: "file", name, file: { path: file }, ...typed });
             }
             return fields.length === 0 ? { notes } : { body: { kind: "form", encoding: "multipart", fields }, notes };
@@ -263,7 +314,8 @@ function bodyFrom(blocks: readonly Block[], mode: string): ParsedBody {
             const entries = enabledPairs(blocks, "body:file").map(([, value]) => withContentType(value));
             const entry = entries.find((each) => filesOf(each.value) !== undefined);
             const file = entry === undefined ? undefined : filesOf(entry.value)?.[0];
-            if (entry === undefined || file === undefined) return { notes: ["its body is a file, but no file is chosen, so it has no body"] };
+            if (entry === undefined || file === undefined)
+                return { notes: ["its body is a file, but no file is chosen, so it has no body"] };
             return fileBody(file, entry.contentType);
         }
         default:
@@ -274,8 +326,8 @@ function bodyFrom(blocks: readonly Block[], mode: string): ParsedBody {
 const VERBS = ["get", "post", "put", "delete", "patch", "options", "head", "connect", "trace"];
 
 function seqOf(meta: Block | undefined): number | undefined {
-    const seq = Number(valueOf(meta, "seq"));
-    return valueOf(meta, "seq") !== "" && Number.isFinite(seq) ? seq : undefined;
+    const seq = Number(pairValue(meta, "seq"));
+    return pairValue(meta, "seq") !== "" && Number.isFinite(seq) ? seq : undefined;
 }
 
 /** The variables set before the request. A name that starts with `@` is local to the request; the `@` is not part of the name. */
@@ -289,43 +341,56 @@ function varsOf(blocks: readonly Block[]): Map<string, string> {
 export function readRequest(source: string, report: Report): ParsedRequest | undefined {
     const blocks = readBlocks(source, report);
     const meta = find(blocks, "meta");
-    const verb = blocks.find((block) => VERBS.includes(block.name) || block.name === "http" || block.name === "grpc" || block.name === "ws");
+    const verb = blocks.find(
+        (block) => VERBS.includes(block.name) || block.name === "http" || block.name === "grpc" || block.name === "ws",
+    );
     if (verb === undefined) {
         report("", "has no request: no get, post, put, delete, patch, options, head, grpc or ws block", "warning");
         return undefined;
     }
-    const type = verb.name === "grpc" ? "grpc" : verb.name === "ws" ? "websocket" : valueOf(meta, "type") === "graphql" ? "graphql" : "http";
-    const named = verb.name === "http" ? valueOf(verb, "method") : verb.name;
+    const type =
+        verb.name === "grpc"
+            ? "grpc"
+            : verb.name === "ws"
+              ? "websocket"
+              : pairValue(meta, "type") === "graphql"
+                ? "graphql"
+                : "http";
+    const named = verb.name === "http" ? pairValue(verb, "method") : verb.name;
     const method = verb.name === "grpc" ? "GRPC" : verb.name === "ws" ? "WEBSOCKET" : named.toUpperCase();
 
     const pathParams = enabledPairs(blocks, "params:path");
     const notes: string[] = [];
-    if (hasText(find(blocks, "script:post-response")?.text)) notes.push("its post-response script is ignored (scripts never run)");
+    if (hasText(find(blocks, "script:post-response")?.text))
+        notes.push("its post-response script is ignored (scripts never run)");
     if (hasText(find(blocks, "tests")?.text)) notes.push("its tests are ignored (scripts never run)");
     if ((find(blocks, "vars:post-response")?.pairs.length ?? 0) > 0) {
         notes.push("its post-response variables are not set (nothing reads the answer)");
     }
-    const tokenRequest = ["body", "headers", "queryparams"].map((part) => `auth:oauth2:additional_params:access_token_req:${part}`);
+    const tokenRequest = ["body", "headers", "queryparams"].map(
+        (part) => `auth:oauth2:additional_params:access_token_req:${part}`,
+    );
     if (tokenRequest.some((name) => find(blocks, name) !== undefined)) {
         notes.push("the additional parameters of its OAuth 2.0 token request are not sent");
     }
-    if (valueOf(find(blocks, "settings"), "followRedirects") === "true") notes.push("followRedirects is ignored: redirects are never followed");
+    if (pairValue(find(blocks, "settings"), "followRedirects") === "true")
+        notes.push("followRedirects is ignored: redirects are never followed");
 
     return {
-        name: valueOf(meta, "name") || undefined,
+        name: pairValue(meta, "name") || undefined,
         seq: seqOf(meta),
         type,
         method,
-        url: valueOf(verb, "url"),
+        url: pairValue(verb, "url"),
         headers: enabledPairs(blocks, "headers"),
         pathParams,
-        body: bodyFrom(blocks, valueOf(verb, "body")),
-        auth: authOf(blocks, valueOf(verb, "auth")),
+        body: bodyFrom(blocks, pairValue(verb, "body")),
+        auth: authOf(blocks, pairValue(verb, "auth")),
         vars: varsOf(blocks),
         prerequest: hasText(find(blocks, "script:pre-request")?.text),
         notes,
         assertions: enabledPairs(blocks, "assert").map(([expression, value]) => `${expression} ${value}`.trim()),
-        docs: hasText(find(blocks, "docs")?.text) ? (find(blocks, "docs")?.text as string).trim() : undefined,
+        docs: hasText(find(blocks, "docs")?.text) ? (find(blocks, "docs")!.text as string).trim() : undefined,
     };
 }
 
@@ -333,15 +398,15 @@ export function readRequest(source: string, report: Report): ParsedRequest | und
 export function readDefaults(source: string, report: Report): ParsedDefaults {
     const blocks = readBlocks(source, report);
     const meta = find(blocks, "meta");
-    const mode = valueOf(find(blocks, "auth"), "mode");
+    const mode = pairValue(find(blocks, "auth"), "mode");
     return {
-        name: valueOf(meta, "name") || undefined,
+        name: pairValue(meta, "name") || undefined,
         seq: seqOf(meta),
         headers: enabledPairs(blocks, "headers"),
         auth: authOf(blocks, mode),
         vars: varsOf(blocks),
         prerequest: hasText(find(blocks, "script:pre-request")?.text),
-        docs: hasText(find(blocks, "docs")?.text) ? (find(blocks, "docs")?.text as string).trim() : undefined,
+        docs: hasText(find(blocks, "docs")?.text) ? (find(blocks, "docs")!.text as string).trim() : undefined,
     };
 }
 
@@ -351,17 +416,23 @@ export function readEnvironment(source: string, report: Report): ParsedEnvironme
     const variables: ParsedVariable[] = [];
     for (const block of blocks) {
         if (block.name === "vars") {
-            for (const pair of block.pairs) if (pair.enabled) variables.push({ name: pair.key, value: pair.value, secret: false });
+            for (const pair of block.pairs)
+                if (pair.enabled) variables.push({ name: pair.key, value: pair.value, secret: false });
         } else if (block.name === "vars:secret") {
             // A name switched off with ~ is not a variable, and an annotation line is not a name.
-            for (const item of block.items) if (!item.startsWith("~") && !item.startsWith("@")) variables.push({ name: item, value: undefined, secret: true });
+            for (const item of block.items)
+                if (!item.startsWith("~") && !item.startsWith("@"))
+                    variables.push({ name: item, value: undefined, secret: true });
         } else if (block.name.startsWith("vars:externalsecrets:")) {
             const manager = block.name.slice("vars:externalsecrets:".length);
-            for (const pair of block.pairs) if (pair.enabled) variables.push({ name: pair.key, value: undefined, secret: true, external: manager });
+            for (const pair of block.pairs)
+                if (pair.enabled) variables.push({ name: pair.key, value: undefined, secret: true, external: manager });
         }
     }
     // `extends: name`, `extends [a, b]` or an array block: the environments it takes variables from.
-    const parents = blocks.filter((block) => block.name === "extends").flatMap((block) => [...block.text.split(","), ...block.items]);
+    const parents = blocks
+        .filter((block) => block.name === "extends")
+        .flatMap((block) => [...block.text.split(","), ...block.items]);
     const named = parents.map((part) => part.trim().replace(/^"(.*)"$/, "$1")).filter((part) => part !== "");
     return { name: undefined, variables, extends: named, dotEnv: false };
 }

@@ -4,13 +4,7 @@ import { createHash } from "node:crypto";
 import { chmod, readdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { SettingsStore } from "./settings.ts";
-import type {
-    ReviewApproval,
-    ReviewComment,
-    ReviewFileScope,
-    ReviewRecord,
-    ReviewResolution,
-} from "./types.ts";
+import type { ReviewApproval, ReviewComment, ReviewFileScope, ReviewRecord, ReviewResolution } from "./types.ts";
 
 /** A pending review untouched for this long is stale whoever owns it. */
 export const STALE_REVIEW_MS = 24 * 60 * 60 * 1000;

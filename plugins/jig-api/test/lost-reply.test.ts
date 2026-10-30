@@ -20,7 +20,8 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 /** What one second of `timeoutSec` lasts in these tests. */
 const SECOND_MS = 1000 * SHORT;
 
-const UNKNOWN = "The outcome is unknown: the server may have carried it out. It was not sent again. Check with a GET before trying again.";
+const UNKNOWN =
+    "The outcome is unknown: the server may have carried it out. It was not sent again. Check with a GET before trying again.";
 const WRITES = [
     { method: "POST", body: { name: "Zed" } },
     { method: "PUT", body: { name: "Zed" } },
@@ -52,12 +53,18 @@ describe("a write whose reply never comes", () => {
                     return { hang: true };
                 };
                 const result = await write(spec);
-                assert.equal(failure(result), `api call ${spec.method} /v1/items/7: no answer (timed out after 1 s). ${UNKNOWN}`);
+                assert.equal(
+                    failure(result),
+                    `api call ${spec.method} /v1/items/7: no answer (timed out after 1 s). ${UNKNOWN}`,
+                );
                 await settle();
                 assert.equal(h.api.requests.length, 1, "sent once, and not again");
                 assert.equal(h.jig.facts.size, 0, "no status, so nothing to record");
                 // The model's next step, as the message tells it.
-                assert.match(ok(await h.call({ method: "GET", path: "/v1/items/7" })), carriedOut ? /"stored": true/ : /"stored": false/);
+                assert.match(
+                    ok(await h.call({ method: "GET", path: "/v1/items/7" })),
+                    carriedOut ? /"stored": true/ : /"stored": false/,
+                );
                 assert.equal(h.api.requests.filter((request) => request.method === spec.method).length, 1);
             });
         }
@@ -66,7 +73,10 @@ describe("a write whose reply never comes", () => {
     test("a reply that comes after the timeout is too late, and does not cause a second send", async () => {
         h.api.respond = () => ({ status: 201, body: '{"id":1}', delayMs: 2 * SECOND_MS });
         const message = failure(await write(WRITES[0]));
-        assert.match(message, /^api call POST \/v1\/items\/7: no answer \(timed out after 1 s\)\. The outcome is unknown/);
+        assert.match(
+            message,
+            /^api call POST \/v1\/items\/7: no answer \(timed out after 1 s\)\. The outcome is unknown/,
+        );
         await sleep(2 * SECOND_MS);
         assert.equal(h.api.requests.length, 1);
         assert.equal(h.jig.facts.size, 0);
@@ -74,7 +84,10 @@ describe("a write whose reply never comes", () => {
 
     test("the message names the path and not the query or the body", async () => {
         h.api.respond = () => ({ hang: true });
-        const result = await h.call({ method: "POST", path: "/v1/items?token=QUERY-SECRET", body: { password: "BODY-SECRET" }, timeoutSec: 1 }, { ask: false });
+        const result = await h.call(
+            { method: "POST", path: "/v1/items?token=QUERY-SECRET", body: { password: "BODY-SECRET" }, timeoutSec: 1 },
+            { ask: false },
+        );
         const message = failure(result);
         assert.match(message, /^api call POST \/v1\/items: no answer/);
         for (const secret of ["QUERY-SECRET", "BODY-SECRET", "token="]) assert.ok(!message.includes(secret), secret);
@@ -86,7 +99,10 @@ describe("a connection that drops", () => {
         test(`${how === "drop" ? "before any answer" : "in the middle of the answer"}: the outcome of a write is unknown, and it is not sent again`, async () => {
             h.api.respond = () => ({ [how]: true }) as Reply;
             const message = failure(await write(WRITES[1]));
-            assert.equal(message, `api call PUT /v1/items/7: no answer (the connection failed (UND_ERR_SOCKET)). ${UNKNOWN}`);
+            assert.equal(
+                message,
+                `api call PUT /v1/items/7: no answer (the connection failed (UND_ERR_SOCKET)). ${UNKNOWN}`,
+            );
             await settle();
             assert.equal(h.api.requests.length, 1);
         });
@@ -97,7 +113,10 @@ describe("a read that gets no answer", () => {
     test("is not an unknown outcome: a GET changes nothing, and the message says it can be sent again", async () => {
         h.api.respond = () => ({ hang: true });
         const message = failure(await h.call({ method: "GET", path: "/v1/items/7", timeoutSec: 1 }));
-        assert.equal(message, "api call GET /v1/items/7: no answer (timed out after 1 s). A GET changes nothing, so it can be sent again.");
+        assert.equal(
+            message,
+            "api call GET /v1/items/7: no answer (timed out after 1 s). A GET changes nothing, so it can be sent again.",
+        );
         assert.doesNotMatch(message, /unknown/);
         h.api.respond = () => ({ drop: true });
         assert.equal(
@@ -121,7 +140,10 @@ describe("an error status is an answer", () => {
             const result = await write(WRITES[0]);
             const text = ok(result);
             assert.match(text, new RegExp(`^POST \\S+/v1/items/7 -> HTTP ${status} `));
-            assert.match(text, /\nThe server reported an error, but a write may still have been carried out: check with a GET before sending it again\.\n/);
+            assert.match(
+                text,
+                /\nThe server reported an error, but a write may still have been carried out: check with a GET before sending it again\.\n/,
+            );
             assert.match(text, /\nupstream trouble$/);
             assert.deepEqual(h.jig.facts.get(result.id), [{ status }]);
             await settle();
@@ -144,7 +166,12 @@ describe("a call that is cancelled", () => {
         h.api.respond = () => ({ hang: true });
         const controller = new AbortController();
         setTimeout(() => controller.abort(), 0.25 * SECOND_MS);
-        const message = failure(await h.call({ method: "POST", path: "/v1/items/7", body: {}, timeoutSec: 30 }, { ask: false, signal: controller.signal }));
+        const message = failure(
+            await h.call(
+                { method: "POST", path: "/v1/items/7", body: {}, timeoutSec: 30 },
+                { ask: false, signal: controller.signal },
+            ),
+        );
         assert.equal(message, `api call POST /v1/items/7: no answer (cancelled). ${UNKNOWN}`);
         await settle();
         assert.equal(h.api.requests.length, 1);
@@ -154,14 +181,21 @@ describe("a call that is cancelled", () => {
         h.api.respond = () => ({ hang: true });
         const controller = new AbortController();
         setTimeout(() => controller.abort(), 0.25 * SECOND_MS);
-        const message = failure(await h.call({ method: "GET", path: "/v1/x", timeoutSec: 30 }, { signal: controller.signal }));
-        assert.equal(message, "api call GET /v1/x: no answer (cancelled). A GET changes nothing, so it can be sent again.");
+        const message = failure(
+            await h.call({ method: "GET", path: "/v1/x", timeoutSec: 30 }, { signal: controller.signal }),
+        );
+        assert.equal(
+            message,
+            "api call GET /v1/x: no answer (cancelled). A GET changes nothing, so it can be sent again.",
+        );
     });
 
     test("before it starts, nothing is sent", async () => {
         const controller = new AbortController();
         controller.abort();
-        const message = failure(await h.call({ method: "POST", path: "/v1/x", body: {} }, { ask: false, signal: controller.signal }));
+        const message = failure(
+            await h.call({ method: "POST", path: "/v1/x", body: {} }, { ask: false, signal: controller.signal }),
+        );
         assert.equal(message, "api call POST /v1/x: it was cancelled before it was sent. Nothing was sent.");
         assert.equal(h.api.requests.length, 0);
     });
@@ -173,7 +207,10 @@ describe("a connection that is refused", () => {
         h.configure(h.section({ none: true }, { baseUrl: origin }));
         const message = failure(await write(WRITES[0], { origin }));
         // ECONNREFUSED is the kernel's answer; ECONNRESET is what a forwarder in front of the port may make of it.
-        assert.match(message, /^api call POST \/v1\/items\/7: (could not connect \(ECONNREFUSED\)\. Nothing was sent\.|no answer \(the connection failed \(ECONNRESET\)\)\. The outcome is unknown)/);
+        assert.match(
+            message,
+            /^api call POST \/v1\/items\/7: (could not connect \(ECONNREFUSED\)\. Nothing was sent\.|no answer \(the connection failed \(ECONNRESET\)\)\. The outcome is unknown)/,
+        );
     });
 });
 
@@ -189,14 +226,26 @@ describe("a transport that gets no answer", () => {
     });
 
     test("one that answers after the timeout is too late", async () => {
-        h.jig.transports.set("company-proxy", { request: () => new Promise<TransportResponse>((resolve) => setTimeout(() => resolve({ status: 200, headers: {}, body: "{}" }), 2 * SECOND_MS).unref()) });
-        assert.match(failure(await write(WRITES[2])), /^api call PATCH \/v1\/items\/7: no answer \(timed out after 1 s\)\. The outcome is unknown/);
+        h.jig.transports.set("company-proxy", {
+            request: () =>
+                new Promise<TransportResponse>((resolve) =>
+                    setTimeout(() => resolve({ status: 200, headers: {}, body: "{}" }), 2 * SECOND_MS).unref(),
+                ),
+        });
+        assert.match(
+            failure(await write(WRITES[2])),
+            /^api call PATCH \/v1\/items\/7: no answer \(timed out after 1 s\)\. The outcome is unknown/,
+        );
         await sleep(2 * SECOND_MS);
         assert.equal(h.jig.transportCalls.length, 1);
     });
 
     test("one that fails leaves the outcome of a write unknown", async () => {
-        h.jig.transports.set("company-proxy", { request: async () => { throw new Error("the connection was reset"); } });
+        h.jig.transports.set("company-proxy", {
+            request: async () => {
+                throw new Error("the connection was reset");
+            },
+        });
         assert.equal(
             failure(await write(WRITES[3])),
             `api call DELETE /v1/items/7: no answer (transport "company-proxy" failed: the connection was reset). ${UNKNOWN}`,
@@ -209,7 +258,12 @@ describe("a transport that gets no answer", () => {
         const controller = new AbortController();
         setTimeout(() => controller.abort(), 0.25 * SECOND_MS);
         assert.equal(
-            failure(await h.call({ method: "PUT", path: "/v1/x", body: {}, timeoutSec: 30 }, { ask: false, signal: controller.signal })),
+            failure(
+                await h.call(
+                    { method: "PUT", path: "/v1/x", body: {}, timeoutSec: 30 },
+                    { ask: false, signal: controller.signal },
+                ),
+            ),
             `api call PUT /v1/x: no answer (cancelled). ${UNKNOWN}`,
         );
     });
@@ -220,7 +274,10 @@ describe("a sign-in that gets no answer", () => {
         h.configure(h.section({ oauthPassword: h.oauth() }));
         h.auth.respond = () => ({ hang: true });
         const message = failure(await write(WRITES[0]));
-        assert.equal(message, "api call POST /v1/items/7: could not sign in (the token request got no answer: timed out). Nothing was sent.");
+        assert.equal(
+            message,
+            "api call POST /v1/items/7: could not sign in (the token request got no answer: timed out). Nothing was sent.",
+        );
         assert.equal(h.api.requests.length, 0);
         assert.doesNotMatch(message, /unknown/);
     });
@@ -228,7 +285,10 @@ describe("a sign-in that gets no answer", () => {
     test("one deadline covers the token request and the call together", async () => {
         h.configure(h.section({ oauthPassword: h.oauth() }));
         // The token takes 60% of the time allowed. A deadline that started again for the call would let it wait 160%.
-        h.auth.respond = () => ({ delayMs: 3 * SECOND_MS, body: JSON.stringify({ access_token: "token-after-a-wait", expires_in: 3600 }) });
+        h.auth.respond = () => ({
+            delayMs: 3 * SECOND_MS,
+            body: JSON.stringify({ access_token: "token-after-a-wait", expires_in: 3600 }),
+        });
         h.api.respond = () => ({ hang: true });
         const allowed = 5 * SECOND_MS;
         const started = Date.now();

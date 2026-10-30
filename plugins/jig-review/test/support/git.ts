@@ -10,4 +10,5 @@ const GIT_ENV = {
     GIT_COMMITTER_EMAIL: "t@example.invalid",
 };
 
-export const git = (cwd: string, ...args: string[]): string => execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8", env: GIT_ENV });
+export const git = (cwd: string, ...args: string[]): string =>
+    execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8", env: GIT_ENV });

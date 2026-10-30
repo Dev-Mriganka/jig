@@ -80,13 +80,26 @@ export interface Answer {
 /** Failures that happen before the server has read anything: the address, the name lookup and the connection. A connection
  *  that was reset or closed is not here, because the request may have been written by then. */
 const BEFORE_SENDING: ReadonlySet<string> = new Set([
-    "ERR_INVALID_URL", "ENOTFOUND", "EAI_AGAIN", "ECONNREFUSED", "EHOSTUNREACH", "ENETUNREACH", "UND_ERR_CONNECT_TIMEOUT",
+    "ERR_INVALID_URL",
+    "ENOTFOUND",
+    "EAI_AGAIN",
+    "ECONNREFUSED",
+    "EHOSTUNREACH",
+    "ENETUNREACH",
+    "UND_ERR_CONNECT_TIMEOUT",
 ]);
 /** The certificate is checked before any request is written, so these too mean that nothing was sent. */
 const CERTIFICATE: ReadonlySet<string> = new Set([
-    "DEPTH_ZERO_SELF_SIGNED_CERT", "SELF_SIGNED_CERT_IN_CHAIN", "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
-    "UNABLE_TO_GET_ISSUER_CERT", "UNABLE_TO_GET_ISSUER_CERT_LOCALLY", "CERT_HAS_EXPIRED", "CERT_NOT_YET_VALID",
-    "CERT_UNTRUSTED", "CERT_REVOKED", "ERR_TLS_CERT_ALTNAME_INVALID",
+    "DEPTH_ZERO_SELF_SIGNED_CERT",
+    "SELF_SIGNED_CERT_IN_CHAIN",
+    "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+    "UNABLE_TO_GET_ISSUER_CERT",
+    "UNABLE_TO_GET_ISSUER_CERT_LOCALLY",
+    "CERT_HAS_EXPIRED",
+    "CERT_NOT_YET_VALID",
+    "CERT_UNTRUSTED",
+    "CERT_REVOKED",
+    "ERR_TLS_CERT_ALTNAME_INVALID",
 ]);
 
 /** Rejects when `signal` aborts, whatever `work` is doing. A transport is another package's code and may ignore the
@@ -128,7 +141,9 @@ function codeOf(error: unknown): string {
  */
 function failure(error: unknown, signal: AbortSignal): NotSentError | LostReplyError {
     if (signal.aborted) {
-        return isTimeout(signal) ? new LostReplyError("timeout", "timed out") : new LostReplyError("cancelled", "cancelled");
+        return isTimeout(signal)
+            ? new LostReplyError("timeout", "timed out")
+            : new LostReplyError("cancelled", "cancelled");
     }
     // `fetch` refuses the ports that browsers block, before it connects, and gives that reason in words and not as a code.
     if (isObject(error) && isObject(error.cause) && error.cause.message === "bad port") {
@@ -137,7 +152,9 @@ function failure(error: unknown, signal: AbortSignal): NotSentError | LostReplyE
     const code = codeOf(error);
     if (BEFORE_SENDING.has(code)) return new NotSentError(`could not connect (${code})`);
     if (CERTIFICATE.has(code)) {
-        return new NotSentError(`the TLS certificate was not accepted (${code}); certificate checks are never turned off`);
+        return new NotSentError(
+            `the TLS certificate was not accepted (${code}); certificate checks are never turned off`,
+        );
     }
     return new LostReplyError("failed", code === "" ? "the connection failed" : `the connection failed (${code})`);
 }
@@ -169,7 +186,14 @@ function withoutCookies(headers: Readonly<Record<string, string>>): Readonly<Rec
 
 function answerOf(status: number, headers: Readonly<Record<string, string>>, bytes: Uint8Array, cut: boolean): Answer {
     const binary = bytes.subarray(0, SNIFF_BYTES).includes(0);
-    return { status, headers: withoutCookies(headers), text: binary ? "" : new TextDecoder().decode(bytes), bytes: bytes.byteLength, cut, binary };
+    return {
+        status,
+        headers: withoutCookies(headers),
+        text: binary ? "" : new TextDecoder().decode(bytes),
+        bytes: bytes.byteLength,
+        cut,
+        binary,
+    };
 }
 
 async function viaFetch(wire: Wire, signal: AbortSignal, maxBytes: number): Promise<Answer> {

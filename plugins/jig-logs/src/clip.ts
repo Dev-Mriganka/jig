@@ -81,8 +81,8 @@ function safeEnd(text: string, end: number): number {
         // A text that is one long word has no earlier word to stop at: cut it rather than return nothing.
         if (start > 0 && end - start <= WORD_BACKOFF) end = start;
     }
-    const escape = text.lastIndexOf("%", end - 1);
-    if (escape >= 0 && escape >= end - 2) end = escape;
+    const percent = text.lastIndexOf("%", end - 1);
+    if (percent >= 0 && percent >= end - 2) end = percent;
     // Do not cut a surrogate pair in half.
     const last = text.charCodeAt(end - 1);
     if (last >= 0xd800 && last <= 0xdbff) end -= 1;
@@ -170,7 +170,7 @@ function unreadable(chunk: string): boolean {
  * quoted `key="value` that never ends.
  */
 function unclosed(text: string): number | undefined {
-    for (let start = jsonStart(text, 0); start >= 0;) {
+    for (let start = jsonStart(text, 0); start >= 0; ) {
         const end = jsonEnd(text, start);
         if (end === undefined || unreadable(text.slice(start, end))) return start;
         start = jsonStart(text, end);

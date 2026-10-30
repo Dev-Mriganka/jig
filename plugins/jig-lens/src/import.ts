@@ -5,7 +5,7 @@
 //  - every line is inserted by its record id with INSERT OR IGNORE, so a line read twice is counted once, whether
 //    because two sessions import at once, the offset was lost, or the index was rebuilt;
 //  - a file is one transaction that also moves its offset, so the tables and the offset never disagree.
-import { closeSync, fstatSync, openSync, readdirSync, readSync } from "node:fs";
+import { closeSync, type Dirent, fstatSync, openSync, readdirSync, readSync } from "node:fs";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { CALL, TURN, insertSql } from "./fields.ts";
@@ -172,7 +172,7 @@ export function cutoffOf(now: Date, days: number): number {
 
 /** The record files from the cutoff day on, oldest first. jig-core deletes a file by the same rule, by its day. */
 function recordFiles(folder: string, cutoff: number): string[] {
-    let entries;
+    let entries: Dirent[];
     try {
         entries = readdirSync(folder, { withFileTypes: true });
     } catch (error) {
@@ -191,7 +191,10 @@ function recordFiles(folder: string, cutoff: number): string[] {
 
 /** Removes rows older than the cutoff, and forgets files that are gone or too old to import. Returns the rows gone. */
 function removeOld(db: DatabaseSync, cutoff: number, current: ReadonlySet<string>): number {
-    const files = db.prepare("SELECT file FROM imported").all().map((row) => String(row.file));
+    const files = db
+        .prepare("SELECT file FROM imported")
+        .all()
+        .map((row) => String(row.file));
     const stale = files.filter((name) => !current.has(name));
     const old = db
         .prepare("SELECT (SELECT count(*) FROM call WHERE time < ?) + (SELECT count(*) FROM turn WHERE time < ?) AS n")
@@ -199,8 +202,9 @@ function removeOld(db: DatabaseSync, cutoff: number, current: ReadonlySet<string
     // Most imports have nothing to remove, and then they must not ask for the write lock.
     if (stale.length === 0 && Number(old?.n ?? 0) === 0) return 0;
     return inTransaction(db, () => {
-        const removed = Number(db.prepare("DELETE FROM call WHERE time < ?").run(cutoff).changes)
-            + Number(db.prepare("DELETE FROM turn WHERE time < ?").run(cutoff).changes);
+        const removed =
+            Number(db.prepare("DELETE FROM call WHERE time < ?").run(cutoff).changes) +
+            Number(db.prepare("DELETE FROM turn WHERE time < ?").run(cutoff).changes);
         const forget = db.prepare("DELETE FROM imported WHERE file = ?");
         for (const name of stale) forget.run(name);
         return removed;

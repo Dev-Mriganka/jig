@@ -9,18 +9,32 @@ import { hashOutputs, hashSources, PACKAGE_ROOT, readManifest } from "../web/scr
 const REBUILD = "run `npm --prefix plugins/jig-review/web run build` and commit web/dist/ and web/build.json";
 
 test("dist was built from the sources as they are now", () => {
-    assert.equal(hashSources(), readManifest().sources, `web/src, index.html, vite.config.ts or package-lock.json changed since dist was built: ${REBUILD}`);
+    assert.equal(
+        hashSources(),
+        readManifest().sources,
+        `web/src, index.html, vite.config.ts or package-lock.json changed since dist was built: ${REBUILD}`,
+    );
 });
 
 test("dist holds exactly the files the build wrote", () => {
-    assert.deepEqual(hashOutputs(), readManifest().files, `web/dist/ differs from web/build.json (edited by hand, or a stale build): ${REBUILD}`);
+    assert.deepEqual(
+        hashOutputs(),
+        readManifest().files,
+        `web/dist/ differs from web/build.json (edited by hand, or a stale build): ${REBUILD}`,
+    );
 });
 
 test("the page loads only assets that exist", () => {
     const html = readFileSync(path.join(PACKAGE_ROOT, "dist", "index.html"), "utf8");
     const referenced = [...html.matchAll(/\b(?:src|href)="([^"]+)"/g)].map((match) => match[1]!);
-    assert.ok(referenced.some((file) => file.endsWith(".js")), "index.html loads the script");
-    assert.ok(referenced.some((file) => file.endsWith(".css")), "index.html loads the stylesheet");
+    assert.ok(
+        referenced.some((file) => file.endsWith(".js")),
+        "index.html loads the script",
+    );
+    assert.ok(
+        referenced.some((file) => file.endsWith(".css")),
+        "index.html loads the stylesheet",
+    );
     for (const file of referenced) {
         assert.match(file, /^\/assets\/[\w.-]+$/, `${file} is served from /assets/`);
         assert.ok(existsSync(path.join(PACKAGE_ROOT, "dist", file)), `${file} is missing from dist/`);

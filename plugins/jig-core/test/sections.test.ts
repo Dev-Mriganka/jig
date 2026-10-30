@@ -22,7 +22,9 @@ const gitCheck: SectionCheck = (raw) => {
 describe("sections in the file", () => {
     let dir: string;
     let counter = 0;
-    before(() => { dir = mkdtempSync(path.join(tmpdir(), "jig-sections-")); });
+    before(() => {
+        dir = mkdtempSync(path.join(tmpdir(), "jig-sections-"));
+    });
     after(() => rmSync(dir, { recursive: true, force: true }));
 
     function write(value: unknown): string {
@@ -69,7 +71,18 @@ describe("sections in the file", () => {
 
     test("a registered section that is not in the file is simply absent: no check, no problem", () => {
         let calls = 0;
-        const loaded = loadConfigFile(write({}), new Map([["git", () => { calls++; return []; }]]));
+        const loaded = loadConfigFile(
+            write({}),
+            new Map([
+                [
+                    "git",
+                    () => {
+                        calls++;
+                        return [];
+                    },
+                ],
+            ]),
+        );
         assert.equal(calls, 0);
         assert.deepEqual(loaded.problems, []);
         assert.equal(loaded.sections.size, 0);
@@ -78,7 +91,12 @@ describe("sections in the file", () => {
     test("a check that throws, or answers with something else than a list, is a problem and not a crash", () => {
         const file = write({ a: 1, b: 2 });
         const checks = new Map<string, SectionCheck>([
-            ["a", () => { throw new Error("boom"); }],
+            [
+                "a",
+                () => {
+                    throw new Error("boom");
+                },
+            ],
             ["b", (() => "fine") as unknown as SectionCheck],
         ]);
         const loaded = loadConfigFile(file, checks);
@@ -97,13 +115,18 @@ describe("sections in the file", () => {
 
     test("several messages from one check are all reported", () => {
         const loaded = loadConfigFile(write({ x: 1 }), new Map([["x", () => ["x.one is wrong", "x.two is wrong"]]]));
-        assert.deepEqual(loaded.problems.map((problem) => problem.message), ["x.one is wrong", "x.two is wrong"]);
+        assert.deepEqual(
+            loaded.problems.map((problem) => problem.message),
+            ["x.one is wrong", "x.two is wrong"],
+        );
     });
 });
 
 describe("through the API", () => {
     let dir: string;
-    before(() => { dir = mkdtempSync(path.join(tmpdir(), "jig-sections-api-")); });
+    before(() => {
+        dir = mkdtempSync(path.join(tmpdir(), "jig-sections-api-"));
+    });
     after(() => rmSync(dir, { recursive: true, force: true }));
 
     function setup(content: unknown) {
@@ -149,7 +172,11 @@ describe("through the API", () => {
     test("a section name that clashes with a jig-core field is refused with an error", () => {
         const { api, state } = setup({});
         for (const name of OWN_SECTIONS) {
-            assert.throws(() => api.config.registerSection(name, () => []), new RegExp(`"${name}" is a jig-core field`), name);
+            assert.throws(
+                () => api.config.registerSection(name, () => []),
+                new RegExp(`"${name}" is a jig-core field`),
+                name,
+            );
         }
         assert.equal(state.sectionChecks.size, 0);
     });

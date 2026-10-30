@@ -44,7 +44,10 @@ describe("run", () => {
 
     describe("the environment", () => {
         const saved = process.env.JIG_TEST_SECRET;
-        before(() => { process.env.JIG_TEST_SECRET = "must-not-reach-the-child"; process.env.GITHUB_TOKEN = "also-not"; });
+        before(() => {
+            process.env.JIG_TEST_SECRET = "must-not-reach-the-child";
+            process.env.GITHUB_TOKEN = "also-not";
+        });
         after(() => {
             if (saved === undefined) delete process.env.JIG_TEST_SECRET;
             else process.env.JIG_TEST_SECRET = saved;
@@ -61,7 +64,9 @@ describe("run", () => {
         });
 
         test("holds the variables the caller adds", async () => {
-            const env = JSON.parse((await run(node, printEnv, { env: { EXTRA: "1", HOME: "/elsewhere" } })).stdout) as Record<string, string>;
+            const env = JSON.parse(
+                (await run(node, printEnv, { env: { EXTRA: "1", HOME: "/elsewhere" } })).stdout,
+            ) as Record<string, string>;
             assert.equal(env.EXTRA, "1");
             assert.equal(env.HOME, "/elsewhere", "the caller's value wins");
         });
@@ -82,11 +87,19 @@ describe("run", () => {
             const pid = Number(result.stdout.trim());
             assert.ok(pid > 0, result.stdout);
             await new Promise((resolve) => setTimeout(resolve, 200));
-            assert.throws(() => process.kill(pid, 0), (error: NodeJS.ErrnoException) => error.code === "ESRCH", "the grandchild is gone");
+            assert.throws(
+                () => process.kill(pid, 0),
+                (error: NodeJS.ErrnoException) => error.code === "ESRCH",
+                "the grandchild is gone",
+            );
         });
 
         test("output beyond the cap is cut, with a marker that says so", async () => {
-            const result = await run(node, ["-e", "process.stdout.write('a'.repeat(10000)); process.stderr.write('b'.repeat(10000))"], { maxOutputBytes: 100 });
+            const result = await run(
+                node,
+                ["-e", "process.stdout.write('a'.repeat(10000)); process.stderr.write('b'.repeat(10000))"],
+                { maxOutputBytes: 100 },
+            );
             assert.equal(result.code, 0);
             assert.ok(result.stdout.startsWith("a".repeat(100)));
             assert.ok(result.stdout.length < 200);
@@ -103,7 +116,10 @@ describe("run", () => {
             const controller = new AbortController();
             const pending = run(node, ["-e", "setTimeout(() => {}, 20000)"], { signal: controller.signal });
             setTimeout(() => controller.abort(), 150);
-            await assert.rejects(pending, (error: Error) => error instanceof ExecError && /was aborted/.test(error.message));
+            await assert.rejects(
+                pending,
+                (error: Error) => error instanceof ExecError && /was aborted/.test(error.message),
+            );
         });
 
         test("a call whose signal is already aborted does not start", async () => {
@@ -112,7 +128,12 @@ describe("run", () => {
             try {
                 const controller = new AbortController();
                 controller.abort();
-                await assert.rejects(run(node, ["-e", `require('fs').writeFileSync(${JSON.stringify(marker)}, '')`], { signal: controller.signal }), ExecError);
+                await assert.rejects(
+                    run(node, ["-e", `require('fs').writeFileSync(${JSON.stringify(marker)}, '')`], {
+                        signal: controller.signal,
+                    }),
+                    ExecError,
+                );
                 await new Promise((resolve) => setTimeout(resolve, 200));
                 assert.equal(existsSync(marker), false);
             } finally {
@@ -123,7 +144,10 @@ describe("run", () => {
 
     describe("what cannot run", () => {
         test("a program that is not installed", async () => {
-            await assert.rejects(run("jig-no-such-program", []), (error: Error) => error instanceof ExecError && /not installed or not on PATH/.test(error.message));
+            await assert.rejects(
+                run("jig-no-such-program", []),
+                (error: Error) => error instanceof ExecError && /not installed or not on PATH/.test(error.message),
+            );
         });
 
         test("a relative path with a folder in it", async () => {
@@ -132,7 +156,10 @@ describe("run", () => {
         });
 
         test("a working folder that does not exist", async () => {
-            await assert.rejects(run(node, ["-e", "1"], { cwd: "/nonexistent/folder/for/jig" }), /working folder \/nonexistent\/folder\/for\/jig does not exist/);
+            await assert.rejects(
+                run(node, ["-e", "1"], { cwd: "/nonexistent/folder/for/jig" }),
+                /working folder \/nonexistent\/folder\/for\/jig does not exist/,
+            );
         });
     });
 
@@ -152,7 +179,11 @@ describe("run", () => {
         });
 
         test("is not run: a PATH folder inside the working folder is skipped", async () => {
-            await assert.rejects(run("planted-tool", [], { cwd: repo }), (error: Error) => error instanceof ExecError && /only in .*bin, a folder the agent can write to/.test(error.message));
+            await assert.rejects(
+                run("planted-tool", [], { cwd: repo }),
+                (error: Error) =>
+                    error instanceof ExecError && /only in .*bin, a folder the agent can write to/.test(error.message),
+            );
         });
 
         test("is not on the child's PATH either, nor is a relative entry", async () => {
@@ -164,8 +195,21 @@ describe("run", () => {
 });
 
 describe("git", () => {
-    const isolated = { HOME: "", GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.com", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.com" };
-    const plain = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8", env: { ...process.env, ...isolated, HOME: process.env.HOME ?? "" } });
+    const isolated = {
+        HOME: "",
+        GIT_CONFIG_GLOBAL: "/dev/null",
+        GIT_CONFIG_SYSTEM: "/dev/null",
+        GIT_AUTHOR_NAME: "t",
+        GIT_AUTHOR_EMAIL: "t@example.com",
+        GIT_COMMITTER_NAME: "t",
+        GIT_COMMITTER_EMAIL: "t@example.com",
+    };
+    const plain = (cwd: string, ...args: string[]) =>
+        execFileSync("git", args, {
+            cwd,
+            encoding: "utf8",
+            env: { ...process.env, ...isolated, HOME: process.env.HOME ?? "" },
+        });
     let root: string;
     let counter = 0;
     let options: { env: Record<string, string> };
@@ -194,7 +238,14 @@ describe("git", () => {
         assert.equal((await git(repo, ["config", "--get", "core.hooksPath"], options)).stdout.trim(), "/dev/null");
         assert.equal((await git(repo, ["config", "--get", "core.fsmonitor"], options)).stdout.trim(), "false");
         assert.equal((await git(repo, ["config", "--get", "color.ui"], options)).stdout.trim(), "false");
-        assert.deepEqual(GIT_FIXED_FLAGS, ["-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "-c", "color.ui=false"]);
+        assert.deepEqual(GIT_FIXED_FLAGS, [
+            "-c",
+            "core.fsmonitor=false",
+            "-c",
+            "core.hooksPath=/dev/null",
+            "-c",
+            "color.ui=false",
+        ]);
     });
 
     test("a hook in the repository does not run", async () => {
@@ -232,26 +283,37 @@ describe("git", () => {
     test("outside a repository it runs and fails the way git does", async () => {
         const plainFolder = path.join(root, `plain${counter++}`);
         mkdirSync(plainFolder);
-        const result = await git(plainFolder, ["rev-parse", "--git-dir"], { env: { ...options.env, GIT_CEILING_DIRECTORIES: root } });
+        const result = await git(plainFolder, ["rev-parse", "--git-dir"], {
+            env: { ...options.env, GIT_CEILING_DIRECTORIES: root },
+        });
         assert.equal(result.code, 128);
     });
 
     describe("the repository's own configuration", () => {
-        const plant = (repo: string, header: string, variable: string, value: string) => appendFileSync(path.join(repo, ".git", "config"), `${header}\n\t${variable} = ${value}\n`);
+        const plant = (repo: string, header: string, variable: string, value: string) =>
+            appendFileSync(path.join(repo, ".git", "config"), `${header}\n\t${variable} = ${value}\n`);
 
         test("a command planted in .git/config refuses the call before git runs", async () => {
             const repo = repository();
             plant(repo, "[core]", "sshCommand", "evil");
             const refusal = await git(repo, ["fetch"], options).catch((error: unknown) => error);
             assert.ok(refusal instanceof ExecError, String(refusal));
-            assert.match((refusal as Error).message, /\.git\/config sets core\.sshcommand, which would run with your credentials/);
+            assert.match(
+                (refusal as Error).message,
+                /\.git\/config sets core\.sshcommand, which would run with your credentials/,
+            );
         });
 
         for (const [header, variable, value, key] of [
             ["[core]", "hooksPath", "/tmp/evil", "core.hookspath"],
             ["[core]", "fsmonitor", "evil-hook", "core.fsmonitor"],
             ["[credential]", "helper", "!evil", "credential.helper"],
-            ['[url "https://evil.example/"]', "insteadOf", "https://github.com/", "url.https://evil.example/.insteadof"],
+            [
+                '[url "https://evil.example/"]',
+                "insteadOf",
+                "https://github.com/",
+                "url.https://evil.example/.insteadof",
+            ],
             ['[filter "lfs"]', "clean", "evil", "filter.lfs.clean"],
         ] as const) {
             test(`${key} is refused`, async () => {
@@ -275,7 +337,10 @@ describe("git", () => {
             chmodSync(chosen, 0o755);
             const repo = repository();
             const result = await run(chosen, ["status"], { ...options, cwd: repo });
-            assert.match(result.stdout, /^chosen git: -c core\.fsmonitor=false -c core\.hooksPath=\/dev\/null -c color\.ui=false status/);
+            assert.match(
+                result.stdout,
+                /^chosen git: -c core\.fsmonitor=false -c core\.hooksPath=\/dev\/null -c color\.ui=false status/,
+            );
             plant(repo, "[core]", "sshCommand", "evil");
             await assert.rejects(run(chosen, ["status"], { ...options, cwd: repo }), /core\.sshcommand/);
         });

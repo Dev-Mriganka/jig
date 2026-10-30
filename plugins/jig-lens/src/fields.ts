@@ -4,11 +4,11 @@
 
 /** How a record field becomes a column. */
 type Kind =
-    | "text"    // TEXT
-    | "count"   // INTEGER: milliseconds and token counts
-    | "number"  // REAL
-    | "time"    // REAL: the record's ISO 8601 time as seconds since the epoch, which is what Grafana reads as a time
-    | "json";   // TEXT: an object kept as JSON, for json_extract
+    | "text" // TEXT
+    | "count" // INTEGER: milliseconds and token counts
+    | "number" // REAL
+    | "time" // REAL: the record's ISO 8601 time as seconds since the epoch, which is what Grafana reads as a time
+    | "json"; // TEXT: an object kept as JSON, for json_extract
 
 export interface Field {
     name: string;

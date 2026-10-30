@@ -1,0 +1,6 @@
+# Revisions that only changed formatting. `git blame` skips them when told to:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# GitHub's blame view reads this file by itself.
+
+# Format every file with Biome; no other change
+6d40e3d0cb0de6a20aa2ca8ec1bcf783ce70a0d8

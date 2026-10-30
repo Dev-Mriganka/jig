@@ -106,7 +106,9 @@ test("buckets are contiguous and ascending, and cover the range", () => {
     assert.equal(buckets[0]?.from, T0);
     assert.equal(buckets[3]?.to, T0 + span);
     assert.equal((buckets[3]?.to ?? 0) - (buckets[3]?.from ?? 0), 5 * HOUR_MS, "the last one is what is left");
-    buckets.slice(1).forEach((bucket, i) => assert.equal(bucket.from, buckets[i]?.to));
+    buckets.slice(1).forEach((bucket, i) => {
+        assert.equal(bucket.from, buckets[i]?.to);
+    });
     assert.ok(buckets.every((bucket) => bucket.depth === 0));
 });
 

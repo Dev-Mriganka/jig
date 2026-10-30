@@ -13,7 +13,10 @@ import { startFakeApi } from "./support/fake-api.ts";
 
 /** The part of Pi that the plugin uses at load: it takes a tool and a command. */
 function fakePi(tools: ToolDefinition[], commands: string[] = []): ExtensionAPI {
-    return { registerTool: (tool: ToolDefinition) => void tools.push(tool), registerCommand: (name: string) => void commands.push(name) } as unknown as ExtensionAPI;
+    return {
+        registerTool: (tool: ToolDefinition) => void tools.push(tool),
+        registerCommand: (name: string) => void commands.push(name),
+    } as unknown as ExtensionAPI;
 }
 
 function load(options = {}): ToolDefinition[] {
@@ -36,11 +39,24 @@ describe("the extension", () => {
             assert.equal(tool?.name, "api");
             assert.equal(tool?.label, "API");
             assert.equal(tool?.parameters, parameters);
-            const properties = (tool?.parameters as unknown as { properties: Record<string, { enum?: string[] }>; required: string[] });
-            assert.deepEqual(
-                Object.keys(properties.properties),
-                ["action", "collection", "folder", "request", "text", "environment", "variables", "method", "url", "body", "headers", "timeoutSec"],
-            );
+            const properties = tool?.parameters as unknown as {
+                properties: Record<string, { enum?: string[] }>;
+                required: string[];
+            };
+            assert.deepEqual(Object.keys(properties.properties), [
+                "action",
+                "collection",
+                "folder",
+                "request",
+                "text",
+                "environment",
+                "variables",
+                "method",
+                "url",
+                "body",
+                "headers",
+                "timeoutSec",
+            ]);
             assert.deepEqual(properties.properties.action?.enum, [...ACTION_NAMES]);
             assert.deepEqual([...ACTION_NAMES], ["list", "show", "run", "run-folder", "call"]);
             assert.deepEqual(properties.properties.method?.enum, [...METHODS]);
@@ -106,7 +122,10 @@ describe("the extension", () => {
             jig.remove();
             assert.ok(tool);
             const input = { action: "list" };
-            await assert.rejects(tool.execute("call-1", input as never, undefined, undefined, {} as never), /jig-core is not loaded/);
+            await assert.rejects(
+                tool.execute("call-1", input as never, undefined, undefined, {} as never),
+                /jig-core is not loaded/,
+            );
             assert.equal(api.requests.length, 0);
         } finally {
             jig.remove();
@@ -117,7 +136,9 @@ describe("the extension", () => {
 
 describe("the package", () => {
     const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
-    const manifest = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")) as { pi: { extensions: string[]; skills: string[] } };
+    const manifest = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")) as {
+        pi: { extensions: string[]; skills: string[] };
+    };
 
     test("Pi loads the extension and finds the skill", () => {
         assert.ok(manifest.pi.extensions.includes("./plugins/jig-api/src/index.ts"));

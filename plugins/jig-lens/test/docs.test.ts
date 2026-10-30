@@ -42,7 +42,8 @@ test("every link in the README and the pages leads to a file and a heading that 
             if (/^[a-z]+:/i.test(link)) continue;
             const [target = "", anchor] = link.split("#");
             const resolved = target === "" ? file : path.resolve(path.dirname(file), target);
-            const mine = resolved.startsWith(PLUGIN + path.sep) || resolved.startsWith(path.join(ROOT, "docs") + path.sep);
+            const mine =
+                resolved.startsWith(PLUGIN + path.sep) || resolved.startsWith(path.join(ROOT, "docs") + path.sep);
             if (!mine) continue;
             const where = `${path.relative(ROOT, file)} links to ${link}`;
             assert.ok(existsSync(resolved), `${where}: no such file`);
@@ -74,7 +75,10 @@ test("the README points at jig-core's records page, where the section moved to",
     const readme = readFileSync(README, "utf8");
     assert.match(readme, /\]\(\.\.\/jig-core\/docs\/records\.md\)/);
     assert.doesNotMatch(readme, /jig-core\/README\.md#records/);
-    assert.match(readFileSync(path.join(PLUGIN, "docs/index-schema.md"), "utf8"), /\]\(\.\.\/\.\.\/jig-core\/docs\/records\.md\)/);
+    assert.match(
+        readFileSync(path.join(PLUGIN, "docs/index-schema.md"), "utf8"),
+        /\]\(\.\.\/\.\.\/jig-core\/docs\/records\.md\)/,
+    );
 });
 
 test("the README has the shape the other plugins' READMEs have, and is about as long as they are", () => {

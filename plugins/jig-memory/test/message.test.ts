@@ -24,5 +24,8 @@ test("notes longer than 16 KB are cut, with a note that says where the rest is",
 test("the reminder names the count, the notes file and what to update", () => {
     const text = reminderText("ACME-1", "/data/tickets/ACME-1/notes.md");
     assert.equal(REMIND_AFTER, 15);
-    assert.match(text, /^\[ticket ACME-1\] 15 tool results since notes\.md last changed: update the ## Now block in \/data\/tickets\/ACME-1\/notes\.md \(status, next step, open questions\)\.$/);
+    assert.match(
+        text,
+        /^\[ticket ACME-1\] 15 tool results since notes\.md last changed: update the ## Now block in \/data\/tickets\/ACME-1\/notes\.md \(status, next step, open questions\)\.$/,
+    );
 });

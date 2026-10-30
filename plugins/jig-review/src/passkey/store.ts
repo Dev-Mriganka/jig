@@ -61,8 +61,10 @@ export class PasskeyStore {
         try {
             const stat = lstatSync(this.file);
             if (!stat.isFile()) return unusable("is not a plain file (a link or a folder)");
-            if ((stat.mode & 0o022) !== 0) return unusable("can be written by other users: run chmod 600 on it after checking it");
-            if (typeof process.getuid === "function" && stat.uid !== process.getuid()) return unusable("belongs to another user");
+            if ((stat.mode & 0o022) !== 0)
+                return unusable("can be written by other users: run chmod 600 on it after checking it");
+            if (typeof process.getuid === "function" && stat.uid !== process.getuid())
+                return unusable("belongs to another user");
             if (stat.size > MAX_BYTES) return unusable("is too big");
             text = readFileSync(this.file, "utf8");
         } catch (error) {
@@ -84,7 +86,11 @@ export class PasskeyStore {
         list.forEach((entry, index) => {
             const result = checkEntry(entry);
             if (typeof result === "string") problems.push(`passkeys.json: entry ${index + 1} ignored: ${result}`);
-            else if (passkeys.some((key) => key.credentialId === result.credentialId || key.fingerprint === result.fingerprint)) {
+            else if (
+                passkeys.some(
+                    (key) => key.credentialId === result.credentialId || key.fingerprint === result.fingerprint,
+                )
+            ) {
                 problems.push(`passkeys.json: entry ${index + 1} ignored: the same key is listed twice`);
             } else passkeys.push(result);
         });
@@ -94,10 +100,13 @@ export class PasskeyStore {
     /** Adds a confirmed key. Refuses when the file is unusable, the key is already there, or ten keys are. */
     public add(passkey: StoredPasskey): void {
         const current = this.writable();
-        if (current.some((key) => key.credentialId === passkey.credentialId || key.fingerprint === passkey.fingerprint)) {
+        if (
+            current.some((key) => key.credentialId === passkey.credentialId || key.fingerprint === passkey.fingerprint)
+        ) {
             throw new PasskeyStoreError("this passkey is already registered");
         }
-        if (current.length >= MAX_PASSKEYS) throw new PasskeyStoreError(`at most ${MAX_PASSKEYS} passkeys can be registered: remove one first`);
+        if (current.length >= MAX_PASSKEYS)
+            throw new PasskeyStoreError(`at most ${MAX_PASSKEYS} passkeys can be registered: remove one first`);
         this.write([...current, passkey]);
     }
 
@@ -122,7 +131,8 @@ export class PasskeyStore {
 
     private writable(): StoredPasskey[] {
         const read = this.read();
-        if (read.unusable !== undefined) throw new PasskeyStoreError(`passkeys.json ${read.unusable}: fix or delete ${this.file}`);
+        if (read.unusable !== undefined)
+            throw new PasskeyStoreError(`passkeys.json ${read.unusable}: fix or delete ${this.file}`);
         return read.passkeys;
     }
 
@@ -133,7 +143,10 @@ export class PasskeyStore {
         chmodSync(dir, 0o700);
         const temporary = `${this.file}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`;
         try {
-            writeFileSync(temporary, `${JSON.stringify({ version: 1, passkeys }, null, 2)}\n`, { flag: "wx", mode: 0o600 });
+            writeFileSync(temporary, `${JSON.stringify({ version: 1, passkeys }, null, 2)}\n`, {
+                flag: "wx",
+                mode: 0o600,
+            });
             renameSync(temporary, this.file);
         } catch (error) {
             try {
@@ -154,13 +167,17 @@ function unusable(reason: string): PasskeyRead {
 function checkEntry(entry: unknown): StoredPasskey | string {
     if (typeof entry !== "object" || entry === null || Array.isArray(entry)) return "it is not an object";
     const e = entry as Record<string, unknown>;
-    if (typeof e.credentialId !== "string" || !/^[A-Za-z0-9_-]{1,1400}$/.test(e.credentialId)) return "its credential id is not valid";
+    if (typeof e.credentialId !== "string" || !/^[A-Za-z0-9_-]{1,1400}$/.test(e.credentialId))
+        return "its credential id is not valid";
     if (typeof e.publicKey !== "string" || e.publicKey === "") return "it has no public key";
     if (typeof e.fingerprint !== "string" || !HEX64.test(e.fingerprint)) return "it has no fingerprint";
-    if (typeof e.confirmedAt !== "string" || Number.isNaN(Date.parse(e.confirmedAt))) return "it was never confirmed (no confirmedAt)";
+    if (typeof e.confirmedAt !== "string" || Number.isNaN(Date.parse(e.confirmedAt)))
+        return "it was never confirmed (no confirmedAt)";
     if (typeof e.createdAt !== "string" || Number.isNaN(Date.parse(e.createdAt))) return "it has no creation time";
-    if (!Number.isInteger(e.signCount) || (e.signCount as number) < 0 || (e.signCount as number) > 0xffffffff) return "its signature counter is not valid";
-    if (e.lastUsedAt !== undefined && (typeof e.lastUsedAt !== "string" || Number.isNaN(Date.parse(e.lastUsedAt)))) return "its last-used time is not valid";
+    if (!Number.isInteger(e.signCount) || (e.signCount as number) < 0 || (e.signCount as number) > 0xffffffff)
+        return "its signature counter is not valid";
+    if (e.lastUsedAt !== undefined && (typeof e.lastUsedAt !== "string" || Number.isNaN(Date.parse(e.lastUsedAt))))
+        return "its last-used time is not valid";
     const spki = Buffer.from(e.publicKey, "base64");
     let algorithm: Algorithm;
     try {
@@ -169,7 +186,8 @@ function checkEntry(entry: unknown): StoredPasskey | string {
         return error instanceof WebAuthnError ? error.message : "its public key does not load";
     }
     // The fingerprint is what the user confirmed. A different key under it was never confirmed.
-    if (fingerprintOf(spki) !== e.fingerprint) return "its fingerprint is not the fingerprint of its key, so this key was never confirmed";
+    if (fingerprintOf(spki) !== e.fingerprint)
+        return "its fingerprint is not the fingerprint of its key, so this key was never confirmed";
     if (e.algorithm !== algorithm) return "its algorithm is not the key's";
     return {
         credentialId: e.credentialId,

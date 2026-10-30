@@ -71,7 +71,7 @@ function checkOperators(operators: Doc, path: readonly string[], ctx: Ctx, depth
         if (VALUE_OPERATORS.has(name)) {
             checkLiteral(argument, path, ctx, depth + 1);
         } else if (GEO_OPERATORS.has(name)) {
-            continue;
+            // Their arguments are coordinates and shapes: nothing to check.
         } else if (name === "$not") {
             if (isObject(argument) && !isWrapper(argument) && allOperators(argument))
                 checkOperators(argument, path, ctx, depth + 1);
@@ -105,7 +105,6 @@ export function checkFilter(filter: unknown, ctx: Ctx, base: readonly string[] =
             checkExpr(value, ctx);
         } else if (key === "$where" || key === "$comment") {
             // `$where` is JavaScript, which was refused already unless the environment allows it.
-            continue;
         } else if (key === "$text") {
             // A text search reads every indexed text field, whatever the lists say.
             if (ctx.view.mode === "allow")

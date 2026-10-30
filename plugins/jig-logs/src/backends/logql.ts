@@ -30,6 +30,7 @@ export function literalPattern(text: string): string {
 const LABEL = "[A-Za-z_][A-Za-z0-9_]*";
 const OPERATOR = "=~|!~|!=|=";
 /** A value is a double-quoted string (a backslash escapes the next character) or a backtick string (no escapes). */
+// biome-ignore lint/style/useTemplate: a template would need the backticks of the second part escaped
 const VALUE = String.raw`"(?:[^"\\]|\\.)*"|` + "`[^`]*`";
 const MATCHER = ` *(${LABEL}) *(${OPERATOR}) *(${VALUE}) *`;
 const SELECTOR = new RegExp(`^\\{${MATCHER}(?:,${MATCHER})*\\}$`);

@@ -16,13 +16,22 @@ const JWT = [
     "eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ",
     "SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
 ].join(".");
-const PEM = (kind: string) => [`-----BEGIN ${kind}PRIVATE KEY-----`, "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7", "VJTUt9Us8cKjMzEfYyjiWA4R4/M2bS1GB4t7NXp98C3SC6dVMvDu", `-----END ${kind}PRIVATE KEY-----`].join("\n");
+const PEM = (kind: string) =>
+    [
+        `-----BEGIN ${kind}PRIVATE KEY-----`,
+        "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7",
+        "VJTUt9Us8cKjMzEfYyjiWA4R4/M2bS1GB4t7NXp98C3SC6dVMvDu",
+        `-----END ${kind}PRIVATE KEY-----`,
+    ].join("\n");
 
 describe("secret values", () => {
     test("a registered value is removed wherever it appears", () => {
         const redactor = createRedactor();
         redactor.register("s3cr3t-value");
-        assert.equal(redactor.text("token=s3cr3t-value and again s3cr3t-value."), `token=${REDACTED} and again ${REDACTED}.`);
+        assert.equal(
+            redactor.text("token=s3cr3t-value and again s3cr3t-value."),
+            `token=${REDACTED} and again ${REDACTED}.`,
+        );
         assert.equal(redactor.text("nothing to hide"), "nothing to hide");
         assert.equal(redactor.count(), 1);
     });
@@ -67,7 +76,7 @@ describe("secret values", () => {
 
 describe("the forms a secret can take", () => {
     // Bytes chosen so that base64 contains both + and /, which base64url writes differently.
-    const secret = "p@ss/w0rd+?>>~ \"quoted\" \\ and\nnewline";
+    const secret = 'p@ss/w0rd+?>>~ "quoted" \\ and\nnewline';
 
     test("the list holds the value, JSON text, base64, base64url, URL encoding and hex", () => {
         const bytes = Buffer.from(secret, "utf8");
@@ -84,7 +93,11 @@ describe("the forms a secret can take", () => {
         ]) {
             assert.ok(forms.includes(expected), expected);
         }
-        assert.ok(bytes.toString("base64").includes("+") || bytes.toString("base64").includes("/") || bytes.toString("base64url") !== bytes.toString("base64"));
+        assert.ok(
+            bytes.toString("base64").includes("+") ||
+                bytes.toString("base64").includes("/") ||
+                bytes.toString("base64url") !== bytes.toString("base64"),
+        );
     });
 
     test("each form is removed from text", () => {
@@ -138,14 +151,24 @@ describe("secret shapes nobody registered", () => {
     }
 
     test("a private key block cut short, with no END line, is removed to the end of the text", () => {
-        const cut = ["before", "-----BEGIN " + "PRIVATE KEY-----", "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7"].join("\n");
+        const cut = [
+            "before",
+            "-----BEGIN " + "PRIVATE KEY-----",
+            "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7",
+        ].join("\n");
         assert.equal(redactor.text(cut), `before\n${REDACTED}`);
     });
 
     test("text that only looks a little like a secret is left alone", () => {
         for (const text of [
-            "ghp_short", "github_pat_short", "AKIA is a prefix", "AKIAlowercase1234567890", "eyJhbGciOiJIUzI1NiJ9 alone",
-            "xoxb- nothing", "-----BEGIN CERTIFICATE-----\nabc\n-----END CERTIFICATE-----", "a normal sentence, with 123456 numbers",
+            "ghp_short",
+            "github_pat_short",
+            "AKIA is a prefix",
+            "AKIAlowercase1234567890",
+            "eyJhbGciOiJIUzI1NiJ9 alone",
+            "xoxb- nothing",
+            "-----BEGIN CERTIFICATE-----\nabc\n-----END CERTIFICATE-----",
+            "a normal sentence, with 123456 numbers",
         ]) {
             assert.equal(redactor.text(text), text);
         }
@@ -161,9 +184,21 @@ describe("deep structures", () => {
     redactor.register("hush-hush-1");
 
     test("every string at every depth, in objects and arrays", () => {
-        const input = { a: "x hush-hush-1", list: ["hush-hush-1", { deep: [{ deeper: "z hush-hush-1 z" }] }], n: 3, flag: true, nothing: null };
+        const input = {
+            a: "x hush-hush-1",
+            list: ["hush-hush-1", { deep: [{ deeper: "z hush-hush-1 z" }] }],
+            n: 3,
+            flag: true,
+            nothing: null,
+        };
         const output = redactor.value(input);
-        assert.deepEqual(output, { a: `x ${REDACTED}`, list: [REDACTED, { deep: [{ deeper: `z ${REDACTED} z` }] }], n: 3, flag: true, nothing: null });
+        assert.deepEqual(output, {
+            a: `x ${REDACTED}`,
+            list: [REDACTED, { deep: [{ deeper: `z ${REDACTED} z` }] }],
+            n: 3,
+            flag: true,
+            nothing: null,
+        });
     });
 
     test("does not change the input", () => {
@@ -203,12 +238,17 @@ describe("deep structures", () => {
     });
 
     test("structures that hold a secret shape are redacted too", () => {
-        assert.deepEqual(redactor.value({ headers: { authorization: `token ${GITHUB_CLASSIC}` } }), { headers: { authorization: `token ${REDACTED}` } });
+        assert.deepEqual(redactor.value({ headers: { authorization: `token ${GITHUB_CLASSIC}` } }), {
+            headers: { authorization: `token ${REDACTED}` },
+        });
     });
 });
 
 describe("mapStrings", () => {
     test("applies a change to every string and nothing else", () => {
-        assert.deepEqual(mapStrings({ a: "x", b: [1, "y"] }, (text) => text.toUpperCase()), { A: "X", B: [1, "Y"] });
+        assert.deepEqual(
+            mapStrings({ a: "x", b: [1, "y"] }, (text) => text.toUpperCase()),
+            { A: "X", B: [1, "Y"] },
+        );
     });
 });
