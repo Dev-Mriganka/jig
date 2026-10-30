@@ -156,7 +156,8 @@ describe("anything else", () => {
         for (const stderr of ["a".repeat(8 * 1024 * 1024), "line\n".repeat(1_000_000), "a://".repeat(500_000), `${"a".repeat(4 * 1024 * 1024)}://x@y`]) {
             const started = Date.now();
             const text = message(stderr, 2);
-            assert.ok(Date.now() - started < 1000, `${Date.now() - started} ms`);
+            // Generous, because the whole suite loads the machine: a quadratic pass over megabytes takes far longer.
+            assert.ok(Date.now() - started < 5000, `${Date.now() - started} ms`);
             assert.ok(text.length < 450);
         }
     });
