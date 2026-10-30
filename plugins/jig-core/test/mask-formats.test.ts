@@ -48,7 +48,10 @@ describe("phones, addresses and log fields", () => {
     });
 
     it("leaves internal addresses and device identifiers readable", () => {
-        assert.deepEqual(maskValue({ clientIp: "10.1.2.3", macAddress: "AA:BB:CC:DD:EE:FF" }), { clientIp: "10.1.2.3", macAddress: "AA:BB:CC:DD:EE:FF" });
+        assert.deepEqual(maskValue({ clientIp: "10.1.2.3", macAddress: "AA:BB:CC:DD:EE:FF" }), {
+            clientIp: "10.1.2.3",
+            macAddress: "AA:BB:CC:DD:EE:FF",
+        });
         assert.equal(maskText("peer AA:BB:CC:DD:EE:FF at 192.168.1.5"), "peer AA:BB:CC:DD:EE:FF at 192.168.1.5");
     });
 

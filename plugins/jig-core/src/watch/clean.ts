@@ -33,11 +33,13 @@ function isObject(value: unknown): value is Record<string, unknown> {
 export function isWatchResult(value: unknown): value is WatchResult {
     if (!isObject(value)) return false;
     const links = value.links;
-    return OUTCOMES.includes(value.outcome as string)
-        && typeof value.summary === "string"
-        && (value.details === undefined || typeof value.details === "string")
-        && (links === undefined || (Array.isArray(links) && links.every((link) => typeof link === "string")))
-        && (value.facts === undefined || isObject(value.facts));
+    return (
+        OUTCOMES.includes(value.outcome as string) &&
+        typeof value.summary === "string" &&
+        (value.details === undefined || typeof value.details === "string") &&
+        (links === undefined || (Array.isArray(links) && links.every((link) => typeof link === "string"))) &&
+        (value.facts === undefined || isObject(value.facts))
+    );
 }
 
 // A CI log is full of colour codes, and a hostile one can carry codes that act on the terminal (a title, the

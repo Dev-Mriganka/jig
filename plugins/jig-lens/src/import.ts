@@ -191,7 +191,10 @@ function recordFiles(folder: string, cutoff: number): string[] {
 
 /** Removes rows older than the cutoff, and forgets files that are gone or too old to import. Returns the rows gone. */
 function removeOld(db: DatabaseSync, cutoff: number, current: ReadonlySet<string>): number {
-    const files = db.prepare("SELECT file FROM imported").all().map((row) => String(row.file));
+    const files = db
+        .prepare("SELECT file FROM imported")
+        .all()
+        .map((row) => String(row.file));
     const stale = files.filter((name) => !current.has(name));
     const old = db
         .prepare("SELECT (SELECT count(*) FROM call WHERE time < ?) + (SELECT count(*) FROM turn WHERE time < ?) AS n")
@@ -199,8 +202,9 @@ function removeOld(db: DatabaseSync, cutoff: number, current: ReadonlySet<string
     // Most imports have nothing to remove, and then they must not ask for the write lock.
     if (stale.length === 0 && Number(old?.n ?? 0) === 0) return 0;
     return inTransaction(db, () => {
-        const removed = Number(db.prepare("DELETE FROM call WHERE time < ?").run(cutoff).changes)
-            + Number(db.prepare("DELETE FROM turn WHERE time < ?").run(cutoff).changes);
+        const removed =
+            Number(db.prepare("DELETE FROM call WHERE time < ?").run(cutoff).changes) +
+            Number(db.prepare("DELETE FROM turn WHERE time < ?").run(cutoff).changes);
         const forget = db.prepare("DELETE FROM imported WHERE file = ?");
         for (const name of stale) forget.run(name);
         return removed;

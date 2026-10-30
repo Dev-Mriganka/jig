@@ -17,19 +17,28 @@ function parsed(text: string): { value: unknown; problems: Problem[] } {
 
 describe("reading YAML", () => {
     test("gives plain data", () => {
-        assert.deepEqual(parsed("a: 1\nb:\n  - x\n  - y: true\nc: 'text'\n").value, { a: 1, b: ["x", { y: true }], c: "text" });
-        assert.deepEqual(parsed("{\"json\": [1, 2]}").value, { json: [1, 2] }, "JSON is YAML");
+        assert.deepEqual(parsed("a: 1\nb:\n  - x\n  - y: true\nc: 'text'\n").value, {
+            a: 1,
+            b: ["x", { y: true }],
+            c: "text",
+        });
+        assert.deepEqual(parsed('{"json": [1, 2]}').value, { json: [1, 2] }, "JSON is YAML");
     });
 
     test("never runs anything: a tag that names code is not code", () => {
-        const { value } = parsed('a: !!js/function "function () { globalThis.jigApiPwned = true }"\nb: !!python/object/apply:os.system ["echo no"]\n');
+        const { value } = parsed(
+            'a: !!js/function "function () { globalThis.jigApiPwned = true }"\nb: !!python/object/apply:os.system ["echo no"]\n',
+        );
         assert.equal((globalThis as { jigApiPwned?: unknown }).jigApiPwned, undefined);
         assert.ok(typeof value === "object" || value === undefined);
     });
 
     test("a file that expands without bound is refused", () => {
         const lines = ["a: &a [1, 2, 3, 4, 5, 6, 7, 8, 9]"];
-        for (let each = 0; each < 12; each++) lines.push(`${String.fromCharCode(98 + each)}: &${String.fromCharCode(98 + each)} [${Array.from({ length: 9 }, () => `*${String.fromCharCode(97 + each)}`).join(", ")}]`);
+        for (let each = 0; each < 12; each++)
+            lines.push(
+                `${String.fromCharCode(98 + each)}: &${String.fromCharCode(98 + each)} [${Array.from({ length: 9 }, () => `*${String.fromCharCode(97 + each)}`).join(", ")}]`,
+            );
         const { value, problems } = parsed(`${lines.join("\n")}\n`);
         assert.equal(value, undefined);
         assert.match(problems[0]?.message ?? "", /too many aliases|is not valid YAML/);
@@ -38,7 +47,9 @@ describe("reading YAML", () => {
     test("a repeated key is an error with its line, because one of the two values would be lost", () => {
         const { value, problems } = parsed("a: 1\nb: 2\na: 3\n");
         assert.equal(value, undefined);
-        assert.deepEqual(problems, [{ file: "f.yml", key: "line 3", message: "is not valid YAML (DUPLICATE_KEY)", level: "error" }]);
+        assert.deepEqual(problems, [
+            { file: "f.yml", key: "line 3", message: "is not valid YAML (DUPLICATE_KEY)", level: "error" },
+        ]);
     });
 
     test("a mistake names its line and a code, and never quotes the text", () => {
@@ -59,7 +70,11 @@ describe("the dependency", () => {
                 else if (entry.name.endsWith(".ts")) {
                     const text = fs.readFileSync(full, "utf8");
                     if (/from "yaml"/.test(text)) importers.push(path.relative(SRC, full));
-                    assert.doesNotMatch(text.replace(/\/\/.*$/gm, ""), /\beval\s*\(|new Function\s*\(/, `${entry.name} evaluates text`);
+                    assert.doesNotMatch(
+                        text.replace(/\/\/.*$/gm, ""),
+                        /\beval\s*\(|new Function\s*\(/,
+                        `${entry.name} evaluates text`,
+                    );
                 }
             }
         };
@@ -68,8 +83,16 @@ describe("the dependency", () => {
     });
 
     test("the manifest pins it exactly, beside jig-review's three run-time dependencies and jig-mongo's driver", () => {
-        const manifest = JSON.parse(fs.readFileSync(path.join(SRC, "..", "..", "..", "package.json"), "utf8")) as { dependencies: Record<string, string> };
-        assert.deepEqual(Object.keys(manifest.dependencies).sort(), ["@hono/node-server", "hono", "ignore", "mongodb", "yaml"]);
+        const manifest = JSON.parse(fs.readFileSync(path.join(SRC, "..", "..", "..", "package.json"), "utf8")) as {
+            dependencies: Record<string, string>;
+        };
+        assert.deepEqual(Object.keys(manifest.dependencies).sort(), [
+            "@hono/node-server",
+            "hono",
+            "ignore",
+            "mongodb",
+            "yaml",
+        ]);
         assert.match(manifest.dependencies.yaml ?? "", /^\d+\.\d+\.\d+$/);
     });
 });

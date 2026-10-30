@@ -146,13 +146,13 @@ export function checkKubernetes(raw: unknown, at: string, errors: string[]): Kub
         errors,
     );
     const selector = checkSelector(raw.selector, `${at}.selector`, errors);
-    const container = raw.container === undefined
-        ? undefined
-        : checkPattern(raw.container, DNS_LABEL, `${at}.container`, "a container name", errors);
+    const container =
+        raw.container === undefined
+            ? undefined
+            : checkPattern(raw.container, DNS_LABEL, `${at}.container`, "a container name", errors);
     const port = raw.port === undefined ? undefined : checkPort(raw.port, `${at}.port`, errors);
-    const healthPath = raw.healthPath === undefined
-        ? undefined
-        : checkHealthPath(raw.healthPath, `${at}.healthPath`, errors);
+    const healthPath =
+        raw.healthPath === undefined ? undefined : checkHealthPath(raw.healthPath, `${at}.healthPath`, errors);
 
     // A health check inside a pod needs all three: the path to call, the port it listens on, and the container to run
     // curl in. One of them alone is a half-finished setting, and the check would never run.

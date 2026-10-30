@@ -31,7 +31,10 @@ function ticketRepo(dir: string, branch: string): void {
 
 function bind(ticket: string, repositories: unknown): void {
     mkdirSync(path.join(tickets, ticket), { recursive: true });
-    writeFileSync(path.join(tickets, ticket, "ticket.json"), typeof repositories === "string" ? repositories : JSON.stringify({ repositories }));
+    writeFileSync(
+        path.join(tickets, ticket, "ticket.json"),
+        typeof repositories === "string" ? repositories : JSON.stringify({ repositories }),
+    );
 }
 
 before(() => {
@@ -53,13 +56,20 @@ after(() => {
 test("the ticket's repositories are the ones jig-memory bound, and no others, whatever the branches are called", async () => {
     bind("PROJ-7", ["worktrees/PROJ-7/orders-api", "shipping-api"]);
     const files = await new WorkspaceReviewSource(root).getChangedFiles({ scope: "branch", ticket: "PROJ-7" });
-    assert.deepEqual(files, ["worktrees/PROJ-7/orders-api/A.java", "shipping-api/A.java"], "in the order the binding lists them");
+    assert.deepEqual(
+        files,
+        ["worktrees/PROJ-7/orders-api/A.java", "shipping-api/A.java"],
+        "in the order the binding lists them",
+    );
     assert.ok(!files.some((file) => file.startsWith("invoices-api")), "PROJ-70 is another ticket and was not bound");
 });
 
 test("a repository outside Pi's folder is allowed and shows under its own folder name", () => {
     bind("PROJ-7", [path.join(elsewhere, "ledger-api"), "shipping-api"]);
-    assert.deepEqual(readBinding("PROJ-7", root).map((repo) => repo.prefix), ["ledger-api", "shipping-api"]);
+    assert.deepEqual(
+        readBinding("PROJ-7", root).map((repo) => repo.prefix),
+        ["ledger-api", "shipping-api"],
+    );
 });
 
 test("two outside repositories with one name do not collide", () => {
@@ -74,7 +84,10 @@ test("two outside repositories with one name do not collide", () => {
 
 test("Pi's own folder may be the bound repository: its paths need no prefix", () => {
     bind("PROJ-8", ["."]);
-    assert.deepEqual(readBinding("PROJ-8", path.join(root, "shipping-api")).map((repo) => repo.prefix), [""]);
+    assert.deepEqual(
+        readBinding("PROJ-8", path.join(root, "shipping-api")).map((repo) => repo.prefix),
+        [""],
+    );
 });
 
 test("a ticket that is not bound says ticket scope needs jig-memory with bound repositories", async () => {
@@ -82,7 +95,10 @@ test("a ticket that is not bound says ticket scope needs jig-memory with bound r
     assert.throws(() => readBinding("PROJ-404", root), needs, "no ticket folder");
     bind("PROJ-404", []);
     assert.throws(() => readBinding("PROJ-404", root), needs, "an empty list");
-    await assert.rejects(new WorkspaceReviewSource(root).getChangedFiles({ scope: "branch", ticket: "PROJ-404" }), needs);
+    await assert.rejects(
+        new WorkspaceReviewSource(root).getChangedFiles({ scope: "branch", ticket: "PROJ-404" }),
+        needs,
+    );
 });
 
 test("a binding with a bad entry is refused with the reason", () => {
@@ -105,7 +121,11 @@ test("the ticket folder follows the memory section, with ~/ expanded, else the X
     assert.equal(ticketFolder(), path.join(os.homedir(), "work", "tickets"));
     jig.setSection("memory", undefined);
     assert.equal(ticketFolder({ XDG_DATA_HOME: "/data" }), "/data/jig/tickets");
-    assert.equal(ticketFolder({ XDG_DATA_HOME: "relative" }), path.join(os.homedir(), ".local", "share", "jig", "tickets"), "a relative XDG_DATA_HOME is ignored");
+    assert.equal(
+        ticketFolder({ XDG_DATA_HOME: "relative" }),
+        path.join(os.homedir(), ".local", "share", "jig", "tickets"),
+        "a relative XDG_DATA_HOME is ignored",
+    );
     jig.setSection("memory", { folder: tickets });
 });
 
@@ -119,15 +139,30 @@ test("a ticket key is the memory section's pattern when it sets one, else a gene
 });
 
 test("/code-review <ticket> reviews the whole branch unless a scope is given", () => {
-    assert.deepEqual(parseCodeReviewCommand("proj-7"), { selection: { scope: "branch", ticket: "PROJ-7" }, subcommand: "review" });
-    assert.deepEqual(parseCodeReviewCommand("PROJ-7 --unstaged"), { selection: { scope: "unstaged", ticket: "PROJ-7" }, subcommand: "review" });
-    assert.deepEqual(parseCodeReviewCommand("worktrees/PROJ-7"), { selection: { scope: "all", folder: "worktrees/PROJ-7" }, subcommand: "review" });
+    assert.deepEqual(parseCodeReviewCommand("proj-7"), {
+        selection: { scope: "branch", ticket: "PROJ-7" },
+        subcommand: "review",
+    });
+    assert.deepEqual(parseCodeReviewCommand("PROJ-7 --unstaged"), {
+        selection: { scope: "unstaged", ticket: "PROJ-7" },
+        subcommand: "review",
+    });
+    assert.deepEqual(parseCodeReviewCommand("worktrees/PROJ-7"), {
+        selection: { scope: "all", folder: "worktrees/PROJ-7" },
+        subcommand: "review",
+    });
     assert.deepEqual(parseCodeReviewCommand("--staged"), { selection: { scope: "staged" }, subcommand: "review" });
     assert.deepEqual(parseCodeReviewCommand("--touched"), { selection: { scope: "touched" }, subcommand: "review" });
-    assert.deepEqual(parseCodeReviewCommand("--branch orders-api"), { selection: { scope: "branch", folder: "orders-api" }, subcommand: "review" });
+    assert.deepEqual(parseCodeReviewCommand("--branch orders-api"), {
+        selection: { scope: "branch", folder: "orders-api" },
+        subcommand: "review",
+    });
     assert.deepEqual(parseCodeReviewCommand("settings"), { subcommand: "settings" });
 });
 
 test("a ticket with no repositories bound says so when asked to review", async () => {
-    await assert.rejects(new WorkspaceReviewSource(root).requireGitRepo({ ticket: "PROJ-500" }), /Ticket scope needs jig-memory with bound repositories/);
+    await assert.rejects(
+        new WorkspaceReviewSource(root).requireGitRepo({ ticket: "PROJ-500" }),
+        /Ticket scope needs jig-memory with bound repositories/,
+    );
 });

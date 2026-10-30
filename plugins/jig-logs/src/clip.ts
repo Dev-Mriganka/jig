@@ -170,7 +170,7 @@ function unreadable(chunk: string): boolean {
  * quoted `key="value` that never ends.
  */
 function unclosed(text: string): number | undefined {
-    for (let start = jsonStart(text, 0); start >= 0;) {
+    for (let start = jsonStart(text, 0); start >= 0; ) {
         const end = jsonEnd(text, start);
         if (end === undefined || unreadable(text.slice(start, end))) return start;
         start = jsonStart(text, end);

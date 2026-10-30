@@ -31,7 +31,10 @@ test("the index and every asset it loads are served as they were built", async (
     for (const asset of assets) {
         const served = await get(asset);
         assert.equal(served.status, 200, asset);
-        assert.match(String(served.headers["content-type"]), asset.endsWith(".js") ? /^text\/javascript/ : /^text\/css/);
+        assert.match(
+            String(served.headers["content-type"]),
+            asset.endsWith(".js") ? /^text\/javascript/ : /^text\/css/,
+        );
         assert.equal(served.body, readFileSync(path.join(dist, asset), "utf8"), `${asset} is the built file`);
     }
 });
@@ -58,7 +61,9 @@ test("the page and its assets need the session cookie like everything else", asy
 
 test("every API route the built page calls is answered by the server", async () => {
     const script = readdirSync(path.join(dist, "assets")).find((name) => name.endsWith(".js"))!;
-    const called = new Set(readFileSync(path.join(dist, "assets", script), "utf8").match(/\/api\/[a-z]+(?:\/[a-z]+)?/g));
+    const called = new Set(
+        readFileSync(path.join(dist, "assets", script), "utf8").match(/\/api\/[a-z]+(?:\/[a-z]+)?/g),
+    );
     assert.deepEqual(
         [...called].sort(),
         [
@@ -88,11 +93,31 @@ test("every API route the built page calls is answered by the server", async () 
     const detail = await get(`/api/reviews/${encodeURIComponent(id)}`);
     assert.equal(detail.status, 200);
     assert.equal(json(detail).isActive, true);
-    assert.deepEqual(json(await get("/api/settings")), { autoAskReview: false, autoOpenBrowser: false, diffView: "split" });
-    assert.equal((await request(session.base, "/api/settings", { method: "PATCH", cookie: session.cookie, body: { diffView: "unified" } })).status, 200);
+    assert.deepEqual(json(await get("/api/settings")), {
+        autoAskReview: false,
+        autoOpenBrowser: false,
+        diffView: "split",
+    });
+    assert.equal(
+        (
+            await request(session.base, "/api/settings", {
+                method: "PATCH",
+                cookie: session.cookie,
+                body: { diffView: "unified" },
+            })
+        ).status,
+        200,
+    );
     assert.equal(json(await get("/api/settings")).diffView, "unified");
     assert.deepEqual(json(await get("/api/passkeys")), { passkeys: [], problems: [] });
-    assert.equal((await session.post("/api/ask", { comments: [{ body: "why?", filePath: "orders-api/Service.java", line: 2, side: "new" }] })).status, 200);
+    assert.equal(
+        (
+            await session.post("/api/ask", {
+                comments: [{ body: "why?", filePath: "orders-api/Service.java", line: 2, side: "new" }],
+            })
+        ).status,
+        200,
+    );
     assert.equal((await session.post("/api/comments", { comments: [{ body: "General note" }] })).status, 200);
     assert.equal(session.host.sent.length, 2, "both reached the agent as follow-up messages");
     // Waiting for the agent: the review cannot be approved, whichever way the page asks.
@@ -102,13 +127,21 @@ test("every API route the built page calls is answered by the server", async () 
     // The event stream stays open: read its first bytes, then hang up.
     const url = new URL(session.base);
     const first = await new Promise<string>((resolve, reject) => {
-        const req = http.get({ host: "127.0.0.1", port: url.port, path: "/api/events", headers: { host: url.host, cookie: session.cookie } }, (res) => {
-            assert.match(String(res.headers["content-type"]), /^text\/event-stream/);
-            res.once("data", (chunk) => {
-                req.destroy();
-                resolve(String(chunk));
-            });
-        });
+        const req = http.get(
+            {
+                host: "127.0.0.1",
+                port: url.port,
+                path: "/api/events",
+                headers: { host: url.host, cookie: session.cookie },
+            },
+            (res) => {
+                assert.match(String(res.headers["content-type"]), /^text\/event-stream/);
+                res.once("data", (chunk) => {
+                    req.destroy();
+                    resolve(String(chunk));
+                });
+            },
+        );
         req.on("error", reject);
     });
     assert.match(first, /^event: connected/);

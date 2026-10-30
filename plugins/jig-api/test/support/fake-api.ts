@@ -74,10 +74,11 @@ export function startFakeApi(): Promise<FakeApi> {
             fake.requests = [];
             fake.respond = () => OK;
         },
-        close: () => new Promise((resolve) => {
-            server.close(() => resolve());
-            server.closeAllConnections();
-        }),
+        close: () =>
+            new Promise((resolve) => {
+                server.close(() => resolve());
+                server.closeAllConnections();
+            }),
     };
 
     const server = http.createServer((request, response) => {
@@ -99,7 +100,9 @@ export function startFakeApi(): Promise<FakeApi> {
                 body: Buffer.concat(chunks).toString("utf8"),
             };
             fake.requests.push(recorded);
-            void Promise.resolve(fake.respond(recorded, fake.requests.length - 1)).then((reply) => send(request, response, reply));
+            void Promise.resolve(fake.respond(recorded, fake.requests.length - 1)).then((reply) =>
+                send(request, response, reply),
+            );
         });
     });
 

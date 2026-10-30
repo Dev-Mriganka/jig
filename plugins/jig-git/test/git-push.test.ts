@@ -248,7 +248,8 @@ test("push, a refusal that is not a lost reply is reported as failed, with no ch
 // ---- the announcement after a push --------------------------------------------------------------------------------
 
 /** What the plugin published on the event bus as `jig-git:pushed`. */
-const pushedEvents = () => h.announced.filter((entry) => entry.event === "jig-git:pushed").map((entry) => entry.payload);
+const pushedEvents = () =>
+    h.announced.filter((entry) => entry.event === "jig-git:pushed").map((entry) => entry.payload);
 
 test("push announces jig-git:pushed with the repository, the branch and the full head, and nothing about CI", async () => {
     const r = unpushed("feature/w1", 1, "acme");

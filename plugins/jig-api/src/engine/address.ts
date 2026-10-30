@@ -10,7 +10,7 @@
 // the team chose.
 
 const NOT_HTTPS =
-    'must be an https address (plain http is only for 127.0.0.1 and localhost, ' +
+    "must be an https address (plain http is only for 127.0.0.1 and localhost, " +
     'with "allowPlainLocal": true in the api section)';
 
 /** The two names of this machine that `allowPlainLocal` opens. */
@@ -18,7 +18,11 @@ const LOCAL_HOSTS: ReadonlySet<string> = new Set(["127.0.0.1", "localhost"]);
 
 /** Names that stand for a cloud provider's metadata service. */
 const METADATA_NAMES: ReadonlySet<string> = new Set([
-    "metadata", "metadata.google.internal", "metadata.goog", "instance-data", "instance-data.ec2.internal",
+    "metadata",
+    "metadata.google.internal",
+    "metadata.goog",
+    "instance-data",
+    "instance-data.ec2.internal",
 ]);
 
 /** Metadata addresses outside the link-local range: Alibaba Cloud's, and Oracle Cloud's older one. */
@@ -49,7 +53,9 @@ function ipv6Of(host: string): number[] | undefined {
     if (halves.length > 2) return undefined;
     const group = (part: string): number[] | undefined => {
         if (part === "") return [];
-        const numbers = part.split(":").map((item) => (/^[0-9a-f]{1,4}$/i.test(item) ? parseInt(item, 16) : Number.NaN));
+        const numbers = part
+            .split(":")
+            .map((item) => (/^[0-9a-f]{1,4}$/i.test(item) ? parseInt(item, 16) : Number.NaN));
         return numbers.some(Number.isNaN) ? undefined : numbers;
     };
     const head = group(halves[0] ?? "");
@@ -72,7 +78,8 @@ function blockedV4(parts: readonly [number, number, number, number]): { reason: 
 function blockedV6(groups: readonly number[]): { reason: string; local: boolean } | undefined {
     const [g0 = 0, g1 = 0] = groups;
     if (groups.every((group) => group === 0)) return { reason: "this machine", local: true };
-    if (groups.slice(0, 7).every((group) => group === 0) && groups[7] === 1) return { reason: "this machine", local: true };
+    if (groups.slice(0, 7).every((group) => group === 0) && groups[7] === 1)
+        return { reason: "this machine", local: true };
     // fe80::/10 is link-local; fd00:ec2::254 is AWS's metadata service over IPv6.
     if ((g0 & 0xffc0) === 0xfe80) return { reason: "a link-local address", local: false };
     if (g0 === 0xfd00 && g1 === 0x0ec2 && groups[7] === 0x0254 && groups.slice(2, 7).every((group) => group === 0)) {
@@ -122,7 +129,8 @@ export function addressProblem(address: unknown, allowPlainLocal: boolean): stri
     const blocked = blockedHost(url.hostname);
     if (blocked !== undefined) {
         if (!blocked.local) return `is ${blocked.reason}, which is never called`;
-        if (!LOCAL_HOSTS.has(url.hostname)) return "is a form of this machine other than 127.0.0.1 and localhost, which is never called";
+        if (!LOCAL_HOSTS.has(url.hostname))
+            return "is a form of this machine other than 127.0.0.1 and localhost, which is never called";
         return allowPlainLocal ? undefined : 'is this machine, which needs "allowPlainLocal": true in the api section';
     }
     return url.protocol === "https:" ? undefined : NOT_HTTPS;

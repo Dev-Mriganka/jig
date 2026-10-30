@@ -62,7 +62,10 @@ describe("performance", () => {
     });
 
     it("still refuses input above the size limit instead of passing it unmasked", () => {
-        assert.throws(() => maskText("x".repeat(LIMIT_BYTES + 1)), (error: Error) => error.name === "MaskError" && /input size/.test(error.message));
+        assert.throws(
+            () => maskText("x".repeat(LIMIT_BYTES + 1)),
+            (error: Error) => error.name === "MaskError" && /input size/.test(error.message),
+        );
     });
 
     it("masks about 1 MiB of realistic log text in under 8 seconds", () => {
@@ -82,7 +85,11 @@ describe("performance", () => {
     it("masks a search-response-shaped value with 5 000 hits in under 8 seconds", () => {
         const hits = Array.from({ length: 5_000 }, (_, i) => ({
             _id: `abcdef0123456789abcdef${String(i).padStart(2, "0")}`,
-            _source: { "@timestamp": "2026-10-13T10:11:12Z", message: `order ord-${i} for user${i}@example.com from 10.0.${i % 250}.1`, level: "INFO" },
+            _source: {
+                "@timestamp": "2026-10-13T10:11:12Z",
+                message: `order ord-${i} for user${i}@example.com from 10.0.${i % 250}.1`,
+                level: "INFO",
+            },
         }));
         const { ms } = timed(() => maskValue({ hits: { hits } }));
         console.log(`  5k-hit value masked in ${ms.toFixed(0)} ms`);

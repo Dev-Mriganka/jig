@@ -47,7 +47,8 @@ describe("the env backend", () => {
 
     test("a name that is not a variable name is refused", async () => {
         const { secrets } = setup(["env"], { env });
-        for (const ref of ["env:BAD NAME", "env:1ABC", "env:A-B", "env:A=B"]) assert.equal(await code(secrets.resolve(ref)), "invalid_ref", ref);
+        for (const ref of ["env:BAD NAME", "env:1ABC", "env:A-B", "env:A=B"])
+            assert.equal(await code(secrets.resolve(ref)), "invalid_ref", ref);
     });
 });
 
@@ -55,7 +56,12 @@ describe("the allowed backends", () => {
     test("the default is pass alone, so env is refused with a clear error", async () => {
         const redactor = createRedactor();
         const secrets = createSecrets({ backends: () => ["pass"], redactor, env: { X: "value" } });
-        await assert.rejects(secrets.resolve("env:X"), (error: SecretError) => error.code === "backend_disabled" && /env secret backend is not enabled.*secrets\.backends/.test(error.message));
+        await assert.rejects(
+            secrets.resolve("env:X"),
+            (error: SecretError) =>
+                error.code === "backend_disabled" &&
+                /env secret backend is not enabled.*secrets\.backends/.test(error.message),
+        );
         assert.equal(redactor.count(), 0);
     });
 
@@ -79,7 +85,10 @@ describe("the allowed backends", () => {
         const { secrets } = setup(["pass", "env"]);
         const pasted = "gh" + "p_PretendThisIsAPastedSecretValue";
         for (const ref of [pasted, "vault:thing", "pass:", "env:", "", "https://example.com"]) {
-            await assert.rejects(secrets.resolve(ref), (error: SecretError) => error.code === "invalid_ref" && !error.message.includes(pasted));
+            await assert.rejects(
+                secrets.resolve(ref),
+                (error: SecretError) => error.code === "invalid_ref" && !error.message.includes(pasted),
+            );
         }
         await assert.rejects(secrets.resolve(42 as unknown as string), SecretError);
     });
@@ -155,7 +164,10 @@ echo "end $1 $2" >> "${log}.timing"
     test("an error never repeats what pass printed", async () => {
         const { secrets } = setup(["pass"], { env });
         for (const entry of ["locked/entry", "broken/entry"]) {
-            await assert.rejects(secrets.resolve(`pass:${entry}`), (error: SecretError) => !/leaked/.test(error.message));
+            await assert.rejects(
+                secrets.resolve(`pass:${entry}`),
+                (error: SecretError) => !/leaked/.test(error.message),
+            );
         }
     });
 
@@ -170,7 +182,10 @@ echo "end $1 $2" >> "${log}.timing"
     test("a pass that takes too long is stopped", async () => {
         const { secrets } = setup(["pass"], { env, timeoutMs: 300 });
         const started = Date.now();
-        await assert.rejects(secrets.resolve("pass:hang/entry"), (error: SecretError) => error.code === "unavailable" && /did not answer/.test(error.message));
+        await assert.rejects(
+            secrets.resolve("pass:hang/entry"),
+            (error: SecretError) => error.code === "unavailable" && /did not answer/.test(error.message),
+        );
         assert.ok(Date.now() - started < 5000);
     });
 
@@ -178,7 +193,10 @@ echo "end $1 $2" >> "${log}.timing"
         process.env.PATH = "/nonexistent-folder-for-jig";
         try {
             const { secrets } = setup(["pass"], { env });
-            await assert.rejects(secrets.resolve("pass:work/token"), (error: SecretError) => error.code === "unavailable" && /pass could not run/.test(error.message));
+            await assert.rejects(
+                secrets.resolve("pass:work/token"),
+                (error: SecretError) => error.code === "unavailable" && /pass could not run/.test(error.message),
+            );
         } finally {
             process.env.PATH = `${bin}${path.delimiter}${savedPath}`;
         }
@@ -186,7 +204,11 @@ echo "end $1 $2" >> "${log}.timing"
 
     test("several lookups at the same moment run one after another, so a locked store is unlocked once", async () => {
         const { secrets } = setup(["pass"], { env });
-        await Promise.all([secrets.resolve("pass:slow/entry"), secrets.resolve("pass:work/token"), secrets.resolve("pass:crlf/entry")]);
+        await Promise.all([
+            secrets.resolve("pass:slow/entry"),
+            secrets.resolve("pass:work/token"),
+            secrets.resolve("pass:crlf/entry"),
+        ]);
         const timing = readFileSync(`${log}.timing`, "utf8").trim().split("\n");
         // Each "start" is followed by its own "end" before the next "start".
         const kinds = timing.map((line) => line.split(" ")[0]);
@@ -197,14 +219,24 @@ echo "end $1 $2" >> "${log}.timing"
         const { secrets } = setup(["pass"], { env });
         const values = await Promise.all([1, 2, 3, 4, 5].map(() => secrets.resolve("pass:slow/entry")));
         assert.deepEqual(new Set(values), new Set(["slow-secret"]));
-        assert.equal(readFileSync(`${log}.timing`, "utf8").split("\n").filter((line) => line.startsWith("start")).length, 1);
+        assert.equal(
+            readFileSync(`${log}.timing`, "utf8")
+                .split("\n")
+                .filter((line) => line.startsWith("start")).length,
+            1,
+        );
     });
 
     test("a failed lookup is not remembered", async () => {
         const { secrets } = setup(["pass"], { env });
         await code(secrets.resolve("pass:missing/entry"));
         await code(secrets.resolve("pass:missing/entry"));
-        assert.equal(readFileSync(`${log}.timing`, "utf8").split("\n").filter((line) => line.startsWith("start")).length, 2);
+        assert.equal(
+            readFileSync(`${log}.timing`, "utf8")
+                .split("\n")
+                .filter((line) => line.startsWith("start")).length,
+            2,
+        );
     });
 });
 
@@ -222,7 +254,10 @@ describe("the keychain backend (macOS)", () => {
         const { calls, run } = fake();
         const { secrets, redactor } = setup(["keychain"], { run, platform: "darwin" });
         assert.equal(await secrets.resolve("keychain:my.service/me@example.com"), "kc-secret");
-        assert.deepEqual(calls.map((c) => [c.file, ...c.args]), [["security", "find-generic-password", "-s", "my.service", "-a", "me@example.com", "-w"]]);
+        assert.deepEqual(
+            calls.map((c) => [c.file, ...c.args]),
+            [["security", "find-generic-password", "-s", "my.service", "-a", "me@example.com", "-w"]],
+        );
         assert.equal(redactor.text("kc-secret"), REDACTED);
     });
 
@@ -236,14 +271,24 @@ describe("the keychain backend (macOS)", () => {
     test("is refused on another system", async () => {
         const { calls, run } = fake();
         const { secrets } = setup(["keychain"], { run, platform: "linux" });
-        await assert.rejects(secrets.resolve("keychain:svc/acct"), (error: SecretError) => error.code === "unavailable" && /needs macOS/.test(error.message));
+        await assert.rejects(
+            secrets.resolve("keychain:svc/acct"),
+            (error: SecretError) => error.code === "unavailable" && /needs macOS/.test(error.message),
+        );
         assert.equal(calls.length, 0);
     });
 
     test("a reference without both parts, with a leading dash or a control character, is refused", async () => {
         const { calls, run } = fake();
         const { secrets } = setup(["keychain"], { run, platform: "darwin" });
-        for (const ref of ["keychain:service-only", "keychain:/acct", "keychain:svc/", "keychain:-s/acct", "keychain:svc/-a", "keychain:svc/a\u0007b"]) {
+        for (const ref of [
+            "keychain:service-only",
+            "keychain:/acct",
+            "keychain:svc/",
+            "keychain:-s/acct",
+            "keychain:svc/-a",
+            "keychain:svc/a\u0007b",
+        ]) {
             assert.equal(await code(secrets.resolve(ref)), "invalid_ref", JSON.stringify(ref));
         }
         assert.equal(calls.length, 0);
@@ -252,7 +297,10 @@ describe("the keychain backend (macOS)", () => {
     test("an item that is not there, or a locked keychain, is an error without text from the command", async () => {
         const { run } = fake("leaked-keychain-output\n", 44);
         const { secrets } = setup(["keychain"], { run, platform: "darwin" });
-        await assert.rejects(secrets.resolve("keychain:svc/acct"), (error: SecretError) => error.code === "missing" && !error.message.includes("leaked"));
+        await assert.rejects(
+            secrets.resolve("keychain:svc/acct"),
+            (error: SecretError) => error.code === "missing" && !error.message.includes("leaked"),
+        );
     });
 });
 
@@ -263,7 +311,10 @@ describe("the op backend (1Password)", () => {
             calls.push({ file, args, ...(options === undefined ? {} : { options }) });
             return ok("op-secret\n");
         };
-        const { secrets, redactor } = setup(["op"], { run, env: { OP_SERVICE_ACCOUNT_TOKEN: "service-token", UNRELATED: "x" } });
+        const { secrets, redactor } = setup(["op"], {
+            run,
+            env: { OP_SERVICE_ACCOUNT_TOKEN: "service-token", UNRELATED: "x" },
+        });
         assert.equal(await secrets.resolve("op://Private/GitHub/token"), "op-secret");
         assert.deepEqual([calls[0]?.file, ...(calls[0]?.args ?? [])], ["op", "read", "op://Private/GitHub/token"]);
         assert.deepEqual(calls[0]?.options?.env, { OP_SERVICE_ACCOUNT_TOKEN: "service-token" });
@@ -279,7 +330,14 @@ describe("the op backend (1Password)", () => {
     test("a reference that is not vault, item and field is refused", async () => {
         const run: FakeRun = async () => ok("never\n");
         const { secrets } = setup(["op"], { run });
-        for (const ref of ["op://", "op://vault", "op://vault/item", "op://vault/item/a b", "op://vault//field", "op://a/b/c/d/e"]) {
+        for (const ref of [
+            "op://",
+            "op://vault",
+            "op://vault/item",
+            "op://vault/item/a b",
+            "op://vault//field",
+            "op://a/b/c/d/e",
+        ]) {
             assert.equal(await code(secrets.resolve(ref)), "invalid_ref", ref);
         }
     });
@@ -287,13 +345,24 @@ describe("the op backend (1Password)", () => {
     test("a failed read is an error without text from the command", async () => {
         const run: FakeRun = async () => ({ code: 1, stdout: "", stderr: "[ERROR] leaked-op-output", timedOut: false });
         const { secrets } = setup(["op"], { run });
-        await assert.rejects(secrets.resolve("op://vault/item/field"), (error: SecretError) => error.code === "missing" && !error.message.includes("leaked"));
+        await assert.rejects(
+            secrets.resolve("op://vault/item/field"),
+            (error: SecretError) => error.code === "missing" && !error.message.includes("leaked"),
+        );
     });
 
     test("a program that cannot start, or takes too long, is unavailable", async () => {
-        const missing: FakeRun = async () => { throw new Error("op is not installed or not on PATH"); };
-        await assert.rejects(setup(["op"], { run: missing }).secrets.resolve("op://vault/item/field"), (error: SecretError) => error.code === "unavailable" && /op could not run/.test(error.message));
+        const missing: FakeRun = async () => {
+            throw new Error("op is not installed or not on PATH");
+        };
+        await assert.rejects(
+            setup(["op"], { run: missing }).secrets.resolve("op://vault/item/field"),
+            (error: SecretError) => error.code === "unavailable" && /op could not run/.test(error.message),
+        );
         const slow: FakeRun = async () => ({ code: 124, stdout: "", stderr: "", timedOut: true });
-        await assert.rejects(setup(["op"], { run: slow, timeoutMs: 5000 }).secrets.resolve("op://vault/item/field"), (error: SecretError) => error.code === "unavailable" && /did not answer in 5 s/.test(error.message));
+        await assert.rejects(
+            setup(["op"], { run: slow, timeoutMs: 5000 }).secrets.resolve("op://vault/item/field"),
+            (error: SecretError) => error.code === "unavailable" && /did not answer in 5 s/.test(error.message),
+        );
     });
 });

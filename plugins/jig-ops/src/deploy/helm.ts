@@ -97,9 +97,10 @@ export function checkHelm(raw: Record<string, unknown>, at: string, errors: stri
         errors,
     );
     const chart = checkLocation(raw.chart, `${at}.chart`, "the chart, such as deploy/chart or acme/orders-api", errors);
-    const valuesFile = raw.valuesFile === undefined
-        ? undefined
-        : checkLocation(raw.valuesFile, `${at}.valuesFile`, "a values file", errors);
+    const valuesFile =
+        raw.valuesFile === undefined
+            ? undefined
+            : checkLocation(raw.valuesFile, `${at}.valuesFile`, "a values file", errors);
     const set = raw.set === undefined ? [] : checkSet(raw.set, `${at}.set`, errors);
 
     if (errors.length > before || release === undefined || chart === undefined || set === undefined) return undefined;
@@ -111,11 +112,18 @@ export function checkHelm(raw: Record<string, unknown>, at: string, errors: stri
 /** `helm upgrade --install`, with the version last among the `--set` pairs so that nothing before it can win. */
 export function upgradeArgs(config: HelmDeploy, target: Target, version: string): string[] {
     return [
-        "upgrade", "--install", config.release, config.chart,
-        "--kube-context", target.context, "--namespace", target.namespace,
+        "upgrade",
+        "--install",
+        config.release,
+        config.chart,
+        "--kube-context",
+        target.context,
+        "--namespace",
+        target.namespace,
         ...(config.valuesFile === undefined ? [] : ["--values", config.valuesFile]),
         ...config.set.flatMap(([key, value]) => ["--set", `${key}=${value}`]),
-        "--set", `${VERSION_KEY}=${version}`,
+        "--set",
+        `${VERSION_KEY}=${version}`,
         "--wait=false",
     ];
 }
@@ -127,16 +135,34 @@ export function rollbackArgs(config: HelmDeploy, target: Target): string[] {
 /** The last two revisions, oldest first. */
 function historyArgs(config: HelmDeploy, target: Target): string[] {
     return [
-        "history", config.release, "--kube-context", target.context, "--namespace", target.namespace,
-        "--max", "2", "-o", "json",
+        "history",
+        config.release,
+        "--kube-context",
+        target.context,
+        "--namespace",
+        target.namespace,
+        "--max",
+        "2",
+        "-o",
+        "json",
     ];
 }
 
 /** The values a revision ran with, the chart's defaults included. */
 function valuesArgs(config: HelmDeploy, target: Target, revision: number): string[] {
     return [
-        "get", "values", config.release, "--revision", String(revision), "--all", "-o", "json",
-        "--kube-context", target.context, "--namespace", target.namespace,
+        "get",
+        "values",
+        config.release,
+        "--revision",
+        String(revision),
+        "--all",
+        "-o",
+        "json",
+        "--kube-context",
+        target.context,
+        "--namespace",
+        target.namespace,
     ];
 }
 

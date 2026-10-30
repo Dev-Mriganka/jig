@@ -1,129 +1,94 @@
 {
-  "category": "government_ids",
-  "cases": [
-    {
-      "id": "gov-ssn-dashed",
-      "input": {
-        "ssn": "900-12-3456",
-        "accountId": "acct-demo-601"
-      },
-      "must_not_contain": [
-        "900-12-3456"
-      ],
-      "must_keep": [
-        "acct-demo-601"
-      ],
-      "expect_tags": [],
-      "notes": "900 area number is invalid for a real SSN and serves as a synthetic canary."
-    },
-    {
-      "id": "gov-ssn-compact",
-      "input": {
-        "taxId": "900123456",
-        "orderId": "ord-7602"
-      },
-      "must_not_contain": [
-        "900123456"
-      ],
-      "must_keep": [
-        "ord-7602"
-      ],
-      "expect_tags": [],
-      "notes": "Nine digits with no separators in a government-ID field."
-    },
-    {
-      "id": "gov-drivers-licence",
-      "input": {
-        "driversLicense": "D00000001",
-        "licenseState": "CA",
-        "orderId": "ord-7603"
-      },
-      "must_not_contain": [
-        "D00000001"
-      ],
-      "must_keep": [
-        "CA",
-        "ord-7603"
-      ],
-      "expect_tags": [],
-      "notes": "Synthetic licence value; the state is useful diagnostic context."
-    },
-    {
-      "id": "gov-passport",
-      "input": {
-        "passportNumber": "P00000000",
-        "accountId": "acct-demo-604"
-      },
-      "must_not_contain": [
-        "P00000000"
-      ],
-      "must_keep": [
-        "acct-demo-604"
-      ],
-      "expect_tags": [],
-      "notes": "Synthetic passport number in an explicit field."
-    },
-    {
-      "id": "gov-itin",
-      "input": {
-        "itin": "900-70-0000",
-        "orderId": "ord-7605"
-      },
-      "must_not_contain": [
-        "900-70-0000"
-      ],
-      "must_keep": [
-        "ord-7605"
-      ],
-      "expect_tags": [],
-      "notes": "The all-zero serial marks this as a deliberately invalid example ITIN."
-    },
-    {
-      "id": "gov-sole-proprietor-ein",
-      "input": {
-        "ownerType": "sole_proprietor",
-        "ein": "00-0000000",
-        "orderId": "ord-7606"
-      },
-      "must_not_contain": [
-        "00-0000000"
-      ],
-      "must_keep": [
-        "sole_proprietor",
-        "ord-7606"
-      ],
-      "expect_tags": [],
-      "notes": "The all-zero EIN is invalid and deliberately synthetic."
-    },
-    {
-      "id": "gov-free-text-log",
-      "input": "WARN note=Example applicant supplied SSN 900-12-3456 order=ord-7607",
-      "must_not_contain": [
-        "900-12-3456"
-      ],
-      "must_keep": [
-        "ord-7607"
-      ],
-      "expect_tags": [],
-      "notes": "SSN detector in free text."
-    },
-    {
-      "id": "gov-negative-controls",
-      "input": {
-        "orderId": "900123456",
-        "sku": "P00000000-MODULE",
-        "accountId": "00-0000000-ACCT",
-        "timestamp": "2026-01-02T03:04:05Z"
-      },
-      "must_not_contain": [],
-      "must_keep": [
-        "900123456",
-        "P00000000-MODULE",
-        "00-0000000-ACCT",
-        "2026-01-02T03:04:05Z"
-      ],
-      "expect_tags": [],
-      "notes": "The same shapes are retained when clearly part of nonpersonal identifiers."
-    }
-  ]
+    "category": "government_ids",
+    "cases": [
+        {
+            "id": "gov-ssn-dashed",
+            "input": {
+                "ssn": "900-12-3456",
+                "accountId": "acct-demo-601"
+            },
+            "must_not_contain": ["900-12-3456"],
+            "must_keep": ["acct-demo-601"],
+            "expect_tags": [],
+            "notes": "900 area number is invalid for a real SSN and serves as a synthetic canary."
+        },
+        {
+            "id": "gov-ssn-compact",
+            "input": {
+                "taxId": "900123456",
+                "orderId": "ord-7602"
+            },
+            "must_not_contain": ["900123456"],
+            "must_keep": ["ord-7602"],
+            "expect_tags": [],
+            "notes": "Nine digits with no separators in a government-ID field."
+        },
+        {
+            "id": "gov-drivers-licence",
+            "input": {
+                "driversLicense": "D00000001",
+                "licenseState": "CA",
+                "orderId": "ord-7603"
+            },
+            "must_not_contain": ["D00000001"],
+            "must_keep": ["CA", "ord-7603"],
+            "expect_tags": [],
+            "notes": "Synthetic licence value; the state is useful diagnostic context."
+        },
+        {
+            "id": "gov-passport",
+            "input": {
+                "passportNumber": "P00000000",
+                "accountId": "acct-demo-604"
+            },
+            "must_not_contain": ["P00000000"],
+            "must_keep": ["acct-demo-604"],
+            "expect_tags": [],
+            "notes": "Synthetic passport number in an explicit field."
+        },
+        {
+            "id": "gov-itin",
+            "input": {
+                "itin": "900-70-0000",
+                "orderId": "ord-7605"
+            },
+            "must_not_contain": ["900-70-0000"],
+            "must_keep": ["ord-7605"],
+            "expect_tags": [],
+            "notes": "The all-zero serial marks this as a deliberately invalid example ITIN."
+        },
+        {
+            "id": "gov-sole-proprietor-ein",
+            "input": {
+                "ownerType": "sole_proprietor",
+                "ein": "00-0000000",
+                "orderId": "ord-7606"
+            },
+            "must_not_contain": ["00-0000000"],
+            "must_keep": ["sole_proprietor", "ord-7606"],
+            "expect_tags": [],
+            "notes": "The all-zero EIN is invalid and deliberately synthetic."
+        },
+        {
+            "id": "gov-free-text-log",
+            "input": "WARN note=Example applicant supplied SSN 900-12-3456 order=ord-7607",
+            "must_not_contain": ["900-12-3456"],
+            "must_keep": ["ord-7607"],
+            "expect_tags": [],
+            "notes": "SSN detector in free text."
+        },
+        {
+            "id": "gov-negative-controls",
+            "input": {
+                "orderId": "900123456",
+                "sku": "P00000000-MODULE",
+                "accountId": "00-0000000-ACCT",
+                "timestamp": "2026-01-02T03:04:05Z"
+            },
+            "must_not_contain": [],
+            "must_keep": ["900123456", "P00000000-MODULE", "00-0000000-ACCT", "2026-01-02T03:04:05Z"],
+            "expect_tags": [],
+            "notes": "The same shapes are retained when clearly part of nonpersonal identifiers."
+        }
+    ]
 }

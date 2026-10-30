@@ -13,7 +13,9 @@ import type { World, WorldOptions } from "./support/session.ts";
 import { rawRecords, tempState } from "./support/state.ts";
 
 const state = tempState();
-beforeEach(() => { state.start(); });
+beforeEach(() => {
+    state.start();
+});
 
 let world: World | undefined;
 afterEach(async () => {
@@ -38,7 +40,10 @@ describe("writes", () => {
         const w = await begin({ config: { ...CONFIG, rules: [rule] }, ui: ALLOW });
         // The rule was refused when the file loaded, and the user was told.
         assert.equal(w.ui?.notifications.length, 1);
-        assert.match(w.ui?.notifications[0]?.message ?? "", /jig\.json: rules\[0\]\.decision:.*production writes.*always denied/);
+        assert.match(
+            w.ui?.notifications[0]?.message ?? "",
+            /jig\.json: rules\[0\]\.decision:.*production writes.*always denied/,
+        );
 
         const result = await w.call("fake_tool", { env: "prod", effect: "write", action: "wipe" });
         assert.equal(result.isError, true);
@@ -48,10 +53,23 @@ describe("writes", () => {
 
         const [record] = w.callRecords();
         assert.deepEqual(
-            [record?.tool, record?.action, record?.environment, record?.environmentKind, record?.effect, record?.decision, record?.decisionSource, record?.outcome, record?.errorKind],
+            [
+                record?.tool,
+                record?.action,
+                record?.environment,
+                record?.environmentKind,
+                record?.effect,
+                record?.decision,
+                record?.decisionSource,
+                record?.outcome,
+                record?.errorKind,
+            ],
             ["fake_tool", "wipe", "prod", "production", "write", "deny", "floor", "blocked", "denied"],
         );
-        assert.deepEqual(w.log.decisions.map((d) => [d.decision, d.source]), [["deny", "floor"]]);
+        assert.deepEqual(
+            w.log.decisions.map((d) => [d.decision, d.source]),
+            [["deny", "floor"]],
+        );
     });
 
     test("an external write with no screen is blocked", async () => {
@@ -60,21 +78,35 @@ describe("writes", () => {
         assert.equal(result.isError, true);
         assert.equal(result.text, "Blocked by jig-core: this call needs approval and there is no screen to ask on.");
         assert.deepEqual(w.log.executed, []);
-        assert.deepEqual(w.callRecords().map((r) => [r.outcome, r.errorKind, r.decisionSource]), [["blocked", "no-screen", "floor"]]);
+        assert.deepEqual(
+            w.callRecords().map((r) => [r.outcome, r.errorKind, r.decisionSource]),
+            [["blocked", "no-screen", "floor"]],
+        );
     });
 
     test("an external write that the user allows runs, and the record shows the question and the wait", async () => {
         const w = await begin({ config: CONFIG, ui: ALLOW });
-        const result = await w.call("fake_tool", { env: "external", effect: "write", action: "push", output: "pushed" });
+        const result = await w.call("fake_tool", {
+            env: "external",
+            effect: "write",
+            action: "push",
+            output: "pushed",
+        });
         assert.equal(result.isError, false);
         assert.match(result.text, /^pushed/);
         assert.equal(w.log.executed.length, 1);
         assert.match(w.ui?.selects[0]?.title ?? "", /^fake_tool · push · external · write\nfake_tool push in external/);
         const [record] = w.callRecords();
-        assert.deepEqual([record?.decision, record?.decisionSource, record?.approval, record?.answer, record?.outcome], ["ask", "table", "dialog", "allow", "ok"]);
+        assert.deepEqual(
+            [record?.decision, record?.decisionSource, record?.approval, record?.answer, record?.outcome],
+            ["ask", "table", "dialog", "allow", "ok"],
+        );
         assert.equal(typeof record?.waitedMs, "number");
         assert.equal(typeof record?.durationMs, "number");
-        assert.deepEqual(w.log.decisions.map((d) => [d.decision, d.answer]), [["ask", "allow"]]);
+        assert.deepEqual(
+            w.log.decisions.map((d) => [d.decision, d.answer]),
+            [["ask", "allow"]],
+        );
     });
 
     test("a declined call is blocked with the user's reason, which the record does not keep", async () => {
@@ -83,45 +115,85 @@ describe("writes", () => {
         assert.equal(result.isError, true);
         assert.equal(result.text, "Blocked by jig-core: the user declined this call, and said: the branch is wrong");
         assert.deepEqual(w.log.executed, []);
-        assert.deepEqual(w.callRecords().map((r) => [r.outcome, r.errorKind, r.answer]), [["blocked", "declined", "decline"]]);
+        assert.deepEqual(
+            w.callRecords().map((r) => [r.outcome, r.errorKind, r.answer]),
+            [["blocked", "declined", "decline"]],
+        );
         const raw = rawRecords(state.dir);
         assert.ok(!raw.includes("the branch is wrong") && !raw.includes("ARGUMENT-MARKER-1"));
     });
 
     test("Allow for this session asks once for the same tool, action and environment", async () => {
         let asked = 0;
-        const w = await begin({ config: CONFIG, ui: { select: () => { asked++; return "Allow for this session"; } } });
+        const w = await begin({
+            config: CONFIG,
+            ui: {
+                select: () => {
+                    asked++;
+                    return "Allow for this session";
+                },
+            },
+        });
         for (let i = 0; i < 3; i++) await w.call("fake_tool", { env: "external", effect: "write", action: "push" });
         assert.equal(asked, 1);
-        assert.deepEqual(w.callRecords().map((r) => [r.decisionSource, r.answer]), [["table", "allow-session"], ["session", undefined], ["session", undefined]]);
+        assert.deepEqual(
+            w.callRecords().map((r) => [r.decisionSource, r.answer]),
+            [
+                ["table", "allow-session"],
+                ["session", undefined],
+                ["session", undefined],
+            ],
+        );
         await w.call("fake_tool", { env: "external", effect: "write", action: "force-push" });
         assert.equal(asked, 2);
     });
 
     test("two writes asked together are asked one at a time", async () => {
-        const w = await begin({ config: CONFIG, ui: { select: async () => { await new Promise((resolve) => setTimeout(resolve, 20)); return "Allow"; } } });
+        const w = await begin({
+            config: CONFIG,
+            ui: {
+                select: async () => {
+                    await new Promise((resolve) => setTimeout(resolve, 20));
+                    return "Allow";
+                },
+            },
+        });
         const results = await w.calls([
             { name: "fake_tool", args: { env: "external", effect: "write", action: "a" } },
             { name: "fake_tool", args: { env: "external", effect: "write", action: "b" } },
             { name: "fake_tool", args: { env: "staging", effect: "write", action: "c" } },
         ]);
-        assert.deepEqual(results.map((r) => r.isError), [false, false, false]);
+        assert.deepEqual(
+            results.map((r) => r.isError),
+            [false, false, false],
+        );
         assert.equal(w.ui?.maxActive, 1);
         assert.equal(w.ui?.selects.length, 3);
     });
 
     test("the review screen shows a preview with a body, and the tool can read what was approved", async () => {
-        const custom: FakeUiScript["custom"] = (factory) => new Promise((resolve) => {
-            const terminal = fakeTerminal();
-            const component = factory(terminal.tui, terminal.theme, terminal.keybindings, resolve) as Component;
-            assert.match(component.render(80).join("\n"), /fake_tool run in external/);
-            assert.match(component.render(80).join("\n"), /the long body/);
-            component.handleInput?.("y");
-        });
+        const custom: FakeUiScript["custom"] = (factory) =>
+            new Promise((resolve) => {
+                const terminal = fakeTerminal();
+                const component = factory(terminal.tui, terminal.theme, terminal.keybindings, resolve) as Component;
+                assert.match(component.render(80).join("\n"), /fake_tool run in external/);
+                assert.match(component.render(80).join("\n"), /the long body/);
+                component.handleInput?.("y");
+            });
         const w = await begin({ config: CONFIG, mode: "tui", ui: { custom } });
-        const result = await w.call("fake_tool", { env: "external", effect: "write", body: "the long body", readPreview: true });
+        const result = await w.call("fake_tool", {
+            env: "external",
+            effect: "write",
+            body: "the long body",
+            readPreview: true,
+        });
         assert.equal(result.isError, false);
-        assert.deepEqual((result.details as { approved?: unknown }).approved, { summary: "fake_tool run in external", body: "the long body", format: "text", fingerprint: "fp-test" });
+        assert.deepEqual((result.details as { approved?: unknown }).approved, {
+            summary: "fake_tool run in external",
+            body: "the long body",
+            format: "text",
+            fingerprint: "fp-test",
+        });
         assert.equal(w.ui?.customs, 1);
         assert.equal(w.callRecords()[0]?.approval, "review");
     });
@@ -133,7 +205,13 @@ describe("writes", () => {
         assert.equal(readFileSync(path.join(w.cwd, "note.txt"), "utf8"), "hello\n");
         const read = await w.call("read", { path: "note.txt" });
         assert.match(read.text, /hello/);
-        assert.deepEqual(w.callRecords().map((r) => [r.tool, r.environment, r.effect, r.decision, r.plugin]), [["write", "local", "write", "allow", "builtin"], ["read", "local", "read", "allow", "builtin"]]);
+        assert.deepEqual(
+            w.callRecords().map((r) => [r.tool, r.environment, r.effect, r.decision, r.plugin]),
+            [
+                ["write", "local", "write", "allow", "builtin"],
+                ["read", "local", "read", "allow", "builtin"],
+            ],
+        );
     });
 });
 
@@ -142,8 +220,14 @@ describe("tools nobody classified", () => {
         const w = await begin({ config: CONFIG, ui: ALLOW });
         const result = await w.call("mystery_tool");
         assert.equal(result.isError, false);
-        assert.match(w.ui?.selects[0]?.title ?? "", /mystery_tool \(not classified, so treated as a write outside this machine\)/);
-        assert.deepEqual([w.callRecords()[0]?.decisionSource, w.callRecords()[0]?.environment], ["unknown", "external"]);
+        assert.match(
+            w.ui?.selects[0]?.title ?? "",
+            /mystery_tool \(not classified, so treated as a write outside this machine\)/,
+        );
+        assert.deepEqual(
+            [w.callRecords()[0]?.decisionSource, w.callRecords()[0]?.environment],
+            ["unknown", "external"],
+        );
     });
 
     test("with no screen they are blocked, and a wildcard rule cannot allow them", async () => {
@@ -162,11 +246,20 @@ describe("tools nobody classified", () => {
         const w = await begin({ config: CONFIG });
         assert.equal((await w.call("viewer_tool")).isError, false);
         assert.equal((await w.call("editor_tool")).isError, true, "a write outside the machine, with no screen");
-        assert.deepEqual(w.callRecords().map((r) => [r.tool, r.environment, r.effect]), [["viewer_tool", "external", "read"], ["editor_tool", "external", "write"]]);
+        assert.deepEqual(
+            w.callRecords().map((r) => [r.tool, r.environment, r.effect]),
+            [
+                ["viewer_tool", "external", "read"],
+                ["editor_tool", "external", "write"],
+            ],
+        );
     });
 
     test("a classification rule in configuration classifies it by a parameter", async () => {
-        const config = { ...CONFIG, classify: [{ tool: "mystery_tool", param: "env", value: "prod", environment: "prod", effect: "read" }] };
+        const config = {
+            ...CONFIG,
+            classify: [{ tool: "mystery_tool", param: "env", value: "prod", environment: "prod", effect: "read" }],
+        };
         const w = await begin({ config });
         assert.equal((await w.call("mystery_tool", { env: "prod" })).isError, false);
         assert.deepEqual([w.callRecords()[0]?.environment, w.callRecords()[0]?.decisionSource], ["prod", "table"]);
@@ -176,7 +269,12 @@ describe("tools nobody classified", () => {
 describe("results", () => {
     test("a production read is masked by the backstop, in the text, the details and the structured content", async () => {
         const w = await begin({ config: CONFIG });
-        const result = await w.call("fake_tool", { env: "prod", effect: "read", output: "customer PERSONAL-JANE", marker: "PERSONAL-IN-DETAILS" });
+        const result = await w.call("fake_tool", {
+            env: "prod",
+            effect: "read",
+            output: "customer PERSONAL-JANE",
+            marker: "PERSONAL-IN-DETAILS",
+        });
         assert.equal(result.isError, false);
         assert.match(result.text, /^customer \[masked\]-JANE/);
         assert.ok(!result.text.includes("PERSONAL"));
@@ -199,12 +297,19 @@ describe("results", () => {
 
     test("when masking fails the result is withheld", async () => {
         const w = await begin({ config: CONFIG, masker: brokenMasker });
-        const result = await w.call("fake_tool", { env: "prod", output: "customer PERSONAL-JANE", marker: "PERSONAL-IN-DETAILS" });
+        const result = await w.call("fake_tool", {
+            env: "prod",
+            output: "customer PERSONAL-JANE",
+            marker: "PERSONAL-IN-DETAILS",
+        });
         assert.equal(result.isError, true);
         assert.equal(result.text, "result withheld: it could not be masked");
         assert.deepEqual(result.details, {});
         assert.equal(result.ended?.result.structuredContent, undefined);
-        assert.deepEqual(w.callRecords().map((r) => [r.outcome, r.errorKind]), [["error", "withheld"]]);
+        assert.deepEqual(
+            w.callRecords().map((r) => [r.outcome, r.errorKind]),
+            [["error", "withheld"]],
+        );
     });
 
     test("the masker that ships turns personal data in a production result into tokens, and leaves local results alone", async () => {
@@ -228,7 +333,10 @@ describe("results", () => {
         assert.deepEqual(result.ended?.result.structuredContent, { text: "ok secret=[redacted]" });
         assert.ok(!rawRecords(state.dir).includes("sup3r-s3cret"));
         // And it stays hidden from later results, until Pi exits.
-        const later = await w.call("fake_tool", { env: "local", output: `printed sup3r-s3cret/value+1 and ${Buffer.from("sup3r-s3cret/value+1").toString("base64")}` });
+        const later = await w.call("fake_tool", {
+            env: "local",
+            output: `printed sup3r-s3cret/value+1 and ${Buffer.from("sup3r-s3cret/value+1").toString("base64")}`,
+        });
         assert.equal(later.text, "printed [redacted] and [redacted]");
     });
 
@@ -261,20 +369,34 @@ describe("nested calls", () => {
         assert.equal(result.isError, false);
         assert.match(result.text, /^outer saw: nested output/);
         const records = w.callRecords();
-        assert.deepEqual(records.map((r) => [r.toolCallId, r.parentToolCallId, r.tool, r.decision, r.outcome]), [
-            ["outer-1/1", "outer-1", "fake_tool", "ask", "ok"],
-            ["outer-1", undefined, "outer_tool", "allow", "ok"],
-        ]);
-        assert.match(w.ui?.selects[0]?.title ?? "", /fake_tool · inner · external · write/, "the nested call asked like any other");
+        assert.deepEqual(
+            records.map((r) => [r.toolCallId, r.parentToolCallId, r.tool, r.decision, r.outcome]),
+            [
+                ["outer-1/1", "outer-1", "fake_tool", "ask", "ok"],
+                ["outer-1", undefined, "outer_tool", "allow", "ok"],
+            ],
+        );
+        assert.match(
+            w.ui?.selects[0]?.title ?? "",
+            /fake_tool · inner · external · write/,
+            "the nested call asked like any other",
+        );
     });
 
     test("a nested production write is blocked, and the outer tool sees the error", async () => {
         const w = await begin({ config: CONFIG, ui: ALLOW });
         const result = await w.call("outer_tool", { env: "prod", effect: "write" }, "outer-2");
         assert.match(result.text, /^outer saw: ERROR Blocked by jig-core: writes to production are never allowed\./);
-        assert.deepEqual(w.log.executed.map((e) => e.tool), ["outer_tool"], "the nested tool never ran");
+        assert.deepEqual(
+            w.log.executed.map((e) => e.tool),
+            ["outer_tool"],
+            "the nested tool never ran",
+        );
         const nested = w.callRecords().find((r) => r.toolCallId === "outer-2/1");
-        assert.deepEqual([nested?.parentToolCallId, nested?.outcome, nested?.errorKind, nested?.decisionSource], ["outer-2", "blocked", "denied", "floor"]);
+        assert.deepEqual(
+            [nested?.parentToolCallId, nested?.outcome, nested?.errorKind, nested?.decisionSource],
+            ["outer-2", "blocked", "denied", "floor"],
+        );
     });
 });
 
@@ -285,7 +407,10 @@ describe("failures", () => {
         assert.equal(result.isError, true);
         assert.match(result.text, /fake tool failed: boom/);
         const [record] = w.callRecords();
-        assert.deepEqual([record?.outcome, record?.errorKind, record?.error, record?.decision], ["error", "tool", "fake tool failed: boom", "allow"]);
+        assert.deepEqual(
+            [record?.outcome, record?.errorKind, record?.error, record?.decision],
+            ["error", "tool", "fake tool failed: boom", "allow"],
+        );
         assert.ok(!rawRecords(state.dir).includes("ARGUMENT-MARKER-2"));
     });
 
@@ -296,7 +421,13 @@ describe("failures", () => {
         const invalid = await w.call("fake_tool", { fail: "not a boolean", marker: "ARGS-MARKER-4" } as never);
         assert.equal(invalid.isError, true);
         const records = w.callRecords();
-        assert.deepEqual(records.map((r) => [r.tool, r.outcome, r.errorKind]), [["no_such_tool", "error", "not-run"], ["fake_tool", "error", "not-run"]]);
+        assert.deepEqual(
+            records.map((r) => [r.tool, r.outcome, r.errorKind]),
+            [
+                ["no_such_tool", "error", "not-run"],
+                ["fake_tool", "error", "not-run"],
+            ],
+        );
         assert.ok(!rawRecords(state.dir).includes("ARGS-MARKER"));
     });
 });
@@ -308,7 +439,10 @@ describe("records", () => {
         await w.call("fake_tool", { env: "external", effect: "write" });
         await w.call("fake_tool", { env: "prod", effect: "write" });
         await w.call("fake_tool", { env: "local", fail: true });
-        await w.calls([{ name: "viewer_tool", args: {} }, { name: "fake_tool", args: { env: "staging" } }]);
+        await w.calls([
+            { name: "viewer_tool", args: {} },
+            { name: "fake_tool", args: { env: "staging" } },
+        ]);
         const records = w.records();
         const calls = records.filter((r) => r.kind === "call");
         const turns = records.filter((r) => r.kind === "turn");
@@ -317,27 +451,44 @@ describe("records", () => {
         assert.equal(turns.length, assistantMessages, "one line per model turn");
         assert.equal(new Set(records.map((r) => r.id)).size, records.length);
         assert.ok(records.every((r) => r.session === w.session.sessionId && r.agentRole === "main"));
-        assert.deepEqual(calls.map((r) => r.outcome), ["ok", "ok", "blocked", "error", "ok", "ok"]);
+        assert.deepEqual(
+            calls.map((r) => r.outcome),
+            ["ok", "ok", "blocked", "error", "ok", "ok"],
+        );
         for (const turn of turns) {
             assert.equal(turn.model, "faux-1");
-            for (const field of ["input", "output", "cacheRead", "cacheWrite", "cost"]) assert.equal(typeof turn[field], "number", field);
+            for (const field of ["input", "output", "cacheRead", "cacheWrite", "cost"])
+                assert.equal(typeof turn[field], "number", field);
         }
     });
 
     test("never hold the arguments or the output of a call", async () => {
         const w = await begin({ config: CONFIG, ui: ALLOW });
-        await w.call("fake_tool", { env: "external", effect: "write", output: "OUTPUT-MARKER-5", marker: "ARGUMENT-MARKER-6", body: "BODY-MARKER-7" });
+        await w.call("fake_tool", {
+            env: "external",
+            effect: "write",
+            output: "OUTPUT-MARKER-5",
+            marker: "ARGUMENT-MARKER-6",
+            body: "BODY-MARKER-7",
+        });
         await w.call("fake_tool", { env: "local", output: "OUTPUT-MARKER-8", marker: "ARGUMENT-MARKER-9", fail: true });
         const raw = rawRecords(state.dir);
-        for (const marker of ["OUTPUT-MARKER", "ARGUMENT-MARKER", "BODY-MARKER"]) assert.ok(!raw.includes(marker), marker);
+        for (const marker of ["OUTPUT-MARKER", "ARGUMENT-MARKER", "BODY-MARKER"])
+            assert.ok(!raw.includes(marker), marker);
     });
 
     test("carry the tool's facts, the ticket, the parent session and the role", async () => {
         const w = await begin({ config: CONFIG, env: { JIG_PARENT_SESSION: "parent-xyz", JIG_AGENT_ROLE: "scout" } });
         jig().setTicket("TICKET-1");
-        await w.call("fake_tool", { env: "local", facts: { passed: 3, ok: true, conclusion: "success", essay: "x".repeat(100) } });
+        await w.call("fake_tool", {
+            env: "local",
+            facts: { passed: 3, ok: true, conclusion: "success", essay: "x".repeat(100) },
+        });
         const [record] = w.callRecords();
-        assert.deepEqual([record?.ticket, record?.parentSession, record?.agentRole], ["TICKET-1", "parent-xyz", "scout"]);
+        assert.deepEqual(
+            [record?.ticket, record?.parentSession, record?.agentRole],
+            ["TICKET-1", "parent-xyz", "scout"],
+        );
         assert.deepEqual(record?.facts, { passed: 3, ok: true, conclusion: "success" });
         jig().setTicket(undefined);
         await w.call("fake_tool", { env: "local" });
@@ -364,12 +515,18 @@ describe("plugin sections of jig.json", () => {
         const rules = [{ tool: "fake_tool", action: "wipe", decision: "deny" }];
         const w = await begin({ config: { ...CONFIG, rules, fake: { level: "high" } }, ui: ALLOW });
         assert.equal(w.log.section, undefined);
-        assert.match(w.ui?.notifications[0]?.message ?? "", /jig-core: 1 configuration problem\n.*jig\.json: fake: fake\.level must be a number/);
+        assert.match(
+            w.ui?.notifications[0]?.message ?? "",
+            /jig-core: 1 configuration problem\n.*jig\.json: fake: fake\.level must be a number/,
+        );
         assert.equal((await w.call("fake_tool", { action: "wipe" })).isError, true, "the rule still applies");
     });
 
     test("a top-level key nobody registered is reported as unknown, and the defaults apply", async () => {
-        const w = await begin({ config: { ...CONFIG, unregistered: {}, rules: [{ tool: "fake_tool", decision: "deny" }] }, ui: ALLOW });
+        const w = await begin({
+            config: { ...CONFIG, unregistered: {}, rules: [{ tool: "fake_tool", decision: "deny" }] },
+            ui: ALLOW,
+        });
         assert.match(w.ui?.notifications[0]?.message ?? "", /jig\.json: unregistered: is not a known field/);
         assert.equal((await w.call("fake_tool", { env: "local" })).isError, false, "the deny rule was not used");
     });

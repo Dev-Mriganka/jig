@@ -9,7 +9,14 @@ export const MAX_TEXT = 32767;
 /** Fields whose value the tool builds from plain input: `priority: "High"` becomes `{ "name": "High" }`. `assignee` is
  *  built from a user the tool looked up (see plan-fields.ts). */
 export const BUILT_IN_FIELDS = [
-    "summary", "description", "labels", "priority", "assignee", "components", "fixVersions", "parent",
+    "summary",
+    "description",
+    "labels",
+    "priority",
+    "assignee",
+    "components",
+    "fixVersions",
+    "parent",
 ] as const;
 
 /** Fields whose text is Jira wiki markup, so the preview page renders them. */
@@ -71,7 +78,8 @@ function checkJson(id: string, value: unknown): void {
             throw new InputError(`${id}: the value is too large or nested too deeply`);
         }
         if (typeof node === "string") {
-            if (node.length > MAX_TEXT) throw new InputError(`${id}: text over ${MAX_TEXT} characters; Jira refuses it`);
+            if (node.length > MAX_TEXT)
+                throw new InputError(`${id}: text over ${MAX_TEXT} characters; Jira refuses it`);
         } else if (typeof node === "number") {
             if (!Number.isFinite(node)) throw new InputError(`${id}: numbers must be finite`);
         } else if (node === null || typeof node === "boolean") {
@@ -92,7 +100,8 @@ function checkJson(id: string, value: unknown): void {
 
 function text(id: string, raw: unknown): string {
     if (typeof raw !== "string") throw new InputError(`${id}: must be text`);
-    if (raw.length > MAX_TEXT) throw new InputError(`${id}: ${raw.length} characters; Jira refuses text over ${MAX_TEXT}`);
+    if (raw.length > MAX_TEXT)
+        throw new InputError(`${id}: ${raw.length} characters; Jira refuses text over ${MAX_TEXT}`);
     return raw;
 }
 
@@ -121,7 +130,8 @@ export function convertField(id: string, raw: unknown): Converted {
             return raw === null ? { send: null, shown: "(cleared)" } : { send: text(id, raw), shown: text(id, raw) };
         case "labels": {
             const labels = raw === null ? [] : names(id, raw);
-            if (labels.some((label) => /\s/.test(label))) throw new InputError("labels: a label cannot contain a space");
+            if (labels.some((label) => /\s/.test(label)))
+                throw new InputError("labels: a label cannot contain a space");
             return { send: labels, shown: labels.length === 0 ? "(none)" : labels.join(", ") };
         }
         case "priority": {
@@ -133,7 +143,8 @@ export function convertField(id: string, raw: unknown): Converted {
         case "fixVersions": {
             // A value that is already in Jira's own form (an object, or a list of them) is sent as it is.
             const ofObjects = Array.isArray(raw) && raw.some((item) => typeof item === "object" && item !== null);
-            if ((raw !== null && typeof raw === "object" && !Array.isArray(raw)) || ofObjects) return passThrough(id, raw);
+            if ((raw !== null && typeof raw === "object" && !Array.isArray(raw)) || ofObjects)
+                return passThrough(id, raw);
             const list = raw === null ? [] : names(id, raw);
             return { send: list.map((name) => ({ name })), shown: list.length === 0 ? "(none)" : list.join(", ") };
         }

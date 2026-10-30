@@ -8,7 +8,15 @@
 //   4. a session allow, which turns an ask into an allow;
 //   5. the floor, last, which configuration can never lower.
 import { matchesName } from "./classify.ts";
-import type { ApprovalKind, Decision, DecisionEvent, Effect, EnvironmentKind, EnvironmentName, Rule } from "./contract.ts";
+import type {
+    ApprovalKind,
+    Decision,
+    DecisionEvent,
+    Effect,
+    EnvironmentKind,
+    EnvironmentName,
+    Rule,
+} from "./contract.ts";
 
 /** Where the decision came from. The same words `DecisionEvent` uses. */
 export type DecisionSource = DecisionEvent["source"];

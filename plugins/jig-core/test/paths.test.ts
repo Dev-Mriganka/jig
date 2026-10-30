@@ -4,7 +4,15 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, uti
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { after, before, describe, test } from "node:test";
-import { appendPrivateLine, configFile, createPrivateFile, privateDir, removeIfEmpty, removeOldFiles, stateDir } from "../src/paths.ts";
+import {
+    appendPrivateLine,
+    configFile,
+    createPrivateFile,
+    privateDir,
+    removeIfEmpty,
+    removeOldFiles,
+    stateDir,
+} from "../src/paths.ts";
 import { tempState } from "./support/state.ts";
 
 const mode = (file: string) => statSync(file).mode & 0o777;
@@ -39,7 +47,9 @@ describe("the configuration file", () => {
 
 describe("private folders and files", () => {
     const state = tempState();
-    before(() => { state.start(); });
+    before(() => {
+        state.start();
+    });
     after(() => state.stop());
 
     test("folders under the state folder are 0700, the state folder too", () => {
@@ -74,14 +84,19 @@ describe("private folders and files", () => {
         const file = path.join(privateDir("spill"), "one.txt");
         createPrivateFile(file, "first");
         assert.equal(mode(file), 0o600);
-        assert.throws(() => createPrivateFile(file, "second"), (error: NodeJS.ErrnoException) => error.code === "EEXIST");
+        assert.throws(
+            () => createPrivateFile(file, "second"),
+            (error: NodeJS.ErrnoException) => error.code === "EEXIST",
+        );
         assert.equal(readFileSync(file, "utf8"), "first");
     });
 });
 
 describe("removing old files", () => {
     let dir: string;
-    before(() => { dir = mkdtempSync(path.join(tmpdir(), "jig-old-")); });
+    before(() => {
+        dir = mkdtempSync(path.join(tmpdir(), "jig-old-"));
+    });
     after(() => rmSync(dir, { recursive: true, force: true }));
 
     test("deletes regular files older than the limit, keeps newer ones and folders", () => {

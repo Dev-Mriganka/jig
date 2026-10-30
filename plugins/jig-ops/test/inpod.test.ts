@@ -28,13 +28,28 @@ const check = (more: Record<string, unknown> = {}, options = {}) => h.runtime.ca
 
 describe("a GET in a pod", () => {
     test("lists the pods, then runs curl in the first ready pod's own container, on the configured port and path", async () => {
-        h.cluster.answer({ pods: list(pod("orders-api-0", { ready: false }), pod("orders-api-1", { sidecar: "1.20" })), exec: { stdout: curlOut('{"status":"UP"}', 200) } });
+        h.cluster.answer({
+            pods: list(pod("orders-api-0", { ready: false }), pod("orders-api-1", { sidecar: "1.20" })),
+            exec: { stdout: curlOut('{"status":"UP"}', 200) },
+        });
         const result = await check();
         assert.equal(ok(result), 'GET /actuator/health on orders-api-1:8080 -> HTTP 200\n{"status":"UP"}');
-        assert.deepEqual(h.cluster.calls().map((call) => call.argv), [
-            [...READ_PREFIX, "get", "pods", "--selector=app=orders-api", "-o", "json"],
-            [...PREFIX, "exec", "orders-api-1", "-c", "orders-api", "--", ...CURL, "http://localhost:8080/actuator/health"],
-        ]);
+        assert.deepEqual(
+            h.cluster.calls().map((call) => call.argv),
+            [
+                [...READ_PREFIX, "get", "pods", "--selector=app=orders-api", "-o", "json"],
+                [
+                    ...PREFIX,
+                    "exec",
+                    "orders-api-1",
+                    "-c",
+                    "orders-api",
+                    "--",
+                    ...CURL,
+                    "http://localhost:8080/actuator/health",
+                ],
+            ],
+        );
         assert.deepEqual(h.jig.facts.get(result.id), [{ status: 200 }]);
         assert.deepEqual(result.details, { pod: "orders-api-1", status: 200, bytes: 15 });
     });
@@ -62,7 +77,8 @@ describe("a GET in a pod", () => {
         ok(await check());
         assert.equal(execs()[0]?.stdin, "");
         assert.ok(h.jig.started.every((started) => started.options.input === undefined));
-        for (const arg of execs()[0]?.argv ?? []) assert.ok(arg !== "-i" && arg !== "-t" && arg !== "--stdin" && arg !== "--tty", arg);
+        for (const arg of execs()[0]?.argv ?? [])
+            assert.ok(arg !== "-i" && arg !== "-t" && arg !== "--stdin" && arg !== "--tty", arg);
     });
 
     test("a status that is not 2xx is a result, with its body", async () => {
@@ -82,15 +98,24 @@ describe("a GET in a pod", () => {
     });
 
     test("terminal sequences and control characters in the body do not get through", async () => {
-        h.cluster.answer({ pods: list(pod("orders-api-0")), exec: { stdout: curlOut("\u001b[31mred\u001b[0m\u0000end", 200) } });
+        h.cluster.answer({
+            pods: list(pod("orders-api-0")),
+            exec: { stdout: curlOut("\u001b[31mred\u001b[0m\u0000end", 200) },
+        });
         assert.equal(ok(await check()).split("\n")[1], "red?end");
     });
 
     test("a reply longer than 2 MiB is cut and says so, and no status is looked for in what is left", async () => {
-        h.cluster.answer({ pods: list(pod("orders-api-0")), exec: { stdout: "first\n__status:200\nmore\n", extraBytes: 3 * 1024 * 1024 } });
+        h.cluster.answer({
+            pods: list(pod("orders-api-0")),
+            exec: { stdout: "first\n__status:200\nmore\n", extraBytes: 3 * 1024 * 1024 },
+        });
         const result = await check();
         const text = ok(result);
-        assert.match(text.split("\n")[0] ?? "", /^GET \/actuator\/health on orders-api-0:8080 -> the reply is larger than 2 MiB and was cut; its HTTP status was not read$/);
+        assert.match(
+            text.split("\n")[0] ?? "",
+            /^GET \/actuator\/health on orders-api-0:8080 -> the reply is larger than 2 MiB and was cut; its HTTP status was not read$/,
+        );
         assert.ok(!text.includes("[output cut at"));
         assert.ok(text.includes("first\n__status:200\nmore"), "the part that came is shown");
         assert.deepEqual(h.jig.facts.get(result.id), [{ cut: true }]);
@@ -124,7 +149,32 @@ describe("what the model controls", () => {
     test("curl gets no flag that sends data, reads a file, follows a redirect or writes one", () => {
         const flags = curlArgs("http://localhost:8080/x").filter((arg) => arg.startsWith("-"));
         assert.deepEqual(flags, ["-sS", "-m", "-X", "-w"]);
-        for (const forbidden of ["-d", "--data", "--data-binary", "--data-raw", "--data-urlencode", "-F", "--form", "-T", "--upload-file", "--json", "-L", "--location", "-o", "-O", "-K", "--config", "-H", "--header", "-u", "--user", "-b", "--cookie", "-x", "--proxy"]) {
+        for (const forbidden of [
+            "-d",
+            "--data",
+            "--data-binary",
+            "--data-raw",
+            "--data-urlencode",
+            "-F",
+            "--form",
+            "-T",
+            "--upload-file",
+            "--json",
+            "-L",
+            "--location",
+            "-o",
+            "-O",
+            "-K",
+            "--config",
+            "-H",
+            "--header",
+            "-u",
+            "--user",
+            "-b",
+            "--cookie",
+            "-x",
+            "--proxy",
+        ]) {
             assert.ok(!curlArgs("http://localhost:8080/x").includes(forbidden), forbidden);
         }
         assert.equal(curlArgs("http://localhost:8080/x")[curlArgs("http://localhost:8080/x").indexOf("-X") + 1], "GET");
@@ -132,9 +182,20 @@ describe("what the model controls", () => {
 
     test("a call cannot carry a path, a body, a method, a header or a timeout: it is refused before kubectl is asked anything", async () => {
         const canary = "BODY-CANARY-91ac7";
-        for (const extra of [{ path: "/x" }, { body: { note: canary } }, { data: canary }, { method: "POST" }, { headers: { "X-Canary": canary } }, { timeoutSec: 5 }, { stdin: canary }]) {
+        for (const extra of [
+            { path: "/x" },
+            { body: { note: canary } },
+            { data: canary },
+            { method: "POST" },
+            { headers: { "X-Canary": canary } },
+            { timeoutSec: 5 },
+            { stdin: canary },
+        ]) {
             const result = await check(extra);
-            assert.match(result.blocked ?? "", /^Blocked by jig-core: runtime cannot run with this input: runtime health does not use /);
+            assert.match(
+                result.blocked ?? "",
+                /^Blocked by jig-core: runtime cannot run with this input: runtime health does not use /,
+            );
         }
         assert.deepEqual(h.cluster.calls(), []);
         assert.deepEqual(h.jig.started, []);
@@ -167,7 +228,10 @@ describe("where it is refused", () => {
         h.cluster.answer({ pods: list(pod("orders-api-0")), exec: { stdout: curlOut("{}", 200) } });
         h.jig.setKinds({ staging: "production" });
         const result = await check();
-        assert.equal(result.blocked, "Blocked by jig-core: runtime cannot run with this input: runtime health is refused in production (orders-api in staging): without a health address it would run curl inside a pod, and nothing is run in a production pod. Add \"health\" (an https address) to its entry in the ops catalog");
+        assert.equal(
+            result.blocked,
+            'Blocked by jig-core: runtime cannot run with this input: runtime health is refused in production (orders-api in staging): without a health address it would run curl inside a pod, and nothing is run in a production pod. Add "health" (an https address) to its entry in the ops catalog',
+        );
         assert.deepEqual(h.cluster.calls(), []);
     });
 
@@ -175,7 +239,10 @@ describe("where it is refused", () => {
         h.configure(withCopy(section(), "orders-api", "staging", "edge"));
         h.cluster.answer({ pods: list(pod("orders-api-0")), exec: { stdout: curlOut("{}", 200) } });
         const result = await h.runtime.call({ action: "health", service: "orders-api", environment: "edge" });
-        assert.match(result.blocked ?? "", /^Blocked by jig-core: runtime cannot run with this input: runtime health is refused in production \(orders-api in edge\)/);
+        assert.match(
+            result.blocked ?? "",
+            /^Blocked by jig-core: runtime cannot run with this input: runtime health is refused in production \(orders-api in edge\)/,
+        );
         assert.deepEqual(h.jig.started, []);
     });
 
@@ -199,7 +266,9 @@ describe("where it is refused", () => {
 
     test("production with an address is checked by the address, and a pod is never asked", async () => {
         const asked: string[] = [];
-        const local = setupHarness({ fetch: async (address) => (asked.push(String(address)), new Response("UP", { status: 200 })) });
+        const local = setupHarness({
+            fetch: async (address) => (asked.push(String(address)), new Response("UP", { status: 200 })),
+        });
         try {
             const result = await local.runtime.call(PRODUCTION);
             assert.equal(ok(result), "GET https://api.example.com/orders/health -> HTTP 200\nUP");
@@ -219,8 +288,13 @@ describe("where it is refused", () => {
 
 describe("what goes wrong in the pod", () => {
     test("no ready pod says to run pods", async () => {
-        h.cluster.answer({ pods: list(pod("orders-api-0", { ready: false }), pod("orders-api-1", { deleting: true })) });
-        assert.equal((await check()).error?.message, "orders-api has no ready pod in staging to call: run pods, and try again when one is ready");
+        h.cluster.answer({
+            pods: list(pod("orders-api-0", { ready: false }), pod("orders-api-1", { deleting: true })),
+        });
+        assert.equal(
+            (await check()).error?.message,
+            "orders-api has no ready pod in staging to call: run pods, and try again when one is ready",
+        );
         assert.deepEqual(execs(), [], "nothing was run in a pod");
     });
 
@@ -228,12 +302,21 @@ describe("what goes wrong in the pod", () => {
         const raw = pod("orders-api-0") as { spec: { containers: Array<{ name: string; image: string }> } };
         raw.spec.containers[0] = { name: "app", image: "registry.example.test/shop/app:1" };
         h.cluster.answer({ pods: list(raw) });
-        assert.equal((await check()).error?.message, 'orders-api-0 has no container orders-api (it has app): fix "container" in the ops catalog of jig.json (runtime.kubernetes)');
+        assert.equal(
+            (await check()).error?.message,
+            'orders-api-0 has no container orders-api (it has app): fix "container" in the ops catalog of jig.json (runtime.kubernetes)',
+        );
         assert.deepEqual(execs(), []);
     });
 
     test("nothing listening on the port", async () => {
-        h.cluster.answer({ pods: list(pod("orders-api-0")), exec: { code: 7, stderr: "curl: (7) Failed to connect to localhost port 8080: Connection refused\ncommand terminated with exit code 7" } });
+        h.cluster.answer({
+            pods: list(pod("orders-api-0")),
+            exec: {
+                code: 7,
+                stderr: "curl: (7) Failed to connect to localhost port 8080: Connection refused\ncommand terminated with exit code 7",
+            },
+        });
         assert.equal(
             (await check()).error?.message,
             "nothing accepted the connection on localhost:8080 inside orders-api-0: the service may be starting, or listen on another port",
@@ -241,40 +324,89 @@ describe("what goes wrong in the pod", () => {
     });
 
     test("a request that times out inside the pod", async () => {
-        h.cluster.answer({ pods: list(pod("orders-api-0")), exec: { code: 28, stderr: "curl: (28) Operation timed out after 20001 milliseconds\ncommand terminated with exit code 28" } });
+        h.cluster.answer({
+            pods: list(pod("orders-api-0")),
+            exec: {
+                code: 28,
+                stderr: "curl: (28) Operation timed out after 20001 milliseconds\ncommand terminated with exit code 28",
+            },
+        });
         assert.equal((await check()).error?.message, "the request timed out after 20 s inside orders-api-0");
     });
 
     test("a connection that closes before the answer is whole", async () => {
         for (const exit of [18, 52, 55, 56]) {
-            h.cluster.answer({ pods: list(pod("orders-api-0")), exec: { code: exit, stderr: `curl: (${exit}) Empty reply from server\ncommand terminated with exit code ${exit}` } });
-            assert.equal((await check()).error?.message, "the connection inside orders-api-0 closed before the answer was complete", String(exit));
+            h.cluster.answer({
+                pods: list(pod("orders-api-0")),
+                exec: {
+                    code: exit,
+                    stderr: `curl: (${exit}) Empty reply from server\ncommand terminated with exit code ${exit}`,
+                },
+            });
+            assert.equal(
+                (await check()).error?.message,
+                "the connection inside orders-api-0 closed before the answer was complete",
+                String(exit),
+            );
         }
     });
 
     test("any other curl failure, with curl's own words", async () => {
-        h.cluster.answer({ pods: list(pod("orders-api-0")), exec: { code: 3, stderr: "curl: (3) URL using bad/illegal format or missing URL\ncommand terminated with exit code 3" } });
-        assert.match((await check()).error?.message ?? "", /^curl failed inside orders-api-0 \(exit 3\): curl: \(3\) URL using bad\/illegal format or missing URL; command terminated with exit code 3$/);
+        h.cluster.answer({
+            pods: list(pod("orders-api-0")),
+            exec: {
+                code: 3,
+                stderr: "curl: (3) URL using bad/illegal format or missing URL\ncommand terminated with exit code 3",
+            },
+        });
+        assert.match(
+            (await check()).error?.message ?? "",
+            /^curl failed inside orders-api-0 \(exit 3\): curl: \(3\) URL using bad\/illegal format or missing URL; command terminated with exit code 3$/,
+        );
     });
 
     test("a container without curl says the pod needs it", async () => {
         h.cluster.answer({
             pods: list(pod("orders-api-0")),
-            exec: { code: 126, stderr: 'OCI runtime exec failed: exec failed: unable to start container process: exec: "curl": executable file not found in $PATH: unknown\ncommand terminated with exit code 126' },
+            exec: {
+                code: 126,
+                stderr: 'OCI runtime exec failed: exec failed: unable to start container process: exec: "curl": executable file not found in $PATH: unknown\ncommand terminated with exit code 126',
+            },
         });
-        assert.equal((await check()).error?.message, "orders-api-0 has no curl in container orders-api: the health check inside a pod needs curl");
+        assert.equal(
+            (await check()).error?.message,
+            "orders-api-0 has no curl in container orders-api: the health check inside a pod needs curl",
+        );
     });
 
     test("kubectl's own failures read as they do for the other actions", async () => {
-        h.cluster.answer({ pods: list(pod("orders-api-0")), exec: { code: 1, stderr: "Unable to connect to the server: dial tcp: i/o timeout" } });
-        assert.match((await check()).error?.message ?? "", /^Cannot reach the cluster of context test-cluster for orders-api in staging/);
-        h.cluster.answer({ pods: list(pod("orders-api-0")), exec: { code: 1, stderr: 'Error from server (Forbidden): pods "orders-api-0" is forbidden: User "u" cannot create resource "pods/exec"' } });
-        assert.match((await check()).error?.message ?? "", /^The kubeconfig user is not allowed to read orders-api in staging/);
+        h.cluster.answer({
+            pods: list(pod("orders-api-0")),
+            exec: { code: 1, stderr: "Unable to connect to the server: dial tcp: i/o timeout" },
+        });
+        assert.match(
+            (await check()).error?.message ?? "",
+            /^Cannot reach the cluster of context test-cluster for orders-api in staging/,
+        );
+        h.cluster.answer({
+            pods: list(pod("orders-api-0")),
+            exec: {
+                code: 1,
+                stderr: 'Error from server (Forbidden): pods "orders-api-0" is forbidden: User "u" cannot create resource "pods/exec"',
+            },
+        });
+        assert.match(
+            (await check()).error?.message ?? "",
+            /^The kubeconfig user is not allowed to read orders-api in staging/,
+        );
     });
 
     test("a reply with no status is reported, not guessed", async () => {
         h.cluster.answer({ pods: list(pod("orders-api-0")), exec: { stdout: "no status here" } });
-        assert.equal((await check()).error?.message, "The reply from orders-api-0 had no HTTP status: report it to the user");
+        assert.equal(
+            (await check()).error?.message,
+            "The reply from orders-api-0 had no HTTP status: report it to the user",
+        );
         h.cluster.answer({ pods: list(pod("orders-api-0")), exec: { stdout: "x\n__status:abc" } });
         assert.match((await check()).error?.message ?? "", /had no HTTP status/);
         h.cluster.answer({ pods: list(pod("orders-api-0")), exec: { stdout: "x\n__status:000" } });
@@ -283,7 +415,11 @@ describe("what goes wrong in the pod", () => {
 
     test("a command that runs out of time is an error that names the limit", async () => {
         h.cluster.answer({ pods: list(pod("orders-api-0")) });
-        h.jig.script = (_file, args) => (args[3] === "exec" ? { code: 124, stdout: "", stderr: "", timedOut: true } : undefined);
-        assert.equal((await check()).error?.message, "kubectl exec timed out after 35 s: the cluster is slow or unreachable");
+        h.jig.script = (_file, args) =>
+            args[3] === "exec" ? { code: 124, stdout: "", stderr: "", timedOut: true } : undefined;
+        assert.equal(
+            (await check()).error?.message,
+            "kubectl exec timed out after 35 s: the cluster is slow or unreachable",
+        );
     });
 });

@@ -40,7 +40,9 @@ test("a field nobody defined is an error that names it, at any depth", () => {
 });
 
 test("the CI settings moved to jig-ops, and the error says where they are now", () => {
-    assert.deepEqual(validateGitSection({ watch: { auto: false } }), ["git.watch moved to ops.watch, which jig-ops reads"]);
+    assert.deepEqual(validateGitSection({ watch: { auto: false } }), [
+        "git.watch moved to ops.watch, which jig-ops reads",
+    ]);
     assert.deepEqual(validateGitSection({ artifacts: [{ kind: "tag", tag: "x" }] }), [
         "git.artifacts moved to ops.artifacts, which jig-ops reads",
     ]);

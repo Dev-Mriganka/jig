@@ -25,34 +25,47 @@ export const parameters = Type.Object(
             description: "A service from the ops catalog. An unknown name is refused with the names there are",
         }),
         environment: Type.String({ description: "One of the service's environments, such as staging" }),
-        waitFor: Type.Optional(Type.String({
-            description: "rollout: wait until every pod is ready on this image tag or version, as pods shows it",
-        })),
-        timeoutSec: Type.Optional(Type.Integer({
-            minimum: 1,
-            maximum: MAX_WAIT_SECONDS,
-            description:
-                `rollout with waitFor: seconds to wait, at most ${MAX_WAIT_SECONDS} (default ${DEFAULT_WAIT_SECONDS})`,
-        })),
-        pod: Type.Optional(Type.String({
-            description: "logs: a pod of the service, as pods shows it. Default: the first ready pod",
-        })),
-        container: Type.Optional(Type.String({
-            description: "logs: a container of the pod. Default: the service's own container",
-        })),
-        tail: Type.Optional(Type.Integer({
-            minimum: 1,
-            maximum: MAX_TAIL,
-            description: `logs: lines from the end (default ${DEFAULT_TAIL})`,
-        })),
-        sinceSeconds: Type.Optional(Type.Integer({
-            minimum: 1,
-            maximum: MAX_SINCE_SECONDS,
-            description: "logs: only lines from the last this many seconds",
-        })),
-        previous: Type.Optional(Type.Boolean({
-            description: "logs: the log of the container's previous run, after a crash",
-        })),
+        waitFor: Type.Optional(
+            Type.String({
+                description: "rollout: wait until every pod is ready on this image tag or version, as pods shows it",
+            }),
+        ),
+        timeoutSec: Type.Optional(
+            Type.Integer({
+                minimum: 1,
+                maximum: MAX_WAIT_SECONDS,
+                description: `rollout with waitFor: seconds to wait, at most ${MAX_WAIT_SECONDS} (default ${DEFAULT_WAIT_SECONDS})`,
+            }),
+        ),
+        pod: Type.Optional(
+            Type.String({
+                description: "logs: a pod of the service, as pods shows it. Default: the first ready pod",
+            }),
+        ),
+        container: Type.Optional(
+            Type.String({
+                description: "logs: a container of the pod. Default: the service's own container",
+            }),
+        ),
+        tail: Type.Optional(
+            Type.Integer({
+                minimum: 1,
+                maximum: MAX_TAIL,
+                description: `logs: lines from the end (default ${DEFAULT_TAIL})`,
+            }),
+        ),
+        sinceSeconds: Type.Optional(
+            Type.Integer({
+                minimum: 1,
+                maximum: MAX_SINCE_SECONDS,
+                description: "logs: only lines from the last this many seconds",
+            }),
+        ),
+        previous: Type.Optional(
+            Type.Boolean({
+                description: "logs: the log of the container's previous run, after a crash",
+            }),
+        ),
     },
     { additionalProperties: false },
 );
@@ -65,15 +78,15 @@ export type Call =
     | { action: "pods"; env: Environment; target: Target }
     | { action: "rollout"; env: Environment; target: Target; waitFor: string | undefined; timeoutSec: number }
     | {
-        action: "logs";
-        env: Environment;
-        target: Target;
-        pod: string | undefined;
-        container: string | undefined;
-        tail: number;
-        sinceSeconds: number | undefined;
-        previous: boolean;
-    }
+          action: "logs";
+          env: Environment;
+          target: Target;
+          pod: string | undefined;
+          container: string | undefined;
+          tail: number;
+          sinceSeconds: number | undefined;
+          previous: boolean;
+      }
     | { action: "events"; env: Environment; target: Target }
     | { action: "health"; env: Environment; how: HealthHow };
 

@@ -31,7 +31,12 @@ type Styles = Pick<Theme, "fg" | "bold">;
 const CHROME_LINES = 6;
 const MAX_SUMMARY_LINES = 4;
 
-export function createReviewScreen(options: ReviewOptions, tui: Screen, theme: Styles, done: (answer: Answer) => void): Component {
+export function createReviewScreen(
+    options: ReviewOptions,
+    tui: Screen,
+    theme: Styles,
+    done: (answer: Answer) => void,
+): Component {
     let top = 0;
     let status = "";
     let finished = false;
@@ -94,7 +99,8 @@ export function createReviewScreen(options: ReviewOptions, tui: Screen, theme: S
             scroll(top, body.length, height);
             const shown = body.slice(top, top + height);
             const position = body.length > height ? ` ${top + 1}-${top + shown.length} of ${body.length} ` : "";
-            const rule = (extra = ""): string => theme.fg("border", `${"─".repeat(Math.max(0, width - extra.length))}${extra}`);
+            const rule = (extra = ""): string =>
+                theme.fg("border", `${"─".repeat(Math.max(0, width - extra.length))}${extra}`);
             const key = (letter: string): string => theme.fg("accent", letter);
             const lines = [
                 rule(),
@@ -113,7 +119,8 @@ export function createReviewScreen(options: ReviewOptions, tui: Screen, theme: S
         handleInput(data) {
             if (matchesKey(data, "y")) return answer("allow");
             if (matchesKey(data, "s")) return answer("allow-session");
-            if (matchesKey(data, "n") || matchesKey(data, "escape") || matchesKey(data, "ctrl+c")) return answer("decline");
+            if (matchesKey(data, "n") || matchesKey(data, "escape") || matchesKey(data, "ctrl+c"))
+                return answer("decline");
             if (matchesKey(data, "o")) {
                 status = "opening the preview in the browser...";
                 tui.requestRender();

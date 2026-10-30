@@ -52,8 +52,12 @@ export function rig(options: RigOptions = {}): Rig {
             shown.push({ message, level });
             return true;
         },
-        emit: (event) => { events.push(event); },
-        send: (message) => { sent.push({ ...message, at: clock.now() }); },
+        emit: (event) => {
+            events.push(event);
+        },
+        send: (message) => {
+            sent.push({ ...message, at: clock.now() });
+        },
     });
     return { clock, engine, shown, events, sent, screen, begin: (session = "session-1") => engine.begin(session) };
 }
@@ -94,7 +98,10 @@ export function scripted(
 }
 
 /** A finished result, for the polls that end a watch. */
-export const passed = (summary = "all good"): PollOutcome<unknown> => ({ state: "end", done: { outcome: "passed", summary } });
+export const passed = (summary = "all good"): PollOutcome<unknown> => ({
+    state: "end",
+    done: { outcome: "passed", summary },
+});
 
 /** The saved file of a watch, as the engine wrote it. */
 export function savedFile(stateDir: string, id: string): SavedWatch {

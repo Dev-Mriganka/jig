@@ -141,8 +141,8 @@ export const MAX_OPEN_CALLS = 1000;
 export function createState(pi: ExtensionAPI, options: JigCoreOptions = {}): JigState {
     const now = options.now ?? (() => new Date());
     const redactor = createRedactor();
-    const makeMasker = options.createMasker ??
-        ((dir, date, extraFields) => createMasker(dailyMaskKey(dir, date), { extraFields }));
+    const makeMasker =
+        options.createMasker ?? ((dir, date, extraFields) => createMasker(dailyMaskKey(dir, date), { extraFields }));
 
     // The mask tokens stay the same all day, so the masker is made once per UTC day.
     let maskerDay: string | undefined;
@@ -173,7 +173,8 @@ export function createState(pi: ExtensionAPI, options: JigCoreOptions = {}): Jig
         tunnels: createTunnels(),
         approvals: createApprovals({
             now: () => Date.now(),
-            openPreview: options.openPreview ?? (async (preview, header) => openInBrowser(writePreviewPage(preview, header))),
+            openPreview:
+                options.openPreview ?? (async (preview, header) => openInBrowser(writePreviewPage(preview, header))),
         }),
         watches: createWatchEngine({
             now: () => now().getTime(),

@@ -29,7 +29,8 @@ const sentence = (error: Error): string => error.message.replace(/[.\s]+$/, "");
 
 /** What the read after a lost reply shows, as a `Finding`. A read that fails too settles nothing. */
 async function recheck(plan: Plan, signal: AbortSignal | undefined): Promise<Finding> {
-    if (signal?.aborted === true) return { happened: undefined, text: "the call was cancelled, so nothing was read again" };
+    if (signal?.aborted === true)
+        return { happened: undefined, text: "the call was cancelled, so nothing was read again" };
     try {
         return await plan.check();
     } catch (error) {
@@ -44,7 +45,12 @@ function flagNote(plan: Plan): string {
     return `\nNote: the text pointed at things its readers may not be able to open (${first}).`;
 }
 
-export async function runWrite(env: Env, call: Call, toolCallId: string, signal: AbortSignal | undefined): Promise<Written> {
+export async function runWrite(
+    env: Env,
+    call: Call,
+    toolCallId: string,
+    signal: AbortSignal | undefined,
+): Promise<Written> {
     const plan = await buildPlan(env, call, false);
 
     const approved = jig().approvedPreview(toolCallId);
@@ -79,8 +85,10 @@ export async function runWrite(env: Env, call: Call, toolCallId: string, signal:
             return { text, key: finding.key ?? plan.key };
         }
         if (finding.happened === undefined) record(plan.key);
-        throw new Error(finding.happened === false
-            ? `${lead} A read afterwards shows that it did not happen: ${finding.text}. Run it again if it is still wanted.`
-            : `${lead} A read afterwards could not settle it: ${finding.text}. Check the issue before trying again.`);
+        throw new Error(
+            finding.happened === false
+                ? `${lead} A read afterwards shows that it did not happen: ${finding.text}. Run it again if it is still wanted.`
+                : `${lead} A read afterwards could not settle it: ${finding.text}. Check the issue before trying again.`,
+        );
     }
 }

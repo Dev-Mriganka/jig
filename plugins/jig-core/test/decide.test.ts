@@ -70,7 +70,12 @@ describe("rules from configuration", () => {
     test("can make a call looser, even past the tool's atLeast", () => {
         const verdict = run(call("external", "write", { atLeast: "ask" }), { rules: [rule({ decision: "allow" })] });
         assert.deepEqual([verdict.decision, verdict.source], ["allow", "rule"]);
-        assert.equal(run(call("test", "write", { environment: "staging" }), { rules: [rule({ environment: "staging", decision: "allow" })] }).decision, "allow");
+        assert.equal(
+            run(call("test", "write", { environment: "staging" }), {
+                rules: [rule({ environment: "staging", decision: "allow" })],
+            }).decision,
+            "allow",
+        );
     });
 
     test("the first matching rule decides, so rules are listed most specific first", () => {
@@ -79,29 +84,46 @@ describe("rules from configuration", () => {
         const push = call("external", "write", { action: "push" });
         assert.equal(run(push, { rules: [specific, general] }).decision, "ask");
         assert.equal(run(push, { rules: [general, specific] }).decision, "allow");
-        assert.equal(run(call("external", "write", { action: "fetch" }), { rules: [specific, general] }).decision, "allow");
+        assert.equal(
+            run(call("external", "write", { action: "fetch" }), { rules: [specific, general] }).decision,
+            "allow",
+        );
     });
 
     test("match on tool, action, environment and effect, and a missing field matches anything", () => {
         const c = call("test", "write", { tool: "deploy", action: "run", environment: "staging" });
         assert.equal(ruleMatches({ tool: "deploy", decision: "ask" }, c), true);
-        assert.equal(ruleMatches({ tool: "deploy", action: "run", environment: "staging", effect: "write", decision: "ask" }, c), true);
+        assert.equal(
+            ruleMatches({ tool: "deploy", action: "run", environment: "staging", effect: "write", decision: "ask" }, c),
+            true,
+        );
         assert.equal(ruleMatches({ tool: "other", decision: "ask" }, c), false);
         assert.equal(ruleMatches({ tool: "deploy", action: "stop", decision: "ask" }, c), false);
         assert.equal(ruleMatches({ tool: "deploy", environment: "qa", decision: "ask" }, c), false);
         assert.equal(ruleMatches({ tool: "deploy", effect: "read", decision: "ask" }, c), false);
-        assert.equal(ruleMatches({ tool: "deploy", action: "run", decision: "ask" }, call("test", "write", { tool: "deploy" })), false, "the call has no action");
+        assert.equal(
+            ruleMatches({ tool: "deploy", action: "run", decision: "ask" }, call("test", "write", { tool: "deploy" })),
+            false,
+            "the call has no action",
+        );
     });
 
     test("can name tools with a wildcard", () => {
-        assert.equal(ruleMatches({ tool: "mcp__*", decision: "deny" }, call("local", "read", { tool: "mcp__db__query" })), true);
+        assert.equal(
+            ruleMatches({ tool: "mcp__*", decision: "deny" }, call("local", "read", { tool: "mcp__db__query" })),
+            true,
+        );
         assert.equal(ruleMatches({ tool: "mcp__*", decision: "deny" }, call("local", "read", { tool: "git" })), false);
     });
 
     test("carry their choice of screen", () => {
         assert.equal(run(call("external", "write"), { rules: [rule({ approval: "review" })] }).approval, "review");
         assert.equal(run(call("external", "write", { approval: "form" })).approval, "form", "the tool's own choice");
-        assert.equal(run(call("external", "write", { approval: "form" }), { rules: [rule({ approval: "dialog" })] }).approval, "dialog", "the rule's choice wins");
+        assert.equal(
+            run(call("external", "write", { approval: "form" }), { rules: [rule({ approval: "dialog" })] }).approval,
+            "dialog",
+            "the rule's choice wins",
+        );
     });
 });
 
@@ -117,18 +139,29 @@ describe("session allows", () => {
     test("apply to that tool, action and environment only", () => {
         assert.equal(run({ ...c, action: "force-push" }, { sessionAllows: allowed }).decision, "ask");
         assert.equal(run({ ...c, tool: "other" }, { sessionAllows: allowed }).decision, "ask");
-        assert.equal(run({ ...c, environment: "elsewhere", environmentKind: "test" }, { sessionAllows: allowed }).decision, "ask");
+        assert.equal(
+            run({ ...c, environment: "elsewhere", environmentKind: "test" }, { sessionAllows: allowed }).decision,
+            "ask",
+        );
     });
 
     test("also turn an ask that a rule or the tool asked for", () => {
-        assert.equal(run(call("local", "write", { tool: "git", action: "push", atLeast: "ask" }), { sessionAllows: allowed }).decision, "ask", "other environment, so no");
+        assert.equal(
+            run(call("local", "write", { tool: "git", action: "push", atLeast: "ask" }), { sessionAllows: allowed })
+                .decision,
+            "ask",
+            "other environment, so no",
+        );
         const local = call("local", "write", { tool: "git", action: "push", atLeast: "ask" });
         assert.equal(run(local, { sessionAllows: new Set([sessionKey(local)]) }).decision, "allow");
     });
 
     test("do not soften a deny", () => {
         const denied = call("external", "write", { tool: "git", action: "push" });
-        const verdict = run(denied, { rules: [{ tool: "git", decision: "deny" }], sessionAllows: new Set([sessionKey(denied)]) });
+        const verdict = run(denied, {
+            rules: [{ tool: "git", decision: "deny" }],
+            sessionAllows: new Set([sessionKey(denied)]),
+        });
         assert.equal(verdict.decision, "deny");
     });
 
@@ -159,7 +192,10 @@ describe("the floor", () => {
     test("a production read is allowed, and a rule can make it ask", () => {
         const read = call("production", "read", { environment: "prod" });
         assert.equal(run(read).decision, "allow");
-        assert.equal(run(read, { rules: [{ tool: "tool", environment: "prod", effect: "read", decision: "ask" }] }).decision, "ask");
+        assert.equal(
+            run(read, { rules: [{ tool: "tool", environment: "prod", effect: "read", decision: "ask" }] }).decision,
+            "ask",
+        );
     });
 
     test("an ask with no screen becomes a deny", () => {
@@ -175,13 +211,19 @@ describe("the floor", () => {
             assert.equal(verdict.floor, "no-screen");
             assert.match(verdict.reason ?? "", /no screen to ask on/);
         }
-        assert.equal(run(call("external", "write"), { hasUI: false, rules: [{ tool: "tool", decision: "ask" }] }).decision, "deny");
+        assert.equal(
+            run(call("external", "write"), { hasUI: false, rules: [{ tool: "tool", decision: "ask" }] }).decision,
+            "deny",
+        );
     });
 
     test("with no screen, a call that needs no question still runs", () => {
         assert.equal(run(call("local", "write"), { hasUI: false }).decision, "allow");
         assert.equal(run(call("external", "read"), { hasUI: false }).decision, "allow");
-        assert.equal(run(call("external", "write"), { hasUI: false, rules: [{ tool: "tool", decision: "allow" }] }).decision, "allow");
+        assert.equal(
+            run(call("external", "write"), { hasUI: false, rules: [{ tool: "tool", decision: "allow" }] }).decision,
+            "allow",
+        );
     });
 
     describe("an unknown tool", () => {
@@ -222,7 +264,10 @@ describe("the floor", () => {
         });
 
         test("a known tool is not held back by a wildcard allow", () => {
-            assert.equal(run(call("external", "write"), { rules: [{ tool: "*", decision: "allow" }] }).decision, "allow");
+            assert.equal(
+                run(call("external", "write"), { rules: [{ tool: "*", decision: "allow" }] }).decision,
+                "allow",
+            );
         });
     });
 });

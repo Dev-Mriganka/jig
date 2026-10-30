@@ -42,7 +42,8 @@ export function bodyOf(shown: Shown): string {
     if (shown.notes.length > 0) parts.push(shown.notes.join("\n"));
     for (const text of shown.texts) {
         parts.push(`${text.label} (Jira wiki markup):\n${text.source}`);
-        if (text.replaces !== undefined) parts.push(`It replaces:\n${text.replaces === "" ? "(nothing)" : text.replaces}`);
+        if (text.replaces !== undefined)
+            parts.push(`It replaces:\n${text.replaces === "" ? "(nothing)" : text.replaces}`);
     }
     return parts.join("\n\n");
 }

@@ -27,8 +27,15 @@ describe("the extension", () => {
             assert.equal(tool?.name, "jira");
             assert.equal(tool?.label, "Jira");
             assert.equal(tool?.parameters, parameters);
-            assert.deepEqual((tool!.parameters as unknown as { properties: { action: { enum: string[] } } }).properties.action.enum, ACTION_NAMES);
-            assert.equal(tool?.executionMode, "sequential", "a comment is on the issue before the transition that follows it");
+            assert.deepEqual(
+                (tool!.parameters as unknown as { properties: { action: { enum: string[] } } }).properties.action.enum,
+                ACTION_NAMES,
+            );
+            assert.equal(
+                tool?.executionMode,
+                "sequential",
+                "a comment is on the issue before the transition that follows it",
+            );
             assert.equal(typeof tool?.execute, "function");
         } finally {
             jig.remove();
@@ -80,17 +87,27 @@ describe("the extension", () => {
     test("fails closed: without jig-core the tool does not run, and does not send anything", async () => {
         const jig = installFakeJig();
         let fetched = false;
-        const [tool] = load({ fetch: (async () => { fetched = true; return new Response("{}"); }) as typeof fetch });
+        const [tool] = load({
+            fetch: (async () => {
+                fetched = true;
+                return new Response("{}");
+            }) as typeof fetch,
+        });
         jig.remove();
         assert.ok(tool);
-        await assert.rejects(tool.execute("call-1", { action: "get", key: "PROJ-1" } as never, undefined, undefined, {} as never), /jig-core is not loaded/);
+        await assert.rejects(
+            tool.execute("call-1", { action: "get", key: "PROJ-1" } as never, undefined, undefined, {} as never),
+            /jig-core is not loaded/,
+        );
         assert.equal(fetched, false);
     });
 });
 
 describe("the package", () => {
     const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
-    const manifest = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")) as { pi: { extensions: string[]; skills: string[] } };
+    const manifest = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")) as {
+        pi: { extensions: string[]; skills: string[] };
+    };
 
     test("Pi loads the extension and finds the skill", () => {
         assert.ok(manifest.pi.extensions.includes("./plugins/jig-jira/src/index.ts"));

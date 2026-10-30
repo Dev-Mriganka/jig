@@ -67,14 +67,18 @@ export function agentValues(
             throw new InputError(`${JSON.stringify(name)} is not a variable of ${request.name}; ${list}`);
         }
         if (secretNames.has(name) || request.secrets.includes(name) || request.signsIn.includes(name)) {
-            throw new InputError(`${name} is a secret or fills the sign-in, so it comes from the environment and api.secrets, not from the call`);
+            throw new InputError(
+                `${name} is a secret or fills the sign-in, so it comes from the environment and api.secrets, not from the call`,
+            );
         }
         if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") {
             throw new InputError(`the value of ${name} must be text, a number or true or false`);
         }
         const text = String(value);
         if (text.length > MAX_VALUE_CHARS || CONTROL.test(text)) {
-            throw new InputError(`the value of ${name} must be at most ${MAX_VALUE_CHARS} characters with no control characters`);
+            throw new InputError(
+                `the value of ${name} must be at most ${MAX_VALUE_CHARS} characters with no control characters`,
+            );
         }
         values.set(name, text);
     }
@@ -82,7 +86,10 @@ export function agentValues(
 }
 
 function escapeXml(text: string): string {
-    return text.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[char] as string);
+    return text.replace(
+        /[&<>"']/g,
+        (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[char] as string,
+    );
 }
 
 /** Whether the position after `chunk` is inside a JSON string, given whether the position before it was. */
@@ -101,7 +108,8 @@ function written(name: string, value: string, slot: Slot, inString: boolean): st
         case "plain":
             return value;
         case "header":
-            if (!/^[\x20-\x7e]*$/.test(value)) throw new InputError(`the value of ${name} goes into a header, so it must be printable ASCII`);
+            if (!/^[\x20-\x7e]*$/.test(value))
+                throw new InputError(`the value of ${name} goes into a header, so it must be printable ASCII`);
             return value;
         case "form":
             return encodeURIComponent(value);
@@ -110,7 +118,9 @@ function written(name: string, value: string, slot: Slot, inString: boolean): st
         case "json":
             if (inString) return JSON.stringify(value).slice(1, -1);
             if (!JSON_SCALAR.test(value)) {
-                throw new InputError(`${name} sits outside a string in a JSON body, so its value must be a number, true, false or null`);
+                throw new InputError(
+                    `${name} sits outside a string in a JSON body, so its value must be a number, true, false or null`,
+                );
             }
             return value;
         case "graphql":
@@ -181,11 +191,19 @@ export function createResolver(input: ScopeInput): Resolver {
         environment.variables.get(name)?.value ?? request?.defaults.get(name) ?? collection.variables.get(name)?.value;
 
     /** One variable, as the pieces it stands for. `top` is true for a variable the request's own text names. */
-    function variable(name: string, top: boolean, slot: Slot, inString: boolean, stack: readonly string[]): { pieces: Piece[]; agent: boolean } {
+    function variable(
+        name: string,
+        top: boolean,
+        slot: Slot,
+        inString: boolean,
+        stack: readonly string[],
+    ): { pieces: Piece[]; agent: boolean } {
         if (name.startsWith("$")) {
             const generated = generatedKind(name);
             if (generated === undefined) {
-                throw new InputError(`{{${name}}} is not supported (only $uuid, $timestamp and $isoTimestamp are made here)`);
+                throw new InputError(
+                    `{{${name}}} is not supported (only $uuid, $timestamp and $isoTimestamp are made here)`,
+                );
             }
             return { pieces: [{ generated }], agent: false };
         }
@@ -198,7 +216,8 @@ export function createResolver(input: ScopeInput): Resolver {
             const as = secretAs(slot, inString);
             return { pieces: [{ secret: name, reference, ...(as === undefined ? {} : { as }) }], agent: false };
         }
-        if (top && agent.has(name)) return { pieces: [written(name, agent.get(name) as string, slot, inString)], agent: true };
+        if (top && agent.has(name))
+            return { pieces: [written(name, agent.get(name) as string, slot, inString)], agent: true };
 
         const value = defined(name);
         if (value === undefined) {
@@ -243,7 +262,8 @@ export function createResolver(input: ScopeInput): Resolver {
                     // The agent's value is written for an address; a team's own value is written as it is.
                     text += found.agent ? encodeURIComponent(piece) : piece;
                 }
-                if (found.agent && /^\.{1,2}$/.test(text.slice(start))) throw new InputError(`${part.variable} cannot be . or .. in an address`);
+                if (found.agent && /^\.{1,2}$/.test(text.slice(start)))
+                    throw new InputError(`${part.variable} cannot be . or .. in an address`);
                 spans.push({ name: part.variable, start, end: text.length, agent: found.agent });
             }
             if (onlyOrigin && originEnd(text) >= 0 && /[/?#]/.test(text.slice(text.indexOf("://") + 3))) break;
@@ -258,12 +278,16 @@ export function createResolver(input: ScopeInput): Resolver {
         const stop = end >= 0 ? end : text.search(/[/?#]/) >= 0 ? text.search(/[/?#]/) : text.length;
         const onHost = spans.find((span) => span.agent && span.start < stop);
         if (onHost !== undefined) {
-            throw new InputError(`${onHost.name} would set the host of the request: the host comes from the environment, not from the call`);
+            throw new InputError(
+                `${onHost.name} would set the host of the request: the host comes from the environment, not from the call`,
+            );
         }
         if (end < 0) {
             if (onlyOrigin) return undefined;
             const starts = JSON.stringify(text.slice(0, 30));
-            throw new InputError(`the address must start with https:// (or http://) once its variables are filled in; it starts ${starts}`);
+            throw new InputError(
+                `the address must start with https:// (or http://) once its variables are filled in; it starts ${starts}`,
+            );
         }
         return { url: text, origin: text.slice(0, end), fromVariables: spans.some((span) => span.start < end) };
     }

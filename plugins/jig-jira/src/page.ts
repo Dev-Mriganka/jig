@@ -46,18 +46,22 @@ function factsTable(rows: Shown["rows"]): string {
 
 /** The markup for a preview. Every text is rendered from its wiki source; everything else is escaped text. */
 export function htmlOf(shown: Shown): string {
-    const listed = flagLines(shown.flags).map((flag) => `<li>${escapeHtml(flag)}</li>`).join("");
-    const flags = shown.flags.length === 0
-        ? ""
-        : `<div class="flags"><p>${escapeHtml(FLAG_HEADING)}</p><ul>${listed}</ul></div>`;
+    const listed = flagLines(shown.flags)
+        .map((flag) => `<li>${escapeHtml(flag)}</li>`)
+        .join("");
+    const flags =
+        shown.flags.length === 0 ? "" : `<div class="flags"><p>${escapeHtml(FLAG_HEADING)}</p><ul>${listed}</ul></div>`;
     const notes = shown.notes.map((note) => `<p>${escapeHtml(note)}</p>`).join("");
-    const texts = shown.texts.map((text) => {
-        const replaced = text.replaces === undefined
-            ? ""
-            : "<details><summary>It replaces this text</summary>" +
-                `<div class="wiki">${renderWiki(text.replaces)}</div></details>`;
-        const heading = `<h2>${escapeHtml(text.label)}, as Jira will show it</h2>`;
-        return `${heading}<div class="wiki">${renderWiki(text.source)}</div>${replaced}`;
-    }).join("");
+    const texts = shown.texts
+        .map((text) => {
+            const replaced =
+                text.replaces === undefined
+                    ? ""
+                    : "<details><summary>It replaces this text</summary>" +
+                      `<div class="wiki">${renderWiki(text.replaces)}</div></details>`;
+            const heading = `<h2>${escapeHtml(text.label)}, as Jira will show it</h2>`;
+            return `${heading}<div class="wiki">${renderWiki(text.source)}</div>${replaced}`;
+        })
+        .join("");
     return `<div class="jira-preview"><style>${STYLE}</style>${flags}${factsTable(shown.rows)}${notes}${texts}</div>`;
 }

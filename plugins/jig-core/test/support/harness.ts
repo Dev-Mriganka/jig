@@ -113,25 +113,58 @@ export async function start(options: StartOptions = {}): Promise<Harness> {
     });
 
     return {
-        host, api, ctx, ui: log, agentDir,
+        host,
+        api,
+        ctx,
+        ui: log,
+        agentDir,
         stateDir: process.env.JIG_STATE_DIR ?? "",
-        gate: async (call) => host.fire("tool_call", toEvent(call, call.id ?? `call-${++counter}`), ctx) as Promise<{ block?: boolean; reason?: string } | undefined>,
+        gate: async (call) =>
+            host.fire("tool_call", toEvent(call, call.id ?? `call-${++counter}`), ctx) as Promise<
+                { block?: boolean; reason?: string } | undefined
+            >,
         async call(call) {
             const id = call.id ?? `call-${++counter}`;
-            const answer = (await host.fire("tool_call", toEvent(call, id), ctx)) as { block?: boolean; reason?: string } | undefined;
+            const answer = (await host.fire("tool_call", toEvent(call, id), ctx)) as
+                | { block?: boolean; reason?: string }
+                | undefined;
             let outcome: Outcome;
             if (answer?.block === true) {
                 // What Pi does for a blocked call: the reason becomes the error result, and the tool never runs.
-                const final: Result = { content: [{ type: "text", text: answer.reason ?? "Tool execution was blocked" }], details: {}, isError: true };
-                outcome = { blocked: true, ...(answer.reason === undefined ? {} : { reason: answer.reason }), final, ran: false };
+                const final: Result = {
+                    content: [{ type: "text", text: answer.reason ?? "Tool execution was blocked" }],
+                    details: {},
+                    isError: true,
+                };
+                outcome = {
+                    blocked: true,
+                    ...(answer.reason === undefined ? {} : { reason: answer.reason }),
+                    final,
+                    ran: false,
+                };
             } else {
                 let produced: Result;
                 try {
-                    produced = (await call.run?.()) ?? call.result ?? { content: [{ type: "text", text: "ok" }], details: undefined };
+                    produced = (await call.run?.()) ??
+                        call.result ?? { content: [{ type: "text", text: "ok" }], details: undefined };
                 } catch (error) {
-                    produced = { content: [{ type: "text", text: error instanceof Error ? error.message : String(error) }], details: {}, isError: true };
+                    produced = {
+                        content: [{ type: "text", text: error instanceof Error ? error.message : String(error) }],
+                        details: {},
+                        isError: true,
+                    };
                 }
-                const replacement = (await host.fire("tool_result", { ...toEvent(call, id), content: produced.content, details: produced.details, structuredContent: produced.structuredContent, isError: produced.isError === true }, ctx)) as Partial<Result> | undefined;
+                const replacement = (await host.fire(
+                    "tool_result",
+                    {
+                        ...toEvent(call, id),
+                        content: produced.content,
+                        details: produced.details,
+                        structuredContent: produced.structuredContent,
+                        isError: produced.isError === true,
+                    },
+                    ctx,
+                )) as Partial<Result> | undefined;
                 // What Pi does with the answer: structured content goes unless it is returned along with the content.
                 const final: Result = { ...produced };
                 if (replacement?.content !== undefined) {
@@ -139,22 +172,30 @@ export async function start(options: StartOptions = {}): Promise<Harness> {
                     if (replacement.structuredContent === undefined) delete final.structuredContent;
                 }
                 if (replacement?.details !== undefined) final.details = replacement.details;
-                if (replacement?.structuredContent !== undefined) final.structuredContent = replacement.structuredContent;
+                if (replacement?.structuredContent !== undefined)
+                    final.structuredContent = replacement.structuredContent;
                 if (replacement?.isError !== undefined) final.isError = replacement.isError;
                 outcome = { blocked: false, final, ran: true };
             }
-            await host.fire("tool_execution_end", {
-                toolCallId: id,
-                toolName: call.tool,
-                result: outcome.final,
-                isError: outcome.final.isError === true,
-                ...(outcome.ran && call.durationMs !== undefined ? { durationMs: call.durationMs } : {}),
-                ...(call.parent === undefined ? {} : { parentToolCallId: call.parent }),
-            }, ctx);
+            await host.fire(
+                "tool_execution_end",
+                {
+                    toolCallId: id,
+                    toolName: call.tool,
+                    result: outcome.final,
+                    isError: outcome.final.isError === true,
+                    ...(outcome.ran && call.durationMs !== undefined ? { durationMs: call.durationMs } : {}),
+                    ...(call.parent === undefined ? {} : { parentToolCallId: call.parent }),
+                },
+                ctx,
+            );
             return outcome;
         },
         records: () => readRecords(process.env.JIG_STATE_DIR ?? "").slice(earlier) as Array<Record<string, any>>,
-        decisions: () => host.emitted.filter((entry) => entry.channel === "jig:decision").map((entry) => entry.data as Record<string, any>),
+        decisions: () =>
+            host.emitted
+                .filter((entry) => entry.channel === "jig:decision")
+                .map((entry) => entry.data as Record<string, any>),
         notifications: () => log.notifications.map((entry) => entry.message),
         async shutdown() {
             await host.fire("session_shutdown", { reason: "quit" }, ctx);

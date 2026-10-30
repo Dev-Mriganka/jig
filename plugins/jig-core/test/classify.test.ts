@@ -12,47 +12,85 @@ function declaration(tool: string, answer: CallClass | undefined, plugin = "jig-
 }
 
 /** Dependencies for `classify`, with the tools' hints given by name. */
-function deps(options: { declarations?: ToolDeclaration[]; rules?: ClassifyRule[]; hints?: Record<string, ToolAnnotations | undefined> } = {}): ClassifyDeps {
+function deps(
+    options: {
+        declarations?: ToolDeclaration[];
+        rules?: ClassifyRule[];
+        hints?: Record<string, ToolAnnotations | undefined>;
+    } = {},
+): ClassifyDeps {
     return {
         declarations: new Map((options.declarations ?? []).map((d) => [d.tool, d])),
         classifyRules: options.rules ?? [],
-        toolInfo: (name) => (options.hints !== undefined && name in options.hints ? ({ name, annotations: options.hints[name] } as unknown as ToolInfo) : undefined),
+        toolInfo: (name) =>
+            options.hints !== undefined && name in options.hints
+                ? ({ name, annotations: options.hints[name] } as unknown as ToolInfo)
+                : undefined,
     };
 }
 
 describe("1. the tool's own declaration", () => {
     test("is used first, with its action, approval and atLeast, and names the plugin", () => {
-        const answer: CallClass = { action: "push", environment: "external", effect: "write", atLeast: "ask", approval: "review" };
-        const result = classify("git", { action: "push" }, deps({ declarations: [declaration("git", answer, "jig-git")] }));
+        const answer: CallClass = {
+            action: "push",
+            environment: "external",
+            effect: "write",
+            atLeast: "ask",
+            approval: "review",
+        };
+        const result = classify(
+            "git",
+            { action: "push" },
+            deps({ declarations: [declaration("git", answer, "jig-git")] }),
+        );
         assert.deepEqual(result, { ...answer, source: "declaration", plugin: "jig-git" });
     });
 
     test("beats a classification rule, a built-in default and a hint", () => {
-        const rules: ClassifyRule[] = [{ tool: "bash", param: "command", pattern: ".", environment: "production", effect: "write" }];
-        const result = classify("bash", { command: "ls" }, deps({
-            declarations: [declaration("bash", { environment: "local", effect: "read" })],
-            rules,
-            hints: { bash: { readOnlyHint: false } },
-        }));
+        const rules: ClassifyRule[] = [
+            { tool: "bash", param: "command", pattern: ".", environment: "production", effect: "write" },
+        ];
+        const result = classify(
+            "bash",
+            { command: "ls" },
+            deps({
+                declarations: [declaration("bash", { environment: "local", effect: "read" })],
+                rules,
+                hints: { bash: { readOnlyHint: false } },
+            }),
+        );
         assert.equal(result.source, "declaration");
         assert.equal(result.effect, "read");
     });
 
     test("receives the call's input", () => {
         const seen: unknown[] = [];
-        const tool: ToolDeclaration = { tool: "t", plugin: "p", classify: (input) => { seen.push(input); return { environment: String(input.env), effect: "read" }; } };
+        const tool: ToolDeclaration = {
+            tool: "t",
+            plugin: "p",
+            classify: (input) => {
+                seen.push(input);
+                return { environment: String(input.env), effect: "read" };
+            },
+        };
         const result = classify("t", { env: "staging" }, deps({ declarations: [tool] }));
         assert.deepEqual(seen, [{ env: "staging" }]);
         assert.equal(result.environment, "staging");
     });
 
     test("a declaration that cannot classify this input makes the call unknown, and no rule or hint guesses for it", () => {
-        const rules: ClassifyRule[] = [{ tool: "git", param: "action", value: "status", environment: "local", effect: "read" }];
-        const result = classify("git", { action: "status" }, deps({
-            declarations: [declaration("git", undefined, "jig-git")],
-            rules,
-            hints: { git: { readOnlyHint: true } },
-        }));
+        const rules: ClassifyRule[] = [
+            { tool: "git", param: "action", value: "status", environment: "local", effect: "read" },
+        ];
+        const result = classify(
+            "git",
+            { action: "status" },
+            deps({
+                declarations: [declaration("git", undefined, "jig-git")],
+                rules,
+                hints: { git: { readOnlyHint: true } },
+            }),
+        );
         assert.equal(result.source, "unknown");
         assert.equal(result.environment, "external");
         assert.equal(result.effect, "write");
@@ -67,13 +105,24 @@ describe("1. the tool's own declaration", () => {
             { effect: "read" },
         ];
         for (const answer of bad) {
-            assert.throws(() => classify("t", {}, deps({ declarations: [declaration("t", answer as unknown as CallClass)] })), /invalid classification/, JSON.stringify(answer));
+            assert.throws(
+                () => classify("t", {}, deps({ declarations: [declaration("t", answer as unknown as CallClass)] })),
+                /invalid classification/,
+                JSON.stringify(answer),
+            );
         }
     });
 });
 
 describe("2. classification rules", () => {
-    const rule = (extra: Partial<ClassifyRule> = {}): ClassifyRule => ({ tool: "other_db", param: "target", value: "live", environment: "prod", effect: "read", ...extra });
+    const rule = (extra: Partial<ClassifyRule> = {}): ClassifyRule => ({
+        tool: "other_db",
+        param: "target",
+        value: "live",
+        environment: "prod",
+        effect: "read",
+        ...extra,
+    });
 
     test("match a parameter value exactly", () => {
         const result = classify("other_db", { target: "live" }, deps({ rules: [rule()] }));
@@ -97,7 +146,12 @@ describe("2. classification rules", () => {
 
     test("can name an action, which the call's `action` parameter must equal, and which the result carries", () => {
         const rules = [rule({ action: "query" })];
-        assert.deepEqual(classify("other_db", { action: "query", target: "live" }, deps({ rules })), { action: "query", environment: "prod", effect: "read", source: "rule" });
+        assert.deepEqual(classify("other_db", { action: "query", target: "live" }, deps({ rules })), {
+            action: "query",
+            environment: "prod",
+            effect: "read",
+            source: "rule",
+        });
         assert.equal(classify("other_db", { action: "drop", target: "live" }, deps({ rules })).source, "unknown");
         assert.equal(classify("other_db", { target: "live" }, deps({ rules })).source, "unknown");
     });
@@ -114,13 +168,27 @@ describe("2. classification rules", () => {
     });
 
     test("beat a built-in default, which lets a pattern reclassify `bash`", () => {
-        const rules: ClassifyRule[] = [{ tool: "bash", param: "command", pattern: "^kubectl ", environment: "external", effect: "write" }];
-        assert.deepEqual(classify("bash", { command: "kubectl apply -f x" }, deps({ rules })), { environment: "external", effect: "write", source: "rule" });
-        assert.deepEqual(classify("bash", { command: "ls" }, deps({ rules })), { environment: "local", effect: "write", source: "builtin" });
+        const rules: ClassifyRule[] = [
+            { tool: "bash", param: "command", pattern: "^kubectl ", environment: "external", effect: "write" },
+        ];
+        assert.deepEqual(classify("bash", { command: "kubectl apply -f x" }, deps({ rules })), {
+            environment: "external",
+            effect: "write",
+            source: "rule",
+        });
+        assert.deepEqual(classify("bash", { command: "ls" }, deps({ rules })), {
+            environment: "local",
+            effect: "write",
+            source: "builtin",
+        });
     });
 
     test("beat a hint", () => {
-        const result = classify("other_db", { target: "live" }, deps({ rules: [rule({ effect: "write" })], hints: { other_db: { readOnlyHint: true } } }));
+        const result = classify(
+            "other_db",
+            { target: "live" },
+            deps({ rules: [rule({ effect: "write" })], hints: { other_db: { readOnlyHint: true } } }),
+        );
         assert.equal(result.effect, "write");
         assert.equal(result.source, "rule");
     });
@@ -129,25 +197,48 @@ describe("2. classification rules", () => {
 describe("3. Pi's built-in defaults", () => {
     test("read, ls, find and grep are local reads", () => {
         for (const tool of ["read", "ls", "find", "grep"]) {
-            assert.deepEqual(classify(tool, {}, deps()), { environment: "local", effect: "read", source: "builtin" }, tool);
+            assert.deepEqual(
+                classify(tool, {}, deps()),
+                { environment: "local", effect: "read", source: "builtin" },
+                tool,
+            );
         }
     });
 
     test("write, edit, bash and powershell are local writes", () => {
         for (const tool of ["write", "edit", "bash", "powershell"]) {
-            assert.deepEqual(classify(tool, {}, deps()), { environment: "local", effect: "write", source: "builtin" }, tool);
+            assert.deepEqual(
+                classify(tool, {}, deps()),
+                { environment: "local", effect: "write", source: "builtin" },
+                tool,
+            );
         }
     });
 
     test("the question tools are local reads, so a question never asks first", () => {
         for (const tool of ["ask_user_question", "ask_questions"]) {
-            assert.deepEqual(classify(tool, {}, deps()), { environment: "local", effect: "read", source: "builtin" }, tool);
+            assert.deepEqual(
+                classify(tool, {}, deps()),
+                { environment: "local", effect: "read", source: "builtin" },
+                tool,
+            );
         }
     });
 
     test("beat a hint, and cover exactly these ten tools", () => {
         assert.equal(classify("read", {}, deps({ hints: { read: { destructiveHint: true } } })).source, "builtin");
-        assert.deepEqual(Object.keys(BUILT_IN_TOOLS).sort(), ["ask_questions", "ask_user_question", "bash", "edit", "find", "grep", "ls", "powershell", "read", "write"]);
+        assert.deepEqual(Object.keys(BUILT_IN_TOOLS).sort(), [
+            "ask_questions",
+            "ask_user_question",
+            "bash",
+            "edit",
+            "find",
+            "grep",
+            "ls",
+            "powershell",
+            "read",
+            "write",
+        ]);
     });
 
     test("a name like an object property is not a built-in", () => {
@@ -165,7 +256,11 @@ describe("4. the tool's hints", () => {
 
     test("destructiveHint or openWorldHint means a write", () => {
         assert.deepEqual(via({ destructiveHint: true }), { environment: "external", effect: "write", source: "hint" });
-        assert.deepEqual(via({ openWorldHint: true, destructiveHint: false }), { environment: "external", effect: "write", source: "hint" });
+        assert.deepEqual(via({ openWorldHint: true, destructiveHint: false }), {
+            environment: "external",
+            effect: "write",
+            source: "hint",
+        });
     });
 
     test("a hint that is absent takes the MCP default: destructive, and reaching an open world", () => {
@@ -192,7 +287,11 @@ describe("4. the tool's hints", () => {
 
 describe("5. the unknown default", () => {
     test("is a write outside the machine", () => {
-        assert.deepEqual(classify("mystery", { anything: 1 }, deps()), { environment: "external", effect: "write", source: "unknown" });
+        assert.deepEqual(classify("mystery", { anything: 1 }, deps()), {
+            environment: "external",
+            effect: "write",
+            source: "unknown",
+        });
     });
 });
 

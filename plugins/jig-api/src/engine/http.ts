@@ -45,7 +45,8 @@ function mergedHeaders(
     signIn: Readonly<Record<string, string>>,
 ): Record<string, string> {
     const merged = new Map<string, readonly [string, string]>();
-    for (const [name, value] of [...OWN_HEADERS, ...own, ...Object.entries(signIn)]) merged.set(name.toLowerCase(), [name, value]);
+    for (const [name, value] of [...OWN_HEADERS, ...own, ...Object.entries(signIn)])
+        merged.set(name.toLowerCase(), [name, value]);
     return Object.fromEntries(merged.values());
 }
 
@@ -53,7 +54,8 @@ function mergedHeaders(
 function checkClash(own: ReadonlyArray<readonly [string, string]>, signIn: Readonly<Record<string, string>>): void {
     const given = new Set(own.map(([name]) => name.toLowerCase()));
     const clash = Object.keys(signIn).find((name) => given.has(name.toLowerCase()));
-    if (clash !== undefined) throw new NotSentError(`header ${clash} is set by the sign-in, so the request cannot have it too`);
+    if (clash !== undefined)
+        throw new NotSentError(`header ${clash} is set by the sign-in, so the request cannot have it too`);
 }
 
 export function createHttp(options: HttpOptions = {}): Http {
@@ -70,7 +72,10 @@ export function createHttp(options: HttpOptions = {}): Http {
             const stops: Stops = {
                 cancel,
                 deadline() {
-                    clock ??= AbortSignal.any([AbortSignal.timeout(timeoutMs), ...(cancel === undefined ? [] : [cancel])]);
+                    clock ??= AbortSignal.any([
+                        AbortSignal.timeout(timeoutMs),
+                        ...(cancel === undefined ? [] : [cancel]),
+                    ]);
                     return clock;
                 },
             };
@@ -125,7 +130,9 @@ export function createHttp(options: HttpOptions = {}): Http {
                     break;
                 }
                 case "basic": {
-                    const [user, password] = await filled(Promise.all([fillString(signIn.username, fillers), fillString(signIn.password, fillers)]));
+                    const [user, password] = await filled(
+                        Promise.all([fillString(signIn.username, fillers), fillString(signIn.password, fillers)]),
+                    );
                     const pair = Buffer.from(`${user}:${password}`).toString("base64");
                     credentials.push(pair, password);
                     answer = await exchange(wire({ Authorization: `Basic ${pair}` }), stops.deadline());
@@ -141,7 +148,11 @@ export function createHttp(options: HttpOptions = {}): Http {
                     // Asked for every request: the service decides when its token has expired.
                     let headers: Readonly<Record<string, string>>;
                     try {
-                        headers = await jig().signIn.headers(signIn.name, { system: plan.system, url: plan.url }, cancel);
+                        headers = await jig().signIn.headers(
+                            signIn.name,
+                            { system: plan.system, url: plan.url },
+                            cancel,
+                        );
                     } catch (error) {
                         throw new NotSentError(`could not sign in (${errorMessage(error)})`);
                     }
@@ -167,7 +178,9 @@ export function createHttp(options: HttpOptions = {}): Http {
                     }
                     // A 401 that is left was for a new token: sending it again would change nothing.
                     if (answer.status === 401) {
-                        notes.push("The server rejected a newly issued token: the account may lack access to this path.");
+                        notes.push(
+                            "The server rejected a newly issued token: the account may lack access to this path.",
+                        );
                     }
                     break;
                 }

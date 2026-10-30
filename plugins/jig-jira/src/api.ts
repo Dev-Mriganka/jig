@@ -126,11 +126,15 @@ export interface FieldInfo {
 /** Every field of this Jira, read once per session. A failed read is not remembered. */
 export function fieldList(env: Env): Promise<FieldInfo[]> {
     env.session.fields ??= env.http.request({ method: "GET", path: "/field" }).then((answer) =>
-        arr(answer).map(obj).filter((field) => str(field.id) !== "").map((field) => ({
-            id: str(field.id),
-            name: str(field.name) || str(field.id),
-            custom: field.custom === true,
-        })));
+        arr(answer)
+            .map(obj)
+            .filter((field) => str(field.id) !== "")
+            .map((field) => ({
+                id: str(field.id),
+                name: str(field.name) || str(field.id),
+                custom: field.custom === true,
+            })),
+    );
     const reading = env.session.fields;
     reading.catch(() => {
         if (env.session.fields === reading) env.session.fields = undefined;
@@ -198,7 +202,9 @@ export async function search(env: Env, options: SearchOptions): Promise<SearchPa
     if (!Number.isInteger(startAt) || startAt < 0) {
         throw new InputError("jira search: page must be the page value the previous result gave");
     }
-    const answer = obj(await env.http.request({ method: "GET", path: "/search", query: { ...query, startAt }, timeoutMs }));
+    const answer = obj(
+        await env.http.request({ method: "GET", path: "/search", query: { ...query, startAt }, timeoutMs }),
+    );
     const issues = arr(answer.issues).map(obj);
     const end = startAt + issues.length;
     const total = Math.max(int(answer.total), end);

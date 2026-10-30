@@ -19,8 +19,19 @@ const HEADER_VALUE = /^[\x20-\x7e]{1,1000}$/;
  * would let a GET, a read that nobody is asked about, act as a write. `Authorization` and `Cookie` are the sign-in's.
  */
 export const REFUSED_HEADERS: ReadonlySet<string> = new Set([
-    "authorization", "proxy-authorization", "cookie", "host", "content-length", "transfer-encoding", "connection",
-    "upgrade", "te", "expect", "x-http-method-override", "x-http-method", "x-method-override",
+    "authorization",
+    "proxy-authorization",
+    "cookie",
+    "host",
+    "content-length",
+    "transfer-encoding",
+    "connection",
+    "upgrade",
+    "te",
+    "expect",
+    "x-http-method-override",
+    "x-http-method",
+    "x-method-override",
 ]);
 
 /** How many times a path is percent-decoded when it is searched for "..". */
@@ -52,9 +63,11 @@ export function climbs(text: string): boolean {
  * a parser would quietly resolve `..` and so hide it.
  */
 export function checkUrl(value: unknown): { origin: string; rest: string } {
-    if (typeof value !== "string" || value.trim() === "") fail("url is required, such as https://api.staging.example.com/v1/orders/123");
+    if (typeof value !== "string" || value.trim() === "")
+        fail("url is required, such as https://api.staging.example.com/v1/orders/123");
     const match = /^([a-z][a-z0-9+.-]*:\/\/[^/?#]*)(.*)$/i.exec(value.trim());
-    if (match === null) fail(`url must be a whole address such as https://api.staging.example.com/v1/orders (got ${shown(value, 40)})`);
+    if (match === null)
+        fail(`url must be a whole address such as https://api.staging.example.com/v1/orders (got ${shown(value, 40)})`);
     const origin = match[1] as string;
     const rest = (match[2] as string) === "" ? "/" : (match[2] as string);
     const scheme = origin.slice(0, origin.indexOf(":")).toLowerCase();
@@ -75,7 +88,8 @@ export function checkUrl(value: unknown): { origin: string; rest: string } {
 /** The JSON text to send. `null` and a missing body both mean no body, as models often send `null` for an unused field. */
 export function checkBody(method: string, body: unknown): string | undefined {
     if (!present(body)) return undefined;
-    if (method === "GET" || method === "HEAD" || method === "OPTIONS") fail(`a ${method} has no body: put the parameters in the ?query`);
+    if (method === "GET" || method === "HEAD" || method === "OPTIONS")
+        fail(`a ${method} has no body: put the parameters in the ?query`);
     let text: string | undefined;
     try {
         text = JSON.stringify(body);
@@ -96,7 +110,9 @@ export function checkHeaders(headers: unknown): Array<[string, string]> {
     const checked: Array<[string, string]> = [];
     for (const [name, value] of entries) {
         if (!HEADER_NAME.test(name)) {
-            fail(`header name must be letters, digits and - starting with a letter, at most 41 characters (got ${shown(name)})`);
+            fail(
+                `header name must be letters, digits and - starting with a letter, at most 41 characters (got ${shown(name)})`,
+            );
         }
         const lower = name.toLowerCase();
         if (REFUSED_HEADERS.has(lower)) {

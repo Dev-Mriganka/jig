@@ -16,7 +16,11 @@ import type { Answer, ErrorKind } from "./records.ts";
 import { rememberCall } from "./state.ts";
 import type { CallState, JigState } from "./state.ts";
 
-export async function gate(state: JigState, event: ToolCallEvent, ctx: ExtensionContext): Promise<ToolCallEventResult | undefined> {
+export async function gate(
+    state: JigState,
+    event: ToolCallEvent,
+    ctx: ExtensionContext,
+): Promise<ToolCallEventResult | undefined> {
     try {
         return await decideCall(state, event, ctx);
     } catch (error) {
@@ -54,7 +58,11 @@ function blockInvalid(state: JigState, event: ToolCallEvent, message: string): T
     return { block: true, reason: `Blocked by jig-core: ${event.toolName} cannot run with this input: ${message}` };
 }
 
-async function decideCall(state: JigState, event: ToolCallEvent, ctx: ExtensionContext): Promise<ToolCallEventResult | undefined> {
+async function decideCall(
+    state: JigState,
+    event: ToolCallEvent,
+    ctx: ExtensionContext,
+): Promise<ToolCallEventResult | undefined> {
     const policy = state.policy();
     const input = (event.input ?? {}) as Record<string, unknown>;
     const toolInfo = (name: string) => state.pi.getAllTools().find((tool) => tool.name === name);
@@ -138,7 +146,10 @@ async function askUser(
     if (isInvalidInput(preview)) {
         call.blocked = { kind: "invalid", line: "the tool found the input invalid" };
         announce(state, call);
-        return { block: true, reason: `Blocked by jig-core: ${call.tool} cannot run with this input: ${preview.invalid}` };
+        return {
+            block: true,
+            reason: `Blocked by jig-core: ${call.tool} cannot run with this input: ${preview.invalid}`,
+        };
     }
     const kind = chooseKind(verdict.approval, preview);
     const approval = await state.approvals.ask(ctx, { header: describeCall(described), preview, kind });
@@ -151,18 +162,22 @@ async function askUser(
         announce(state, call, "decline");
         const why = approval.dismissed
             ? "the question was closed without an answer"
-            : approval.reason === undefined ? "the user declined this call" : `the user declined this call, and said: ${approval.reason}`;
+            : approval.reason === undefined
+              ? "the user declined this call"
+              : `the user declined this call, and said: ${approval.reason}`;
         return { block: true, reason: `Blocked by jig-core: ${why}` };
     }
 
     // The tool can read this back with `approvedPreview()` and refuse to run if what it would do has changed.
     call.approvedPreview = preview;
     if (approval.answer === "allow-session") {
-        state.sessionAllows.add(sessionKey({
-            tool: call.tool,
-            ...(classification.action === undefined ? {} : { action: classification.action }),
-            environment: classification.environment,
-        }));
+        state.sessionAllows.add(
+            sessionKey({
+                tool: call.tool,
+                ...(classification.action === undefined ? {} : { action: classification.action }),
+                environment: classification.environment,
+            }),
+        );
     }
     announce(state, call, approval.answer);
     return undefined;

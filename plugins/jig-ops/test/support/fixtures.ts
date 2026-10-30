@@ -31,17 +31,21 @@ export const IMAGE = (tag: string, name = "orders-api") => `registry.example.tes
 export function pod(name: string, options: PodOptions = {}): Record<string, unknown> {
     const service = options.service ?? "orders-api";
     const ready = options.ready ?? true;
-    const containers: Array<Record<string, unknown>> = [{ name: service, image: options.image ?? IMAGE(options.tag ?? "1.4.2", service) }];
-    const statuses: Array<Record<string, unknown>> = [{
-        name: service,
-        ready,
-        restartCount: options.restarts ?? 0,
-        state: options.waiting
-            ? { waiting: { reason: options.waiting } }
-            : options.terminated
-                ? { terminated: options.terminated }
-                : { running: {} },
-    }];
+    const containers: Array<Record<string, unknown>> = [
+        { name: service, image: options.image ?? IMAGE(options.tag ?? "1.4.2", service) },
+    ];
+    const statuses: Array<Record<string, unknown>> = [
+        {
+            name: service,
+            ready,
+            restartCount: options.restarts ?? 0,
+            state: options.waiting
+                ? { waiting: { reason: options.waiting } }
+                : options.terminated
+                  ? { terminated: options.terminated }
+                  : { running: {} },
+        },
+    ];
     if (options.sidecar !== undefined) {
         containers.push({ name: "mesh-proxy", image: `registry.example.test/mesh/proxy:${options.sidecar}` });
         statuses.push({ name: "mesh-proxy", ready, restartCount: 0, state: { running: {} } });
@@ -65,7 +69,11 @@ export function pod(name: string, options: PodOptions = {}): Record<string, unkn
             conditions: [{ type: "Ready", status: ready ? "True" : "False" }],
             containerStatuses: statuses,
             ...(options.initWaiting
-                ? { initContainerStatuses: [{ name: "init", ready: false, state: { waiting: { reason: options.initWaiting } } }] }
+                ? {
+                      initContainerStatuses: [
+                          { name: "init", ready: false, state: { waiting: { reason: options.initWaiting } } },
+                      ],
+                  }
                 : {}),
         },
     };
@@ -120,9 +128,9 @@ export function workload(name: string, options: WorkloadOptions = {}): Record<st
             updatedReplicas: options.updated ?? 2,
             ...(kind === "StatefulSet"
                 ? {
-                    currentRevision: options.currentRevision ?? "orders-api-5d9f",
-                    updateRevision: options.updateRevision ?? options.currentRevision ?? "orders-api-5d9f",
-                }
+                      currentRevision: options.currentRevision ?? "orders-api-5d9f",
+                      updateRevision: options.updateRevision ?? options.currentRevision ?? "orders-api-5d9f",
+                  }
                 : {}),
         },
     };
@@ -146,7 +154,10 @@ export interface EventOptions {
 /** An event about `kind/name`, as `kubectl get events -o json` prints it. */
 export function event(name: string, options: EventOptions = {}): Record<string, unknown> {
     return {
-        metadata: { name: `${name}.${options.reason ?? "Pulled"}`, ...(options.created === undefined ? {} : { creationTimestamp: options.created }) },
+        metadata: {
+            name: `${name}.${options.reason ?? "Pulled"}`,
+            ...(options.created === undefined ? {} : { creationTimestamp: options.created }),
+        },
         involvedObject: { kind: options.kind ?? "Pod", name },
         type: options.type ?? "Normal",
         reason: options.reason ?? "Pulled",
@@ -205,7 +216,11 @@ export function controllerRevision(name: string, options: ControllerRevisionOpti
         kind: "ControllerRevision",
         metadata: { name, ownerReferences: [{ kind: "StatefulSet", name: options.owner ?? service }] },
         revision: options.revision ?? 1,
-        data: { spec: { template: { spec: { containers: [{ name: service, image: IMAGE(options.tag ?? "1.4.2", service) }] } } } },
+        data: {
+            spec: {
+                template: { spec: { containers: [{ name: service, image: IMAGE(options.tag ?? "1.4.2", service) }] } },
+            },
+        },
     };
 }
 
@@ -223,5 +238,8 @@ export const history = (...revisions: Array<{ revision: number; status?: string;
 
 /** What `helm get values --all -o json` prints for a revision that ran `tag`, or for a chart that takes no image tag. */
 export const values = (tag?: string | number): Reply => ({
-    stdout: tag === undefined ? { replicaCount: 2 } : { replicaCount: 2, image: { repository: "registry.example.test/shop/orders-api", tag } },
+    stdout:
+        tag === undefined
+            ? { replicaCount: 2 }
+            : { replicaCount: 2, image: { repository: "registry.example.test/shop/orders-api", tag } },
 });

@@ -26,7 +26,10 @@ function withNetwork(answer: Fetch, more: { healthTimeoutMs?: number } = {}) {
     return { harness: h, requests };
 }
 
-const reply = (body: string | null, status = 200, headers: Record<string, string> = {}) => async () => new Response(body, { status, headers });
+const reply =
+    (body: string | null, status = 200, headers: Record<string, string> = {}) =>
+    async () =>
+        new Response(body, { status, headers });
 
 describe("what is asked", () => {
     test("one GET on the catalog's address, with no redirect followed, a signal for the time limit, and no credential", async () => {
@@ -55,19 +58,35 @@ describe("what is asked", () => {
 
     test("the address wins over a check in a pod, and no pod is asked", async () => {
         const { harness } = withNetwork(reply("UP"));
-        harness.configure(withEnvironment("orders-api", "staging", { health: "https://orders.staging.example.com/health" }));
+        harness.configure(
+            withEnvironment("orders-api", "staging", { health: "https://orders.staging.example.com/health" }),
+        );
         harness.cluster.answer({ pods: list(pod("orders-api-0")) });
-        assert.match(ok(await harness.runtime.call({ action: "health", service: "orders-api", environment: "staging" })), /^GET https:\/\/orders\.staging\.example\.com\/health -> HTTP 200/);
+        assert.match(
+            ok(await harness.runtime.call({ action: "health", service: "orders-api", environment: "staging" })),
+            /^GET https:\/\/orders\.staging\.example\.com\/health -> HTTP 200/,
+        );
         assert.deepEqual(harness.cluster.calls(), []);
     });
 
     test("the query of an address is never put in a message: it can hold a token", async () => {
         const { harness, requests } = withNetwork(reply("UP"));
-        harness.configure(withEnvironment("billing", "staging", { health: "https://billing.example.test/health?token=TOKEN-CANARY-91ac7&full=1" }));
+        harness.configure(
+            withEnvironment("billing", "staging", {
+                health: "https://billing.example.test/health?token=TOKEN-CANARY-91ac7&full=1",
+            }),
+        );
         const text = ok(await harness.runtime.call({ action: "health", service: "billing", environment: "staging" }));
         assert.equal(text, "GET https://billing.example.test/health?… -> HTTP 200\nUP");
-        assert.equal(requests[0]?.address, "https://billing.example.test/health?token=TOKEN-CANARY-91ac7&full=1", "the whole address is what is requested");
-        assert.equal(shownAddress("https://billing.example.test:8443/a/b?x=1"), "https://billing.example.test:8443/a/b?…");
+        assert.equal(
+            requests[0]?.address,
+            "https://billing.example.test/health?token=TOKEN-CANARY-91ac7&full=1",
+            "the whole address is what is requested",
+        );
+        assert.equal(
+            shownAddress("https://billing.example.test:8443/a/b?x=1"),
+            "https://billing.example.test:8443/a/b?…",
+        );
         assert.equal(shownAddress("https://billing.example.test/a"), "https://billing.example.test/a");
     });
 });
@@ -79,7 +98,9 @@ describe("what comes back", () => {
     });
 
     test("a redirect is not followed: it is a result that says where it points", async () => {
-        const { harness, requests } = withNetwork(reply(null, 302, { location: "https://login.example.test/sso?next=orders" }));
+        const { harness, requests } = withNetwork(
+            reply(null, 302, { location: "https://login.example.test/sso?next=orders" }),
+        );
         const result = await harness.runtime.call(PRODUCTION);
         assert.equal(
             ok(result),
@@ -95,7 +116,9 @@ describe("what comes back", () => {
     });
 
     test("terminal sequences and control characters in the body, and in a redirect's address, do not get through", async () => {
-        const { harness } = withNetwork(reply("\u001b[31mred\u001b[0m\u0007end", 302, { location: "https://x.test/\u001b[2Jgo" }));
+        const { harness } = withNetwork(
+            reply("\u001b[31mred\u001b[0m\u0007end", 302, { location: "https://x.test/\u001b[2Jgo" }),
+        );
         const text = ok(await harness.runtime.call(PRODUCTION));
         assert.equal(text.split("\n")[1], "red?end");
         assert.ok(!text.includes("\u001b"));
@@ -132,8 +155,13 @@ describe("what comes back", () => {
     });
 
     test("a body that is not text is not shown", async () => {
-        const { harness } = withNetwork(async () => new Response(new Uint8Array([137, 80, 78, 71, 0, 1, 2]), { status: 200 }));
-        assert.equal(ok(await harness.runtime.call(PRODUCTION)), `GET ${ADDRESS} -> HTTP 200\n(not text: 7 bytes read)`);
+        const { harness } = withNetwork(
+            async () => new Response(new Uint8Array([137, 80, 78, 71, 0, 1, 2]), { status: 200 }),
+        );
+        assert.equal(
+            ok(await harness.runtime.call(PRODUCTION)),
+            `GET ${ADDRESS} -> HTTP 200\n(not text: 7 bytes read)`,
+        );
     });
 });
 
@@ -151,7 +179,10 @@ describe("when there is no answer", () => {
     test("a body that stops half way is held to the same limit", async () => {
         const stalled = new ReadableStream<Uint8Array>({ pull: () => new Promise<void>(() => {}) });
         const { harness } = withNetwork(async () => new Response(stalled, { status: 200 }), { healthTimeoutMs: 60 });
-        assert.equal((await harness.runtime.call(PRODUCTION)).error?.message, `GET ${ADDRESS}: no answer within 0.06 s`);
+        assert.equal(
+            (await harness.runtime.call(PRODUCTION)).error?.message,
+            `GET ${ADDRESS}: no answer within 0.06 s`,
+        );
     });
 
     test("a call the user stops is cancelled at once, and says so", async () => {
@@ -164,13 +195,36 @@ describe("when there is no answer", () => {
 
     test("a failure to connect is told by its code, in this plugin's words and never Node's", async () => {
         const cases: Array<[unknown, string]> = [
-            [Object.assign(new TypeError("fetch failed"), { cause: { code: "ENOTFOUND", message: "getaddrinfo ENOTFOUND api.example.com secret-host" } }), "the name does not resolve (ENOTFOUND)"],
-            [Object.assign(new TypeError("fetch failed"), { cause: { code: "EAI_AGAIN" } }), "the name does not resolve (EAI_AGAIN)"],
-            [Object.assign(new TypeError("fetch failed"), { cause: { code: "ECONNREFUSED" } }), "the connection was refused (ECONNREFUSED)"],
-            [Object.assign(new TypeError("fetch failed"), { cause: { errors: [{ code: "ECONNREFUSED" }] } }), "the connection was refused (ECONNREFUSED)"],
-            [Object.assign(new TypeError("fetch failed"), { cause: { code: "CERT_HAS_EXPIRED" } }), "the TLS certificate was not accepted (CERT_HAS_EXPIRED); certificate checks are never turned off"],
-            [Object.assign(new TypeError("fetch failed"), { cause: { code: "UND_ERR_SOCKET" } }), "the connection failed (UND_ERR_SOCKET)"],
-            [new TypeError("fetch failed https://api.example.com/orders/health?token=SECRET-CANARY"), "the connection failed"],
+            [
+                Object.assign(new TypeError("fetch failed"), {
+                    cause: { code: "ENOTFOUND", message: "getaddrinfo ENOTFOUND api.example.com secret-host" },
+                }),
+                "the name does not resolve (ENOTFOUND)",
+            ],
+            [
+                Object.assign(new TypeError("fetch failed"), { cause: { code: "EAI_AGAIN" } }),
+                "the name does not resolve (EAI_AGAIN)",
+            ],
+            [
+                Object.assign(new TypeError("fetch failed"), { cause: { code: "ECONNREFUSED" } }),
+                "the connection was refused (ECONNREFUSED)",
+            ],
+            [
+                Object.assign(new TypeError("fetch failed"), { cause: { errors: [{ code: "ECONNREFUSED" }] } }),
+                "the connection was refused (ECONNREFUSED)",
+            ],
+            [
+                Object.assign(new TypeError("fetch failed"), { cause: { code: "CERT_HAS_EXPIRED" } }),
+                "the TLS certificate was not accepted (CERT_HAS_EXPIRED); certificate checks are never turned off",
+            ],
+            [
+                Object.assign(new TypeError("fetch failed"), { cause: { code: "UND_ERR_SOCKET" } }),
+                "the connection failed (UND_ERR_SOCKET)",
+            ],
+            [
+                new TypeError("fetch failed https://api.example.com/orders/health?token=SECRET-CANARY"),
+                "the connection failed",
+            ],
         ];
         for (const [failure, words] of cases) {
             const { harness } = withNetwork(async () => {
@@ -201,8 +255,18 @@ describe("the address is checked again for every request", () => {
 
     test("a plain http address, a user name and a fragment are refused before anything is sent", async () => {
         const asked: string[] = [];
-        for (const address of ["http://api.example.com/h", "https://u:p@api.example.com/h", "https://api.example.com/h#x", "https:///h", "ftp://api.example.com/h"]) {
-            await assert.rejects(urlHealth(address, undefined, deps(asked)), /^Error: The health address is refused \(it .+\)\. Nothing was sent$/, address);
+        for (const address of [
+            "http://api.example.com/h",
+            "https://u:p@api.example.com/h",
+            "https://api.example.com/h#x",
+            "https:///h",
+            "ftp://api.example.com/h",
+        ]) {
+            await assert.rejects(
+                urlHealth(address, undefined, deps(asked)),
+                /^Error: The health address is refused \(it .+\)\. Nothing was sent$/,
+                address,
+            );
         }
         assert.deepEqual(asked, []);
     });

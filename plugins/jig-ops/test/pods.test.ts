@@ -1,7 +1,15 @@
 // The pods of a service: how a pod is read from kubectl's JSON, which pod is the first Ready one, and the `pods` action.
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, test } from "node:test";
-import { age, firstReady, listPods, ownContainers, parsePod, podsAction, tagOf } from "../src/runtime/kubernetes/pods.ts";
+import {
+    age,
+    firstReady,
+    listPods,
+    ownContainers,
+    parsePod,
+    podsAction,
+    tagOf,
+} from "../src/runtime/kubernetes/pods.ts";
 import type { Container } from "../src/runtime/kubernetes/pods.ts";
 import { fakeClock, NOW } from "./support/clock.ts";
 import { IMAGE, list, pod } from "./support/fixtures.ts";
@@ -14,7 +22,8 @@ beforeEach(() => {
 });
 afterEach(() => r.close());
 
-const parse = (raw: unknown, service = "orders-api", environment = "staging") => parsePod(raw, r.target(service, environment));
+const parse = (raw: unknown, service = "orders-api", environment = "staging") =>
+    parsePod(raw, r.target(service, environment));
 
 describe("the tag of an image", () => {
     test("is what follows the last colon after the last slash", () => {
@@ -38,28 +47,51 @@ describe("the containers that run the service itself", () => {
 
     test("the configured container wins", () => {
         const target = { ...r.target(), container: "worker" };
-        assert.deepEqual(ownContainers(containers, target).map((c) => c.name), ["worker"]);
+        assert.deepEqual(
+            ownContainers(containers, target).map((c) => c.name),
+            ["worker"],
+        );
     });
 
     test("a pod with one container has no sidecar", () => {
-        assert.deepEqual(ownContainers(containers.slice(0, 1), { ...r.target(), container: undefined }).map((c) => c.name), ["mesh-proxy"]);
+        assert.deepEqual(
+            ownContainers(containers.slice(0, 1), { ...r.target(), container: undefined }).map((c) => c.name),
+            ["mesh-proxy"],
+        );
     });
 
     test("otherwise the container or the image that is named like the service", () => {
         const target = { ...r.target(), container: undefined };
-        assert.deepEqual(ownContainers(containers, target).map((c) => c.name), ["main"], "by its image");
-        const byName = [...containers.slice(0, 1), { name: "orders-api", image: "registry.example.test/x/y:9", tag: "9" }];
-        assert.deepEqual(ownContainers(byName, target).map((c) => c.name), ["orders-api"], "by its name");
+        assert.deepEqual(
+            ownContainers(containers, target).map((c) => c.name),
+            ["main"],
+            "by its image",
+        );
+        const byName = [
+            ...containers.slice(0, 1),
+            { name: "orders-api", image: "registry.example.test/x/y:9", tag: "9" },
+        ];
+        assert.deepEqual(
+            ownContainers(byName, target).map((c) => c.name),
+            ["orders-api"],
+            "by its name",
+        );
     });
 
     test("when none is named like the service, every container is", () => {
         const target = { ...r.target(), container: undefined, service: "something-else" };
-        assert.deepEqual(ownContainers(containers, target).map((c) => c.name), ["mesh-proxy", "main", "worker"]);
+        assert.deepEqual(
+            ownContainers(containers, target).map((c) => c.name),
+            ["mesh-proxy", "main", "worker"],
+        );
     });
 
     test("a configured container the pod does not have is ignored", () => {
         const target = { ...r.target(), container: "gone" };
-        assert.deepEqual(ownContainers(containers, target).map((c) => c.name), ["main"]);
+        assert.deepEqual(
+            ownContainers(containers, target).map((c) => c.name),
+            ["main"],
+        );
     });
 });
 
@@ -86,7 +118,10 @@ describe("a pod read from kubectl's JSON", () => {
         const read = parse(pod("orders-api-0", { sidecar: "1.20", tag: "1.4.3" }));
         assert.deepEqual(read?.tags, ["1.4.3"]);
         assert.deepEqual([read?.readyContainers, read?.totalContainers], [2, 2]);
-        assert.deepEqual(read?.containers.map((c) => c.tag), ["1.4.3", "1.20"]);
+        assert.deepEqual(
+            read?.containers.map((c) => c.tag),
+            ["1.4.3", "1.20"],
+        );
     });
 
     test("what kubectl would print under STATUS", () => {
@@ -97,8 +132,15 @@ describe("a pod read from kubectl's JSON", () => {
         assert.equal(status({ waiting: "ContainerCreating", ready: false, phase: "Pending" }), "ContainerCreating");
         assert.equal(status({ initWaiting: "PodInitializing", ready: false }), "Init:PodInitializing");
         assert.equal(status({ terminated: { reason: "OOMKilled", exitCode: 137 }, ready: false }), "OOMKilled");
-        assert.equal(status({ terminated: { reason: "Completed", exitCode: 0 }, phase: "Succeeded", ready: false }), "Succeeded");
-        assert.equal(status({ deleting: true, waiting: "CrashLoopBackOff" }), "Terminating", "a pod on its way out says so first");
+        assert.equal(
+            status({ terminated: { reason: "Completed", exitCode: 0 }, phase: "Succeeded", ready: false }),
+            "Succeeded",
+        );
+        assert.equal(
+            status({ deleting: true, waiting: "CrashLoopBackOff" }),
+            "Terminating",
+            "a pod on its way out says so first",
+        );
         assert.equal(status({ phase: "Failed", ready: false }), "Failed");
     });
 
@@ -109,19 +151,31 @@ describe("a pod read from kubectl's JSON", () => {
     });
 
     test("restarts add up over the containers", () => {
-        const raw = pod("p", { sidecar: "1.20", restarts: 3 }) as { status: { containerStatuses: Array<Record<string, unknown>> } };
+        const raw = pod("p", { sidecar: "1.20", restarts: 3 }) as {
+            status: { containerStatuses: Array<Record<string, unknown>> };
+        };
         (raw.status.containerStatuses[1] as Record<string, unknown>).restartCount = 4;
         assert.equal(parse(raw)?.restarts, 7);
     });
 
     test("a pod that cannot come up by itself is failing", () => {
-        for (const waiting of ["CrashLoopBackOff", "ImagePullBackOff", "ErrImagePull", "CreateContainerConfigError", "InvalidImageName"]) {
+        for (const waiting of [
+            "CrashLoopBackOff",
+            "ImagePullBackOff",
+            "ErrImagePull",
+            "CreateContainerConfigError",
+            "InvalidImageName",
+        ]) {
             assert.equal(parse(pod("p", { waiting, ready: false }))?.failing, waiting, waiting);
         }
         for (const waiting of ["ContainerCreating", "PodInitializing", "Pending"]) {
             assert.equal(parse(pod("p", { waiting, ready: false }))?.failing, undefined, waiting);
         }
-        assert.equal(parse(pod("p", { initWaiting: "ImagePullBackOff", ready: false }))?.failing, "ImagePullBackOff", "an init container too");
+        assert.equal(
+            parse(pod("p", { initWaiting: "ImagePullBackOff", ready: false }))?.failing,
+            "ImagePullBackOff",
+            "an init container too",
+        );
     });
 
     test("a pod being deleted is terminating", () => {
@@ -134,24 +188,57 @@ describe("a pod read from kubectl's JSON", () => {
     });
 
     test("anything that is not a pod is skipped, and a pod with little in it still reads", () => {
-        for (const raw of [null, undefined, 5, "pod", [], {}, { metadata: {} }, { metadata: { name: "" } }, { metadata: { name: 5 } }]) {
+        for (const raw of [
+            null,
+            undefined,
+            5,
+            "pod",
+            [],
+            {},
+            { metadata: {} },
+            { metadata: { name: "" } },
+            { metadata: { name: 5 } },
+        ]) {
             assert.equal(parse(raw), undefined, JSON.stringify(raw));
         }
         const bare = parse({ metadata: { name: "bare" } });
-        assert.deepEqual([bare?.status, bare?.ready, bare?.restarts, bare?.created, bare?.tags, bare?.totalContainers], ["Unknown", false, 0, undefined, [], 0]);
+        assert.deepEqual(
+            [bare?.status, bare?.ready, bare?.restarts, bare?.created, bare?.tags, bare?.totalContainers],
+            ["Unknown", false, 0, undefined, [], 0],
+        );
     });
 
     test("a pod or a container whose name Kubernetes would not allow is left out, because the name goes into a command line", () => {
-        for (const name of ["-A", "--all", "-n=kube-system", "Orders", "a b", "x;y", "$(id)", "a\nb", ".", "a..", "x".repeat(254)]) {
+        for (const name of [
+            "-A",
+            "--all",
+            "-n=kube-system",
+            "Orders",
+            "a b",
+            "x;y",
+            "$(id)",
+            "a\nb",
+            ".",
+            "a..",
+            "x".repeat(254),
+        ]) {
             assert.equal(parse(pod(name)), undefined, JSON.stringify(name));
         }
         for (const name of ["a", "orders-api-0", "orders-api-6d4f9c7b8-x2k9q", "pod.with.dots", "x".repeat(253)]) {
             assert.equal(parse(pod(name))?.name, name, name);
         }
-        const raw = pod("orders-api-0", { sidecar: "1.20" }) as { spec: { containers: Array<{ name: string; image: string }> } };
-        raw.spec.containers.push({ name: "--all-containers", image: "registry.example.test/x:1" }, { name: "Main", image: "registry.example.test/x:1" });
+        const raw = pod("orders-api-0", { sidecar: "1.20" }) as {
+            spec: { containers: Array<{ name: string; image: string }> };
+        };
+        raw.spec.containers.push(
+            { name: "--all-containers", image: "registry.example.test/x:1" },
+            { name: "Main", image: "registry.example.test/x:1" },
+        );
         const read = parse(raw);
-        assert.deepEqual(read?.containers.map((c) => c.name), ["orders-api", "mesh-proxy"]);
+        assert.deepEqual(
+            read?.containers.map((c) => c.name),
+            ["orders-api", "mesh-proxy"],
+        );
         assert.equal(read?.totalContainers, 2);
     });
 
@@ -165,14 +252,18 @@ describe("the age of a pod", () => {
     test("is shown in the largest unit that has two of it", () => {
         const at = Date.parse("2026-10-15T08:00:00Z");
         const ago = (seconds: number) => age(at, at + seconds * 1000);
-        assert.deepEqual([ago(0), ago(119), ago(120), ago(7199), ago(7200), ago(172_799), ago(172_800), ago(5 * 86_400)], ["0s", "119s", "2m", "119m", "2h", "47h", "2d", "5d"]);
+        assert.deepEqual(
+            [ago(0), ago(119), ago(120), ago(7199), ago(7200), ago(172_799), ago(172_800), ago(5 * 86_400)],
+            ["0s", "119s", "2m", "119m", "2h", "47h", "2d", "5d"],
+        );
         assert.equal(age(undefined, at), "?");
         assert.equal(age(at + 5000, at), "0s", "a clock that is behind does not give a negative age");
     });
 });
 
 describe("the first Ready pod", () => {
-    const read = (...items: Array<Record<string, unknown>>) => items.map((item) => parse(item)).filter((p) => p !== undefined);
+    const read = (...items: Array<Record<string, unknown>>) =>
+        items.map((item) => parse(item)).filter((p) => p !== undefined);
 
     test("is the first one in the order kubectl listed them that is ready", () => {
         const pods = read(pod("a-0", { ready: false }), pod("a-1"), pod("a-2"));
@@ -194,10 +285,25 @@ describe("listing the pods", () => {
     test("asks kubectl for the pods that match the selector, as JSON, and reads them in order", async () => {
         r.cluster.answer({ pods: list(pod("orders-api-1"), pod("orders-api-0"), { not: "a pod" }) });
         const pods = await listPods(r.kube());
-        assert.deepEqual(pods.map((p) => p.name), ["orders-api-1", "orders-api-0"]);
-        assert.deepEqual(r.cluster.calls().map((call) => call.argv), [
-            ["--request-timeout=25s", "--context=test-cluster", "--namespace=orders-staging", "get", "pods", "--selector=app=orders-api", "-o", "json"],
-        ]);
+        assert.deepEqual(
+            pods.map((p) => p.name),
+            ["orders-api-1", "orders-api-0"],
+        );
+        assert.deepEqual(
+            r.cluster.calls().map((call) => call.argv),
+            [
+                [
+                    "--request-timeout=25s",
+                    "--context=test-cluster",
+                    "--namespace=orders-staging",
+                    "get",
+                    "pods",
+                    "--selector=app=orders-api",
+                    "-o",
+                    "json",
+                ],
+            ],
+        );
     });
 
     test("uses the selector of the target, with all its pairs", async () => {
@@ -219,7 +325,13 @@ describe("the pods action", () => {
         r.cluster.answer({
             pods: list(
                 pod("orders-api-0", { created: "2026-10-15T08:55:00Z" }),
-                pod("orders-api-1", { ready: false, waiting: "CrashLoopBackOff", restarts: 7, tag: "1.4.3", created: "2026-10-15T08:00:00Z" }),
+                pod("orders-api-1", {
+                    ready: false,
+                    waiting: "CrashLoopBackOff",
+                    restarts: 7,
+                    tag: "1.4.3",
+                    created: "2026-10-15T08:00:00Z",
+                }),
                 pod("orders-api-2", { sidecar: "1.20", created: "2026-10-12T08:00:00Z" }),
             ),
         });
@@ -234,7 +346,13 @@ describe("the pods action", () => {
             ].join("\n"),
         );
         assert.deepEqual(outcome.facts, { pods: 3, ready: 2 });
-        assert.deepEqual((outcome.details.pods as unknown[])[1], { name: "orders-api-1", ready: false, status: "CrashLoopBackOff", restarts: 7, tags: ["1.4.3"] });
+        assert.deepEqual((outcome.details.pods as unknown[])[1], {
+            name: "orders-api-1",
+            ready: false,
+            status: "CrashLoopBackOff",
+            restarts: 7,
+            tags: ["1.4.3"],
+        });
     });
 
     test("says when no pod matches, and what was looked for", async () => {
@@ -259,6 +377,9 @@ describe("the pods action", () => {
 
     test("a kubectl that fails is one line that says what to do", async () => {
         r.cluster.answer({ pods: { code: 1, stderr: "Unable to connect to the server: dial tcp: i/o timeout" } });
-        await assert.rejects(podsAction(r.kube(), NOW), /^Error: Cannot reach the cluster of context test-cluster for orders-api in staging/);
+        await assert.rejects(
+            podsAction(r.kube(), NOW),
+            /^Error: Cannot reach the cluster of context test-cluster for orders-api in staging/,
+        );
     });
 });

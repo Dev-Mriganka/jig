@@ -304,8 +304,7 @@ async function pollPull(poll: Poll, finish: Extract<Finish, { kind: "pr" }>): Pr
     if (reviews.approved.length > 0) {
         return {
             outcome: "passed",
-            summary:
-                `Pull request ${spec.pr} was approved by ${reviews.approved.map((review) => review.login).join(", ")}`,
+            summary: `Pull request ${spec.pr} was approved by ${reviews.approved.map((review) => review.login).join(", ")}`,
             links: [pull.url],
         };
     }

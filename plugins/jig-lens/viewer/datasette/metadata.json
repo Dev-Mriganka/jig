@@ -1,84 +1,84 @@
 {
-  "title": "Jig lens",
-  "description": "What the agent did and what it cost, from jig-core's records. This page runs only the queries below.",
-  "databases": {
-    "index": {
-      "allow_sql": false,
-      "queries": {
-        "cost_per_day": {
-          "title": "Cost per day",
-          "description": "Model turns and what they cost, by UTC day, newest first.",
-          "sql": "SELECT date(time, 'unixepoch') AS day, round(sum(cost), 4) AS cost, count(*) AS turns\nFROM turn\nGROUP BY day\nORDER BY day DESC"
-        },
-        "cost_per_model": {
-          "title": "Cost per model",
-          "description": "Cache hit is the share of prompt tokens that were read from the cache.",
-          "sql": "SELECT model,\n       round(sum(cost), 4) AS cost,\n       count(*) AS turns,\n       sum(input) AS input,\n       sum(output) AS output,\n       sum(cacheRead) AS cache_read,\n       sum(cacheWrite) AS cache_write,\n       round(100.0 * sum(cacheRead) / nullif(sum(input) + sum(cacheRead) + sum(cacheWrite), 0), 1) AS cache_hit_percent\nFROM turn\nGROUP BY model\nORDER BY cost DESC, model"
-        },
-        "cost_per_agent_role": {
-          "title": "Cost per agent role",
-          "description": "The main agent is main; a child agent has the role it was started with, such as a reviewer.",
-          "sql": "SELECT agentRole AS role,\n       round(sum(cost), 4) AS cost,\n       count(*) AS turns,\n       count(DISTINCT session) AS sessions\nFROM turn\nGROUP BY agentRole\nORDER BY cost DESC, role"
-        },
-        "cost_per_ticket": {
-          "title": "Cost per ticket",
-          "sql": "SELECT coalesce(ticket, '(none)') AS ticket,\n       round(sum(cost), 4) AS cost,\n       count(DISTINCT session) AS sessions,\n       count(*) AS turns\nFROM turn\nGROUP BY ticket\nORDER BY cost DESC, ticket"
-        },
-        "sessions_by_cost": {
-          "title": "Sessions, by cost",
-          "description": "Copy a session id into Session timeline to see every call and turn in it.",
-          "sql": "WITH events AS (\n    SELECT session, agentRole, ticket, time, cost, 0 AS calls, 0 AS errors FROM turn\n    UNION ALL\n    SELECT session, agentRole, ticket, time, 0.0, 1, outcome = 'error' FROM call\n)\nSELECT session,\n       min(agentRole) AS role,\n       max(ticket) AS ticket,\n       datetime(min(time), 'unixepoch') AS started,\n       round(sum(cost), 4) AS cost,\n       sum(calls) AS calls,\n       sum(errors) AS errors\nFROM events\nGROUP BY session\nORDER BY sum(cost) DESC, session\nLIMIT 100"
-        },
-        "session_timeline": {
-          "title": "Session timeline",
-          "description": "Every call and model turn of one session, in order. Give the session id.",
-          "sql": "SELECT datetime(time, 'unixepoch') AS time,\n       'call' AS kind,\n       tool || coalesce(' ' || action, '') AS what,\n       environment,\n       decision,\n       decisionSource AS decided_by,\n       answer,\n       outcome,\n       errorKind,\n       durationMs AS duration_ms,\n       waitedMs AS waited_ms,\n       NULL AS cost,\n       error\nFROM call\nWHERE session = :session\nUNION ALL\nSELECT datetime(time, 'unixepoch'),\n       'turn',\n       model,\n       NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,\n       cost,\n       NULL\nFROM turn\nWHERE session = :session\nORDER BY time, kind"
-        },
-        "calls_per_day": {
-          "title": "Calls per day",
-          "description": "Errors ran and failed or never ran; blocked calls were refused by a rule or declined by you.",
-          "sql": "SELECT date(time, 'unixepoch') AS day,\n       count(*) AS calls,\n       sum(outcome = 'error') AS errors,\n       sum(outcome = 'blocked') AS blocked\nFROM call\nGROUP BY day\nORDER BY day DESC"
-        },
-        "calls_per_tool": {
-          "title": "Calls and failures per tool",
-          "sql": "SELECT tool,\n       coalesce(action, '') AS action,\n       count(*) AS calls,\n       sum(outcome = 'error') AS errors,\n       sum(outcome = 'blocked') AS blocked,\n       round(100.0 * sum(outcome = 'error') / count(*), 1) AS error_percent\nFROM call\nGROUP BY tool, action\nORDER BY errors DESC, calls DESC, tool, action"
-        },
-        "failures_per_error_kind": {
-          "title": "Failures per error kind",
-          "description": "Why calls did not succeed: denied, no-screen, declined, invalid, dismissed, internal, tool, withheld, not-run.",
-          "sql": "SELECT errorKind, count(*) AS calls\nFROM call\nWHERE errorKind IS NOT NULL\nGROUP BY errorKind\nORDER BY calls DESC, errorKind"
-        },
-        "slowest_tools": {
-          "title": "Slowest tools",
-          "description": "By average time the tool ran, in milliseconds.",
-          "sql": "SELECT tool,\n       coalesce(action, '') AS action,\n       count(*) AS calls,\n       round(avg(durationMs)) AS average_ms,\n       max(durationMs) AS slowest_ms\nFROM call\nWHERE durationMs IS NOT NULL\nGROUP BY tool, action\nORDER BY avg(durationMs) DESC, tool, action\nLIMIT 15"
-        },
-        "refused_calls": {
-          "title": "Calls refused by a rule",
-          "description": "Calls with decision deny.",
-          "sql": "SELECT datetime(time, 'unixepoch') AS time,\n       session,\n       tool,\n       coalesce(action, '') AS action,\n       environment,\n       decisionSource AS decided_by,\n       error\nFROM call\nWHERE decision = 'deny'\nORDER BY time DESC\nLIMIT 100"
-        },
-        "questions_per_tool": {
-          "title": "Questions per tool",
-          "description": "Each question is a call that asked you. Waits are in milliseconds.",
-          "sql": "SELECT tool,\n       coalesce(action, '') AS action,\n       count(*) AS questions,\n       sum(answer = 'allow') AS allowed,\n       sum(answer = 'allow-session') AS allowed_for_the_session,\n       sum(answer = 'decline') AS declined,\n       sum(waitedMs) AS waited_ms,\n       round(avg(waitedMs)) AS average_wait_ms\nFROM call\nWHERE answer IS NOT NULL\nGROUP BY tool, action\nORDER BY questions DESC, tool, action"
-        },
-        "questions_per_ticket": {
-          "title": "Questions per ticket",
-          "description": "A ticket is one change, so this is how often each change needed you.",
-          "sql": "SELECT coalesce(ticket, '(none)') AS ticket,\n       count(*) AS questions,\n       sum(waitedMs) AS waited_ms\nFROM call\nWHERE answer IS NOT NULL\nGROUP BY ticket\nORDER BY questions DESC, ticket"
-        },
-        "longest_waits": {
-          "title": "Longest waits",
-          "description": "The calls that waited longest for your answer, in milliseconds.",
-          "sql": "SELECT datetime(time, 'unixepoch') AS time,\n       session,\n       tool,\n       coalesce(action, '') AS action,\n       approval AS asked_with,\n       answer,\n       waitedMs AS waited_ms\nFROM call\nWHERE answer IS NOT NULL\nORDER BY waitedMs DESC, time\nLIMIT 50"
-        },
-        "calls_with_facts": {
-          "title": "Calls with facts",
-          "description": "Newest first. passed, failed and conclusion are read from the facts; facts is all of them.",
-          "sql": "SELECT datetime(time, 'unixepoch') AS time,\n       session,\n       tool,\n       coalesce(action, '') AS action,\n       outcome,\n       durationMs AS duration_ms,\n       json_extract(facts, '$.passed') AS passed,\n       json_extract(facts, '$.failed') AS failed,\n       json_extract(facts, '$.conclusion') AS conclusion,\n       facts\nFROM call\nWHERE facts IS NOT NULL\nORDER BY time DESC\nLIMIT 200"
+    "title": "Jig lens",
+    "description": "What the agent did and what it cost, from jig-core's records. This page runs only the queries below.",
+    "databases": {
+        "index": {
+            "allow_sql": false,
+            "queries": {
+                "cost_per_day": {
+                    "title": "Cost per day",
+                    "description": "Model turns and what they cost, by UTC day, newest first.",
+                    "sql": "SELECT date(time, 'unixepoch') AS day, round(sum(cost), 4) AS cost, count(*) AS turns\nFROM turn\nGROUP BY day\nORDER BY day DESC"
+                },
+                "cost_per_model": {
+                    "title": "Cost per model",
+                    "description": "Cache hit is the share of prompt tokens that were read from the cache.",
+                    "sql": "SELECT model,\n       round(sum(cost), 4) AS cost,\n       count(*) AS turns,\n       sum(input) AS input,\n       sum(output) AS output,\n       sum(cacheRead) AS cache_read,\n       sum(cacheWrite) AS cache_write,\n       round(100.0 * sum(cacheRead) / nullif(sum(input) + sum(cacheRead) + sum(cacheWrite), 0), 1) AS cache_hit_percent\nFROM turn\nGROUP BY model\nORDER BY cost DESC, model"
+                },
+                "cost_per_agent_role": {
+                    "title": "Cost per agent role",
+                    "description": "The main agent is main; a child agent has the role it was started with, such as a reviewer.",
+                    "sql": "SELECT agentRole AS role,\n       round(sum(cost), 4) AS cost,\n       count(*) AS turns,\n       count(DISTINCT session) AS sessions\nFROM turn\nGROUP BY agentRole\nORDER BY cost DESC, role"
+                },
+                "cost_per_ticket": {
+                    "title": "Cost per ticket",
+                    "sql": "SELECT coalesce(ticket, '(none)') AS ticket,\n       round(sum(cost), 4) AS cost,\n       count(DISTINCT session) AS sessions,\n       count(*) AS turns\nFROM turn\nGROUP BY ticket\nORDER BY cost DESC, ticket"
+                },
+                "sessions_by_cost": {
+                    "title": "Sessions, by cost",
+                    "description": "Copy a session id into Session timeline to see every call and turn in it.",
+                    "sql": "WITH events AS (\n    SELECT session, agentRole, ticket, time, cost, 0 AS calls, 0 AS errors FROM turn\n    UNION ALL\n    SELECT session, agentRole, ticket, time, 0.0, 1, outcome = 'error' FROM call\n)\nSELECT session,\n       min(agentRole) AS role,\n       max(ticket) AS ticket,\n       datetime(min(time), 'unixepoch') AS started,\n       round(sum(cost), 4) AS cost,\n       sum(calls) AS calls,\n       sum(errors) AS errors\nFROM events\nGROUP BY session\nORDER BY sum(cost) DESC, session\nLIMIT 100"
+                },
+                "session_timeline": {
+                    "title": "Session timeline",
+                    "description": "Every call and model turn of one session, in order. Give the session id.",
+                    "sql": "SELECT datetime(time, 'unixepoch') AS time,\n       'call' AS kind,\n       tool || coalesce(' ' || action, '') AS what,\n       environment,\n       decision,\n       decisionSource AS decided_by,\n       answer,\n       outcome,\n       errorKind,\n       durationMs AS duration_ms,\n       waitedMs AS waited_ms,\n       NULL AS cost,\n       error\nFROM call\nWHERE session = :session\nUNION ALL\nSELECT datetime(time, 'unixepoch'),\n       'turn',\n       model,\n       NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,\n       cost,\n       NULL\nFROM turn\nWHERE session = :session\nORDER BY time, kind"
+                },
+                "calls_per_day": {
+                    "title": "Calls per day",
+                    "description": "Errors ran and failed or never ran; blocked calls were refused by a rule or declined by you.",
+                    "sql": "SELECT date(time, 'unixepoch') AS day,\n       count(*) AS calls,\n       sum(outcome = 'error') AS errors,\n       sum(outcome = 'blocked') AS blocked\nFROM call\nGROUP BY day\nORDER BY day DESC"
+                },
+                "calls_per_tool": {
+                    "title": "Calls and failures per tool",
+                    "sql": "SELECT tool,\n       coalesce(action, '') AS action,\n       count(*) AS calls,\n       sum(outcome = 'error') AS errors,\n       sum(outcome = 'blocked') AS blocked,\n       round(100.0 * sum(outcome = 'error') / count(*), 1) AS error_percent\nFROM call\nGROUP BY tool, action\nORDER BY errors DESC, calls DESC, tool, action"
+                },
+                "failures_per_error_kind": {
+                    "title": "Failures per error kind",
+                    "description": "Why calls did not succeed: denied, no-screen, declined, invalid, dismissed, internal, tool, withheld, not-run.",
+                    "sql": "SELECT errorKind, count(*) AS calls\nFROM call\nWHERE errorKind IS NOT NULL\nGROUP BY errorKind\nORDER BY calls DESC, errorKind"
+                },
+                "slowest_tools": {
+                    "title": "Slowest tools",
+                    "description": "By average time the tool ran, in milliseconds.",
+                    "sql": "SELECT tool,\n       coalesce(action, '') AS action,\n       count(*) AS calls,\n       round(avg(durationMs)) AS average_ms,\n       max(durationMs) AS slowest_ms\nFROM call\nWHERE durationMs IS NOT NULL\nGROUP BY tool, action\nORDER BY avg(durationMs) DESC, tool, action\nLIMIT 15"
+                },
+                "refused_calls": {
+                    "title": "Calls refused by a rule",
+                    "description": "Calls with decision deny.",
+                    "sql": "SELECT datetime(time, 'unixepoch') AS time,\n       session,\n       tool,\n       coalesce(action, '') AS action,\n       environment,\n       decisionSource AS decided_by,\n       error\nFROM call\nWHERE decision = 'deny'\nORDER BY time DESC\nLIMIT 100"
+                },
+                "questions_per_tool": {
+                    "title": "Questions per tool",
+                    "description": "Each question is a call that asked you. Waits are in milliseconds.",
+                    "sql": "SELECT tool,\n       coalesce(action, '') AS action,\n       count(*) AS questions,\n       sum(answer = 'allow') AS allowed,\n       sum(answer = 'allow-session') AS allowed_for_the_session,\n       sum(answer = 'decline') AS declined,\n       sum(waitedMs) AS waited_ms,\n       round(avg(waitedMs)) AS average_wait_ms\nFROM call\nWHERE answer IS NOT NULL\nGROUP BY tool, action\nORDER BY questions DESC, tool, action"
+                },
+                "questions_per_ticket": {
+                    "title": "Questions per ticket",
+                    "description": "A ticket is one change, so this is how often each change needed you.",
+                    "sql": "SELECT coalesce(ticket, '(none)') AS ticket,\n       count(*) AS questions,\n       sum(waitedMs) AS waited_ms\nFROM call\nWHERE answer IS NOT NULL\nGROUP BY ticket\nORDER BY questions DESC, ticket"
+                },
+                "longest_waits": {
+                    "title": "Longest waits",
+                    "description": "The calls that waited longest for your answer, in milliseconds.",
+                    "sql": "SELECT datetime(time, 'unixepoch') AS time,\n       session,\n       tool,\n       coalesce(action, '') AS action,\n       approval AS asked_with,\n       answer,\n       waitedMs AS waited_ms\nFROM call\nWHERE answer IS NOT NULL\nORDER BY waitedMs DESC, time\nLIMIT 50"
+                },
+                "calls_with_facts": {
+                    "title": "Calls with facts",
+                    "description": "Newest first. passed, failed and conclusion are read from the facts; facts is all of them.",
+                    "sql": "SELECT datetime(time, 'unixepoch') AS time,\n       session,\n       tool,\n       coalesce(action, '') AS action,\n       outcome,\n       durationMs AS duration_ms,\n       json_extract(facts, '$.passed') AS passed,\n       json_extract(facts, '$.failed') AS failed,\n       json_extract(facts, '$.conclusion') AS conclusion,\n       facts\nFROM call\nWHERE facts IS NOT NULL\nORDER BY time DESC\nLIMIT 200"
+                }
+            }
         }
-      }
     }
-  }
 }

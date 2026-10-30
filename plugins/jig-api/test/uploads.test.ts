@@ -31,16 +31,30 @@ beforeEach(() => {
 function postman(src: string): void {
     const file = path.join(root, "c.postman_collection.json");
     const url = { raw: "{{baseUrl}}/up" };
-    fs.writeFileSync(file, JSON.stringify({
-        info: { name: "Uploads" },
-        item: [
-            { name: "Form", request: { method: "POST", url, body: { mode: "formdata", formdata: [{ key: "f", type: "file", src }] } } },
-            { name: "Body", request: { method: "PUT", url, body: { mode: "file", file: { src } } } },
-        ],
-    }));
+    fs.writeFileSync(
+        file,
+        JSON.stringify({
+            info: { name: "Uploads" },
+            item: [
+                {
+                    name: "Form",
+                    request: {
+                        method: "POST",
+                        url,
+                        body: { mode: "formdata", formdata: [{ key: "f", type: "file", src }] },
+                    },
+                },
+                { name: "Body", request: { method: "PUT", url, body: { mode: "file", file: { src } } } },
+            ],
+        }),
+    );
     const env = path.join(root, "staging.json");
     fs.writeFileSync(env, JSON.stringify({ values: [{ key: "baseUrl", value: h.api.origin, enabled: true }] }));
-    h.configure({ collections: { up: { postman: file, environments: { Staging: env } } }, environments: { Staging: "staging" }, allowPlainLocal: true });
+    h.configure({
+        collections: { up: { postman: file, environments: { Staging: env } } },
+        environments: { Staging: "staging" },
+        allowPlainLocal: true,
+    });
 }
 
 function httpFile(include: string): void {
@@ -49,9 +63,12 @@ function httpFile(include: string): void {
     h.configure({ collections: { up: { http: root } }, environments: { staging: "staging" }, allowPlainLocal: true });
 }
 
-const upload = (request: string, environment = "Staging") => h.call({ action: "run", request, collection: "up", environment });
-const refusal = (_name: string, src: string, why: string): string => `jig-core could not decide: the file ${JSON.stringify(src)} ${why}`;
-const OUTSIDE = "is outside the collection's folder (after following links), and a request may only use files inside it";
+const upload = (request: string, environment = "Staging") =>
+    h.call({ action: "run", request, collection: "up", environment });
+const refusal = (_name: string, src: string, why: string): string =>
+    `jig-core could not decide: the file ${JSON.stringify(src)} ${why}`;
+const OUTSIDE =
+    "is outside the collection's folder (after following links), and a request may only use files inside it";
 
 describe("a file inside the collection's folder", () => {
     test("is uploaded, as a form field and as a whole body", async () => {
@@ -67,7 +84,10 @@ describe("a file inside the collection's folder", () => {
         ok(await upload("Body"));
         postman("files/../files/./inside.txt");
         ok(await upload("Body"));
-        assert.deepEqual(h.api.requests.map((r) => r.body), ["inside the collection", "inside the collection"]);
+        assert.deepEqual(
+            h.api.requests.map((r) => r.body),
+            ["inside the collection", "inside the collection"],
+        );
     });
 
     test("in a .http collection too", async () => {
@@ -79,7 +99,12 @@ describe("a file inside the collection's folder", () => {
 
 describe("a file outside it", () => {
     test("is refused, written as a relative path or an absolute one", async () => {
-        for (const src of ["../elsewhere/secret.txt", path.join(outside, "secret.txt"), "files/../../elsewhere/secret.txt", "/etc/hostname"]) {
+        for (const src of [
+            "../elsewhere/secret.txt",
+            path.join(outside, "secret.txt"),
+            "files/../../elsewhere/secret.txt",
+            "/etc/hostname",
+        ]) {
             postman(src);
             for (const request of ["Form", "Body"]) {
                 const result = await upload(request);
@@ -87,7 +112,10 @@ describe("a file outside it", () => {
             }
         }
         httpFile("../elsewhere/secret.txt");
-        assert.equal((await upload("up.http#1", "staging")).blocked, refusal("up.http#1", "../elsewhere/secret.txt", OUTSIDE));
+        assert.equal(
+            (await upload("up.http#1", "staging")).blocked,
+            refusal("up.http#1", "../elsewhere/secret.txt", OUTSIDE),
+        );
         assert.equal(h.api.requests.length, 0);
     });
 
@@ -96,10 +124,14 @@ describe("a file outside it", () => {
         fs.symlinkSync(outside, path.join(root, "linked-folder"));
         for (const src of ["files/linked.txt", "linked-folder/secret.txt"]) {
             postman(src);
-            for (const request of ["Form", "Body"]) assert.equal((await upload(request)).blocked, refusal(request, src, OUTSIDE), `${request} ${src}`);
+            for (const request of ["Form", "Body"])
+                assert.equal((await upload(request)).blocked, refusal(request, src, OUTSIDE), `${request} ${src}`);
         }
         httpFile("./files/linked.txt");
-        assert.equal((await upload("up.http#1", "staging")).blocked, refusal("up.http#1", "./files/linked.txt", OUTSIDE));
+        assert.equal(
+            (await upload("up.http#1", "staging")).blocked,
+            refusal("up.http#1", "./files/linked.txt", OUTSIDE),
+        );
         assert.equal(h.api.requests.length, 0);
         assert.ok(!JSON.stringify(h.api.requests).includes("OUTSIDE-CANARY"));
     });
@@ -147,10 +179,16 @@ describe("what the person approves", () => {
         assert.match(first.preview?.body ?? "", /<file inside\.txt, 21 bytes, sha256 [0-9a-f]{12}>/);
         assert.ok(!(first.preview?.body ?? "").includes("inside the collection"), "the content is not in the preview");
         ok(first);
-        const changed = await h.call({ action: "run", request: "Body", collection: "up", environment: "Staging" }, {
-            between: () => fs.writeFileSync(path.join(root, "files", "inside.txt"), "changed while you read it"),
-        });
-        assert.equal(changed.error?.message, 'api run "Body": changed since the preview; run it again to see the new preview. Nothing was sent.');
+        const changed = await h.call(
+            { action: "run", request: "Body", collection: "up", environment: "Staging" },
+            {
+                between: () => fs.writeFileSync(path.join(root, "files", "inside.txt"), "changed while you read it"),
+            },
+        );
+        assert.equal(
+            changed.error?.message,
+            'api run "Body": changed since the preview; run it again to see the new preview. Nothing was sent.',
+        );
         assert.equal(h.api.requests.length, 1, "only the first one was sent");
         // The file is the new one on the next run, and its preview shows the new digest.
         const next = await upload("Body");
@@ -162,9 +200,15 @@ describe("what the person approves", () => {
     test("an upload is not carried by a transport, which holds a text body only", async () => {
         postman("files/inside.txt");
         h.jig.transports.set("company-proxy", { request: async () => ({ status: 200, headers: {}, body: "{}" }) });
-        h.configure({ ...(h.jig.api.config.section("api") as Record<string, unknown>), environments: { Staging: { environment: "staging", transport: "company-proxy" } } });
+        h.configure({
+            ...(h.jig.api.config.section("api") as Record<string, unknown>),
+            environments: { Staging: { environment: "staging", transport: "company-proxy" } },
+        });
         const result = await upload("Body");
-        assert.equal(result.error?.message, 'api run "Body": a transport carries a text body, and not a file or a multipart form. Nothing was sent.');
+        assert.equal(
+            result.error?.message,
+            'api run "Body": a transport carries a text body, and not a file or a multipart form. Nothing was sent.',
+        );
         assert.equal(h.jig.transportCalls.length, 0);
     });
 });
@@ -172,9 +216,20 @@ describe("what the person approves", () => {
 describe("the fixtures", () => {
     test("the example company's request for a file outside its folder is refused", async () => {
         h.configure(acmeSection(h));
-        const postmanResult = await h.call({ action: "run", request: "Upload outside", collection: "acme", environment: "Staging", variables: { orderId: "1" } });
+        const postmanResult = await h.call({
+            action: "run",
+            request: "Upload outside",
+            collection: "acme",
+            environment: "Staging",
+            variables: { orderId: "1" },
+        });
         assert.equal(postmanResult.blocked, refusal("Upload outside", "../outside.txt", OUTSIDE));
-        const httpResult = await h.call({ action: "run", request: "Upload outside", collection: "ledger", environment: "staging" });
+        const httpResult = await h.call({
+            action: "run",
+            request: "Upload outside",
+            collection: "ledger",
+            environment: "staging",
+        });
         assert.equal(httpResult.blocked, refusal("Upload outside", "../outside.txt", OUTSIDE));
         assert.equal(h.api.requests.length, 0);
     });

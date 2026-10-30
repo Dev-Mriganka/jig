@@ -19,7 +19,11 @@ describe("a sign-in that kubectl cannot use", () => {
             "Unable to connect to the server: getting credentials: exec: executable gke-gcloud-auth-plugin not found",
             "error: Unable to locate credentials. You can configure credentials by running aws configure",
         ]) {
-            assert.match(message(stderr), /^kubectl is not signed in to context test-cluster \(.+\): the user signs in again for that context outside Pi, then retry$/, stderr);
+            assert.match(
+                message(stderr),
+                /^kubectl is not signed in to context test-cluster \(.+\): the user signs in again for that context outside Pi, then retry$/,
+                stderr,
+            );
         }
     });
 
@@ -50,7 +54,10 @@ describe("a cluster that cannot be reached", () => {
     });
 
     test("is told apart from a sign-in problem that starts like it", () => {
-        assert.match(message("Unable to connect to the server: getting credentials: exec: Token has expired"), /^kubectl is not signed in/);
+        assert.match(
+            message("Unable to connect to the server: getting credentials: exec: Token has expired"),
+            /^kubectl is not signed in/,
+        );
     });
 });
 
@@ -71,7 +78,9 @@ describe("a configuration that does not match the cluster", () => {
 
     test("a user who may not read is told to tell the user", () => {
         assert.match(
-            message('Error from server (Forbidden): pods is forbidden: User "u" cannot list resource "pods" in the namespace "orders-staging"'),
+            message(
+                'Error from server (Forbidden): pods is forbidden: User "u" cannot list resource "pods" in the namespace "orders-staging"',
+            ),
             /^The kubeconfig user is not allowed to read orders-api in staging \(Error from server \(Forbidden\): pods is forbidden.*\): tell the user$/,
         );
     });
@@ -79,9 +88,16 @@ describe("a configuration that does not match the cluster", () => {
 
 describe("a user who may not change the cluster", () => {
     test("is told so for a change, not for a read", () => {
-        const stderr = 'Error from server (Forbidden): deployments.apps "orders-api" is forbidden: User "u" cannot patch resource "deployments"';
-        assert.match(explain(stderr, 1, "kubectl set", target, "change").message, /^The kubeconfig user is not allowed to change orders-api in staging \(/);
-        assert.match(explain(stderr, 1, "kubectl get", target).message, /^The kubeconfig user is not allowed to read orders-api in staging \(/);
+        const stderr =
+            'Error from server (Forbidden): deployments.apps "orders-api" is forbidden: User "u" cannot patch resource "deployments"';
+        assert.match(
+            explain(stderr, 1, "kubectl set", target, "change").message,
+            /^The kubeconfig user is not allowed to change orders-api in staging \(/,
+        );
+        assert.match(
+            explain(stderr, 1, "kubectl get", target).message,
+            /^The kubeconfig user is not allowed to read orders-api in staging \(/,
+        );
     });
 });
 
@@ -90,7 +106,9 @@ describe("what helm says", () => {
 
     test("a cluster it cannot reach is the network's to fix", () => {
         assert.equal(
-            helm('Error: Kubernetes cluster unreachable: Get "https://10.0.0.1/version": dial tcp 10.0.0.1:443: i/o timeout'),
+            helm(
+                'Error: Kubernetes cluster unreachable: Get "https://10.0.0.1/version": dial tcp 10.0.0.1:443: i/o timeout',
+            ),
             "Cannot reach the cluster of context test-cluster for orders-api in staging: check the network or VPN, and retry once it is back",
         );
     });
@@ -103,34 +121,59 @@ describe("what helm says", () => {
     });
 
     test("a release that does not exist says which setting to check", () => {
-        for (const stderr of ["Error: release: not found", "Error: UPGRADE FAILED: \"orders-api\" has no deployed releases"]) {
-            assert.match(helm(stderr), /^helm has no such release for orders-api in staging \(.+\): it was never deployed with helm there, or "release" in the ops catalog of jig.json is wrong$/, stderr);
+        for (const stderr of [
+            "Error: release: not found",
+            'Error: UPGRADE FAILED: "orders-api" has no deployed releases',
+        ]) {
+            assert.match(
+                helm(stderr),
+                /^helm has no such release for orders-api in staging \(.+\): it was never deployed with helm there, or "release" in the ops catalog of jig.json is wrong$/,
+                stderr,
+            );
         }
     });
 
     test("a chart it cannot find says to fix the chart or the folder Pi starts in", () => {
-        for (const stderr of ['Error: path "deploy/chart" not found', 'Error: chart "orders" matching  not found in acme index. (try \'helm repo update\')', "Error: failed to download \"acme/orders\""]) {
-            assert.match(helm(stderr), /^helm cannot find the chart \(.+\): fix "chart" in the ops catalog of jig.json, or start Pi in the folder a relative chart path is read from$/, stderr);
+        for (const stderr of [
+            'Error: path "deploy/chart" not found',
+            "Error: chart \"orders\" matching  not found in acme index. (try 'helm repo update')",
+            'Error: failed to download "acme/orders"',
+        ]) {
+            assert.match(
+                helm(stderr),
+                /^helm cannot find the chart \(.+\): fix "chart" in the ops catalog of jig.json, or start Pi in the folder a relative chart path is read from$/,
+                stderr,
+            );
         }
     });
 });
 
 describe("a pod that changed under the call", () => {
     test("a pod that is gone says to list the pods again", () => {
-        assert.equal(message('Error from server (NotFound): pods "orders-api-0" not found'), "The pod is gone: it was replaced after it was listed. Run pods again");
+        assert.equal(
+            message('Error from server (NotFound): pods "orders-api-0" not found'),
+            "The pod is gone: it was replaced after it was listed. Run pods again",
+        );
     });
 
     test("a container that has not started says to wait or to read its last run", () => {
         assert.match(
-            message('Error from server (BadRequest): container "orders-api" in pod "orders-api-0" is waiting to start: CrashLoopBackOff'),
+            message(
+                'Error from server (BadRequest): container "orders-api" in pod "orders-api-0" is waiting to start: CrashLoopBackOff',
+            ),
             /^The container is not running yet \(Error from server \(BadRequest\): container "orders-api" in pod "orders-api-0" is waiting to start: CrashLoopBackOff\): try again shortly, or read the log of its last run with previous: true$/,
         );
-        assert.match(message('container "x" in pod "y" is waiting to start: ContainerCreating'), /^The container is not running yet/);
+        assert.match(
+            message('container "x" in pod "y" is waiting to start: ContainerCreating'),
+            /^The container is not running yet/,
+        );
     });
 
     test("a pod that never restarted has no previous log", () => {
         assert.equal(
-            message('Error from server (BadRequest): previous terminated container "orders-api" in pod "orders-api-0" not found'),
+            message(
+                'Error from server (BadRequest): previous terminated container "orders-api" in pod "orders-api-0" not found',
+            ),
             "The pod has no previous container log: its container has not restarted",
         );
     });
@@ -138,14 +181,20 @@ describe("a pod that changed under the call", () => {
 
 describe("anything else", () => {
     test("is the command, its exit code and the first lines of the complaint", () => {
-        assert.equal(message("error: something odd\nsecond\nthird\nfourth", 2), "kubectl get failed (exit 2): error: something odd; second; third");
+        assert.equal(
+            message("error: something odd\nsecond\nthird\nfourth", 2),
+            "kubectl get failed (exit 2): error: something odd; second; third",
+        );
         assert.equal(message("", 3, "kubectl logs"), "kubectl logs failed (exit 3): no error text");
     });
 
     test("never repeats a user name or a password in an address", () => {
         const text = message("error: something odd at https://user:s3cr3t@host.invalid/x\nsecond", 2);
         assert.equal(text, "kubectl get failed (exit 2): error: something odd at https://host.invalid/x; second");
-        assert.equal(firstLines("see ssh://deploy:pw@git.example.test/repo.git"), "see ssh://git.example.test/repo.git");
+        assert.equal(
+            firstLines("see ssh://deploy:pw@git.example.test/repo.git"),
+            "see ssh://git.example.test/repo.git",
+        );
     });
 
     test("a very long complaint is cut", () => {
@@ -153,7 +202,12 @@ describe("anything else", () => {
     });
 
     test("a complaint of megabytes costs no more than a short one", () => {
-        for (const stderr of ["a".repeat(8 * 1024 * 1024), "line\n".repeat(1_000_000), "a://".repeat(500_000), `${"a".repeat(4 * 1024 * 1024)}://x@y`]) {
+        for (const stderr of [
+            "a".repeat(8 * 1024 * 1024),
+            "line\n".repeat(1_000_000),
+            "a://".repeat(500_000),
+            `${"a".repeat(4 * 1024 * 1024)}://x@y`,
+        ]) {
             const started = Date.now();
             const text = message(stderr, 2);
             // Generous, because the whole suite loads the machine: a quadratic pass over megabytes takes far longer.

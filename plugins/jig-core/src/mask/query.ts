@@ -16,7 +16,8 @@ export function maskQuery(host: Host, input: string, depth: number): string {
         if (key.includes("%")) throw malformedError();
         const kind = host.kindOf(key, "");
         // Fields that are normally read as they are (or scanned as text) cannot be trusted once a `%` is left over.
-        const ambiguous = value.includes("%") &&
+        const ambiguous =
+            value.includes("%") &&
             (kind === "safe" || ((kind === "other" || kind === "identifier") && NESTED_SYNTAX.test(value)));
         const masked = ambiguous ? removed("sensitive") : host.scalar(value, kind, depth + 1);
         return `${separator}${key}=${host.protect(masked)}`; // final: later stages must not re-scan it

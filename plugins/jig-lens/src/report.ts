@@ -82,6 +82,6 @@ export function missingProgram(viewer: Viewer): string {
 export const FIRST_START = [
     "First start: sign in as admin (Grafana's initial password is admin) and choose a new password when it asks.",
     "Do not skip that: until you do, any program on this machine can sign in.",
-    "If the dashboards report that the data source plugin is missing, run "
-        + "grafana cli plugins install frser-sqlite-datasource and start Grafana again.",
+    "If the dashboards report that the data source plugin is missing, run " +
+        "grafana cli plugins install frser-sqlite-datasource and start Grafana again.",
 ];

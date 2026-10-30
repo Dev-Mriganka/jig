@@ -9,7 +9,12 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { ExtensionAPI, ExtensionCommandContext, ExtensionToolContext, ToolDefinition } from "@earendil-works/pi-coding-agent";
+import type {
+    ExtensionAPI,
+    ExtensionCommandContext,
+    ExtensionToolContext,
+    ToolDefinition,
+} from "@earendil-works/pi-coding-agent";
 import type { CallClass, Preview, ToolDeclaration } from "../../../jig-core/src/contract.ts";
 import { jigApi } from "../../src/index.ts";
 import type { ApiOptions } from "../../src/tool.ts";
@@ -130,14 +135,18 @@ export async function setupHarness(options: { timeoutScale?: number } = {}): Pro
     issueTokens();
 
     /** Loads the plugin into a fake Pi, as Pi does at start-up. A new load has learned nothing yet. */
-    const apiOptions: ApiOptions = { now: () => clock.now, ...(options.timeoutScale === undefined ? {} : { timeoutScale: options.timeoutScale }) };
+    const apiOptions: ApiOptions = {
+        now: () => clock.now,
+        ...(options.timeoutScale === undefined ? {} : { timeoutScale: options.timeoutScale }),
+    };
     function load(): { tool: ToolDefinition; declaration: ToolDeclaration; commands: Harness["commands"] } {
         jig.publish();
         const tools: ToolDefinition[] = [];
         const commands: Harness["commands"] = new Map();
         const pi = {
             registerTool: (tool: ToolDefinition) => void tools.push(tool),
-            registerCommand: (name: string, command: { handler: CommandHandler }) => void commands.set(name, command.handler),
+            registerCommand: (name: string, command: { handler: CommandHandler }) =>
+                void commands.set(name, command.handler),
         } as unknown as ExtensionAPI;
         void jigApi(apiOptions)(pi);
         const tool = tools[0];
@@ -155,13 +164,19 @@ export async function setupHarness(options: { timeoutScale?: number } = {}): Pro
         ...extra,
     });
 
-    const section = (signIn: Record<string, unknown> = { none: true }, extra: Record<string, unknown> = {}): Record<string, unknown> => {
+    const section = (
+        signIn: Record<string, unknown> = { none: true },
+        extra: Record<string, unknown> = {},
+    ): Record<string, unknown> => {
         const baseUrl = typeof extra.baseUrl === "string" ? extra.baseUrl : api.origin;
-        const values: Array<Record<string, unknown>> = [{ key: "baseUrl", value: baseUrl, type: "default", enabled: true }];
+        const values: Array<Record<string, unknown>> = [
+            { key: "baseUrl", value: baseUrl, type: "default", enabled: true },
+        ];
         const secrets: Record<string, string> = {};
         const secretValue = (key: string): void => void values.push({ key, value: "", type: "secret", enabled: true });
         let auth_: Record<string, unknown> = { type: "noauth" };
-        let mapping: string | Record<string, unknown> = typeof extra.environment === "string" ? extra.environment : "staging";
+        let mapping: string | Record<string, unknown> =
+            typeof extra.environment === "string" ? extra.environment : "staging";
 
         if (typeof signIn.bearer === "string") {
             auth_ = { type: "bearer", bearer: [{ key: "token", value: "{{token}}", type: "string" }] };
@@ -180,18 +195,29 @@ export async function setupHarness(options: { timeoutScale?: number } = {}): Pro
                 { key: "password", value: "{{password}}" },
             ];
             if (typeof settings.scope === "string") attributes.push({ key: "scope", value: settings.scope });
-            for (const [name, reference] of [["username", settings.username], ["password", settings.password], ["clientSecret", settings.clientSecret]] as const) {
+            for (const [name, reference] of [
+                ["username", settings.username],
+                ["password", settings.password],
+                ["clientSecret", settings.clientSecret],
+            ] as const) {
                 if (typeof reference === "string") {
                     secretValue(name);
                     secrets[name] = reference;
                 }
             }
-            if (typeof settings.clientSecret === "string") attributes.push({ key: "clientSecret", value: "{{clientSecret}}" });
+            if (typeof settings.clientSecret === "string")
+                attributes.push({ key: "clientSecret", value: "{{clientSecret}}" });
             auth_ = { type: "oauth2", oauth2: attributes };
         } else if (typeof signIn.signIn === "string") {
-            mapping = { environment: typeof extra.environment === "string" ? extra.environment : "staging", signIn: signIn.signIn };
+            mapping = {
+                environment: typeof extra.environment === "string" ? extra.environment : "staging",
+                signIn: signIn.signIn,
+            };
         } else if (typeof signIn.transport === "string") {
-            mapping = { environment: typeof extra.environment === "string" ? extra.environment : "staging", transport: signIn.transport };
+            mapping = {
+                environment: typeof extra.environment === "string" ? extra.environment : "staging",
+                transport: signIn.transport,
+            };
         }
 
         const collection = {
@@ -203,9 +229,13 @@ export async function setupHarness(options: { timeoutScale?: number } = {}): Pro
         const environmentFile = path.join(dir, "base-staging.postman_environment.json");
         fs.writeFileSync(collectionFile, JSON.stringify(collection));
         fs.writeFileSync(environmentFile, JSON.stringify({ name: "Staging", values }));
-        const adHoc = Array.isArray(extra.adHoc) ? extra.adHoc : [typeof extra.environment === "string" ? extra.environment : "staging"];
+        const adHoc = Array.isArray(extra.adHoc)
+            ? extra.adHoc
+            : [typeof extra.environment === "string" ? extra.environment : "staging"];
         return {
-            collections: { [COLLECTION]: { postman: collectionFile, environments: { [ENVIRONMENT]: environmentFile } } },
+            collections: {
+                [COLLECTION]: { postman: collectionFile, environments: { [ENVIRONMENT]: environmentFile } },
+            },
             environments: { [ENVIRONMENT]: mapping },
             secrets,
             adHoc,
@@ -227,7 +257,13 @@ export async function setupHarness(options: { timeoutScale?: number } = {}): Pro
     /** The input of an ad-hoc call to the test API, from the shorter form most tests use. */
     const adHoc = (given: Record<string, unknown>): Record<string, unknown> => {
         const { path: target, origin, ...rest } = given;
-        return { action: "call", environment: ENVIRONMENT, collection: COLLECTION, url: `${typeof origin === "string" ? origin : api.origin}${String(target)}`, ...rest };
+        return {
+            action: "call",
+            environment: ENVIRONMENT,
+            collection: COLLECTION,
+            url: `${typeof origin === "string" ? origin : api.origin}${String(target)}`,
+            ...rest,
+        };
     };
 
     const harness: Harness = {
@@ -251,7 +287,10 @@ export async function setupHarness(options: { timeoutScale?: number } = {}): Pro
             const handler = harness.commands.get(name ?? "");
             if (handler === undefined) throw new Error(`the plugin registered no command named ${name}`);
             const notices: Notice[] = [];
-            const context = { ui: { notify: (text: string, level = "info") => void notices.push({ text, level }) }, signal: undefined } as unknown as ExtensionCommandContext;
+            const context = {
+                ui: { notify: (text: string, level = "info") => void notices.push({ text, level }) },
+                signal: undefined,
+            } as unknown as ExtensionCommandContext;
             await handler(rest.join(" "), context);
             return notices;
         },
@@ -283,7 +322,8 @@ export async function setupHarness(options: { timeoutScale?: number } = {}): Pro
                 const reason = error instanceof Error ? error.message : String(error);
                 return { id, text: "", blocked: `jig-core could not decide: ${reason}` };
             }
-            const asks = callOptions.ask ?? (cls === undefined || (cls.environment !== "local" && cls.effect === "write"));
+            const asks =
+                callOptions.ask ?? (cls === undefined || (cls.environment !== "local" && cls.effect === "write"));
             let preview: Preview | undefined;
             if (asks && declaration.preview !== undefined) {
                 try {
@@ -291,8 +331,16 @@ export async function setupHarness(options: { timeoutScale?: number } = {}): Pro
                 } catch (error) {
                     // What jig-core does: the message is cut to one line of 200 characters; a TypeError blocks the call,
                     // anything else shows "preview unavailable" and the person can still decide.
-                    const reason = (error instanceof Error ? error.message : String(error)).replace(/\s+/g, " ").slice(0, 200);
-                    if (error instanceof TypeError) return { id, text: "", blocked: `Blocked by jig-core: api cannot run with this input: ${reason}`, cls };
+                    const reason = (error instanceof Error ? error.message : String(error))
+                        .replace(/\s+/g, " ")
+                        .slice(0, 200);
+                    if (error instanceof TypeError)
+                        return {
+                            id,
+                            text: "",
+                            blocked: `Blocked by jig-core: api cannot run with this input: ${reason}`,
+                            cls,
+                        };
                     preview = { summary: `preview unavailable: ${reason}` };
                 }
                 jig.approved.set(id, preview);
@@ -300,9 +348,21 @@ export async function setupHarness(options: { timeoutScale?: number } = {}): Pro
             await callOptions.between?.(input);
             const shown = preview === undefined ? {} : { preview };
             try {
-                const result = await tool.execute(id, input as never, callOptions.signal, undefined, {} as ExtensionToolContext);
+                const result = await tool.execute(
+                    id,
+                    input as never,
+                    callOptions.signal,
+                    undefined,
+                    {} as ExtensionToolContext,
+                );
                 const first = result.content[0];
-                return { id, text: first !== undefined && first.type === "text" ? first.text : "", cls, ...shown, details: result.details };
+                return {
+                    id,
+                    text: first !== undefined && first.type === "text" ? first.text : "",
+                    cls,
+                    ...shown,
+                    details: result.details,
+                };
             } catch (error) {
                 return { id, text: "", error: error as Error, cls, ...shown };
             }
@@ -322,7 +382,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /** The text of a call that must have worked; a failure or a block fails the test with the message. */
 export function ok(result: CallResult): string {
-    if (result.blocked !== undefined) throw new Error(`expected the call to work, but it was blocked: ${result.blocked}`);
-    if (result.error !== undefined) throw new Error(`expected the call to work, but it failed: ${result.error.message}`);
+    if (result.blocked !== undefined)
+        throw new Error(`expected the call to work, but it was blocked: ${result.blocked}`);
+    if (result.error !== undefined)
+        throw new Error(`expected the call to work, but it failed: ${result.error.message}`);
     return result.text;
 }

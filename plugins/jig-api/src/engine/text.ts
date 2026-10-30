@@ -103,9 +103,12 @@ export interface Fillers {
 
 function generatedValue(piece: Generated, now: () => number): string {
     switch (piece.generated) {
-        case "uuid": return randomUUID();
-        case "timestamp": return String(Math.floor(now() / 1000));
-        case "isoTimestamp": return new Date(now()).toISOString();
+        case "uuid":
+            return randomUUID();
+        case "timestamp":
+            return String(Math.floor(now() / 1000));
+        case "isoTimestamp":
+            return new Date(now()).toISOString();
     }
 }
 

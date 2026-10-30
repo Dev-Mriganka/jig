@@ -22,12 +22,13 @@ function context(script: FakeUiScript, mode: AskContext["mode"] = "rpc", signal?
 
 /** A fake review screen, answered by these key presses. */
 function pressing(...keys: string[]): NonNullable<FakeUiScript["custom"]> {
-    return (factory) => new Promise((resolve) => {
-        const terminal = fakeTerminal();
-        const component = factory(terminal.tui, terminal.theme, terminal.keybindings, resolve) as Component;
-        component.render(80);
-        for (const key of keys) component.handleInput?.(key);
-    });
+    return (factory) =>
+        new Promise((resolve) => {
+            const terminal = fakeTerminal();
+            const component = factory(terminal.tui, terminal.theme, terminal.keybindings, resolve) as Component;
+            component.render(80);
+            for (const key of keys) component.handleInput?.(key);
+        });
 }
 
 describe("a dialog question", () => {
@@ -64,7 +65,11 @@ describe("a dialog question", () => {
         for (const typed of [undefined, "", "   "]) {
             const { ctx } = context({ select: () => "Decline", input: () => typed });
             const result = await createApprovals().ask(ctx, request());
-            assert.deepEqual([result.answer, result.dismissed, result.reason], ["decline", false, undefined], String(typed));
+            assert.deepEqual(
+                [result.answer, result.dismissed, result.reason],
+                ["decline", false, undefined],
+                String(typed),
+            );
         }
     });
 
@@ -82,13 +87,20 @@ describe("a dialog question", () => {
     });
 
     test("a screen that fails fails the question, so the call is blocked and not allowed", async () => {
-        const { ctx } = context({ select: () => { throw new Error("the connection to the client is gone"); } });
+        const { ctx } = context({
+            select: () => {
+                throw new Error("the connection to the client is gone");
+            },
+        });
         await assert.rejects(createApprovals().ask(ctx, request()), /connection to the client is gone/);
     });
 });
 
 describe("the review screen", () => {
-    const review = request({ kind: "review", preview: { summary: "Comment on PR 7", body: "The comment text\nsecond line", format: "markdown" } });
+    const review = request({
+        kind: "review",
+        preview: { summary: "Comment on PR 7", body: "The comment text\nsecond line", format: "markdown" },
+    });
 
     test("is used in the terminal interface, and y allows", async () => {
         const { ctx, log } = context({ custom: pressing("y") }, "tui");
@@ -106,14 +118,23 @@ describe("the review screen", () => {
         for (const key of ["n", "\u001b"]) {
             const { ctx, log } = context({ custom: pressing(key), input: () => "wrong branch" }, "tui");
             const result = await createApprovals().ask(ctx, review);
-            assert.deepEqual([result.answer, result.reason, result.dismissed], ["decline", "wrong branch", false], JSON.stringify(key));
+            assert.deepEqual(
+                [result.answer, result.reason, result.dismissed],
+                ["decline", "wrong branch", false],
+                JSON.stringify(key),
+            );
             assert.equal(log.inputs.length, 1);
         }
     });
 
     test("the o key opens the rendered preview in the browser and leaves the question open", async () => {
         const opened: Array<[Preview, string]> = [];
-        const approvals = createApprovals({ openPreview: async (preview, header) => { opened.push([preview, header]); return "opened in the browser"; } });
+        const approvals = createApprovals({
+            openPreview: async (preview, header) => {
+                opened.push([preview, header]);
+                return "opened in the browser";
+            },
+        });
         const { ctx } = context({ custom: pressing("o", "y") }, "tui");
         const result = await approvals.ask(ctx, review);
         assert.equal(result.answer, "allow");
@@ -138,7 +159,10 @@ describe("the review screen", () => {
 
 describe("hosts without the terminal interface, and the form kind", () => {
     const longBody = Array.from({ length: 60 }, (_, index) => `line ${index + 1}`).join("\n");
-    const review = request({ kind: "review", preview: { summary: "Update the description", body: longBody, format: "text" } });
+    const review = request({
+        kind: "review",
+        preview: { summary: "Update the description", body: longBody, format: "text" },
+    });
 
     test("a review question in RPC mode is a selector, with the summary and the start of the body", async () => {
         const { ctx, log } = context({ select: () => "Allow for this session" }, "rpc");
@@ -154,14 +178,20 @@ describe("hosts without the terminal interface, and the form kind", () => {
 
     test("a short body is shown whole, with no note", async () => {
         const { ctx, log } = context({ select: () => "Allow" }, "rpc");
-        await createApprovals().ask(ctx, request({ kind: "review", preview: { summary: "s", body: "only\nthree\nlines" } }));
+        await createApprovals().ask(
+            ctx,
+            request({ kind: "review", preview: { summary: "s", body: "only\nthree\nlines" } }),
+        );
         assert.ok(log.selects[0]?.title.includes("only\nthree\nlines"));
         assert.ok(!(log.selects[0]?.title ?? "").includes("the rest is not shown"));
     });
 
     test("a very long line in the body is cut too", async () => {
         const { ctx, log } = context({ select: () => "Allow" }, "rpc");
-        await createApprovals().ask(ctx, request({ kind: "review", preview: { summary: "s", body: "x".repeat(5000) } }));
+        await createApprovals().ask(
+            ctx,
+            request({ kind: "review", preview: { summary: "s", body: "x".repeat(5000) } }),
+        );
         assert.ok((log.selects[0]?.title ?? "").length < 2500);
     });
 
@@ -200,20 +230,39 @@ describe("one question at a time", () => {
     test("a decline and its reason are one turn: the next question waits for the reason too", async () => {
         const order: string[] = [];
         const { ctx, log } = context({
-            select: async (title) => { order.push(`select ${title.split("\n")[1]}`); return title.includes("first") ? "Decline" : "Allow"; },
-            input: async () => { order.push("reason"); await new Promise((resolve) => setTimeout(resolve, 20)); return "because"; },
+            select: async (title) => {
+                order.push(`select ${title.split("\n")[1]}`);
+                return title.includes("first") ? "Decline" : "Allow";
+            },
+            input: async () => {
+                order.push("reason");
+                await new Promise((resolve) => setTimeout(resolve, 20));
+                return "because";
+            },
         });
         const approvals = createApprovals();
-        await Promise.all([approvals.ask(ctx, request({ preview: { summary: "first" } })), approvals.ask(ctx, request({ preview: { summary: "second" } }))]);
+        await Promise.all([
+            approvals.ask(ctx, request({ preview: { summary: "first" } })),
+            approvals.ask(ctx, request({ preview: { summary: "second" } })),
+        ]);
         assert.deepEqual(order, ["select first", "reason", "select second"]);
         assert.equal(log.maxActive, 1);
     });
 
     test("a review screen and a selector are not shown together either", async () => {
-        const { ctx, log } = context({ select: async () => { await new Promise((resolve) => setTimeout(resolve, 20)); return "Allow"; }, custom: async (factory) => {
-            await new Promise((resolve) => setTimeout(resolve, 20));
-            return pressing("y")(factory);
-        } }, "tui");
+        const { ctx, log } = context(
+            {
+                select: async () => {
+                    await new Promise((resolve) => setTimeout(resolve, 20));
+                    return "Allow";
+                },
+                custom: async (factory) => {
+                    await new Promise((resolve) => setTimeout(resolve, 20));
+                    return pressing("y")(factory);
+                },
+            },
+            "tui",
+        );
         const approvals = createApprovals();
         await Promise.all([
             approvals.ask(ctx, request({ kind: "review", preview: { summary: "a", body: "b" } })),
@@ -225,9 +274,18 @@ describe("one question at a time", () => {
 
     test("a question that fails does not stop the ones behind it", async () => {
         let calls = 0;
-        const { ctx } = context({ select: () => { calls++; if (calls === 1) throw new Error("first one broke"); return "Allow"; } });
+        const { ctx } = context({
+            select: () => {
+                calls++;
+                if (calls === 1) throw new Error("first one broke");
+                return "Allow";
+            },
+        });
         const approvals = createApprovals();
-        const [first, second] = await Promise.allSettled([approvals.ask(ctx, request()), approvals.ask(ctx, request())]);
+        const [first, second] = await Promise.allSettled([
+            approvals.ask(ctx, request()),
+            approvals.ask(ctx, request()),
+        ]);
         assert.equal(first.status, "rejected");
         assert.equal(second.status, "fulfilled");
     });
@@ -235,7 +293,12 @@ describe("one question at a time", () => {
     test("a question whose run was aborted while it waited is not shown", async () => {
         const controller = new AbortController();
         const gate: { release?: () => void } = {};
-        const { ctx: slow, log } = context({ select: () => new Promise<string>((resolve) => { gate.release = () => resolve("Allow"); }) });
+        const { ctx: slow, log } = context({
+            select: () =>
+                new Promise<string>((resolve) => {
+                    gate.release = () => resolve("Allow");
+                }),
+        });
         const { ctx: abortable, log: abortableLog } = context({ select: () => "Allow" }, "rpc", controller.signal);
         // The abortable question uses its own fake, but shares the queue through the same approvals object.
         const approvals = createApprovals();
@@ -255,21 +318,40 @@ describe("one question at a time", () => {
 describe("how long the call waited", () => {
     test("is the time from the question being asked to the answer", async () => {
         let clock = 1_000;
-        const { ctx } = context({ select: () => { clock += 250; return "Allow"; } });
+        const { ctx } = context({
+            select: () => {
+                clock += 250;
+                return "Allow";
+            },
+        });
         const result = await createApprovals({ now: () => clock }).ask(ctx, request());
         assert.equal(result.waitedMs, 250);
     });
 
     test("includes the time spent typing a reason", async () => {
         let clock = 0;
-        const { ctx } = context({ select: () => { clock += 100; return "Decline"; }, input: () => { clock += 900; return "no"; } });
+        const { ctx } = context({
+            select: () => {
+                clock += 100;
+                return "Decline";
+            },
+            input: () => {
+                clock += 900;
+                return "no";
+            },
+        });
         const result = await createApprovals({ now: () => clock }).ask(ctx, request());
         assert.equal(result.waitedMs, 1000);
     });
 
     test("includes the time spent in the queue behind another question", async () => {
         let clock = 0;
-        const { ctx } = context({ select: () => { clock += 100; return "Allow"; } });
+        const { ctx } = context({
+            select: () => {
+                clock += 100;
+                return "Allow";
+            },
+        });
         const approvals = createApprovals({ now: () => clock });
         const [first, second] = await Promise.all([approvals.ask(ctx, request()), approvals.ask(ctx, request())]);
         assert.equal(first.waitedMs, 100);

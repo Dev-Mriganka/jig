@@ -27,7 +27,12 @@ describe("SettingsStore", () => {
 
     it("ignores unknown keys and values of the wrong type", () => {
         assert.deepEqual(
-            parseReviewSettings({ autoAskReview: true, autoOpenBrowser: "yes", commentMode: "interactive", diffView: "side-by-side" }),
+            parseReviewSettings({
+                autoAskReview: true,
+                autoOpenBrowser: "yes",
+                commentMode: "interactive",
+                diffView: "side-by-side",
+            }),
             { ...DEFAULT_SETTINGS, autoAskReview: true },
         );
     });
@@ -35,7 +40,11 @@ describe("SettingsStore", () => {
     it("loads persisted valid settings", async () => {
         const store = new SettingsStore(await createTempDirectory());
         await store.ensureDirectories();
-        await writeFile(path.join(store.reviewDir, "config.json"), JSON.stringify({ autoOpenBrowser: true, diffView: "unified" }), "utf8");
+        await writeFile(
+            path.join(store.reviewDir, "config.json"),
+            JSON.stringify({ autoOpenBrowser: true, diffView: "unified" }),
+            "utf8",
+        );
         assert.deepEqual(await store.load(), { ...DEFAULT_SETTINGS, autoOpenBrowser: true, diffView: "unified" });
     });
 
@@ -71,8 +80,16 @@ describe("the settings menu", () => {
 
     it("offers to remove each registered passkey, and maps a chosen line back to it", () => {
         const keys = [
-            { fingerprint: "3f9a1c7eb2d04a55".padEnd(64, "0"), algorithm: "ES256" as const, createdAt: "2026-01-01T00:00:00Z" },
-            { fingerprint: "aa00bb11cc22dd33".padEnd(64, "1"), algorithm: "RS256" as const, createdAt: "2026-01-02T00:00:00Z" },
+            {
+                fingerprint: "3f9a1c7eb2d04a55".padEnd(64, "0"),
+                algorithm: "ES256" as const,
+                createdAt: "2026-01-01T00:00:00Z",
+            },
+            {
+                fingerprint: "aa00bb11cc22dd33".padEnd(64, "1"),
+                algorithm: "RS256" as const,
+                createdAt: "2026-01-02T00:00:00Z",
+            },
         ];
         const lines = formatSettingsOptions(DEFAULT_SETTINGS, keys);
         assert.equal(lines.length, 5);

@@ -382,7 +382,11 @@ export function createWatchEngine(options: WatchEngineOptions): WatchEngine {
         persist(saved);
 
         const event: WatchDoneEvent = {
-            id: saved.id, kind: saved.kind, plugin: saved.plugin, title: saved.title, result: structuredClone(result),
+            id: saved.id,
+            kind: saved.kind,
+            plugin: saved.plugin,
+            title: saved.title,
+            result: structuredClone(result),
         };
         // A listener that fails does not change how the watch ended.
         guarded(() => options.emit(event));
@@ -485,7 +489,9 @@ export function createWatchEngine(options: WatchEngineOptions): WatchEngine {
     /** What the kind says the spec watches, as one short line, or undefined. */
     function describeSpec(saved: SavedWatch): string | undefined {
         let text: unknown;
-        guarded(() => { text = kinds.get(saved.kind)?.describe(saved.spec); });
+        guarded(() => {
+            text = kinds.get(saved.kind)?.describe(saved.spec);
+        });
         return typeof text === "string" && text !== "" ? plainLine(text, MAX_TITLE_CHARS) : undefined;
     }
 

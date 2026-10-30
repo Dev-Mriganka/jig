@@ -1,78 +1,58 @@
 {
-  "category": "health_biometric_demographic",
-  "cases": [
-    {
-      "id": "sensitive-health",
-      "input": {
-        "healthNote": "FAKE-HEALTH-NOTE-001",
-        "orderId": "ord-8301"
-      },
-      "must_not_contain": [
-        "FAKE-HEALTH-NOTE-001"
-      ],
-      "must_keep": [
-        "ord-8301"
-      ],
-      "expect_tags": [],
-      "notes": "Unexpected health data in an explicit field is removed."
-    },
-    {
-      "id": "sensitive-biometric",
-      "input": {
-        "biometricTemplate": "FAKE-BIOMETRIC-TEMPLATE-002",
-        "accountId": "acct-demo-1302"
-      },
-      "must_not_contain": [
-        "FAKE-BIOMETRIC-TEMPLATE-002"
-      ],
-      "must_keep": [
-        "acct-demo-1302"
-      ],
-      "expect_tags": [],
-      "notes": "Unexpected biometric value in an explicit field is removed."
-    },
-    {
-      "id": "sensitive-demographic",
-      "input": {
-        "demographicProfile": "FAKE-DEMOGRAPHIC-PROFILE-003",
-        "orderId": "ord-8303"
-      },
-      "must_not_contain": [
-        "FAKE-DEMOGRAPHIC-PROFILE-003"
-      ],
-      "must_keep": [
-        "ord-8303"
-      ],
-      "expect_tags": [],
-      "notes": "Unexpected sensitive demographic profile is removed."
-    },
-    {
-      "id": "sensitive-nested-log",
-      "input": "WARN payload={\"healthNote\":\"FAKE-HEALTH-NOTE-004\",\"orderId\":\"ord-8304\"}",
-      "must_not_contain": [
-        "FAKE-HEALTH-NOTE-004"
-      ],
-      "must_keep": [
-        "ord-8304"
-      ],
-      "expect_tags": [],
-      "notes": "Unexpected sensitive field inside JSON-encoded log text."
-    },
-    {
-      "id": "sensitive-negative",
-      "input": {
-        "sku": "HEALTH-CHECK-MODULE",
-        "orderId": "BIO-8305",
-        "status": "ACTIVE"
-      },
-      "must_not_contain": [],
-      "must_keep": [
-        "HEALTH-CHECK-MODULE",
-        "BIO-8305",
-        "ACTIVE"
-      ],
-      "expect_tags": [],
-      "notes": "Product and order labels are not sensitive values."
-    }
-  ]
+    "category": "health_biometric_demographic",
+    "cases": [
+        {
+            "id": "sensitive-health",
+            "input": {
+                "healthNote": "FAKE-HEALTH-NOTE-001",
+                "orderId": "ord-8301"
+            },
+            "must_not_contain": ["FAKE-HEALTH-NOTE-001"],
+            "must_keep": ["ord-8301"],
+            "expect_tags": [],
+            "notes": "Unexpected health data in an explicit field is removed."
+        },
+        {
+            "id": "sensitive-biometric",
+            "input": {
+                "biometricTemplate": "FAKE-BIOMETRIC-TEMPLATE-002",
+                "accountId": "acct-demo-1302"
+            },
+            "must_not_contain": ["FAKE-BIOMETRIC-TEMPLATE-002"],
+            "must_keep": ["acct-demo-1302"],
+            "expect_tags": [],
+            "notes": "Unexpected biometric value in an explicit field is removed."
+        },
+        {
+            "id": "sensitive-demographic",
+            "input": {
+                "demographicProfile": "FAKE-DEMOGRAPHIC-PROFILE-003",
+                "orderId": "ord-8303"
+            },
+            "must_not_contain": ["FAKE-DEMOGRAPHIC-PROFILE-003"],
+            "must_keep": ["ord-8303"],
+            "expect_tags": [],
+            "notes": "Unexpected sensitive demographic profile is removed."
+        },
+        {
+            "id": "sensitive-nested-log",
+            "input": "WARN payload={\"healthNote\":\"FAKE-HEALTH-NOTE-004\",\"orderId\":\"ord-8304\"}",
+            "must_not_contain": ["FAKE-HEALTH-NOTE-004"],
+            "must_keep": ["ord-8304"],
+            "expect_tags": [],
+            "notes": "Unexpected sensitive field inside JSON-encoded log text."
+        },
+        {
+            "id": "sensitive-negative",
+            "input": {
+                "sku": "HEALTH-CHECK-MODULE",
+                "orderId": "BIO-8305",
+                "status": "ACTIVE"
+            },
+            "must_not_contain": [],
+            "must_keep": ["HEALTH-CHECK-MODULE", "BIO-8305", "ACTIVE"],
+            "expect_tags": [],
+            "notes": "Product and order labels are not sensitive values."
+        }
+    ]
 }

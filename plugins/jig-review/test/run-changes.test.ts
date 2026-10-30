@@ -32,7 +32,13 @@ after(() => {
 });
 
 test("reads the paths of a status listing, a rename with its origin", () => {
-    assert.deepEqual(parseStatus(" M a b.java\0?? new.java\0R  moved.java\0old.java\0 D gone.java\0"), ["a b.java", "new.java", "moved.java", "old.java", "gone.java"]);
+    assert.deepEqual(parseStatus(" M a b.java\0?? new.java\0R  moved.java\0old.java\0 D gone.java\0"), [
+        "a b.java",
+        "new.java",
+        "moved.java",
+        "old.java",
+        "gone.java",
+    ]);
     assert.deepEqual(parseStatus(""), []);
 });
 
@@ -46,7 +52,11 @@ test("new and re-edited paths differ; untouched dirty paths, a clean tree and a 
     writeFileSync(path.join(repo, "New.java"), "new\n");
     git(repo, "checkout", "--", "A.java");
     const after = await snap();
-    assert.deepEqual(changedBetween(before, after).map((file) => path.relative(repo, file)), ["B.java", "New.java"], "A.java was committed or reverted: gone from the status is not the run's doing");
+    assert.deepEqual(
+        changedBetween(before, after).map((file) => path.relative(repo, file)),
+        ["B.java", "New.java"],
+        "A.java was committed or reverted: gone from the status is not the run's doing",
+    );
 
     git(repo, "checkout", "--", "B.java");
     rmSync(path.join(repo, "New.java"));

@@ -74,7 +74,8 @@ export function parseReviewSettings(value: unknown): ReviewSettings {
     const raw = value as Record<string, unknown>;
     return {
         autoAskReview: typeof raw.autoAskReview === "boolean" ? raw.autoAskReview : DEFAULT_SETTINGS.autoAskReview,
-        autoOpenBrowser: typeof raw.autoOpenBrowser === "boolean" ? raw.autoOpenBrowser : DEFAULT_SETTINGS.autoOpenBrowser,
+        autoOpenBrowser:
+            typeof raw.autoOpenBrowser === "boolean" ? raw.autoOpenBrowser : DEFAULT_SETTINGS.autoOpenBrowser,
         diffView: raw.diffView === "split" || raw.diffView === "unified" ? raw.diffView : DEFAULT_SETTINGS.diffView,
     };
 }

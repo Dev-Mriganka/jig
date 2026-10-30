@@ -1,406 +1,398 @@
 {
-  "uid": "jig-checks",
-  "title": "Jig: checks",
-  "description": "Calls that carry facts: numbers, flags or short codes a tool adds to its own record, such as tests passed and failed or a CI run's conclusion.",
-  "tags": [
-    "jig"
-  ],
-  "timezone": "utc",
-  "editable": true,
-  "graphTooltip": 1,
-  "schemaVersion": 39,
-  "version": 1,
-  "refresh": "",
-  "time": {
-    "from": "now-7d",
-    "to": "now"
-  },
-  "links": [
-    {
-      "type": "dashboards",
-      "title": "Jig",
-      "tags": [
-        "jig"
-      ],
-      "asDropdown": false,
-      "includeVars": false,
-      "keepTime": true,
-      "icon": "external link"
-    }
-  ],
-  "templating": {
-    "list": []
-  },
-  "annotations": {
-    "list": []
-  },
-  "panels": [
-    {
-      "id": 1,
-      "type": "timeseries",
-      "title": "Tests passed and failed, per day",
-      "description": "Sums the facts passed and failed, for the tools that report them.",
-      "datasource": {
-        "type": "frser-sqlite-datasource",
-        "uid": "jig-lens"
-      },
-      "targets": [
+    "uid": "jig-checks",
+    "title": "Jig: checks",
+    "description": "Calls that carry facts: numbers, flags or short codes a tool adds to its own record, such as tests passed and failed or a CI run's conclusion.",
+    "tags": ["jig"],
+    "timezone": "utc",
+    "editable": true,
+    "graphTooltip": 1,
+    "schemaVersion": 39,
+    "version": 1,
+    "refresh": "",
+    "time": {
+        "from": "now-7d",
+        "to": "now"
+    },
+    "links": [
         {
-          "refId": "A",
-          "datasource": {
-            "type": "frser-sqlite-datasource",
-            "uid": "jig-lens"
-          },
-          "queryType": "time series",
-          "rawQueryText": "SELECT CAST(time / 86400 AS INTEGER) * 86400 AS day,\n       sum(json_extract(facts, '$.passed')) AS passed,\n       sum(json_extract(facts, '$.failed')) AS failed\nFROM call\nWHERE (json_extract(facts, '$.passed') IS NOT NULL OR json_extract(facts, '$.failed') IS NOT NULL)\n  AND time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY day\nORDER BY day",
-          "queryText": "SELECT CAST(time / 86400 AS INTEGER) * 86400 AS day,\n       sum(json_extract(facts, '$.passed')) AS passed,\n       sum(json_extract(facts, '$.failed')) AS failed\nFROM call\nWHERE (json_extract(facts, '$.passed') IS NOT NULL OR json_extract(facts, '$.failed') IS NOT NULL)\n  AND time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY day\nORDER BY day",
-          "timeColumns": [
-            "day"
-          ]
+            "type": "dashboards",
+            "title": "Jig",
+            "tags": ["jig"],
+            "asDropdown": false,
+            "includeVars": false,
+            "keepTime": true,
+            "icon": "external link"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "bars",
-            "fillOpacity": 80,
-            "lineWidth": 1,
-            "showPoints": "never",
-            "stacking": {
-              "mode": "normal",
-              "group": "A"
-            }
-          },
-          "min": 0,
-          "decimals": 0
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "passed"
+    ],
+    "templating": {
+        "list": []
+    },
+    "annotations": {
+        "list": []
+    },
+    "panels": [
+        {
+            "id": 1,
+            "type": "timeseries",
+            "title": "Tests passed and failed, per day",
+            "description": "Sums the facts passed and failed, for the tools that report them.",
+            "datasource": {
+                "type": "frser-sqlite-datasource",
+                "uid": "jig-lens"
             },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "green"
+            "targets": [
+                {
+                    "refId": "A",
+                    "datasource": {
+                        "type": "frser-sqlite-datasource",
+                        "uid": "jig-lens"
+                    },
+                    "queryType": "time series",
+                    "rawQueryText": "SELECT CAST(time / 86400 AS INTEGER) * 86400 AS day,\n       sum(json_extract(facts, '$.passed')) AS passed,\n       sum(json_extract(facts, '$.failed')) AS failed\nFROM call\nWHERE (json_extract(facts, '$.passed') IS NOT NULL OR json_extract(facts, '$.failed') IS NOT NULL)\n  AND time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY day\nORDER BY day",
+                    "queryText": "SELECT CAST(time / 86400 AS INTEGER) * 86400 AS day,\n       sum(json_extract(facts, '$.passed')) AS passed,\n       sum(json_extract(facts, '$.failed')) AS failed\nFROM call\nWHERE (json_extract(facts, '$.passed') IS NOT NULL OR json_extract(facts, '$.failed') IS NOT NULL)\n  AND time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY day\nORDER BY day",
+                    "timeColumns": ["day"]
                 }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "failed"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "red"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 0
-      }
-    },
-    {
-      "id": 2,
-      "type": "barchart",
-      "title": "CI conclusions",
-      "description": "Counts the fact conclusion, for the tools that report it.",
-      "datasource": {
-        "type": "frser-sqlite-datasource",
-        "uid": "jig-lens"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "frser-sqlite-datasource",
-            "uid": "jig-lens"
-          },
-          "queryType": "table",
-          "rawQueryText": "SELECT json_extract(facts, '$.conclusion') AS conclusion, count(*) AS runs\nFROM call\nWHERE json_extract(facts, '$.conclusion') IS NOT NULL AND time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY conclusion\nORDER BY runs DESC, conclusion",
-          "queryText": "SELECT json_extract(facts, '$.conclusion') AS conclusion, count(*) AS runs\nFROM call\nWHERE json_extract(facts, '$.conclusion') IS NOT NULL AND time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY conclusion\nORDER BY runs DESC, conclusion",
-          "timeColumns": []
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "fillOpacity": 80
-          },
-          "min": 0,
-          "decimals": 0
-        },
-        "overrides": []
-      },
-      "options": {
-        "xField": "conclusion",
-        "orientation": "horizontal",
-        "showValue": "auto",
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": false
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 0
-      }
-    },
-    {
-      "id": 3,
-      "type": "table",
-      "title": "Facts the tools report",
-      "description": "Every fact name in use, so you know what else can be charted with json_extract. Lowest and highest are for numbers.",
-      "datasource": {
-        "type": "frser-sqlite-datasource",
-        "uid": "jig-lens"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "frser-sqlite-datasource",
-            "uid": "jig-lens"
-          },
-          "queryType": "table",
-          "rawQueryText": "SELECT call.tool,\n       coalesce(call.action, '') AS action,\n       fact.key AS fact,\n       count(*) AS calls,\n       min(CASE WHEN fact.type IN ('integer', 'real') THEN fact.value END) AS lowest,\n       max(CASE WHEN fact.type IN ('integer', 'real') THEN fact.value END) AS highest\nFROM call, json_each(call.facts) AS fact\nWHERE call.facts IS NOT NULL AND call.time >= $__from / 1000 AND call.time < $__to / 1000\nGROUP BY call.tool, call.action, fact.key\nORDER BY call.tool, call.action, fact.key",
-          "queryText": "SELECT call.tool,\n       coalesce(call.action, '') AS action,\n       fact.key AS fact,\n       count(*) AS calls,\n       min(CASE WHEN fact.type IN ('integer', 'real') THEN fact.value END) AS lowest,\n       max(CASE WHEN fact.type IN ('integer', 'real') THEN fact.value END) AS highest\nFROM call, json_each(call.facts) AS fact\nWHERE call.facts IS NOT NULL AND call.time >= $__from / 1000 AND call.time < $__to / 1000\nGROUP BY call.tool, call.action, fact.key\nORDER BY call.tool, call.action, fact.key",
-          "timeColumns": []
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "auto",
-            "filterable": true,
-            "minWidth": 60
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "showHeader": true,
-        "cellHeight": "sm",
-        "footer": {
-          "show": false
-        }
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 8
-      }
-    },
-    {
-      "id": 4,
-      "type": "table",
-      "title": "Calls with facts",
-      "description": "Newest first. passed, failed and conclusion are read from the facts; the last column is all of them.",
-      "datasource": {
-        "type": "frser-sqlite-datasource",
-        "uid": "jig-lens"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "frser-sqlite-datasource",
-            "uid": "jig-lens"
-          },
-          "queryType": "table",
-          "rawQueryText": "SELECT time,\n       session,\n       tool,\n       coalesce(action, '') AS action,\n       outcome,\n       durationMs AS duration,\n       json_extract(facts, '$.passed') AS passed,\n       json_extract(facts, '$.failed') AS failed,\n       json_extract(facts, '$.conclusion') AS conclusion,\n       facts\nFROM call\nWHERE facts IS NOT NULL AND time >= $__from / 1000 AND time < $__to / 1000\nORDER BY time DESC\nLIMIT 200",
-          "queryText": "SELECT time,\n       session,\n       tool,\n       coalesce(action, '') AS action,\n       outcome,\n       durationMs AS duration,\n       json_extract(facts, '$.passed') AS passed,\n       json_extract(facts, '$.failed') AS failed,\n       json_extract(facts, '$.conclusion') AS conclusion,\n       facts\nFROM call\nWHERE facts IS NOT NULL AND time >= $__from / 1000 AND time < $__to / 1000\nORDER BY time DESC\nLIMIT 200",
-          "timeColumns": [
-            "time"
-          ]
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "auto",
-            "filterable": true,
-            "minWidth": 60
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "time"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 170
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "session"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 290
-              },
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "title": "Open this session",
-                    "url": "/d/jig-session?var-session=${__value.raw}"
-                  }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "custom": {
+                        "drawStyle": "bars",
+                        "fillOpacity": 80,
+                        "lineWidth": 1,
+                        "showPoints": "never",
+                        "stacking": {
+                            "mode": "normal",
+                            "group": "A"
+                        }
+                    },
+                    "min": 0,
+                    "decimals": 0
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "passed"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "mode": "fixed",
+                                    "fixedColor": "green"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "failed"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "mode": "fixed",
+                                    "fixedColor": "red"
+                                }
+                            }
+                        ]
+                    }
                 ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "tool"
             },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 100
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "action"
+            "options": {
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "multi",
+                    "sort": "desc"
+                }
             },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 90
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "outcome"
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 0
+            }
+        },
+        {
+            "id": 2,
+            "type": "barchart",
+            "title": "CI conclusions",
+            "description": "Counts the fact conclusion, for the tools that report it.",
+            "datasource": {
+                "type": "frser-sqlite-datasource",
+                "uid": "jig-lens"
             },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 80
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "duration"
+            "targets": [
+                {
+                    "refId": "A",
+                    "datasource": {
+                        "type": "frser-sqlite-datasource",
+                        "uid": "jig-lens"
+                    },
+                    "queryType": "table",
+                    "rawQueryText": "SELECT json_extract(facts, '$.conclusion') AS conclusion, count(*) AS runs\nFROM call\nWHERE json_extract(facts, '$.conclusion') IS NOT NULL AND time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY conclusion\nORDER BY runs DESC, conclusion",
+                    "queryText": "SELECT json_extract(facts, '$.conclusion') AS conclusion, count(*) AS runs\nFROM call\nWHERE json_extract(facts, '$.conclusion') IS NOT NULL AND time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY conclusion\nORDER BY runs DESC, conclusion",
+                    "timeColumns": []
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "custom": {
+                        "fillOpacity": 80
+                    },
+                    "min": 0,
+                    "decimals": 0
+                },
+                "overrides": []
             },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 90
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "passed"
+            "options": {
+                "xField": "conclusion",
+                "orientation": "horizontal",
+                "showValue": "auto",
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": false
+                },
+                "tooltip": {
+                    "mode": "single",
+                    "sort": "none"
+                }
             },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 80
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "failed"
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 0
+            }
+        },
+        {
+            "id": 3,
+            "type": "table",
+            "title": "Facts the tools report",
+            "description": "Every fact name in use, so you know what else can be charted with json_extract. Lowest and highest are for numbers.",
+            "datasource": {
+                "type": "frser-sqlite-datasource",
+                "uid": "jig-lens"
             },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 80
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "conclusion"
+            "targets": [
+                {
+                    "refId": "A",
+                    "datasource": {
+                        "type": "frser-sqlite-datasource",
+                        "uid": "jig-lens"
+                    },
+                    "queryType": "table",
+                    "rawQueryText": "SELECT call.tool,\n       coalesce(call.action, '') AS action,\n       fact.key AS fact,\n       count(*) AS calls,\n       min(CASE WHEN fact.type IN ('integer', 'real') THEN fact.value END) AS lowest,\n       max(CASE WHEN fact.type IN ('integer', 'real') THEN fact.value END) AS highest\nFROM call, json_each(call.facts) AS fact\nWHERE call.facts IS NOT NULL AND call.time >= $__from / 1000 AND call.time < $__to / 1000\nGROUP BY call.tool, call.action, fact.key\nORDER BY call.tool, call.action, fact.key",
+                    "queryText": "SELECT call.tool,\n       coalesce(call.action, '') AS action,\n       fact.key AS fact,\n       count(*) AS calls,\n       min(CASE WHEN fact.type IN ('integer', 'real') THEN fact.value END) AS lowest,\n       max(CASE WHEN fact.type IN ('integer', 'real') THEN fact.value END) AS highest\nFROM call, json_each(call.facts) AS fact\nWHERE call.facts IS NOT NULL AND call.time >= $__from / 1000 AND call.time < $__to / 1000\nGROUP BY call.tool, call.action, fact.key\nORDER BY call.tool, call.action, fact.key",
+                    "timeColumns": []
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "custom": {
+                        "align": "auto",
+                        "filterable": true,
+                        "minWidth": 60
+                    }
+                },
+                "overrides": []
             },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 110
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "duration"
+            "options": {
+                "showHeader": true,
+                "cellHeight": "sm",
+                "footer": {
+                    "show": false
+                }
             },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "ms"
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "showHeader": true,
-        "cellHeight": "sm",
-        "footer": {
-          "show": false
+            "gridPos": {
+                "h": 8,
+                "w": 24,
+                "x": 0,
+                "y": 8
+            }
+        },
+        {
+            "id": 4,
+            "type": "table",
+            "title": "Calls with facts",
+            "description": "Newest first. passed, failed and conclusion are read from the facts; the last column is all of them.",
+            "datasource": {
+                "type": "frser-sqlite-datasource",
+                "uid": "jig-lens"
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "datasource": {
+                        "type": "frser-sqlite-datasource",
+                        "uid": "jig-lens"
+                    },
+                    "queryType": "table",
+                    "rawQueryText": "SELECT time,\n       session,\n       tool,\n       coalesce(action, '') AS action,\n       outcome,\n       durationMs AS duration,\n       json_extract(facts, '$.passed') AS passed,\n       json_extract(facts, '$.failed') AS failed,\n       json_extract(facts, '$.conclusion') AS conclusion,\n       facts\nFROM call\nWHERE facts IS NOT NULL AND time >= $__from / 1000 AND time < $__to / 1000\nORDER BY time DESC\nLIMIT 200",
+                    "queryText": "SELECT time,\n       session,\n       tool,\n       coalesce(action, '') AS action,\n       outcome,\n       durationMs AS duration,\n       json_extract(facts, '$.passed') AS passed,\n       json_extract(facts, '$.failed') AS failed,\n       json_extract(facts, '$.conclusion') AS conclusion,\n       facts\nFROM call\nWHERE facts IS NOT NULL AND time >= $__from / 1000 AND time < $__to / 1000\nORDER BY time DESC\nLIMIT 200",
+                    "timeColumns": ["time"]
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "custom": {
+                        "align": "auto",
+                        "filterable": true,
+                        "minWidth": 60
+                    }
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "time"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 170
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "session"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 290
+                            },
+                            {
+                                "id": "links",
+                                "value": [
+                                    {
+                                        "title": "Open this session",
+                                        "url": "/d/jig-session?var-session=${__value.raw}"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "tool"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 100
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "action"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 90
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "outcome"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 80
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "duration"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 90
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "passed"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 80
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "failed"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 80
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "conclusion"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 110
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "duration"
+                        },
+                        "properties": [
+                            {
+                                "id": "unit",
+                                "value": "ms"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "options": {
+                "showHeader": true,
+                "cellHeight": "sm",
+                "footer": {
+                    "show": false
+                }
+            },
+            "gridPos": {
+                "h": 12,
+                "w": 24,
+                "x": 0,
+                "y": 16
+            }
         }
-      },
-      "gridPos": {
-        "h": 12,
-        "w": 24,
-        "x": 0,
-        "y": 16
-      }
-    }
-  ]
+    ]
 }

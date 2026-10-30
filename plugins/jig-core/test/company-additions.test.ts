@@ -25,7 +25,9 @@ const logsCheck: SectionCheck = (raw) => {
 describe("company defaults for a plugin's section", () => {
     let dir: string;
     let counter = 0;
-    before(() => { dir = mkdtempSync(path.join(tmpdir(), "jig-defaults-")); });
+    before(() => {
+        dir = mkdtempSync(path.join(tmpdir(), "jig-defaults-"));
+    });
     after(() => rmSync(dir, { recursive: true, force: true }));
 
     function setup(personal: unknown) {
@@ -48,7 +50,10 @@ describe("company defaults for a plugin's section", () => {
         const { api } = setup({ logs: { indexes: ["mine-*"], url: "https://mine.example.com" } });
         api.config.addSectionDefaults("logs", { url: "https://logs.example.com", indexes: ["app-logs-*"] });
         assert.deepEqual(api.config.section("logs"), { url: "https://mine.example.com", indexes: ["mine-*"] });
-        assert.deepEqual(layered({ a: { b: 1, c: 2 }, d: [1] }, { a: { c: 3 }, d: [9] }), { a: { b: 1, c: 3 }, d: [9] });
+        assert.deepEqual(layered({ a: { b: 1, c: 2 }, d: [1] }, { a: { c: 3 }, d: [9] }), {
+            a: { b: 1, c: 3 },
+            d: [9],
+        });
     });
 
     test("that do not fit with your settings are reported once, and your own section is used", () => {
@@ -72,7 +77,14 @@ describe("tunnels", () => {
     test("open through the provider registered by name, and close", async () => {
         const tunnels = createTunnels();
         let closed = 0;
-        tunnels.register("company", { open: async (target) => ({ port: 40000 + (target.port % 1000), close: () => { closed++; } }) });
+        tunnels.register("company", {
+            open: async (target) => ({
+                port: 40000 + (target.port % 1000),
+                close: () => {
+                    closed++;
+                },
+            }),
+        });
         const tunnel = await tunnels.open("company", { host: "db.internal.example.com", port: 27017 });
         assert.equal(tunnel.port, 40017);
         await tunnel.close();
@@ -81,7 +93,10 @@ describe("tunnels", () => {
 
     test("an unknown name lists the registered ones; a bad target or a bad answer is named", async () => {
         const tunnels = createTunnels();
-        await assert.rejects(tunnels.open("none", { host: "h", port: 1 }), /no tunnel provider named "none" \(none is registered\)/);
+        await assert.rejects(
+            tunnels.open("none", { host: "h", port: 1 }),
+            /no tunnel provider named "none" \(none is registered\)/,
+        );
         tunnels.register("one", { open: async () => ({ port: 0, close: () => {} }) });
         await assert.rejects(tunnels.open("x", { host: "h", port: 1 }), /registered: one/);
         await assert.rejects(tunnels.open("one", { host: "", port: 1 }), /target host and a port/);
@@ -89,8 +104,15 @@ describe("tunnels", () => {
         await assert.rejects(tunnels.open("one", { host: "h", port: 1 }), /without a valid local port/);
         tunnels.register("one", { open: async () => ({ port: 5000 }) as never });
         await assert.rejects(tunnels.open("one", { host: "h", port: 1 }), /cannot be closed/);
-        tunnels.register("one", { open: async () => { throw new Error("jump host refused"); } });
-        await assert.rejects(tunnels.open("one", { host: "h", port: 1 }), /tunnel provider "one" failed: jump host refused/);
+        tunnels.register("one", {
+            open: async () => {
+                throw new Error("jump host refused");
+            },
+        });
+        await assert.rejects(
+            tunnels.open("one", { host: "h", port: 1 }),
+            /tunnel provider "one" failed: jump host refused/,
+        );
         assert.throws(() => tunnels.register("bad", {} as never), /must have an open function/);
     });
 });

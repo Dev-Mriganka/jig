@@ -100,14 +100,24 @@ export function createApprovals(options: ApprovalsOptions = {}): Approvals {
                 done(answer);
             };
             return createReviewScreen(
-                { header: request.header, preview: request.preview, openInBrowser: () => openPreview(request.preview, request.header) },
-                tui, theme, finish,
+                {
+                    header: request.header,
+                    preview: request.preview,
+                    openInBrowser: () => openPreview(request.preview, request.header),
+                },
+                tui,
+                theme,
+                finish,
             );
         });
     }
 
     async function askReason(ctx: AskContext): Promise<string | undefined> {
-        const typed = await ctx.ui.input("Why decline? The model will read this (optional)", "reason", signalOption(ctx));
+        const typed = await ctx.ui.input(
+            "Why decline? The model will read this (optional)",
+            "reason",
+            signalOption(ctx),
+        );
         const reason = typed?.trim();
         return reason === undefined || reason === "" ? undefined : reason.slice(0, MAX_REASON_CHARS);
     }

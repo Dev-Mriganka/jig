@@ -3,7 +3,15 @@
 // environment, the approved preview and the facts. Everything the plugin tells jig-core or asks of it is recorded for the tests.
 import { publishJig, withdrawJig } from "../../../jig-core/src/client.ts";
 import type {
-    EnvironmentKind, Facts, JigApi, Preview, SignInRequest, ToolDeclaration, Transport, TransportRequest, TransportResponse,
+    EnvironmentKind,
+    Facts,
+    JigApi,
+    Preview,
+    SignInRequest,
+    ToolDeclaration,
+    Transport,
+    TransportRequest,
+    TransportResponse,
 } from "../../../jig-core/src/contract.ts";
 
 type Headers = Record<string, string>;
@@ -53,10 +61,16 @@ export function installFakeJig(): FakeJig {
     const signInCalls: FakeJig["signInCalls"] = [];
     const transports = new Map<string, Transport>();
     const transportCalls: FakeJig["transportCalls"] = [];
-    const defaultKinds = (): Map<string, EnvironmentKind> => new Map<string, EnvironmentKind>([
-        ["local", "local"], ["external", "external"], ["production", "production"], ["prod", "production"],
-        ["staging", "test"], ["qa", "test"], ["dev", "test"],
-    ]);
+    const defaultKinds = (): Map<string, EnvironmentKind> =>
+        new Map<string, EnvironmentKind>([
+            ["local", "local"],
+            ["external", "external"],
+            ["production", "production"],
+            ["prod", "production"],
+            ["staging", "test"],
+            ["qa", "test"],
+            ["dev", "test"],
+        ]);
     const kinds = defaultKinds();
 
     const api: JigApi = {
@@ -82,7 +96,9 @@ export function installFakeJig(): FakeJig {
                 try {
                     return await service(request);
                 } catch (error) {
-                    throw new Error(`sign-in service "${name}" failed: ${error instanceof Error ? error.message : String(error)}`);
+                    throw new Error(
+                        `sign-in service "${name}" failed: ${error instanceof Error ? error.message : String(error)}`,
+                    );
                 }
             },
         },
@@ -100,11 +116,14 @@ export function installFakeJig(): FakeJig {
             request: async (name, request, signal) => {
                 transportCalls.push({ name, request });
                 const transport = transports.get(name);
-                if (transport === undefined) throw new Error(`no transport named "${name}" (none is registered); a company plugin registers it`);
+                if (transport === undefined)
+                    throw new Error(`no transport named "${name}" (none is registered); a company plugin registers it`);
                 try {
                     return checked(await transport.request(request, signal));
                 } catch (error) {
-                    throw new Error(`transport "${name}" failed: ${error instanceof Error ? error.message : String(error)}`);
+                    throw new Error(
+                        `transport "${name}" failed: ${error instanceof Error ? error.message : String(error)}`,
+                    );
                 }
             },
         },
@@ -128,7 +147,9 @@ export function installFakeJig(): FakeJig {
                 const value = values.get(name);
                 const validate = sections.get(name);
                 // As in jig-core: a section with errors is reported at start-up, and then reads as absent.
-                return value !== undefined && (validate === undefined || validate(value).length === 0) ? value : undefined;
+                return value !== undefined && (validate === undefined || validate(value).length === 0)
+                    ? value
+                    : undefined;
             },
         },
         exec: {

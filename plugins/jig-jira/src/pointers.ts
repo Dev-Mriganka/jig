@@ -37,7 +37,8 @@ function escapeRegExp(text: string): string {
 export function stringsIn(value: unknown, found: string[] = []): string[] {
     if (typeof value === "string") found.push(value);
     else if (Array.isArray(value)) for (const item of value) stringsIn(item, found);
-    else if (typeof value === "object" && value !== null) for (const item of Object.values(value)) stringsIn(item, found);
+    else if (typeof value === "object" && value !== null)
+        for (const item of Object.values(value)) stringsIn(item, found);
     return found;
 }
 

@@ -1,123 +1,77 @@
 {
-  "category": "email",
-  "cases": [
-    {
-      "id": "email-mixed-case-mongo",
-      "input": {
-        "_id": "acct-demo-001",
-        "Email": "alex.example@example.com",
-        "EMAIL_ADDRESS": "casey.sample@example.net",
-        "contactEmail": "jordan.test@example.org",
-        "status": "ACTIVE"
-      },
-      "must_not_contain": [
-        "alex.example@example.com",
-        "casey.sample@example.net",
-        "jordan.test@example.org"
-      ],
-      "must_keep": [
-        "acct-demo-001",
-        "ACTIVE"
-      ],
-      "expect_tags": [
-        "email"
-      ],
-      "notes": "Three field-name spellings in a Mongo-style document."
-    },
-    {
-      "id": "email-nested-array",
-      "input": {
-        "orderId": "ord-7001",
-        "contacts": [
-          {
-            "kind": "billing",
-            "email": "billing.example@example.com"
-          },
-          {
-            "kind": "technical",
-            "email": "tech.sample@example.net"
-          }
-        ],
-        "sku": "SIP-2000"
-      },
-      "must_not_contain": [
-        "billing.example@example.com",
-        "tech.sample@example.net"
-      ],
-      "must_keep": [
-        "ord-7001",
-        "SIP-2000",
-        "billing",
-        "technical"
-      ],
-      "expect_tags": [
-        "email"
-      ],
-      "notes": "Traverse arrays and nested documents."
-    },
-    {
-      "id": "email-free-text",
-      "input": "2026-01-02T03:04:05Z INFO order=ord-7002 note=Please email alex.example@example.com about SKU-SAMPLE-42",
-      "must_not_contain": [
-        "alex.example@example.com"
-      ],
-      "must_keep": [
-        "2026-01-02T03:04:05Z",
-        "ord-7002",
-        "SKU-SAMPLE-42"
-      ],
-      "expect_tags": [
-        "email"
-      ],
-      "notes": "Detect an email inside a log note while keeping diagnostic data."
-    },
-    {
-      "id": "email-json-encoded-log",
-      "input": "INFO event=lookup payload={\"contactEmail\":\"casey.sample@example.net\",\"orderId\":\"ord-7003\",\"version\":\"v2.1.0\"}",
-      "must_not_contain": [
-        "casey.sample@example.net"
-      ],
-      "must_keep": [
-        "ord-7003",
-        "v2.1.0"
-      ],
-      "expect_tags": [
-        "email"
-      ],
-      "notes": "The log message contains a JSON-encoded object as text."
-    },
-    {
-      "id": "email-url-query",
-      "input": "GET /lookup?contactEmail=jordan.test%40example.org&orderId=ord-7004&sku=SKU-SAMPLE-44",
-      "must_not_contain": [
-        "jordan.test%40example.org"
-      ],
-      "must_keep": [
-        "ord-7004",
-        "SKU-SAMPLE-44"
-      ],
-      "expect_tags": [
-        "email"
-      ],
-      "notes": "Percent-encoded email in a URL query must not survive in encoded form."
-    },
-    {
-      "id": "email-negative-controls",
-      "input": {
-        "orderId": "email-order-7005",
-        "sku": "EMAIL-MODULE-01",
-        "event": "sent_email",
-        "accountId": "acct-EMAIL-9"
-      },
-      "must_not_contain": [],
-      "must_keep": [
-        "email-order-7005",
-        "EMAIL-MODULE-01",
-        "sent_email",
-        "acct-EMAIL-9"
-      ],
-      "expect_tags": [],
-      "notes": "Field-like words inside non-personal identifiers are not email addresses."
-    }
-  ]
+    "category": "email",
+    "cases": [
+        {
+            "id": "email-mixed-case-mongo",
+            "input": {
+                "_id": "acct-demo-001",
+                "Email": "alex.example@example.com",
+                "EMAIL_ADDRESS": "casey.sample@example.net",
+                "contactEmail": "jordan.test@example.org",
+                "status": "ACTIVE"
+            },
+            "must_not_contain": ["alex.example@example.com", "casey.sample@example.net", "jordan.test@example.org"],
+            "must_keep": ["acct-demo-001", "ACTIVE"],
+            "expect_tags": ["email"],
+            "notes": "Three field-name spellings in a Mongo-style document."
+        },
+        {
+            "id": "email-nested-array",
+            "input": {
+                "orderId": "ord-7001",
+                "contacts": [
+                    {
+                        "kind": "billing",
+                        "email": "billing.example@example.com"
+                    },
+                    {
+                        "kind": "technical",
+                        "email": "tech.sample@example.net"
+                    }
+                ],
+                "sku": "SIP-2000"
+            },
+            "must_not_contain": ["billing.example@example.com", "tech.sample@example.net"],
+            "must_keep": ["ord-7001", "SIP-2000", "billing", "technical"],
+            "expect_tags": ["email"],
+            "notes": "Traverse arrays and nested documents."
+        },
+        {
+            "id": "email-free-text",
+            "input": "2026-01-02T03:04:05Z INFO order=ord-7002 note=Please email alex.example@example.com about SKU-SAMPLE-42",
+            "must_not_contain": ["alex.example@example.com"],
+            "must_keep": ["2026-01-02T03:04:05Z", "ord-7002", "SKU-SAMPLE-42"],
+            "expect_tags": ["email"],
+            "notes": "Detect an email inside a log note while keeping diagnostic data."
+        },
+        {
+            "id": "email-json-encoded-log",
+            "input": "INFO event=lookup payload={\"contactEmail\":\"casey.sample@example.net\",\"orderId\":\"ord-7003\",\"version\":\"v2.1.0\"}",
+            "must_not_contain": ["casey.sample@example.net"],
+            "must_keep": ["ord-7003", "v2.1.0"],
+            "expect_tags": ["email"],
+            "notes": "The log message contains a JSON-encoded object as text."
+        },
+        {
+            "id": "email-url-query",
+            "input": "GET /lookup?contactEmail=jordan.test%40example.org&orderId=ord-7004&sku=SKU-SAMPLE-44",
+            "must_not_contain": ["jordan.test%40example.org"],
+            "must_keep": ["ord-7004", "SKU-SAMPLE-44"],
+            "expect_tags": ["email"],
+            "notes": "Percent-encoded email in a URL query must not survive in encoded form."
+        },
+        {
+            "id": "email-negative-controls",
+            "input": {
+                "orderId": "email-order-7005",
+                "sku": "EMAIL-MODULE-01",
+                "event": "sent_email",
+                "accountId": "acct-EMAIL-9"
+            },
+            "must_not_contain": [],
+            "must_keep": ["email-order-7005", "EMAIL-MODULE-01", "sent_email", "acct-EMAIL-9"],
+            "expect_tags": [],
+            "notes": "Field-like words inside non-personal identifiers are not email addresses."
+        }
+    ]
 }

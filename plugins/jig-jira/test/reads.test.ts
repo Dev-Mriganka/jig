@@ -51,9 +51,15 @@ describe("get", () => {
             "Description:",
         ]);
         assert.match(text, /h3\. Steps\n# Open the login page in Safari 17/);
-        assert.match(text, /Comments \(3\):\n#10001 Sam Lee, 2026-10-02\n {2}Reproduced on Safari 17\.\n\n {2}Steps are in the description\./);
+        assert.match(
+            text,
+            /Comments \(3\):\n#10001 Sam Lee, 2026-10-02\n {2}Reproduced on Safari 17\.\n\n {2}Steps are in the description\./,
+        );
         assert.match(text, /#10003 Sam Lee, 2026-10-05 \(edited\)\n {2}Verified on staging\./);
-        assert.deepEqual(h.jira.requests.map((request) => `${request.method} ${request.path}`), ["GET /issue/PROJ-1"]);
+        assert.deepEqual(
+            h.jira.requests.map((request) => `${request.method} ${request.path}`),
+            ["GET /issue/PROJ-1"],
+        );
         assert.equal(
             h.jira.requests[0]?.query.fields,
             "summary,issuetype,status,priority,resolution,assignee,reporter,labels,components,fixVersions," +
@@ -62,22 +68,28 @@ describe("get", () => {
     });
 
     test("an issue with nothing to list says so briefly", async () => {
-        assert.equal(ok(await h.call({ action: "get", key: "PROJ-2" })), [
-            "PROJ-2 | Task | Open | Medium",
-            "Update the onboarding guide",
-            "Assignee: unassigned | Reporter: Jane Doe",
-            "Created: 2026-10-08 | Updated: 2026-10-08",
-            "Description:",
-            "Add the new VPN steps.",
-            "Comments: none",
-        ].join("\n"));
+        assert.equal(
+            ok(await h.call({ action: "get", key: "PROJ-2" })),
+            [
+                "PROJ-2 | Task | Open | Medium",
+                "Update the onboarding guide",
+                "Assignee: unassigned | Reporter: Jane Doe",
+                "Created: 2026-10-08 | Updated: 2026-10-08",
+                "Description:",
+                "Add the new VPN steps.",
+                "Comments: none",
+            ].join("\n"),
+        );
     });
 
     test("the latest five comments, and how many there are", async () => {
         addComments(h, "PROJ-1", 6);
         const text = ok(await h.call({ action: "get", key: "PROJ-1" }));
         assert.match(text, /Comments \(last 5 of 9\):/);
-        assert.deepEqual([...text.matchAll(/^#(\d+) /gm)].map((match) => match[1]), ["20004", "20005", "20006", "20007", "20008"]);
+        assert.deepEqual(
+            [...text.matchAll(/^#(\d+) /gm)].map((match) => match[1]),
+            ["20004", "20005", "20006", "20007", "20008"],
+        );
     });
 
     test("a long thread that Jira sends only in part is asked for again, newest last", async () => {
@@ -85,7 +97,10 @@ describe("get", () => {
         h.jira.inlineComments = 2;
         const text = ok(await h.call({ action: "get", key: "PROJ-1" }));
         assert.match(text, /Comments \(last 5 of 9\):/);
-        assert.deepEqual([...text.matchAll(/^#(\d+) /gm)].map((match) => match[1]), ["20004", "20005", "20006", "20007", "20008"]);
+        assert.deepEqual(
+            [...text.matchAll(/^#(\d+) /gm)].map((match) => match[1]),
+            ["20004", "20005", "20006", "20007", "20008"],
+        );
         const tail = h.jira.sent("GET", "/issue/PROJ-1/comment");
         assert.equal(tail.length, 1);
         assert.deepEqual(tail[0]?.query, { startAt: "4", maxResults: "5" });
@@ -104,43 +119,79 @@ describe("get", () => {
     });
 
     test("include shows more fields, by friendly name, by id and by the name Jira shows", async () => {
-        h.configure({ site: "https://jira.example.test", auth: { token: "pass:jira/token" }, fields: { Points: "customfield_10016" } });
-        const text = ok(await h.call({ action: "get", key: "PROJ-1", include: ["points", "customfield_10500", "Acceptance Criteria", "Labels"] }));
+        h.configure({
+            site: "https://jira.example.test",
+            auth: { token: "pass:jira/token" },
+            fields: { Points: "customfield_10016" },
+        });
+        const text = ok(
+            await h.call({
+                action: "get",
+                key: "PROJ-1",
+                include: ["points", "customfield_10500", "Acceptance Criteria", "Labels"],
+            }),
+        );
         assert.match(text, /\npoints: 5\n/);
-        assert.match(text, /\nPull Request Link \(customfield_10500\): https:\/\/git\.example\.test\/org\/app\/pull\/42\n/);
+        assert.match(
+            text,
+            /\nPull Request Link \(customfield_10500\): https:\/\/git\.example\.test\/org\/app\/pull\/42\n/,
+        );
         assert.match(text, /\nAcceptance Criteria \(customfield_10600\): \(empty\)\nLabels: login, safari\n/);
         assert.match(h.jira.requests[0]?.path ?? "", /^\/field$/);
-        assert.match(h.jira.requests[1]?.query.fields ?? "", /,comment,customfield_10016,customfield_10500,customfield_10600,labels$/);
+        assert.match(
+            h.jira.requests[1]?.query.fields ?? "",
+            /,comment,customfield_10016,customfield_10500,customfield_10600,labels$/,
+        );
     });
 
     test("a field name Jira does not have is refused with the closest names", async () => {
         const result = await h.call({ action: "get", key: "PROJ-1", include: ["Pull Reqest Link"] });
-        assert.match(result.error?.message ?? "", /^jira: no field is named "Pull Reqest Link"\. Did you mean Pull Request Link \(customfield_10500\)\?$/);
+        assert.match(
+            result.error?.message ?? "",
+            /^jira: no field is named "Pull Reqest Link"\. Did you mean Pull Request Link \(customfield_10500\)\?$/,
+        );
         assert.equal(h.jira.sent("GET", "/issue/PROJ-1").length, 0, "nothing was asked of the issue");
     });
 
     test("an issue that does not exist is the answer Jira gave, without a token", async () => {
         const result = await h.call({ action: "get", key: "PROJ-99" });
-        assert.equal(result.error?.message, "Jira said 404 to GET /issue/PROJ-99: Issue does not exist or you do not have permission to see it. - not found, or the account cannot see it");
+        assert.equal(
+            result.error?.message,
+            "Jira said 404 to GET /issue/PROJ-99: Issue does not exist or you do not have permission to see it. - not found, or the account cannot see it",
+        );
     });
 });
 
 describe("search", () => {
     test("Jira Cloud pages by token: the first page, and the page value to ask for the next", async () => {
         const first = ok(await h.call({ action: "search", jql: "project = PROJ ORDER BY updated DESC", limit: 1 }));
-        assert.equal(first, [
-            "1 issue (more follow) for: project = PROJ ORDER BY updated DESC",
-            "PROJ-1 | In Progress | Bug | High | Jane Doe | 2026-10-12 | Fix login crash on Safari",
-            'More: repeat with page="1"',
-        ].join("\n"));
-        const second = ok(await h.call({ action: "search", jql: "project = PROJ ORDER BY updated DESC", limit: 1, page: "1" }));
-        assert.equal(second, [
-            "1 issue for: project = PROJ ORDER BY updated DESC",
-            "PROJ-2 | Open | Task | Medium | unassigned | 2026-10-08 | Update the onboarding guide",
-        ].join("\n"));
-        assert.deepEqual(h.jira.requests.map((request) => request.path), ["/search/jql", "/search/jql"]);
+        assert.equal(
+            first,
+            [
+                "1 issue (more follow) for: project = PROJ ORDER BY updated DESC",
+                "PROJ-1 | In Progress | Bug | High | Jane Doe | 2026-10-12 | Fix login crash on Safari",
+                'More: repeat with page="1"',
+            ].join("\n"),
+        );
+        const second = ok(
+            await h.call({ action: "search", jql: "project = PROJ ORDER BY updated DESC", limit: 1, page: "1" }),
+        );
+        assert.equal(
+            second,
+            [
+                "1 issue for: project = PROJ ORDER BY updated DESC",
+                "PROJ-2 | Open | Task | Medium | unassigned | 2026-10-08 | Update the onboarding guide",
+            ].join("\n"),
+        );
+        assert.deepEqual(
+            h.jira.requests.map((request) => request.path),
+            ["/search/jql", "/search/jql"],
+        );
         assert.deepEqual(h.jira.requests[1]?.query, {
-            jql: "project = PROJ ORDER BY updated DESC", fields: "summary,status,issuetype,priority,assignee,updated", maxResults: "1", nextPageToken: "1",
+            jql: "project = PROJ ORDER BY updated DESC",
+            fields: "summary,status,issuetype,priority,assignee,updated",
+            maxResults: "1",
+            nextPageToken: "1",
         });
     });
 
@@ -148,17 +199,28 @@ describe("search", () => {
         const first = ok(await datacenter.call({ action: "search", jql: "project = PROJ", limit: 1 }));
         assert.match(first, /^1-1 of 2 for: project = PROJ\nPROJ-1 \| /);
         assert.match(first, /\nMore: repeat with page="1"$/);
-        assert.deepEqual(datacenter.jira.requests.map((request) => request.path), ["/search/jql", "/search"], "the first search tries the token endpoint, then the offset one");
+        assert.deepEqual(
+            datacenter.jira.requests.map((request) => request.path),
+            ["/search/jql", "/search"],
+            "the first search tries the token endpoint, then the offset one",
+        );
         const second = ok(await datacenter.call({ action: "search", jql: "project = PROJ", limit: 1, page: "1" }));
         assert.match(second, /^2-2 of 2 for: project = PROJ\nPROJ-2 \| /);
         assert.doesNotMatch(second, /More:/);
-        assert.deepEqual(datacenter.jira.requests.map((request) => request.path), ["/search/jql", "/search", "/search"], "the second search goes straight to the offset one");
+        assert.deepEqual(
+            datacenter.jira.requests.map((request) => request.path),
+            ["/search/jql", "/search", "/search"],
+            "the second search goes straight to the offset one",
+        );
         assert.equal(datacenter.jira.requests[2]?.query.startAt, "1");
     });
 
     test("a page value that Data Center cannot use is refused", async () => {
         const result = await datacenter.call({ action: "search", jql: "project = PROJ", page: "abc" });
-        assert.match(result.error?.message ?? result.blocked ?? "", /page must be the page value the previous result gave/);
+        assert.match(
+            result.error?.message ?? result.blocked ?? "",
+            /page must be the page value the previous result gave/,
+        );
     });
 
     test("no match says so, and extra fields are shown under each issue", async () => {
@@ -166,7 +228,10 @@ describe("search", () => {
         assert.equal(ok(await h.call({ action: "search", jql: "project = NONE" })), "No issues for: project = NONE");
         h.reset();
         const text = ok(await h.call({ action: "search", jql: "project = PROJ", include: ["customfield_10016"] }));
-        assert.match(text, /PROJ-1 \| .*\n {4}Story Points \(customfield_10016\): 5\nPROJ-2 \| .*\n {4}Story Points \(customfield_10016\): \(empty\)/);
+        assert.match(
+            text,
+            /PROJ-1 \| .*\n {4}Story Points \(customfield_10016\): 5\nPROJ-2 \| .*\n {4}Story Points \(customfield_10016\): \(empty\)/,
+        );
     });
 
     test("a field Jira does not know in the query gets the closest names", async () => {
@@ -189,7 +254,10 @@ describe("comments", () => {
     test("the newest comments, newest last", async () => {
         const text = ok(await h.call({ action: "comments", key: "PROJ-1" }));
         assert.match(text, /^PROJ-1: 3 comments, newest last\n#10001 Sam Lee, 2026-10-02\n/);
-        assert.match(text, /#10002 Jane Doe, 2026-10-03\n {2}Fix is in \[PR 42\|https:\/\/git\.example\.test\/org\/app\/pull\/42\]\.\n#10003 /);
+        assert.match(
+            text,
+            /#10002 Jane Doe, 2026-10-03\n {2}Fix is in \[PR 42\|https:\/\/git\.example\.test\/org\/app\/pull\/42\]\.\n#10003 /,
+        );
         assert.equal(ok(await h.call({ action: "comments", key: "PROJ-2" })), "No comments on PROJ-2.");
     });
 
@@ -198,77 +266,134 @@ describe("comments", () => {
         h.jira.requests.length = 0;
         const text = ok(await h.call({ action: "comments", key: "PROJ-1", limit: 4 }));
         assert.match(text, /^PROJ-1: newest 4 of 23 comments, newest last\n/);
-        assert.deepEqual([...text.matchAll(/^#(\d+) /gm)].map((match) => match[1]), ["20019", "20020", "20021", "20022"]);
-        assert.deepEqual(h.jira.requests.map((request) => request.query.startAt), ["0", "19"], "the first page shows the total; then the newest page");
+        assert.deepEqual(
+            [...text.matchAll(/^#(\d+) /gm)].map((match) => match[1]),
+            ["20019", "20020", "20021", "20022"],
+        );
+        assert.deepEqual(
+            h.jira.requests.map((request) => request.query.startAt),
+            ["0", "19"],
+            "the first page shows the total; then the newest page",
+        );
     });
 
     test("each comment is cut at 1,500 characters unless full is asked for", async () => {
         addComments(h, "PROJ-2", 1, () => "z".repeat(1700));
-        assert.match(ok(await h.call({ action: "comments", key: "PROJ-2" })), /z{1500}\n {2}\[\.\.\. 200 more characters; call again with full=true for all of it\]/);
+        assert.match(
+            ok(await h.call({ action: "comments", key: "PROJ-2" })),
+            /z{1500}\n {2}\[\.\.\. 200 more characters; call again with full=true for all of it\]/,
+        );
         assert.doesNotMatch(ok(await h.call({ action: "comments", key: "PROJ-2", full: true })), /more characters/);
     });
 });
 
 describe("transitions, changelog, attachments", () => {
     test("transitions lists each name with the status it leads to and its id", async () => {
-        assert.equal(ok(await h.call({ action: "transitions", key: "PROJ-1" })), [
-            "PROJ-1 transitions (name -> status [id]):",
-            "- Start Progress -> In Progress [21]",
-            "- Resolve Issue -> Done [31]",
-            "- Back to Open -> Open [41]",
-        ].join("\n"));
+        assert.equal(
+            ok(await h.call({ action: "transitions", key: "PROJ-1" })),
+            [
+                "PROJ-1 transitions (name -> status [id]):",
+                "- Start Progress -> In Progress [21]",
+                "- Resolve Issue -> Done [31]",
+                "- Back to Open -> Open [41]",
+            ].join("\n"),
+        );
         issue(h, "PROJ-2").transitions = [];
-        assert.equal(ok(await h.call({ action: "transitions", key: "PROJ-2" })), "PROJ-2 has no transitions available to this account.");
+        assert.equal(
+            ok(await h.call({ action: "transitions", key: "PROJ-2" })),
+            "PROJ-2 has no transitions available to this account.",
+        );
     });
 
     test("changelog gives status and field changes, oldest first, limited to the newest", async () => {
-        assert.equal(ok(await h.call({ action: "changelog", key: "PROJ-1" })), [
-            "PROJ-1 history (2 changes, newest last):",
-            "2026-10-03 09:00 Jane Doe: status Open -> In Progress",
-            "2026-10-04 12:30 Sam Lee: priority Medium -> High; labels (none) -> safari",
-        ].join("\n"));
-        assert.match(ok(await h.call({ action: "changelog", key: "PROJ-1", limit: 1 })), /^PROJ-1 history \(newest 1 of 2 changes, newest last\):\n2026-10-04 12:30 Sam Lee/);
+        assert.equal(
+            ok(await h.call({ action: "changelog", key: "PROJ-1" })),
+            [
+                "PROJ-1 history (2 changes, newest last):",
+                "2026-10-03 09:00 Jane Doe: status Open -> In Progress",
+                "2026-10-04 12:30 Sam Lee: priority Medium -> High; labels (none) -> safari",
+            ].join("\n"),
+        );
+        assert.match(
+            ok(await h.call({ action: "changelog", key: "PROJ-1", limit: 1 })),
+            /^PROJ-1 history \(newest 1 of 2 changes, newest last\):\n2026-10-04 12:30 Sam Lee/,
+        );
         assert.equal(ok(await h.call({ action: "changelog", key: "PROJ-2" })), "PROJ-2: no changes recorded.");
         assert.equal(h.jira.requests[0]?.query.expand, "changelog");
     });
 
     test("attachments are listed, never downloaded", async () => {
-        assert.equal(ok(await h.call({ action: "attachments", key: "PROJ-1" })), [
-            "PROJ-1 attachments (id | name | size | type | date | author; files are not downloaded):",
-            "20001 | crash.log | 2.0 KB | text/plain | 2026-10-02 | Sam Lee",
-        ].join("\n"));
+        assert.equal(
+            ok(await h.call({ action: "attachments", key: "PROJ-1" })),
+            [
+                "PROJ-1 attachments (id | name | size | type | date | author; files are not downloaded):",
+                "20001 | crash.log | 2.0 KB | text/plain | 2026-10-02 | Sam Lee",
+            ].join("\n"),
+        );
         assert.equal(ok(await h.call({ action: "attachments", key: "PROJ-2" })), "PROJ-2 has no attachments.");
-        assert.ok(h.jira.requests.every((request) => request.method === "GET" && !request.path.includes("attachment")), "only the issue was read");
+        assert.ok(
+            h.jira.requests.every((request) => request.method === "GET" && !request.path.includes("attachment")),
+            "only the issue was read",
+        );
     });
 });
 
 describe("assignable and find_field", () => {
     test("assignable gives the id to use: an account id on Cloud, a user name on Data Center", async () => {
-        assert.equal(ok(await h.call({ action: "assignable", key: "PROJ-1" })), [
-            "Assignable users for PROJ-1 (id | name):",
-            "5b10a2844c20165700ede21g | Jane Doe",
-            "712020:6c21d3a0-1111-4222-8333-944455556666 | Sam Lee",
-        ].join("\n"));
-        assert.equal(ok(await datacenter.call({ action: "assignable", key: "PROJ-1", query: "sam" })), "Assignable users for PROJ-1 (id | name):\nslee | Sam Lee");
-        assert.deepEqual(datacenter.jira.requests[0]?.query, { issueKey: "PROJ-1", query: "sam", username: "sam", maxResults: "20" }, "both spellings of the query are sent");
+        assert.equal(
+            ok(await h.call({ action: "assignable", key: "PROJ-1" })),
+            [
+                "Assignable users for PROJ-1 (id | name):",
+                "5b10a2844c20165700ede21g | Jane Doe",
+                "712020:6c21d3a0-1111-4222-8333-944455556666 | Sam Lee",
+            ].join("\n"),
+        );
+        assert.equal(
+            ok(await datacenter.call({ action: "assignable", key: "PROJ-1", query: "sam" })),
+            "Assignable users for PROJ-1 (id | name):\nslee | Sam Lee",
+        );
+        assert.deepEqual(
+            datacenter.jira.requests[0]?.query,
+            { issueKey: "PROJ-1", query: "sam", username: "sam", maxResults: "20" },
+            "both spellings of the query are sent",
+        );
     });
 
     test("no one matching, and an inactive person", async () => {
-        assert.equal(ok(await h.call({ action: "assignable", key: "PROJ-1", query: "nobody" })), "No assignable users match for PROJ-1.");
+        assert.equal(
+            ok(await h.call({ action: "assignable", key: "PROJ-1", query: "nobody" })),
+            "No assignable users match for PROJ-1.",
+        );
         (h.jira.users[1] as { active: boolean }).active = false;
-        assert.match(ok(await h.call({ action: "assignable", key: "PROJ-1", query: "sam" })), /\| Sam Lee \| inactive$/);
+        assert.match(
+            ok(await h.call({ action: "assignable", key: "PROJ-1", query: "sam" })),
+            /\| Sam Lee \| inactive$/,
+        );
     });
 
     test("find_field matches a name or an id, and also the friendly names set in the configuration", async () => {
-        assert.equal(ok(await h.call({ action: "find_field", query: "pull" })), 'Fields matching "pull" (id  name):\ncustomfield_10500  Pull Request Link (custom)');
-        assert.match(ok(await h.call({ action: "find_field", query: "CUSTOMFIELD_10016" })), /customfield_10016 {2}Story Points \(custom\)/);
-        h.configure({ site: "https://jira.example.test", auth: { token: "pass:jira/token" }, fields: { "Story Points": "customfield_10016" } });
+        assert.equal(
+            ok(await h.call({ action: "find_field", query: "pull" })),
+            'Fields matching "pull" (id  name):\ncustomfield_10500  Pull Request Link (custom)',
+        );
+        assert.match(
+            ok(await h.call({ action: "find_field", query: "CUSTOMFIELD_10016" })),
+            /customfield_10016 {2}Story Points \(custom\)/,
+        );
+        h.configure({
+            site: "https://jira.example.test",
+            auth: { token: "pass:jira/token" },
+            fields: { "Story Points": "customfield_10016" },
+        });
         assert.equal(
             ok(await h.call({ action: "find_field", query: "story" })),
             'Fields matching "story" (id  name):\ncustomfield_10016  Story Points (custom)\n' +
                 "Story Points -> customfield_10016 (a name set in the jira section)",
         );
-        assert.equal(ok(await h.call({ action: "find_field", query: "zzz" })), 'No field name or id contains "zzz". Try a shorter part of the name.');
+        assert.equal(
+            ok(await h.call({ action: "find_field", query: "zzz" })),
+            'No field name or id contains "zzz". Try a shorter part of the name.',
+        );
     });
 
     test("the field list is read once per session", async () => {
@@ -288,9 +413,14 @@ describe("reads in general", () => {
     test("no read changes anything, asks, or builds a preview", async () => {
         h.jira.duplicates = ["PROJ-2"];
         for (const input of [
-            { action: "get", key: "PROJ-1" }, { action: "search", jql: "project = PROJ" }, { action: "comments", key: "PROJ-1" },
-            { action: "transitions", key: "PROJ-1" }, { action: "changelog", key: "PROJ-1" }, { action: "attachments", key: "PROJ-1" },
-            { action: "assignable", key: "PROJ-1" }, { action: "find_field", query: "story" },
+            { action: "get", key: "PROJ-1" },
+            { action: "search", jql: "project = PROJ" },
+            { action: "comments", key: "PROJ-1" },
+            { action: "transitions", key: "PROJ-1" },
+            { action: "changelog", key: "PROJ-1" },
+            { action: "attachments", key: "PROJ-1" },
+            { action: "assignable", key: "PROJ-1" },
+            { action: "find_field", query: "story" },
         ]) {
             const result = await h.call(input);
             assert.equal(result.error, undefined, JSON.stringify(input));
@@ -310,7 +440,10 @@ describe("reads in general", () => {
     test("without a configuration the tool says what to set, and does not try", async () => {
         h.jig.reset();
         const result = await h.call({ action: "get", key: "PROJ-1" });
-        assert.match(result.error?.message ?? "", /^jira is not set up: add a "jira" section with "site" and "auth" to jig\.json/);
+        assert.match(
+            result.error?.message ?? "",
+            /^jira is not set up: add a "jira" section with "site" and "auth" to jig\.json/,
+        );
         assert.equal(h.jira.requests.length, 0);
     });
 });

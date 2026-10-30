@@ -100,7 +100,10 @@ export function fakeHost(): FakeHost {
         registerCommand: (name: string, options: { handler: (args: string, ctx: unknown) => Promise<void> }) => {
             commands.set(name, options.handler);
         },
-        registerTool: (definition: { name: string; execute: (...args: unknown[]) => Promise<{ content: Array<{ text: string }> }> }) => {
+        registerTool: (definition: {
+            name: string;
+            execute: (...args: unknown[]) => Promise<{ content: Array<{ text: string }> }>;
+        }) => {
             tools.set(definition.name, definition);
         },
         sendUserMessage: (text: string) => {
@@ -203,7 +206,10 @@ export const TICKET = "PROJ-1";
  * so it is the ticket's branch review (what /code-review gives there, and what a push needs); `ticket: false` leaves the
  * ticket out, so it reviews the uncommitted changes.
  */
-export async function openReview(args = "", options: { byAgent?: boolean; ticket?: boolean } = {}): Promise<ReviewSession> {
+export async function openReview(
+    args = "",
+    options: { byAgent?: boolean; ticket?: boolean } = {},
+): Promise<ReviewSession> {
     const root = mkdtempSync(path.join(os.tmpdir(), "jig-review-ws-"));
     const agentRoot = mkdtempSync(path.join(os.tmpdir(), "jig-review-root-"));
     const tickets = mkdtempSync(path.join(os.tmpdir(), "jig-review-tickets-"));
@@ -220,7 +226,11 @@ export async function openReview(args = "", options: { byAgent?: boolean; ticket
         mkdirSync(path.join(tickets, TICKET), { recursive: true });
         writeFileSync(path.join(tickets, TICKET, "ticket.json"), JSON.stringify({ repositories: REPOSITORIES }));
     }
-    const session = context(root, "tui", withTicket ? [{ type: "custom", customType: "jig-memory-ticket", data: { key: TICKET } }] : []);
+    const session = context(
+        root,
+        "tui",
+        withTicket ? [{ type: "custom", customType: "jig-memory-ticket", data: { key: TICKET } }] : [],
+    );
     if (options.byAgent) await host.tool("start_interactive_code_review", {}, session.ctx);
     else await host.run("code-review", args, session.ctx);
     const link = session.notices.map((notice) => /^Interactive review ready: (\S+)$/.exec(notice)?.[1]).find(Boolean);
@@ -246,7 +256,9 @@ export async function openReview(args = "", options: { byAgent?: boolean; ticket
             readdirSync(reviewsDir)
                 .filter((name) => name.endsWith(".json"))
                 .sort()
-                .map((name) => JSON.parse(readFileSync(path.join(reviewsDir, name), "utf8")) as Record<string, unknown>),
+                .map(
+                    (name) => JSON.parse(readFileSync(path.join(reviewsDir, name), "utf8")) as Record<string, unknown>,
+                ),
         post: (route, body) => request(base, route, { method: "POST", cookie, body }),
         get: (route) => request(base, route, { cookie }),
         close: async () => {

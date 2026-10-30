@@ -47,7 +47,8 @@ function absolutePath(value: unknown, key: string, errors: string[]): string | u
 
 function check(entry: Readonly<Record<string, unknown>>, at: string, errors: string[]): PostmanConfig | undefined {
     const before = errors.length;
-    for (const key of Object.keys(entry)) if (key !== "postman" && key !== "environments") errors.push(`${at}.${key}: unknown field`);
+    for (const key of Object.keys(entry))
+        if (key !== "postman" && key !== "environments") errors.push(`${at}.${key}: unknown field`);
 
     const file = absolutePath(entry.postman, `${at}.postman`, errors);
 
@@ -55,13 +56,17 @@ function check(entry: Readonly<Record<string, unknown>>, at: string, errors: str
     const raw = entry.environments;
     if (raw !== undefined) {
         if (!isObject(raw)) {
-            errors.push(`${at}.environments: must be an object that maps an environment name to the path of its exported file`);
+            errors.push(
+                `${at}.environments: must be an object that maps an environment name to the path of its exported file`,
+            );
         } else if (Object.keys(raw).length > MAX_ENVIRONMENTS) {
             errors.push(`${at}.environments: at most ${MAX_ENVIRONMENTS} environments`);
         } else {
             for (const [name, value] of Object.entries(raw)) {
                 if (!NAME.test(name)) {
-                    errors.push(`${at}.environments: an environment name is text of 1 to 60 characters with no control characters`);
+                    errors.push(
+                        `${at}.environments: an environment name is text of 1 to 60 characters with no control characters`,
+                    );
                     continue;
                 }
                 const environment = absolutePath(value, `${at}.environments.${name}`, errors);
@@ -87,7 +92,11 @@ interface Reading {
 }
 
 const text = (value: unknown): string | undefined =>
-    typeof value === "string" ? value : typeof value === "number" || typeof value === "boolean" ? String(value) : undefined;
+    typeof value === "string"
+        ? value
+        : typeof value === "number" || typeof value === "boolean"
+          ? String(value)
+          : undefined;
 
 /** A description, which may be text or `{ content }`. */
 function descriptionOf(value: unknown): string | undefined {
@@ -120,9 +129,19 @@ function readEnvironment(name: string, file: string, problems: Problem[]): Envir
 }
 
 /** The environment in an export that is already read, such as one kept by the Postman cloud source. */
-export function environmentFrom(name: string, shown: string, raw: unknown, problems: Problem[]): Environment | undefined {
+export function environmentFrom(
+    name: string,
+    shown: string,
+    raw: unknown,
+    problems: Problem[],
+): Environment | undefined {
     if (!isObject(raw) || !Array.isArray(raw.values)) {
-        problems.push({ file: shown, key: "values", message: "is missing: this is not an exported environment", level: "error" });
+        problems.push({
+            file: shown,
+            key: "values",
+            message: "is missing: this is not an exported environment",
+            level: "error",
+        });
         return undefined;
     }
     const variables = new Map<string, Variable>();
@@ -142,7 +161,7 @@ export function environmentFrom(name: string, shown: string, raw: unknown, probl
                     key: item.key,
                     message:
                         `is a secret with a value in the file. The value is ignored and never sent; ` +
-                            `give the secret in api.secrets as "${item.key}"`,
+                        `give the secret in api.secrets as "${item.key}"`,
                     level: "warning",
                 });
             }
@@ -191,7 +210,10 @@ function authOf(raw: unknown, reading: Reading, key: string): AuthResult | undef
             return { auth: { kind: "basic", username: get("username"), password: get("password") } };
         case "apikey": {
             if ((attributes.get("in") ?? "header") !== "header") {
-                return { unsupported: "an API key sent in the query string (an address ends up in logs, so a key is sent in a header only)" };
+                return {
+                    unsupported:
+                        "an API key sent in the query string (an address ends up in logs, so a key is sent in a header only)",
+                };
             }
             return { auth: { kind: "apiKey", name: get("key"), value: get("value") } };
         }
@@ -205,14 +227,17 @@ function authOf(raw: unknown, reading: Reading, key: string): AuthResult | undef
                         key: `${key}.oauth2`,
                         message:
                             "holds an access token in the file. It is ignored and never sent; " +
-                                "get tokens with a client-credentials or password grant",
+                            "get tokens with a client-credentials or password grant",
                         level: "warning",
                     });
                 }
                 const named = grant === "" ? "no headless grant" : `the grant "${grant}"`;
-                return { unsupported: `OAuth 2.0 with ${named} (it needs a browser; only client_credentials and password work)` };
+                return {
+                    unsupported: `OAuth 2.0 with ${named} (it needs a browser; only client_credentials and password work)`,
+                };
             }
-            if ((attributes.get("addTokenTo") ?? "header") !== "header") return { unsupported: "OAuth 2.0 with the token in the query string" };
+            if ((attributes.get("addTokenTo") ?? "header") !== "header")
+                return { unsupported: "OAuth 2.0 with the token in the query string" };
             const prefix = attributes.get("headerPrefix");
             if (prefix !== undefined && prefix !== "" && prefix.toLowerCase() !== "bearer") {
                 return { unsupported: `OAuth 2.0 with the header prefix "${prefix}" (only Bearer is sent)` };
@@ -236,7 +261,9 @@ function authOf(raw: unknown, reading: Reading, key: string): AuthResult | undef
             };
         }
         default:
-            return { unsupported: `the sign-in type "${type}" is not sent (bearer, basic, apikey and OAuth 2.0 client credentials or password are)` };
+            return {
+                unsupported: `the sign-in type "${type}" is not sent (bearer, basic, apikey and OAuth 2.0 client credentials or password are)`,
+            };
     }
 }
 
@@ -244,7 +271,8 @@ function authOf(raw: unknown, reading: Reading, key: string): AuthResult | undef
 function scriptOf(events: unknown, listen: string): boolean {
     if (!Array.isArray(events)) return false;
     return (events as unknown[]).some((event) => {
-        if (!isObject(event) || event.listen !== listen || event.disabled === true || !isObject(event.script)) return false;
+        if (!isObject(event) || event.listen !== listen || event.disabled === true || !isObject(event.script))
+            return false;
         const { exec, src } = event.script;
         const lines = Array.isArray(exec) ? (exec as unknown[]).filter((line) => typeof line === "string") : [exec];
         const code = lines.filter((line) => typeof line === "string").join("\n");
@@ -269,15 +297,25 @@ function rawAddress(url: Record<string, unknown>): string {
     if (typeof url.raw === "string" && url.raw.trim() !== "") {
         raw = url.raw.trim();
     } else {
-        const host = Array.isArray(url.host) ? (url.host as unknown[]).map(String).join(".") : typeof url.host === "string" ? url.host : "";
+        const host = Array.isArray(url.host)
+            ? (url.host as unknown[]).map(String).join(".")
+            : typeof url.host === "string"
+              ? url.host
+              : "";
         const segments = Array.isArray(url.path)
-            ? (url.path as unknown[]).map((segment) => (isObject(segment) ? String(segment.value ?? "") : String(segment)))
-            : typeof url.path === "string" ? [url.path] : [];
+            ? (url.path as unknown[]).map((segment) =>
+                  isObject(segment) ? String(segment.value ?? "") : String(segment),
+              )
+            : typeof url.path === "string"
+              ? [url.path]
+              : [];
         const query = Array.isArray(url.query)
             ? (url.query as unknown[]).flatMap((item) => {
-                if (!isObject(item) || item.disabled === true || typeof item.key !== "string") return [];
-                return [`${item.key}${item.value === null || item.value === undefined ? "" : `=${String(item.value)}`}`];
-            })
+                  if (!isObject(item) || item.disabled === true || typeof item.key !== "string") return [];
+                  return [
+                      `${item.key}${item.value === null || item.value === undefined ? "" : `=${String(item.value)}`}`,
+                  ];
+              })
             : [];
         const protocol = typeof url.protocol === "string" && url.protocol !== "" ? `${url.protocol}://` : "";
         const port = typeof url.port === "string" && url.port !== "" ? `:${url.port}` : "";
@@ -303,7 +341,8 @@ function headersOf(raw: unknown): Array<readonly [string, string]> {
     const headers: Array<readonly [string, string]> = [];
     if (Array.isArray(raw)) {
         for (const item of raw as unknown[]) {
-            if (!isObject(item) || item.disabled === true || typeof item.key !== "string" || item.key.trim() === "") continue;
+            if (!isObject(item) || item.disabled === true || typeof item.key !== "string" || item.key.trim() === "")
+                continue;
             headers.push([item.key.trim(), text(item.value) ?? ""]);
         }
     } else if (typeof raw === "string") {
@@ -316,7 +355,11 @@ function headersOf(raw: unknown): Array<readonly [string, string]> {
 }
 
 const LANGUAGE_TYPES: Readonly<Record<string, string>> = {
-    json: "application/json", xml: "application/xml", html: "text/html", text: "text/plain", javascript: "application/javascript",
+    json: "application/json",
+    xml: "application/xml",
+    html: "text/html",
+    text: "text/plain",
+    javascript: "application/javascript",
 };
 
 interface BodyResult {
@@ -351,18 +394,26 @@ function bodyOf(raw: unknown): BodyResult {
                 }
             }
             if (fields.length === 0) return { notes };
-            return { body: { kind: "form", encoding: "urlencoded", fields }, contentType: "application/x-www-form-urlencoded", notes };
+            return {
+                body: { kind: "form", encoding: "urlencoded", fields },
+                contentType: "application/x-www-form-urlencoded",
+                notes,
+            };
         }
         case "formdata": {
             const fields: FormField[] = [];
             if (Array.isArray(raw.formdata)) {
                 for (const item of raw.formdata as unknown[]) {
                     if (!isObject(item) || item.disabled === true || typeof item.key !== "string") continue;
-                    const contentType = typeof item.contentType === "string" && item.contentType !== "" ? item.contentType : undefined;
+                    const contentType =
+                        typeof item.contentType === "string" && item.contentType !== "" ? item.contentType : undefined;
                     if (item.type === "file") {
                         const sources = Array.isArray(item.src) ? (item.src as unknown[]) : [item.src];
-                        const files = sources.filter((source): source is string => typeof source === "string" && source !== "");
-                        if (files.length === 0) notes.push(`the file field "${item.key}" has no file chosen, so it is left out`);
+                        const files = sources.filter(
+                            (source): source is string => typeof source === "string" && source !== "",
+                        );
+                        if (files.length === 0)
+                            notes.push(`the file field "${item.key}" has no file chosen, so it is left out`);
                         for (const file of files) {
                             const typed = contentType === undefined ? {} : { contentType };
                             fields.push({ kind: "file", name: item.key, file: { path: file }, ...typed });
@@ -388,7 +439,10 @@ function bodyOf(raw: unknown): BodyResult {
             const graphql = isObject(raw.graphql) ? raw.graphql : {};
             const query = typeof graphql.query === "string" ? graphql.query : "";
             if (query.trim() === "") return { notes };
-            const variables = typeof graphql.variables === "string" && graphql.variables.trim() !== "" ? graphql.variables : undefined;
+            const variables =
+                typeof graphql.variables === "string" && graphql.variables.trim() !== ""
+                    ? graphql.variables
+                    : undefined;
             return {
                 body: { kind: "graphql", query, ...(variables === undefined ? {} : { variables }) },
                 contentType: "application/json",
@@ -408,8 +462,10 @@ function behaviourOf(raw: unknown): { unsupported: string | undefined; notes: st
         if (NOT_HTTP.test(key) || (typeof value === "string" && NOT_HTTP.test(value))) {
             return { unsupported: `its protocol profile (${key}) is not plain HTTP, and only HTTP is sent`, notes };
         }
-        if (key === "followRedirects" && value === true) notes.push("followRedirects is ignored: redirects are never followed");
-        if (key === "strictSSL" && value === false) notes.push("strictSSL: false is ignored: certificates are always checked");
+        if (key === "followRedirects" && value === true)
+            notes.push("followRedirects is ignored: redirects are never followed");
+        if (key === "strictSSL" && value === false)
+            notes.push("strictSSL: false is ignored: certificates are always checked");
     }
     return { unsupported: undefined, notes };
 }
@@ -447,7 +503,9 @@ function requestOf(item: Record<string, unknown>, inherited: Inherited, reading:
     const given = item.request;
     const request: Record<string, unknown> = isObject(given) ? given : { url: given, method: "GET" };
     const name = typeof item.name === "string" && item.name.trim() !== "" ? item.name.trim() : "(unnamed)";
-    const method = (typeof request.method === "string" && request.method.trim() !== "" ? request.method.trim() : "GET").toUpperCase();
+    const method = (
+        typeof request.method === "string" && request.method.trim() !== "" ? request.method.trim() : "GET"
+    ).toUpperCase();
     const url = addressOf(request.url);
     const headers = [...headersOf(request.header)];
     const body = bodyOf(request.body);
@@ -464,7 +522,12 @@ function requestOf(item: Record<string, unknown>, inherited: Inherited, reading:
         headers.push(["Content-Type", body.contentType]);
     }
 
-    const variables = variablesIn(url, ...headers.map(([, value]) => value), ...bodyTexts(body.body), ...authTexts(auth));
+    const variables = variablesIn(
+        url,
+        ...headers.map(([, value]) => value),
+        ...bodyTexts(body.body),
+        ...authTexts(auth),
+    );
     const signsIn = variablesIn(
         ...authTexts(auth),
         ...headers.filter(([header]) => CREDENTIAL_HEADERS.has(header.toLowerCase())).map(([, value]) => value),
@@ -517,27 +580,44 @@ function walk(items: unknown, inherited: Inherited, reading: Reading, prefix: st
     (items as unknown[]).forEach((item, index) => {
         const key = `${prefix}[${index}]`;
         if (!isObject(item)) {
-            reading.problems.push({ file: reading.shown, key, message: "is not a request or a folder", level: "warning" });
+            reading.problems.push({
+                file: reading.shown,
+                key,
+                message: "is not a request or a folder",
+                level: "warning",
+            });
             return;
         }
         if (Array.isArray(item.item)) {
-            const name = typeof item.name === "string" && item.name.trim() !== "" ? item.name.trim() : "(unnamed folder)";
+            const name =
+                typeof item.name === "string" && item.name.trim() !== "" ? item.name.trim() : "(unnamed folder)";
             const auth = authOf(item.auth, reading, `${key}.auth`);
             const behaviour = behaviourOf(item.protocolProfileBehavior);
-            walk(item.item, {
-                folder: [...inherited.folder, name],
-                auth: auth ?? inherited.auth,
-                prerequest: scriptOf(item.event, "prerequest") ? `the folder ${name}` : inherited.prerequest,
-                behaviour: {
-                    unsupported: inherited.behaviour.unsupported ?? behaviour.unsupported,
-                    notes: [...inherited.behaviour.notes, ...behaviour.notes],
+            walk(
+                item.item,
+                {
+                    folder: [...inherited.folder, name],
+                    auth: auth ?? inherited.auth,
+                    prerequest: scriptOf(item.event, "prerequest") ? `the folder ${name}` : inherited.prerequest,
+                    behaviour: {
+                        unsupported: inherited.behaviour.unsupported ?? behaviour.unsupported,
+                        notes: [...inherited.behaviour.notes, ...behaviour.notes],
+                    },
+                    defaults: new Map([...inherited.defaults, ...variablesOf(item.variable)]),
                 },
-                defaults: new Map([...inherited.defaults, ...variablesOf(item.variable)]),
-            }, reading, `${key}.item`, found);
+                reading,
+                `${key}.item`,
+                found,
+            );
         } else if (item.request !== undefined) {
             found.push(requestOf(item, inherited, reading, key));
         } else {
-            reading.problems.push({ file: reading.shown, key, message: "has neither a request nor items", level: "warning" });
+            reading.problems.push({
+                file: reading.shown,
+                key,
+                message: "has neither a request nor items",
+                level: "warning",
+            });
         }
     });
 }
@@ -551,7 +631,13 @@ export interface PostmanContent {
 }
 
 /** Reads a collection that is already parsed. `shown` names it in messages and `root` is the folder files must stay inside. */
-export function collectionFrom(name: string, shown: string, root: string, content: PostmanContent, problems: Problem[]): Collection {
+export function collectionFrom(
+    name: string,
+    shown: string,
+    root: string,
+    content: PostmanContent,
+    problems: Problem[],
+): Collection {
     const environments = new Map(content.environments);
     const secretNames = declaredSecrets(environments.values());
     const reading: Reading = { collection: name, shown, problems, secretNames };
@@ -563,25 +649,39 @@ export function collectionFrom(name: string, shown: string, root: string, conten
 
     if (raw !== undefined) {
         if (!isObject(raw) || !Array.isArray(raw.item)) {
-            problems.push({ file: shown, key: "item", message: "is missing: this is not an exported collection", level: "error" });
+            problems.push({
+                file: shown,
+                key: "item",
+                message: "is missing: this is not an exported collection",
+                level: "error",
+            });
         } else {
             const schema = isObject(raw.info) && typeof raw.info.schema === "string" ? raw.info.schema : "";
             if (schema !== "" && !/\/v2\.[01](?:\.0)?\//.test(schema)) {
                 problems.push({
-                    file: shown, key: "info.schema", message: `is ${schema}: only collection format v2.0 and v2.1 are read`, level: "warning",
+                    file: shown,
+                    key: "info.schema",
+                    message: `is ${schema}: only collection format v2.0 and v2.1 are read`,
+                    level: "warning",
                 });
             }
             for (const [key, value] of variablesOf(raw.variable)) variables.set(key, { value, secret: false });
             const top = authOf(raw.auth, reading, "auth");
             if (top?.auth !== undefined) auth = top.auth;
             authRefused = top?.unsupported;
-            walk(raw.item, {
-                folder: [],
-                auth: top,
-                prerequest: scriptOf(raw.event, "prerequest") ? "the collection" : undefined,
-                behaviour: behaviourOf(raw.protocolProfileBehavior),
-                defaults: new Map(),
-            }, reading, "item", requests);
+            walk(
+                raw.item,
+                {
+                    folder: [],
+                    auth: top,
+                    prerequest: scriptOf(raw.event, "prerequest") ? "the collection" : undefined,
+                    behaviour: behaviourOf(raw.protocolProfileBehavior),
+                    defaults: new Map(),
+                },
+                reading,
+                "item",
+                requests,
+            );
         }
     }
     return {
@@ -604,7 +704,13 @@ function load(config: PostmanConfig, name: string): Collection {
         if (read !== undefined) environments.set(environment, read);
     }
     const collection = readJson(config.file, COLLECTION_MAX_BYTES, problems);
-    return collectionFrom(name, path.basename(config.file), path.dirname(config.file), { collection, environments }, problems);
+    return collectionFrom(
+        name,
+        path.basename(config.file),
+        path.dirname(config.file),
+        { collection, environments },
+        problems,
+    );
 }
 
 export const postman: Source<PostmanConfig> = { kind: "postman", check, load };

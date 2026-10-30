@@ -48,7 +48,13 @@ describe("identifiers are never masked", () => {
             traceId: "4bf92f3577b34da6a3ce929d0e0e4736",
             spanId: "00f067aa0ba902b7",
             sku: "SIP-TRUNK-100",
-            device: { deviceId: "SN-1", macAddress: "02:42:ac:11:00:02", imei: "490154203237518", iccid: "8944500102198304826", imsi: "310150123456789" },
+            device: {
+                deviceId: "SN-1",
+                macAddress: "02:42:ac:11:00:02",
+                imei: "490154203237518",
+                iccid: "8944500102198304826",
+                imsi: "310150123456789",
+            },
             serial: 4155550132,
             reference: "14155550132",
             internalHosts: ["10.12.0.7", "192.168.4.20", "172.16.0.1"],
@@ -70,39 +76,57 @@ describe("customer personal data is masked", () => {
         const cases: Array<{ line: string; gone: string[]; kept: string[]; tags: string[] }> = [
             {
                 line: "2026-10-13T10:11:12.345Z INFO [crm] customerAccountId=1234567890 contact alex.example@example.com updated crmAccountId=0013000000AbCdE",
-                gone: ["alex.example@example.com"], kept: ["customerAccountId=1234567890", "crmAccountId=0013000000AbCdE"], tags: ["email#"],
+                gone: ["alex.example@example.com"],
+                kept: ["customerAccountId=1234567890", "crmAccountId=0013000000AbCdE"],
+                tags: ["email#"],
             },
             {
                 line: "2026-10-13T10:11:12.345Z WARN [callback] call-back (415) 555-0132 or 415-555-0132 or 415.555.0132 for order 4532015112830366",
-                gone: ["555-0132", "555.0132"], kept: ["order 4532015112830366"], tags: ["phone#"],
+                gone: ["555-0132", "555.0132"],
+                kept: ["order 4532015112830366"],
+                tags: ["phone#"],
             },
             {
                 line: "2026-10-13T10:11:12.345Z INFO [cdr] did=4155550132 callingNumber=+14155550133 calledNumber=4155550134 callId=call-9",
-                gone: ["4155550132", "4155550133", "4155550134"], kept: ["callId=call-9"], tags: ["phone#"],
+                gone: ["4155550132", "4155550133", "4155550134"],
+                kept: ["callId=call-9"],
+                tags: ["phone#"],
             },
             {
                 line: '2026-10-13T10:11:12.345Z INFO [billing] contactName="Avery Sample" asked about order 4532015112830366',
-                gone: ["Avery Sample"], kept: ["order 4532015112830366"], tags: ["name#"],
+                gone: ["Avery Sample"],
+                kept: ["order 4532015112830366"],
+                tags: ["name#"],
             },
             {
                 line: "2026-10-13T10:11:12.345Z INFO [auth] login username=casey.sample from 203.0.113.9 (gateway 10.12.0.7)",
-                gone: ["casey.sample", "203.0.113.9"], kept: ["10.12.0.7"], tags: ["user#", "ip#"],
+                gone: ["casey.sample", "203.0.113.9"],
+                kept: ["10.12.0.7"],
+                tags: ["user#", "ip#"],
             },
             {
                 line: "2026-10-13T10:11:12.345Z ERROR [payments] card 4111 1111 1111 1111 declined, also 4111-1111-1111-1111, order 4532015112830366",
-                gone: ["4111 1111", "4111-1111"], kept: ["order 4532015112830366"], tags: ["card ****1111"],
+                gone: ["4111 1111", "4111-1111"],
+                kept: ["order 4532015112830366"],
+                tags: ["card ****1111"],
             },
             {
                 line: "2026-10-13T10:11:12.345Z INFO [service] install at 123 Example Lane, Sample City, CA 94000, US for customerAccountId=1234567890",
-                gone: ["123 Example Lane", "Sample City", "94000", "CA"], kept: ["[removed:address]", "customerAccountId=1234567890"], tags: [],
+                gone: ["123 Example Lane", "Sample City", "94000", "CA"],
+                kept: ["[removed:address]", "customerAccountId=1234567890"],
+                tags: [],
             },
             {
                 line: "2026-10-13T10:11:12.345Z INFO [kyc] applicant DOB 02/03/1982 SSN 900-12-3456 gps=40.712776,-74.005974",
-                gone: ["02/03/1982", "900-12-3456", "40.712776"], kept: [], tags: ["[removed:birth]", "[removed:government]", "[removed:geo]"],
+                gone: ["02/03/1982", "900-12-3456", "40.712776"],
+                kept: [],
+                tags: ["[removed:birth]", "[removed:government]", "[removed:geo]"],
             },
             {
                 line: "2026-10-13T10:11:12.345Z WARN [auth] retry password=hunter2 api_key=abc123 Authorization: Bearer abcdefghijklmnopqrstuvwxyz0123 tok_FAKE_TEST_ONLY_001abcdef",
-                gone: ["hunter2", "abc123", "abcdefghijklmnopqrstuvwxyz0123", "tok_FAKE"], kept: [], tags: ["[removed:credential]"],
+                gone: ["hunter2", "abc123", "abcdefghijklmnopqrstuvwxyz0123", "tok_FAKE"],
+                kept: [],
+                tags: ["[removed:credential]"],
             },
         ];
         for (const { line, gone, kept, tags } of cases) {
@@ -127,7 +151,13 @@ describe("customer personal data is masked", () => {
                 ssn: "900-12-3456",
                 did: "4155550132",
                 contactPhone: "(415) 555-0132",
-                serviceAddress: { street: "123 Example Lane", city: "Sample City", state: "CA", postalCode: "94000", country: "US" },
+                serviceAddress: {
+                    street: "123 Example Lane",
+                    city: "Sample City",
+                    state: "CA",
+                    postalCode: "94000",
+                    country: "US",
+                },
                 login: "alex.example",
                 password: "hunter2",
                 securityAnswer: "blue",
@@ -142,9 +172,27 @@ describe("customer personal data is masked", () => {
         const masked = maskValue(structuredClone(document));
         const out = render(masked);
         for (const leaked of [
-            "Alex", "Example", "alex.example", "1980-01-02", "900-12-3456", "4155550132", "555-0132", "123 Example Lane", "Sample City", "94000",
-            "hunter2", "blue", "4532015112830366", "\"123\"", "40.712776", "203.0.113.9", "000123456789", "021000021", "GB82WEST",
-        ]) assert.ok(!out.includes(leaked), `leaked ${leaked}: ${out}`);
+            "Alex",
+            "Example",
+            "alex.example",
+            "1980-01-02",
+            "900-12-3456",
+            "4155550132",
+            "555-0132",
+            "123 Example Lane",
+            "Sample City",
+            "94000",
+            "hunter2",
+            "blue",
+            "4532015112830366",
+            '"123"',
+            "40.712776",
+            "203.0.113.9",
+            "000123456789",
+            "021000021",
+            "GB82WEST",
+        ])
+            assert.ok(!out.includes(leaked), `leaked ${leaked}: ${out}`);
         assert.equal(masked.customerAccountId, "1234567890");
         assert.equal(masked.crmAccountId, "0013000000AbCdE");
         assert.equal(masked.accountNumber, "A00012345");
@@ -152,7 +200,11 @@ describe("customer personal data is masked", () => {
         assert.equal(masked.customer.cardNumber, "card ****0366");
         assert.match(masked.customer.email, /^email#[0-9a-f]{6}$/);
         assert.match(masked.customer.did, /^phone#[0-9a-f]{6}-0132$/);
-        assert.equal(masked.customer.did.slice(0, -5), masked.customer.contactPhone.slice(0, -5), "one number, one token");
+        assert.equal(
+            masked.customer.did.slice(0, -5),
+            masked.customer.contactPhone.slice(0, -5),
+            "one number, one token",
+        );
         assert.match(masked.customer.firstName, /^name#/);
         assert.match(masked.customer.login, /^user#/);
         assert.match(masked.customer.clientIp, /^ip#/);
@@ -189,7 +241,13 @@ describe("addresses", () => {
     });
 
     it("are not guessed from a number alone", () => {
-        for (const line of ["5 items in stock", "order 12 shipped on time", "build 20261013 passed", "retry 3 of 5", "sku 100 Street-Lamp"]) {
+        for (const line of [
+            "5 items in stock",
+            "order 12 shipped on time",
+            "build 20261013 passed",
+            "retry 3 of 5",
+            "sku 100 Street-Lamp",
+        ]) {
             assert.equal(maskText(line), line, line);
         }
     });
@@ -197,7 +255,18 @@ describe("addresses", () => {
 
 describe("phone numbers", () => {
     it("masks phone-formatted numbers in free text", () => {
-        for (const phone of ["+14155550132", "+1 415 555 0132", "+442079460958", "(415) 555-0132", "(415)555-0132", "415-555-0132", "415.555.0132", "415 555 0132", "1-415-555-0132", "+1 (415) 555-0132 ext. 99"]) {
+        for (const phone of [
+            "+14155550132",
+            "+1 415 555 0132",
+            "+442079460958",
+            "(415) 555-0132",
+            "(415)555-0132",
+            "415-555-0132",
+            "415.555.0132",
+            "415 555 0132",
+            "1-415-555-0132",
+            "+1 (415) 555-0132 ext. 99",
+        ]) {
             const out = maskText(`call ${phone} now`);
             assert.ok(out.includes("phone#"), `${phone}: ${out}`);
             assert.ok(!/\d{3}[ .-]?\d{4}|555/.test(out.replace(/-\d{4} now$/, "")), `${phone}: ${out}`);
@@ -206,39 +275,82 @@ describe("phone numbers", () => {
     });
 
     it("leaves a bare digit run in free text alone, whatever its length", () => {
-        for (const digits of ["4155550132", "14155550132", "004915112345678", "442079460958", "20261013123456", "123456789012"]) {
+        for (const digits of [
+            "4155550132",
+            "14155550132",
+            "004915112345678",
+            "442079460958",
+            "20261013123456",
+            "123456789012",
+        ]) {
             const line = `ref ${digits} done`;
             assert.equal(maskText(line), line);
         }
     });
 
     it("masks any value in a phone-named field", () => {
-        const out = maskValue({ phone: "4155550132", msisdn: 14155550132, tn: "415 5550132", did: "14155550132", callingNumber: "4155550132", cdr: { from: "4155550132", to: "4155550133" } });
-        for (const value of [out.phone, out.msisdn, out.tn, out.did, out.callingNumber, out.cdr.from, out.cdr.to]) assert.match(String(value), /^phone#[0-9a-f]{6}-\d{4}$/);
+        const out = maskValue({
+            phone: "4155550132",
+            msisdn: 14155550132,
+            tn: "415 5550132",
+            did: "14155550132",
+            callingNumber: "4155550132",
+            cdr: { from: "4155550132", to: "4155550133" },
+        });
+        for (const value of [out.phone, out.msisdn, out.tn, out.did, out.callingNumber, out.cdr.from, out.cdr.to])
+            assert.match(String(value), /^phone#[0-9a-f]{6}-\d{4}$/);
     });
 
     it("leaves a bare digit run in a non-phone field alone", () => {
-        const input = { accountId: "4155550132", orderId: "14155550132", reference: 4155550132, serial: "4155550132", note: "4155550132", from: "4155550132", to: "4155550132" };
+        const input = {
+            accountId: "4155550132",
+            orderId: "14155550132",
+            reference: 4155550132,
+            serial: "4155550132",
+            note: "4155550132",
+            from: "4155550132",
+            to: "4155550132",
+        };
         assert.deepEqual(maskValue(structuredClone(input)), input);
     });
 });
 
 describe("card numbers", () => {
     it("masks grouped, Luhn-valid numbers in free text", () => {
-        for (const card of ["4111 1111 1111 1111", "4111-1111-1111-1111", "5555 5555 5555 4444", "3782 822463 10005", "4222 2222 2222 2"]) {
+        for (const card of [
+            "4111 1111 1111 1111",
+            "4111-1111-1111-1111",
+            "5555 5555 5555 4444",
+            "3782 822463 10005",
+            "4222 2222 2222 2",
+        ]) {
             assert.match(maskText(`paid with ${card} today`), /^paid with card \*{4}\d{1,4} today$/, card);
         }
     });
 
     it("leaves bare digit runs and Luhn-invalid groups alone", () => {
-        for (const value of ["4532015112830366", "4111111111111111", "378282246310005", "4111 1111 1111 1112", "2026 1013 1234 5678", "1234-5678-9012-3456"]) {
+        for (const value of [
+            "4532015112830366",
+            "4111111111111111",
+            "378282246310005",
+            "4111 1111 1111 1112",
+            "2026 1013 1234 5678",
+            "1234-5678-9012-3456",
+        ]) {
             const line = `order ${value} posted`;
             assert.equal(maskText(line), line);
         }
     });
 
     it("masks any value in a card-named field and always removes card secrets", () => {
-        const out = maskValue({ pan: "4532015112830366", card: "4111111111111111", cardNumber: 4111111111111111, cvv: "123", cvc: 456, expiry: "12/30" });
+        const out = maskValue({
+            pan: "4532015112830366",
+            card: "4111111111111111",
+            cardNumber: 4111111111111111,
+            cvv: "123",
+            cvc: 456,
+            expiry: "12/30",
+        });
         assert.equal(out.pan, "card ****0366");
         assert.equal(out.card, "card ****1111");
         assert.equal(out.cardNumber, "card ****1111");
@@ -248,12 +360,41 @@ describe("card numbers", () => {
 
 describe("IP addresses", () => {
     const internal = [
-        "10.0.0.1", "10.255.255.254", "172.16.0.1", "172.31.255.254", "192.168.0.1", "192.168.255.254", "127.0.0.1", "127.1.2.3",
-        "169.254.169.254", "100.64.0.1", "100.127.255.254", "::1", "fc00::1", "fd12:3456:789a::1", "fe80::1", "febf::1", "::ffff:10.0.0.1",
+        "10.0.0.1",
+        "10.255.255.254",
+        "172.16.0.1",
+        "172.31.255.254",
+        "192.168.0.1",
+        "192.168.255.254",
+        "127.0.0.1",
+        "127.1.2.3",
+        "169.254.169.254",
+        "100.64.0.1",
+        "100.127.255.254",
+        "::1",
+        "fc00::1",
+        "fd12:3456:789a::1",
+        "fe80::1",
+        "febf::1",
+        "::ffff:10.0.0.1",
     ];
     const publicAddresses = [
-        "8.8.8.8", "203.0.113.9", "172.15.255.255", "172.32.0.1", "192.167.1.1", "192.169.0.1", "169.253.1.1", "169.255.1.1",
-        "100.63.255.255", "100.128.0.1", "11.0.0.1", "9.255.255.255", "2001:db8::1", "2606:4700::1111", "fec0::1", "::ffff:8.8.8.8",
+        "8.8.8.8",
+        "203.0.113.9",
+        "172.15.255.255",
+        "172.32.0.1",
+        "192.167.1.1",
+        "192.169.0.1",
+        "169.253.1.1",
+        "169.255.1.1",
+        "100.63.255.255",
+        "100.128.0.1",
+        "11.0.0.1",
+        "9.255.255.255",
+        "2001:db8::1",
+        "2606:4700::1111",
+        "fec0::1",
+        "::ffff:8.8.8.8",
     ];
 
     it("keeps internal addresses readable in text and in IP fields", () => {
@@ -271,7 +412,10 @@ describe("IP addresses", () => {
     });
 
     it("masks only the public addresses of a list", () => {
-        assert.equal(maskValue({ forwardedIp: "10.0.0.1, 203.0.113.9" }).forwardedIp.replace(/ip#[0-9a-f]{6}/, "ip#"), "10.0.0.1, ip#");
+        assert.equal(
+            maskValue({ forwardedIp: "10.0.0.1, 203.0.113.9" }).forwardedIp.replace(/ip#[0-9a-f]{6}/, "ip#"),
+            "10.0.0.1, ip#",
+        );
     });
 
     it("gives one public address one token across spellings", () => {
@@ -286,17 +430,46 @@ describe("field names are judged by words", () => {
         for (const key of ["crmAccountId", "machineId", "macroId", "imeiNumber", "deviceId", "macAddress", "mac"]) {
             assert.equal(fieldKind(key, ""), "identifier", key);
         }
-        assert.deepEqual(maskValue({ crmAccountId: "0013000000AbCdE", machineId: "m-1" }), { crmAccountId: "0013000000AbCdE", machineId: "m-1" });
+        assert.deepEqual(maskValue({ crmAccountId: "0013000000AbCdE", machineId: "m-1" }), {
+            crmAccountId: "0013000000AbCdE",
+            machineId: "m-1",
+        });
     });
 
     it("does not read words out of longer words", () => {
-        for (const key of ["domain", "ipoNumber", "remainingCount", "skipCount", "tripleTime", "scriptName", "secretary", "pinned", "shipping", "mapping", "firmware", "hostName", "serviceName", "bankName", "fileName", "geography", "address_type", "userNameFormat", "phoneType", "emailVerified", "passwordLength", "tokenType", "cardType", "loginCount"]) {
+        for (const key of [
+            "domain",
+            "ipoNumber",
+            "remainingCount",
+            "skipCount",
+            "tripleTime",
+            "scriptName",
+            "secretary",
+            "pinned",
+            "shipping",
+            "mapping",
+            "firmware",
+            "hostName",
+            "serviceName",
+            "bankName",
+            "fileName",
+            "geography",
+            "address_type",
+            "userNameFormat",
+            "phoneType",
+            "emailVerified",
+            "passwordLength",
+            "tokenType",
+            "cardType",
+            "loginCount",
+        ]) {
             assert.equal(fieldKind(key, ""), "other", key);
         }
     });
 
     it("keeps account and location names (business names) and masks customer and contact names", () => {
-        for (const key of ["accountName", "account_name", "locationName", "LOCATION_NAME"]) assert.equal(fieldKind(key, ""), "other", key);
+        for (const key of ["accountName", "account_name", "locationName", "LOCATION_NAME"])
+            assert.equal(fieldKind(key, ""), "other", key);
         for (const key of ["customerName", "contactName", "firstName"]) assert.equal(fieldKind(key, ""), "name", key);
         const masked = maskValue({
             accountName: "Example Cabinets Ltd",
@@ -312,7 +485,8 @@ describe("field names are judged by words", () => {
 
     it("lets a word for a thing hide a person's name only where it can do no harm", () => {
         // `charges[].name` names a charge. But the same word inside a longer field name must not hide the person.
-        for (const key of ["rateContactName", "amendmentOwnerName", "triggerUserFullName"]) assert.equal(fieldKind(key, ""), "name", key);
+        for (const key of ["rateContactName", "amendmentOwnerName", "triggerUserFullName"])
+            assert.equal(fieldKind(key, ""), "name", key);
         assert.equal(fieldKind("name", "charges"), "other");
         assert.equal(fieldKind("name", "rate"), "other");
         assert.equal(fieldKind("name", "contacts"), "name");
@@ -321,17 +495,63 @@ describe("field names are judged by words", () => {
 
     it("still finds the personal-data words, however the name is spelled", () => {
         const expected: Array<[string, string]> = [
-            ["phoneNumber", "phone"], ["contact_phone", "phone"], ["MSISDN", "phone"], ["calling-number", "phone"], ["telephone", "phone"],
-            ["emailAddress", "email"], ["EMAIL_ADDRESS", "email"], ["e-mail", "email"], ["contactEmail", "email"], ["primaryMail", "email"],
-            ["username", "user"], ["userName", "user"], ["authUsername", "user"], ["portalLogin", "user"], ["loginId", "user"],
-            ["firstname", "name"], ["Last Name", "name"], ["fullName", "name"], ["cardholderName", "name"], ["displayName", "name"],
-            ["ipAddress", "ip"], ["clientIP", "ip"], ["sourceIPv6", "ip"], ["remoteAddress", "ip"], ["ipaddress", "ip"],
-            ["cardNumber", "card"], ["creditCard", "card"], ["pan", "card"], ["cvv", "cardSecret"], ["cardExpiry", "cardSecret"],
-            ["billingAddress", "address"], ["Street Address", "address"], ["postalCode", "address"], ["line1", "address"], ["zip", "address"],
-            ["dateOfBirth", "birth"], ["dob", "birth"], ["birthDate", "birth"], ["ssn", "government"], ["taxId", "government"], ["driverLicense", "government"], ["passportNumber", "government"],
-            ["iban", "bank"], ["routingNumber", "bank"], ["bankAccountNumber", "bank"], ["latitude", "geo"], ["gps", "geo"], ["serviceGeo", "geo"],
-            ["password", "credential"], ["clientSecret", "credential"], ["access_token", "credential"], ["apiKey", "credential"], ["authorization", "credential"], ["accountPIN", "credential"], ["securityAnswer", "credential"],
-            ["healthNote", "sensitive"], ["biometricTemplate", "sensitive"],
+            ["phoneNumber", "phone"],
+            ["contact_phone", "phone"],
+            ["MSISDN", "phone"],
+            ["calling-number", "phone"],
+            ["telephone", "phone"],
+            ["emailAddress", "email"],
+            ["EMAIL_ADDRESS", "email"],
+            ["e-mail", "email"],
+            ["contactEmail", "email"],
+            ["primaryMail", "email"],
+            ["username", "user"],
+            ["userName", "user"],
+            ["authUsername", "user"],
+            ["portalLogin", "user"],
+            ["loginId", "user"],
+            ["firstname", "name"],
+            ["Last Name", "name"],
+            ["fullName", "name"],
+            ["cardholderName", "name"],
+            ["displayName", "name"],
+            ["ipAddress", "ip"],
+            ["clientIP", "ip"],
+            ["sourceIPv6", "ip"],
+            ["remoteAddress", "ip"],
+            ["ipaddress", "ip"],
+            ["cardNumber", "card"],
+            ["creditCard", "card"],
+            ["pan", "card"],
+            ["cvv", "cardSecret"],
+            ["cardExpiry", "cardSecret"],
+            ["billingAddress", "address"],
+            ["Street Address", "address"],
+            ["postalCode", "address"],
+            ["line1", "address"],
+            ["zip", "address"],
+            ["dateOfBirth", "birth"],
+            ["dob", "birth"],
+            ["birthDate", "birth"],
+            ["ssn", "government"],
+            ["taxId", "government"],
+            ["driverLicense", "government"],
+            ["passportNumber", "government"],
+            ["iban", "bank"],
+            ["routingNumber", "bank"],
+            ["bankAccountNumber", "bank"],
+            ["latitude", "geo"],
+            ["gps", "geo"],
+            ["serviceGeo", "geo"],
+            ["password", "credential"],
+            ["clientSecret", "credential"],
+            ["access_token", "credential"],
+            ["apiKey", "credential"],
+            ["authorization", "credential"],
+            ["accountPIN", "credential"],
+            ["securityAnswer", "credential"],
+            ["healthNote", "sensitive"],
+            ["biometricTemplate", "sensitive"],
         ];
         for (const [key, kind] of expected) assert.equal(fieldKind(key, ""), kind, key);
         assert.equal(fieldKind("from", "cdr"), "phone");
@@ -350,7 +570,15 @@ describe("field names are judged by words", () => {
     });
 
     it("keeps descriptions of a field out of the personal-data rules", () => {
-        const input = { phoneType: "MOBILE", emailVerified: true, passwordLength: 12, userNameFormat: "first.last", tokenType: "Bearer", addressType: "BILLING", loginCount: 7 };
+        const input = {
+            phoneType: "MOBILE",
+            emailVerified: true,
+            passwordLength: 12,
+            userNameFormat: "first.last",
+            tokenType: "Bearer",
+            addressType: "BILLING",
+            loginCount: 7,
+        };
         assert.deepEqual(maskValue(structuredClone(input)), input);
     });
 });

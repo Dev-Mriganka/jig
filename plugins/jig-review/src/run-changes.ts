@@ -165,7 +165,8 @@ async function fingerprints(git: Git, root: string, files: string[]): Promise<Re
         const batch = regular.slice(i, i + HASH_BATCH);
         const hashed = await git(root, ["hash-object", "--no-filters", "--", ...batch], HASH_TIMEOUT_MS);
         const hashes = hashed.stdout.split("\n").filter((line) => line.length > 0);
-        if (hashed.code !== 0 || hashed.timedOut || hashes.length !== batch.length) throw new Error(`Cannot fingerprint files in ${root}.`);
+        if (hashed.code !== 0 || hashed.timedOut || hashes.length !== batch.length)
+            throw new Error(`Cannot fingerprint files in ${root}.`);
         batch.forEach((file, index) => {
             result.set(file, hashes[index]!);
         });

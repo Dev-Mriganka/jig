@@ -57,7 +57,12 @@ const DEFAULT_TIMEOUT_MS = 60_000;
 
 /** Variables a `pass` run needs to find the store and to show a graphical passphrase prompt. */
 const PASS_ENV = [
-    "PASSWORD_STORE_DIR", "GNUPGHOME", "DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY", "DBUS_SESSION_BUS_ADDRESS",
+    "PASSWORD_STORE_DIR",
+    "GNUPGHOME",
+    "DISPLAY",
+    "WAYLAND_DISPLAY",
+    "XAUTHORITY",
+    "DBUS_SESSION_BUS_ADDRESS",
 ];
 
 export function createSecrets(options: SecretsOptions): Secrets {
@@ -73,7 +78,10 @@ export function createSecrets(options: SecretsOptions): Secrets {
 
     function inTurn<T>(program: string, job: () => Promise<T>): Promise<T> {
         const turn = (queues.get(program) ?? Promise.resolve()).then(job, job);
-        queues.set(program, turn.catch(() => undefined));
+        queues.set(
+            program,
+            turn.catch(() => undefined),
+        );
         return turn;
     }
 
@@ -83,20 +91,26 @@ export function createSecrets(options: SecretsOptions): Secrets {
         programEnv: Record<string, string>,
         signal: AbortSignal | undefined,
     ): Promise<RunResult> {
-        return inTurn(program, () => run(program, args, {
-            env: programEnv,
-            timeoutMs,
-            maxOutputBytes: MAX_SECRET_BYTES,
-            ...(signal === undefined ? {} : { signal }),
-        }));
+        return inTurn(program, () =>
+            run(program, args, {
+                env: programEnv,
+                timeoutMs,
+                maxOutputBytes: MAX_SECRET_BYTES,
+                ...(signal === undefined ? {} : { signal }),
+            }),
+        );
     }
 
     function fromEnvironment(name: string): string {
         if (!ENV_NAME.test(name)) {
-            throw new SecretError("invalid_ref", "an env: reference names an environment variable with letters, digits and _ only");
+            throw new SecretError(
+                "invalid_ref",
+                "an env: reference names an environment variable with letters, digits and _ only",
+            );
         }
         const value = env[name];
-        if (value === undefined || value === "") throw new SecretError("missing", `the environment variable ${name} is not set`);
+        if (value === undefined || value === "")
+            throw new SecretError("missing", `the environment variable ${name} is not set`);
         return value;
     }
 
@@ -115,7 +129,8 @@ export function createSecrets(options: SecretsOptions): Secrets {
             if (value === "") throw new SecretError("missing", "the pass entry is empty");
             return value;
         }
-        if (/is not in the password store/i.test(result.stderr)) throw new SecretError("missing", "the pass entry does not exist");
+        if (/is not in the password store/i.test(result.stderr))
+            throw new SecretError("missing", "the pass entry does not exist");
         if (/pinentry|inappropriate ioctl|passphrase|cancelled|decryption failed|no secret key/i.test(result.stderr)) {
             throw new SecretError(
                 "locked",
@@ -135,17 +150,25 @@ export function createSecrets(options: SecretsOptions): Secrets {
         if (!fine(service) || !fine(account)) {
             throw new SecretError("invalid_ref", "a keychain: reference is keychain:<service>/<account>");
         }
-        const result = await runBackend("security", ["find-generic-password", "-s", service, "-a", account, "-w"], {}, signal);
+        const result = await runBackend(
+            "security",
+            ["find-generic-password", "-s", service, "-a", account, "-w"],
+            {},
+            signal,
+        );
         if (result.code !== 0) throw new SecretError("missing", "the keychain has no such item, or it is locked");
         return withoutFinalNewline(result.stdout);
     }
 
     async function fromOnePassword(ref: string, signal: AbortSignal | undefined): Promise<string> {
-        if (!OP_REF.test(ref)) throw new SecretError("invalid_ref", "an op:// reference is op://<vault>/<item>/<field>");
+        if (!OP_REF.test(ref))
+            throw new SecretError("invalid_ref", "an op:// reference is op://<vault>/<item>/<field>");
         const opEnv: Record<string, string> = {};
-        for (const [name, value] of Object.entries(env)) if (name.startsWith("OP_") && value !== undefined) opEnv[name] = value;
+        for (const [name, value] of Object.entries(env))
+            if (name.startsWith("OP_") && value !== undefined) opEnv[name] = value;
         const result = await runBackend("op", ["read", ref], opEnv, signal);
-        if (result.code !== 0) throw new SecretError("missing", "1Password could not read the item: is it there, and are you signed in?");
+        if (result.code !== 0)
+            throw new SecretError("missing", "1Password could not read the item: is it there, and are you signed in?");
         return withoutFinalNewline(result.stdout);
     }
 
@@ -162,7 +185,8 @@ export function createSecrets(options: SecretsOptions): Secrets {
         } catch (error) {
             throw new SecretError("unavailable", `${program} could not run: ${errorMessage(error)}`);
         }
-        if (result.timedOut) throw new SecretError("unavailable", `${program} did not answer in ${Math.round(timeoutMs / 1000)} s`);
+        if (result.timedOut)
+            throw new SecretError("unavailable", `${program} did not answer in ${Math.round(timeoutMs / 1000)} s`);
         return result;
     }
 
@@ -183,10 +207,18 @@ export function createSecrets(options: SecretsOptions): Secrets {
         }
         let value: string;
         switch (parsed.backend) {
-            case "env": value = fromEnvironment(parsed.rest); break;
-            case "pass": value = await fromPass(parsed.rest, signal); break;
-            case "keychain": value = await fromKeychain(parsed.rest, signal); break;
-            case "op": value = await fromOnePassword(ref, signal); break;
+            case "env":
+                value = fromEnvironment(parsed.rest);
+                break;
+            case "pass":
+                value = await fromPass(parsed.rest, signal);
+                break;
+            case "keychain":
+                value = await fromKeychain(parsed.rest, signal);
+                break;
+            case "op":
+                value = await fromOnePassword(ref, signal);
+                break;
         }
         // Registered before it is returned, so it is hidden from output from this moment on.
         options.redactor.register(value);
@@ -195,7 +227,8 @@ export function createSecrets(options: SecretsOptions): Secrets {
 
     return {
         resolve(ref, signal) {
-            if (typeof ref !== "string") return Promise.reject(new SecretError("invalid_ref", "a secret reference is a string"));
+            if (typeof ref !== "string")
+                return Promise.reject(new SecretError("invalid_ref", "a secret reference is a string"));
             const pending = inFlight.get(ref);
             if (pending !== undefined) return pending;
             const started = lookup(ref, signal).finally(() => inFlight.delete(ref));

@@ -2,7 +2,15 @@
 // this machine, with sign-in inherited from the collection and its folders, and secrets from api.secrets and nowhere else.
 import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, test } from "node:test";
-import { API_KEY, CLIENT_SECRET, REPORT_KEY, SERVICE_PASSWORD, SERVICE_USER, TOKENS, useBruno } from "./support/acme.ts";
+import {
+    API_KEY,
+    CLIENT_SECRET,
+    REPORT_KEY,
+    SERVICE_PASSWORD,
+    SERVICE_USER,
+    TOKENS,
+    useBruno,
+} from "./support/acme.ts";
 import { ok, setupHarness } from "./support/harness.ts";
 import type { Harness } from "./support/harness.ts";
 
@@ -31,9 +39,15 @@ for (const format of ["yaml", "bru"] as const) {
         test("list names the source, the size and the environments, and what each request needs", async () => {
             const text = ok(await h.call({ action: "list" }));
             assert.match(text, /^acme \(bruno, 28 requests; environments: Production, Staging\)$/m);
-            assert.match(text, /^ {2}Orders\/Get order {2}GET \{\{baseUrl\}\}\/\{\{apiVersion\}\}\/orders\/\{\{orderId\}\} {2}\[reads; needs orderId\]$/m);
+            assert.match(
+                text,
+                /^ {2}Orders\/Get order {2}GET \{\{baseUrl\}\}\/\{\{apiVersion\}\}\/orders\/\{\{orderId\}\} {2}\[reads; needs orderId\]$/m,
+            );
             assert.match(text, /^ {2}Orders\/Create order {2}POST .*\[writes; needs sku, quantity\]$/m);
-            assert.match(text, /Admin\/Rebuild index .*\[writes; refused: it has a pre-request script \(the folder Admin\), and scripts never run\]/);
+            assert.match(
+                text,
+                /Admin\/Rebuild index .*\[writes; refused: it has a pre-request script \(the folder Admin\), and scripts never run\]/,
+            );
             assert.match(text, /Reports\/Watch orders .*refused: WEBSOCKET is not plain HTTP/);
             assert.match(text, /Auth styles\/Key in query .*refused: an API key sent in the query string/);
         });
@@ -41,18 +55,28 @@ for (const format of ["yaml", "bru"] as const) {
         test("list reports the plain secret by file and key, without its value", async () => {
             const text = ok(await h.call({ action: "list", collection: "acme", text: "health" }));
             const ext = format === "yaml" ? "yml" : "bru";
-            assert.match(text, new RegExp(`warning: environments/Production\\.${ext} token: is a secret with a value in the file\\. The value is ignored and never sent`));
+            assert.match(
+                text,
+                new RegExp(
+                    `warning: environments/Production\\.${ext} token: is a secret with a value in the file\\. The value is ignored and never sent`,
+                ),
+            );
             assert.doesNotMatch(text, /plain-prod-token/);
         });
 
         test("show prints the asserts as declared and not run, the documentation and where each variable comes from", async () => {
-            const text = ok(await h.call({ action: "show", request: "Get order", collection: "acme", environment: "Staging" }));
+            const text = ok(
+                await h.call({ action: "show", request: "Get order", collection: "acme", environment: "Staging" }),
+            );
             assert.match(text, /^Sign-in: a bearer token$/m);
             assert.match(text, /^Headers:\n {2}X-Acme-Client: jig-tests\n {2}Accept: application\/json$/m);
             assert.match(text, /^ {2}apiVersion: from the collection$/m);
             assert.match(text, /^ {2}orderId: needs a value \(pass it in variables\)$/m);
             assert.match(text, /^ {2}token: secret, set in api\.secrets$/m);
-            assert.match(text, /^Asserts \(declared, not run\):\n {2}res\.status eq 200\n {2}res\.body\.id isDefined$/m);
+            assert.match(
+                text,
+                /^Asserts \(declared, not run\):\n {2}res\.status eq 200\n {2}res\.body\.id isDefined$/m,
+            );
             assert.match(text, /^Docs: Reads one order by its id\.$/m);
             assert.match(text, /^Note: its tests are ignored \(scripts never run\)$/m);
         });
@@ -68,7 +92,15 @@ for (const format of ["yaml", "bru"] as const) {
         });
 
         test("in production the host and the token are production's, and a value typed into the file is never sent", async () => {
-            ok(await h.call({ action: "run", request: "Get order", collection: "acme", environment: "Production", variables: { orderId: "9" } }));
+            ok(
+                await h.call({
+                    action: "run",
+                    request: "Get order",
+                    collection: "acme",
+                    environment: "Production",
+                    variables: { orderId: "9" },
+                }),
+            );
             const request = last(h.prod);
             assert.equal(request.headers.authorization, `Bearer ${TOKENS.production.value}`);
             assert.equal(h.api.requests.length, 0, "staging was not touched");
@@ -102,7 +134,10 @@ for (const format of ["yaml", "bru"] as const) {
             const request = last();
             assert.match(request.headers["content-type"] ?? "", /^multipart\/form-data; boundary=/);
             assert.match(request.body, /name="note"\r\n\r\nlate\r\n/);
-            assert.match(request.body, /name="receipt"; filename="receipt\.txt"\r\nContent-Type: text\/plain\r\n\r\norder,qty\nA-1,2\n\r\n/);
+            assert.match(
+                request.body,
+                /name="receipt"; filename="receipt\.txt"\r\nContent-Type: text\/plain\r\n\r\norder,qty\nA-1,2\n\r\n/,
+            );
         });
 
         test("a whole body can be a file, sent with its content type", async () => {
@@ -165,7 +200,10 @@ for (const format of ["yaml", "bru"] as const) {
             const { "process.env.ACME_REPORT_KEY": _removed, ...rest } = section.secrets;
             h.configure({ ...section, secrets: rest });
             const refused = await run("Report with a key");
-            assert.equal(refused.blocked, "jig-core could not decide: process.env.ACME_REPORT_KEY is a secret, but api.secrets has no reference for it in Staging");
+            assert.equal(
+                refused.blocked,
+                "jig-core could not decide: process.env.ACME_REPORT_KEY is a secret, but api.secrets has no reference for it in Staging",
+            );
         });
 
         test("the agent cannot give a secret, or a variable that signs in", async () => {
@@ -178,7 +216,10 @@ for (const format of ["yaml", "bru"] as const) {
 
         test("every request that cannot be sent is refused by name, and nothing goes out", async () => {
             const refusals: Array<[string, RegExp]> = [
-                ["Rebuild index", /"Rebuild index" is refused: it has a pre-request script \(the folder Admin\), and scripts never run/],
+                [
+                    "Rebuild index",
+                    /"Rebuild index" is refused: it has a pre-request script \(the folder Admin\), and scripts never run/,
+                ],
                 ["With its own script", /is refused: it has a pre-request script \(the request\)/],
                 ["Watch orders", /cannot be sent: WEBSOCKET is not plain HTTP, and only HTTP is sent/],
                 ["Stream profile", /cannot be sent: GRPC is not plain HTTP/],
@@ -202,21 +243,32 @@ for (const format of ["yaml", "bru"] as const) {
         });
 
         test("a folder runs in Bruno's order, one line per request", async () => {
-            const text = ok(await h.call({ action: "run-folder", folder: "Smoke", collection: "acme", environment: "Staging" }));
-            assert.match(text, /^Folder Smoke in Staging \(staging\): 2 of 2 ran, all answered 2xx\n1\. Health: GET \S+\/health -> HTTP 200 OK\n2\. Latest orders: GET \S+\/v1\/orders\?limit=1 -> HTTP 200 OK/);
+            const text = ok(
+                await h.call({ action: "run-folder", folder: "Smoke", collection: "acme", environment: "Staging" }),
+            );
+            assert.match(
+                text,
+                /^Folder Smoke in Staging \(staging\): 2 of 2 ran, all answered 2xx\n1\. Health: GET \S+\/health -> HTTP 200 OK\n2\. Latest orders: GET \S+\/v1\/orders\?limit=1 -> HTTP 200 OK/,
+            );
             assert.equal(h.api.requests[0]?.headers.authorization, undefined);
             assert.equal(h.api.requests[1]?.headers.authorization, `Bearer ${TOKENS.staging.value}`);
         });
 
         test("a folder with one refused request is refused as a whole", async () => {
-            const result = await h.call({ action: "run-folder", folder: "Admin", collection: "acme", environment: "Staging" });
+            const result = await h.call({
+                action: "run-folder",
+                folder: "Admin",
+                collection: "acme",
+                environment: "Staging",
+            });
             assert.match(result.blocked ?? "", /is refused: it has a pre-request script/);
         });
 
         test("the files are read again on every call", async () => {
             const before = ok(await h.call({ action: "list", collection: "acme", text: "health" }));
             assert.match(before, /Smoke\/Health/);
-            const folder = (h.jig.api.config.section("api") as { collections: { acme: { bruno: string } } }).collections.acme.bruno;
+            const folder = (h.jig.api.config.section("api") as { collections: { acme: { bruno: string } } }).collections
+                .acme.bruno;
             const file = `${folder}/smoke/health.${format === "yaml" ? "yml" : "bru"}`;
             const { readFileSync, writeFileSync } = await import("node:fs");
             writeFileSync(file, readFileSync(file, "utf8").replace(/Health/, "Liveness"));

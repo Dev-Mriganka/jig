@@ -25,7 +25,8 @@ export function readsOf(settings: ApiSettings, request: SavedRequest): boolean {
 
 /** What stops a request from running, in a few words, or undefined. */
 export function refusalOf(request: SavedRequest): string | undefined {
-    if (request.scripts.prerequest) return `refused: it has a pre-request script (${request.scripts.where ?? "its own"}), and scripts never run`;
+    if (request.scripts.prerequest)
+        return `refused: it has a pre-request script (${request.scripts.where ?? "its own"}), and scripts never run`;
     if (request.unsupported !== undefined) return `refused: ${request.unsupported}`;
     return undefined;
 }
@@ -41,12 +42,16 @@ function givableVariables(collection: Collection, request: SavedRequest, secretN
 
 /** Those of them the request cannot do without. */
 function neededVariables(collection: Collection, request: SavedRequest, secretNames: ReadonlySet<string>): string[] {
-    return givableVariables(collection, request, secretNames).filter((name) => request.optional?.includes(name) !== true);
+    return givableVariables(collection, request, secretNames).filter(
+        (name) => request.optional?.includes(name) !== true,
+    );
 }
 
 /** Those it can: a parameter that is left out when it is not given. */
 function optionalVariables(collection: Collection, request: SavedRequest, secretNames: ReadonlySet<string>): string[] {
-    return givableVariables(collection, request, secretNames).filter((name) => request.optional?.includes(name) === true);
+    return givableVariables(collection, request, secretNames).filter(
+        (name) => request.optional?.includes(name) === true,
+    );
 }
 
 function problemLines(problems: readonly Problem[]): string[] {
@@ -70,7 +75,10 @@ export function listText(catalog: Catalog, settings: ApiSettings, filter: Filter
         });
         const kind = settings.collections.get(collection.name)?.kind ?? "";
         const environments = [...collection.environments.values()].map((environment) =>
-            (environment.unavailable === undefined ? environment.name : `${environment.name} (unavailable: ${environment.unavailable})`));
+            environment.unavailable === undefined
+                ? environment.name
+                : `${environment.name} (unavailable: ${environment.unavailable})`,
+        );
         const count = `${collection.requests.length} request${collection.requests.length === 1 ? "" : "s"}`;
         const named = environments.length === 0 ? "none" : environments.join(", ");
         lines.push(`${collection.name} (${kind}, ${count}; environments: ${named})`);
@@ -99,11 +107,16 @@ export function listText(catalog: Catalog, settings: ApiSettings, filter: Filter
 
 function describeAuth(auth: Auth): string {
     switch (auth.kind) {
-        case "none": return "none";
-        case "bearer": return "a bearer token";
-        case "basic": return "a user name and password (HTTP Basic)";
-        case "apiKey": return `an API key in the ${auth.name} header`;
-        case "oauth2": return `OAuth 2.0, ${auth.grant === "password" ? "password grant" : "client credentials"}`;
+        case "none":
+            return "none";
+        case "bearer":
+            return "a bearer token";
+        case "basic":
+            return "a user name and password (HTTP Basic)";
+        case "apiKey":
+            return `an API key in the ${auth.name} header`;
+        case "oauth2":
+            return `OAuth 2.0, ${auth.grant === "password" ? "password grant" : "client credentials"}`;
     }
 }
 
@@ -135,18 +148,25 @@ function variableLine(
     if (name.startsWith("$")) return `  ${name}: made when the request is sent`;
     if (secretNames.has(name)) {
         const source = settings.secrets.get(name);
-        const reference = label === undefined ? source?.everywhere : source?.byEnvironment.get(label) ?? source?.everywhere;
+        const reference =
+            label === undefined ? source?.everywhere : (source?.byEnvironment.get(label) ?? source?.everywhere);
         return `  ${name}: secret, ${reference === undefined ? "NOT SET in api.secrets" : "set in api.secrets"}`;
     }
     if (request.signsIn.includes(name)) return `  ${name}: fills the sign-in, so it comes from the environment`;
     if (environment?.variables.has(name) === true) return `  ${name}: from the environment ${label}`;
     if (request.defaults.has(name)) return `  ${name}: from the file`;
     if (collection.variables.has(name)) return `  ${name}: from the collection`;
-    if (request.optional?.includes(name) === true) return `  ${name}: optional, left out when not given (pass it in variables)`;
+    if (request.optional?.includes(name) === true)
+        return `  ${name}: optional, left out when not given (pass it in variables)`;
     return `  ${name}: needs a value (pass it in variables)`;
 }
 
-export function showText(catalog: Catalog, settings: ApiSettings, request: SavedRequest, label: string | undefined): string {
+export function showText(
+    catalog: Catalog,
+    settings: ApiSettings,
+    request: SavedRequest,
+    label: string | undefined,
+): string {
     const collection = catalog.collection(request.collection);
     const secretNames = secretNamesOf(collection, settings.secrets);
     const environment = label === undefined ? undefined : catalog.environment(collection, label);
@@ -162,7 +182,8 @@ export function showText(catalog: Catalog, settings: ApiSettings, request: Saved
         lines.push("Headers:");
         for (const [name, value] of request.headers) {
             const names = [...value.matchAll(/\{\{\s*([^{}]+?)\s*\}\}/g)].map((match) => match[1] as string);
-            const hidden = CREDENTIAL_HEADERS.has(name.toLowerCase()) || names.some((variable) => secretNames.has(variable));
+            const hidden =
+                CREDENTIAL_HEADERS.has(name.toLowerCase()) || names.some((variable) => secretNames.has(variable));
             lines.push(`  ${name}: ${hidden ? "(secret)" : oneLine(value, 120)}`);
         }
     }
@@ -170,20 +191,33 @@ export function showText(catalog: Catalog, settings: ApiSettings, request: Saved
         const body = request.body;
         lines.push(`Body (${body.kind}${body.kind === "form" ? `, ${body.encoding}` : ""}):`);
         const text =
-            body.kind === "raw" || body.kind === "json" ? body.text
-                : body.kind === "graphql" ? [body.query, body.variables ?? ""].join("\n\n").trim()
-                    : body.kind === "file" ? `file ${body.file.path}`
-                        : body.fields.map((field) =>
-                            field.kind === "file" ? `${field.name} = file ${field.file.path}` : `${field.name} = ${field.value}`).join("\n");
+            body.kind === "raw" || body.kind === "json"
+                ? body.text
+                : body.kind === "graphql"
+                  ? [body.query, body.variables ?? ""].join("\n\n").trim()
+                  : body.kind === "file"
+                    ? `file ${body.file.path}`
+                    : body.fields
+                          .map((field) =>
+                              field.kind === "file"
+                                  ? `${field.name} = file ${field.file.path}`
+                                  : `${field.name} = ${field.value}`,
+                          )
+                          .join("\n");
         const bodyLines = text.split("\n");
         lines.push(...bodyLines.slice(0, SHOWN_BODY_LINES).map((line) => `  ${line}`));
-        if (bodyLines.length > SHOWN_BODY_LINES) lines.push(`  [${bodyLines.length - SHOWN_BODY_LINES} more lines not shown]`);
+        if (bodyLines.length > SHOWN_BODY_LINES)
+            lines.push(`  [${bodyLines.length - SHOWN_BODY_LINES} more lines not shown]`);
     }
     const variables = variableLines(settings, collection, request, secretNames, environment, label);
     lines.push(variables.length === 0 ? "Variables: none" : "Variables:", ...variables);
-    if (environment?.unavailable !== undefined) lines.push(`Environment ${label}: unavailable: ${environment.unavailable}`);
+    if (environment?.unavailable !== undefined)
+        lines.push(`Environment ${label}: unavailable: ${environment.unavailable}`);
     if (request.assertions !== undefined && request.assertions.length > 0) {
-        lines.push("Asserts (declared, not run):", ...request.assertions.map((assertion) => `  ${oneLine(assertion, 160)}`));
+        lines.push(
+            "Asserts (declared, not run):",
+            ...request.assertions.map((assertion) => `  ${oneLine(assertion, 160)}`),
+        );
     }
     if (request.description !== undefined) lines.push(`Docs: ${oneLine(request.description, 400)}`);
     for (const note of request.notes) lines.push(`Note: ${note}`);

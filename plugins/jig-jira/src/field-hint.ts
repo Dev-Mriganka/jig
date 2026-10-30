@@ -62,14 +62,17 @@ export function score(guess: string, name: string): number {
             continue;
         }
         const initialsAt = (index: number): boolean =>
-            [...word].every((letter, offset) => covered[index + offset] === false && have[index + offset]?.[0] === letter);
+            [...word].every(
+                (letter, offset) => covered[index + offset] === false && have[index + offset]?.[0] === letter,
+            );
         const start = word.length < 2 ? -1 : have.findIndex((_, index) => initialsAt(index));
         if (start >= 0) {
             for (let offset = 0; offset < word.length; offset++) covered[start + offset] = true;
             explained++;
         }
     }
-    const byWords = explained === 0 ? 0 : (explained / wanted.length + covered.filter(Boolean).length / have.length) / 2;
+    const byWords =
+        explained === 0 ? 0 : (explained / wanted.length + covered.filter(Boolean).length / have.length) / 2;
     const a = wanted.join("");
     const b = have.join("");
     const byLetters = 1 - distance(a, b) / Math.max(a.length, b.length);

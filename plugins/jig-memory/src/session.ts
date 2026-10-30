@@ -172,7 +172,10 @@ export function registerTicketMemory(pi: ExtensionAPI): void {
         if (sinceNotes < REMIND_AFTER) return;
         sinceNotes = 0;
         return {
-            content: [...event.content, { type: "text" as const, text: reminderText(key, ticketPaths(mem.folder, key).notes) }],
+            content: [
+                ...event.content,
+                { type: "text" as const, text: reminderText(key, ticketPaths(mem.folder, key).notes) },
+            ],
             // Replacing content drops structuredContent unless it is returned too, so it goes back as it came.
             ...(event.structuredContent === undefined ? {} : { structuredContent: event.structuredContent }),
         };
@@ -193,7 +196,10 @@ export function registerTicketMemory(pi: ExtensionAPI): void {
                     return;
                 }
                 const saved = indexCount(mem.folder, active);
-                note(ctx, `Ticket ${active}: notes ${ticketPaths(mem.folder, active).notes}, ${saved} saved result${saved === 1 ? "" : "s"}.`);
+                note(
+                    ctx,
+                    `Ticket ${active}: notes ${ticketPaths(mem.folder, active).notes}, ${saved} saved result${saved === 1 ? "" : "s"}.`,
+                );
                 return;
             }
             if (arg === "off") {

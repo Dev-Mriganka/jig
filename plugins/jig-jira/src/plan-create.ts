@@ -20,7 +20,11 @@ const MAX_DUPLICATES = 5;
 const RECHECK_MINUTES = 10;
 
 /** The words of a summary that a text search is given: letters and digits only, so nothing in it is search syntax. */
-const searchWords = (summary: string): string => summary.replace(/[^\p{L}\p{N}]+/gu, " ").trim().slice(0, 100);
+const searchWords = (summary: string): string =>
+    summary
+        .replace(/[^\p{L}\p{N}]+/gu, " ")
+        .trim()
+        .slice(0, 100);
 
 /** Issues like this one, created in the project lately, for the person to see before a duplicate is made. */
 async function duplicateNotes(env: Env, project: string, summary: string): Promise<string[]> {
@@ -57,7 +61,11 @@ interface Given {
 /** The names of the fields a call may set: the project and the type are given by their own parameters. */
 function screenNames(screen: Screen): string {
     const fields = [...screen.fields.values()].filter((field) => field.id !== "project" && field.id !== "issuetype");
-    return shortList(fields.map((field) => field.name), ", ", 80);
+    return shortList(
+        fields.map((field) => field.name),
+        ", ",
+        80,
+    );
 }
 
 export async function planCreate(env: Env, call: CallOf<"create">, preview: boolean): Promise<Plan> {
@@ -85,12 +93,12 @@ export async function planCreate(env: Env, call: CallOf<"create">, preview: bool
     };
 
     const add = async (name: string, id: string, raw: unknown): Promise<void> => {
-        if (id === "project" || id === "issuetype") throw new InputError(`jira create: ${id} is set by project and type`);
+        if (id === "project" || id === "issuetype")
+            throw new InputError(`jira create: ${id} is set by project and type`);
         if (given.has(id)) throw new InputError(`jira create: ${id} is given twice`);
         try {
-            let converted = id === "assignee"
-                ? await assigneeValue(env, { project: call.project }, raw)
-                : convertField(id, raw);
+            let converted =
+                id === "assignee" ? await assigneeValue(env, { project: call.project }, raw) : convertField(id, raw);
             const field = screen?.fields.get(id);
             if (field !== undefined) converted = checkAllowed(field, converted);
             // The screen's own name for a field is the clearest label; without a screen, the name the call used.
@@ -107,7 +115,11 @@ export async function planCreate(env: Env, call: CallOf<"create">, preview: bool
     if (screen !== undefined) {
         const missing = missingRequired(screen, new Set(given.keys()));
         if (missing.length > 0) {
-            const needed = shortList(missing.map((field) => `${field.name} (${expectation(field)})`), "; ", 110);
+            const needed = shortList(
+                missing.map((field) => `${field.name} (${expectation(field)})`),
+                "; ",
+                110,
+            );
             throw new InputError(`jira create: ${where} also needs ${needed}; pass them in fields`);
         }
     }
@@ -152,8 +164,9 @@ export async function planCreate(env: Env, call: CallOf<"create">, preview: bool
         async check() {
             const words = searchWords(summary);
             const page = await search(env, {
-                jql: `project = "${call.project}" AND created >= -${RECHECK_MINUTES}m`
-                    + (words === "" ? "" : ` AND summary ~ "${words}"`),
+                jql:
+                    `project = "${call.project}" AND created >= -${RECHECK_MINUTES}m` +
+                    (words === "" ? "" : ` AND summary ~ "${words}"`),
                 fields: ["summary", "status"],
                 limit: 20,
             });
@@ -164,7 +177,10 @@ export async function planCreate(env: Env, call: CallOf<"create">, preview: bool
             const [first] = same;
             const created = `created in the last ${RECHECK_MINUTES} minutes`;
             if (first === undefined) {
-                return { happened: false, text: `no issue in ${call.project} with exactly this summary was ${created}` };
+                return {
+                    happened: false,
+                    text: `no issue in ${call.project} with exactly this summary was ${created}`,
+                };
             }
             const keys = same.map((issue) => str(issue.key)).join(", ");
             return {

@@ -17,7 +17,9 @@ export interface FakeUiScript {
     select?: (title: string, options: string[]) => string | undefined | Promise<string | undefined>;
     input?: (title: string) => string | undefined | Promise<string | undefined>;
     /** Runs the component factory the way Pi does: it gets a fake terminal, a theme, keybindings and `done`. */
-    custom?: (factory: (tui: unknown, theme: unknown, keybindings: unknown, done: (value: unknown) => void) => unknown) => Promise<unknown>;
+    custom?: (
+        factory: (tui: unknown, theme: unknown, keybindings: unknown, done: (value: unknown) => void) => unknown,
+    ) => Promise<unknown>;
 }
 
 export function fakeUi(script: FakeUiScript = {}): { ui: ExtensionUIContext; log: FakeUiLog } {
@@ -33,31 +35,46 @@ export function fakeUi(script: FakeUiScript = {}): { ui: ExtensionUIContext; log
         }
     }
     const ui = {
-        select: (title: string, options: string[]) => counted(async () => {
-            log.selects.push({ title, options });
-            await Promise.resolve();
-            return script.select?.(title, options);
-        }),
-        input: (title: string) => counted(async () => {
-            log.inputs.push({ title });
-            return script.input?.(title);
-        }),
+        select: (title: string, options: string[]) =>
+            counted(async () => {
+                log.selects.push({ title, options });
+                await Promise.resolve();
+                return script.select?.(title, options);
+            }),
+        input: (title: string) =>
+            counted(async () => {
+                log.inputs.push({ title });
+                return script.input?.(title);
+            }),
         confirm: async () => false,
-        notify: (message: string, type?: string) => { log.notifications.push({ message, type }); },
-        custom: (factory: Parameters<NonNullable<FakeUiScript["custom"]>>[0]) => counted(async () => {
-            log.customs++;
-            if (script.custom === undefined) throw new Error("this fake screen has no custom component");
-            return script.custom(factory);
-        }),
+        notify: (message: string, type?: string) => {
+            log.notifications.push({ message, type });
+        },
+        custom: (factory: Parameters<NonNullable<FakeUiScript["custom"]>>[0]) =>
+            counted(async () => {
+                log.customs++;
+                if (script.custom === undefined) throw new Error("this fake screen has no custom component");
+                return script.custom(factory);
+            }),
     };
     return { ui: ui as unknown as ExtensionUIContext, log };
 }
 
 /** A fake terminal, theme and keybindings, for a component made by `ui.custom`. Styles are left off, so text is plain. */
-export function fakeTerminal(rows = 24): { tui: unknown; theme: unknown; keybindings: unknown; rendered: { count: number } } {
+export function fakeTerminal(rows = 24): {
+    tui: unknown;
+    theme: unknown;
+    keybindings: unknown;
+    rendered: { count: number };
+} {
     const rendered = { count: 0 };
     return {
-        tui: { terminal: { rows }, requestRender: () => { rendered.count++; } },
+        tui: {
+            terminal: { rows },
+            requestRender: () => {
+                rendered.count++;
+            },
+        },
         theme: { fg: (_color: string, text: string) => text, bold: (text: string) => text },
         keybindings: {},
         rendered,
@@ -68,11 +85,18 @@ export function fakeTerminal(rows = 24): { tui: unknown; theme: unknown; keybind
  *  backstop ran. */
 export const fakeMasker: Masker = {
     text: (input) => input.replaceAll("PERSONAL", "[masked]"),
-    value: <T>(input: T): T => JSON.parse(JSON.stringify(input), (_key, value: unknown) => (typeof value === "string" ? value.replaceAll("PERSONAL", "[masked]") : value)) as T,
+    value: <T>(input: T): T =>
+        JSON.parse(JSON.stringify(input), (_key, value: unknown) =>
+            typeof value === "string" ? value.replaceAll("PERSONAL", "[masked]") : value,
+        ) as T,
 };
 
 /** A masker that cannot mask, like the stub before the real one is built. */
 export const brokenMasker: Masker = {
-    text: () => { throw new Error("masking is broken"); },
-    value: () => { throw new Error("masking is broken"); },
+    text: () => {
+        throw new Error("masking is broken");
+    },
+    value: () => {
+        throw new Error("masking is broken");
+    },
 };

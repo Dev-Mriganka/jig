@@ -18,7 +18,8 @@ after(() => h.close());
 beforeEach(() => h.reset());
 
 const GET = { method: "GET", path: "/v1/x" };
-const lines = (count: number, prefix = "line"): string => Array.from({ length: count }, (_, index) => `${prefix} ${index + 1}`).join("\n");
+const lines = (count: number, prefix = "line"): string =>
+    Array.from({ length: count }, (_, index) => `${prefix} ${index + 1}`).join("\n");
 
 describe("the status line", () => {
     test("names the method, the full address and the status with its words, then the request and its environment", async () => {
@@ -44,23 +45,43 @@ describe("the headers shown", () => {
     test("content-type, location and trace or request ids, at most six, and nothing else", async () => {
         h.api.respond = () => ({
             headers: {
-                "content-type": "text/plain", location: "/elsewhere", traceparent: "00-abc-def-01", "x-amzn-trace-id": "Root=1-abc", "x-b3-traceid": "b3",
-                "x-correlation-id": "c1", "x-extra-trace": "e", "x-request-id": "r1", "x-amzn-requestid": "r2",
-                server: "nginx", "set-cookie": "s=1", "cache-control": "no-store", etag: '"abc"', "x-powered-by": "x",
+                "content-type": "text/plain",
+                location: "/elsewhere",
+                traceparent: "00-abc-def-01",
+                "x-amzn-trace-id": "Root=1-abc",
+                "x-b3-traceid": "b3",
+                "x-correlation-id": "c1",
+                "x-extra-trace": "e",
+                "x-request-id": "r1",
+                "x-amzn-requestid": "r2",
+                server: "nginx",
+                "set-cookie": "s=1",
+                "cache-control": "no-store",
+                etag: '"abc"',
+                "x-powered-by": "x",
             },
             body: "ok",
         });
         const text = ok(await h.call(GET));
         const shown = text.split("\n").filter((line) => /^[a-z0-9-]+: /.test(line));
         assert.deepEqual(shown, [
-            "content-type: text/plain", "location: /elsewhere", "traceparent: 00-abc-def-01", "x-amzn-requestid: r2", "x-amzn-trace-id: Root=1-abc", "x-b3-traceid: b3",
+            "content-type: text/plain",
+            "location: /elsewhere",
+            "traceparent: 00-abc-def-01",
+            "x-amzn-requestid: r2",
+            "x-amzn-trace-id: Root=1-abc",
+            "x-b3-traceid: b3",
         ]);
-        for (const hidden of ["nginx", "s=1", "no-store", "abc\"", "x-powered-by"]) assert.ok(!text.includes(hidden), hidden);
+        for (const hidden of ["nginx", "s=1", "no-store", 'abc"', "x-powered-by"])
+            assert.ok(!text.includes(hidden), hidden);
     });
 
     test("shownHeaders keeps the names in lower case, one line each, and cuts a long value", () => {
         const long = "x".repeat(300);
-        assert.deepEqual(shownHeaders({ "content-type": "a", "x-request-id": long, other: "b" }), ["content-type: a", `x-request-id: ${"x".repeat(200)}`]);
+        assert.deepEqual(shownHeaders({ "content-type": "a", "x-request-id": long, other: "b" }), [
+            "content-type: a",
+            `x-request-id: ${"x".repeat(200)}`,
+        ]);
         assert.deepEqual(shownHeaders({ location: "a\tb  c" }), ["location: a b c"]);
         assert.deepEqual(shownHeaders({}), []);
     });
@@ -68,36 +89,43 @@ describe("the headers shown", () => {
 
 describe("a JSON body", () => {
     test("is re-indented by two spaces, with numbers, strings and escapes untouched", async () => {
-        const raw = '{"id":12345678901234567890,"price":1.50,"big":1e3,"neg":-0,"third":0.10000000000000001,"s":"a \\"b\\" {x} [y], z \\u00e9 \\\\","e":{},"l":[],"a":[1,{"k":null}],"t":true}';
+        const raw =
+            '{"id":12345678901234567890,"price":1.50,"big":1e3,"neg":-0,"third":0.10000000000000001,"s":"a \\"b\\" {x} [y], z \\u00e9 \\\\","e":{},"l":[],"a":[1,{"k":null}],"t":true}';
         h.api.respond = () => ({ body: raw });
         const text = ok(await h.call(GET));
         const body = text.slice(text.indexOf("\n\n") + 2);
-        assert.equal(body, [
-            "{",
-            '  "id": 12345678901234567890,',
-            '  "price": 1.50,',
-            '  "big": 1e3,',
-            '  "neg": -0,',
-            '  "third": 0.10000000000000001,',
-            '  "s": "a \\"b\\" {x} [y], z \\u00e9 \\\\",',
-            '  "e": {},',
-            '  "l": [],',
-            '  "a": [',
-            "    1,",
-            "    {",
-            '      "k": null',
-            "    }",
-            "  ],",
-            '  "t": true',
-            "}",
-        ].join("\n"));
+        assert.equal(
+            body,
+            [
+                "{",
+                '  "id": 12345678901234567890,',
+                '  "price": 1.50,',
+                '  "big": 1e3,',
+                '  "neg": -0,',
+                '  "third": 0.10000000000000001,',
+                '  "s": "a \\"b\\" {x} [y], z \\u00e9 \\\\",',
+                '  "e": {},',
+                '  "l": [],',
+                '  "a": [',
+                "    1,",
+                "    {",
+                '      "k": null',
+                "    }",
+                "  ],",
+                '  "t": true',
+                "}",
+            ].join("\n"),
+        );
         assert.deepEqual(JSON.parse(body), JSON.parse(raw), "the same data");
     });
 
     test("is not cut here, however long: jig-core cuts a long result and keeps the whole text", async () => {
         const list = Array.from({ length: 500 }, (_, index) => ({ id: index }));
         h.api.respond = () => ({ body: JSON.stringify(list) });
-        const body = ok(await h.call(GET)).split("\n\n").slice(1).join("\n\n");
+        const body = ok(await h.call(GET))
+            .split("\n\n")
+            .slice(1)
+            .join("\n\n");
         assert.ok(body.split("\n").length > 1500);
         assert.ok(body.includes('"id": 499'));
         assert.doesNotMatch(body, /more lines/);
@@ -109,7 +137,13 @@ describe("a JSON body", () => {
     });
 
     test("a JSON value that is not an object or a list is shown as it is", async () => {
-        const cases: Array<[raw: string, shown: string]> = [["42", "42"], ['"text"', '"text"'], ["true", "true"], ["null", "null"], [" [ 1 , 2 ] ", "[\n  1,\n  2\n]"]];
+        const cases: Array<[raw: string, shown: string]> = [
+            ["42", "42"],
+            ['"text"', '"text"'],
+            ["true", "true"],
+            ["null", "null"],
+            [" [ 1 , 2 ] ", "[\n  1,\n  2\n]"],
+        ];
         for (const [raw, shown] of cases) {
             h.api.respond = () => ({ body: raw });
             assert.ok(ok(await h.call(GET)).endsWith(`\n\n${shown}`), raw);
@@ -122,12 +156,16 @@ describe("a JSON body", () => {
     });
 
     test("prettyJson re-indents nested data, keeps empty containers on one line, and refuses what is not JSON", () => {
-        assert.equal(prettyJson('{"a":[],"b":{},"c":[{}],"d":[[]]}'), '{\n  "a": [],\n  "b": {},\n  "c": [\n    {}\n  ],\n  "d": [\n    []\n  ]\n}');
+        assert.equal(
+            prettyJson('{"a":[],"b":{},"c":[{}],"d":[[]]}'),
+            '{\n  "a": [],\n  "b": {},\n  "c": [\n    {}\n  ],\n  "d": [\n    []\n  ]\n}',
+        );
         assert.equal(prettyJson('{ "a" : [ ] , "b" : { } }'), '{\n  "a": [],\n  "b": {}\n}');
         assert.equal(prettyJson('{"s":"[{,:}]"}'), '{\n  "s": "[{,:}]"\n}');
         assert.equal(prettyJson("42"), "42");
         assert.equal(prettyJson(" \n true \n"), "true");
-        for (const text of ["not json", '{"a":', "", "{'a':1}", "[1,]", "{} {}"]) assert.equal(prettyJson(text), undefined, text);
+        for (const text of ["not json", '{"a":', "", "{'a':1}", "[1,]", "{} {}"])
+            assert.equal(prettyJson(text), undefined, text);
         assert.equal(JSON.stringify(JSON.parse(prettyJson('{"a":[1,2,{"b":null}]}') ?? "")), '{"a":[1,2,{"b":null}]}');
     });
 });
@@ -149,14 +187,20 @@ describe("a text body", () => {
     });
 
     test("reads CRLF line ends", async () => {
-        h.api.respond = () => ({ body: lines(210).replaceAll("\n", "\r\n"), headers: { "content-type": "text/plain" } });
+        h.api.respond = () => ({
+            body: lines(210).replaceAll("\n", "\r\n"),
+            headers: { "content-type": "text/plain" },
+        });
         const text = ok(await h.call(GET));
         assert.ok(text.endsWith("line 200\n[10 more lines not shown]"));
         assert.ok(!text.includes("\r"));
     });
 
     test("passes other text through, including non-ASCII", async () => {
-        h.api.respond = () => ({ body: "héllo wörld ✓\n<html>&amp;</html>", headers: { "content-type": "text/html; charset=utf-8" } });
+        h.api.respond = () => ({
+            body: "héllo wörld ✓\n<html>&amp;</html>",
+            headers: { "content-type": "text/html; charset=utf-8" },
+        });
         assert.ok(ok(await h.call(GET)).endsWith("\n\nhéllo wörld ✓\n<html>&amp;</html>"));
     });
 
@@ -166,7 +210,10 @@ describe("a text body", () => {
     });
 
     test("a compressed answer is read as text", async () => {
-        h.api.respond = () => ({ body: gzipSync(Buffer.from('{"zipped":true}')), headers: { "content-encoding": "gzip" } });
+        h.api.respond = () => ({
+            body: gzipSync(Buffer.from('{"zipped":true}')),
+            headers: { "content-encoding": "gzip" },
+        });
         assert.match(ok(await h.call(GET)), /\n\n\{\n {2}"zipped": true\n\}$/);
     });
 });
@@ -180,7 +227,10 @@ describe("a body that is not text, empty or too long", () => {
     });
 
     test("a body with a NUL byte is binary: its size is shown and not its bytes", async () => {
-        h.api.respond = () => ({ body: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 13]), headers: { "content-type": "image/png" } });
+        h.api.respond = () => ({
+            body: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 13]),
+            headers: { "content-type": "image/png" },
+        });
         const text = ok(await h.call(GET));
         assert.ok(text.endsWith("\n\n(binary body, 8 bytes)"), text);
         assert.match(text, /\ncontent-type: image\/png\n/);
@@ -206,7 +256,16 @@ describe("a body that is not text, empty or too long", () => {
 });
 
 describe("an answer that is not a success", () => {
-    for (const [status, words] of [[400, "Bad Request"], [401, "Unauthorized"], [403, "Forbidden"], [404, "Not Found"], [409, "Conflict"], [422, "Unprocessable Entity"], [429, "Too Many Requests"], [500, "Internal Server Error"]] as const) {
+    for (const [status, words] of [
+        [400, "Bad Request"],
+        [401, "Unauthorized"],
+        [403, "Forbidden"],
+        [404, "Not Found"],
+        [409, "Conflict"],
+        [422, "Unprocessable Entity"],
+        [429, "Too Many Requests"],
+        [500, "Internal Server Error"],
+    ] as const) {
         test(`${status} is a result with its body, not an error`, async () => {
             h.api.respond = () => ({ status, body: JSON.stringify({ message: `it is ${status}` }) });
             const result = await h.call(GET);
@@ -220,7 +279,10 @@ describe("an answer that is not a success", () => {
     test("a redirect is a result too: it says where the server points, and that it was not followed", async () => {
         h.api.respond = () => ({ status: 301, headers: { location: "https://elsewhere.example.test/new" }, body: "" });
         const text = ok(await h.call(GET));
-        assert.match(text, /-> HTTP 301 Moved Permanently\nRequest: call \(base\) in Staging \(staging\)\nRedirects are not followed: the location header says where the server points\.\ncontent-type: application\/json\nlocation: https:\/\/elsewhere\.example\.test\/new\n/);
+        assert.match(
+            text,
+            /-> HTTP 301 Moved Permanently\nRequest: call \(base\) in Staging \(staging\)\nRedirects are not followed: the location header says where the server points\.\ncontent-type: application\/json\nlocation: https:\/\/elsewhere\.example\.test\/new\n/,
+        );
         h.api.respond = () => ({ status: 304, body: "" });
         assert.doesNotMatch(ok(await h.call(GET)), /Redirects are not followed/, "a 304 has no place to go");
     });
@@ -246,15 +308,22 @@ describe("what the call's record carries", () => {
 describe("an answer through a transport", () => {
     test("is rendered the same way, and a long text is cut at 200 lines", async () => {
         h.configure(h.section({ transport: "company-proxy" }));
-        h.jig.transports.set("company-proxy", { request: async () => ({ status: 200, headers: { "Content-Type": "text/plain" }, body: lines(210) }) });
+        h.jig.transports.set("company-proxy", {
+            request: async () => ({ status: 200, headers: { "Content-Type": "text/plain" }, body: lines(210) }),
+        });
         const text = ok(await h.call(GET));
-        assert.match(text, /^GET \S+ -> HTTP 200 OK\nRequest: call \(base\) in Staging \(staging\)\ncontent-type: text\/plain\n\nline 1\n/);
+        assert.match(
+            text,
+            /^GET \S+ -> HTTP 200 OK\nRequest: call \(base\) in Staging \(staging\)\ncontent-type: text\/plain\n\nline 1\n/,
+        );
         assert.ok(text.endsWith("line 200\n[10 more lines not shown]"));
     });
 
     test("a body with a NUL character is binary", async () => {
         h.configure(h.section({ transport: "company-proxy" }));
-        h.jig.transports.set("company-proxy", { request: async () => ({ status: 200, headers: {}, body: "ab\u0000cd" }) });
+        h.jig.transports.set("company-proxy", {
+            request: async () => ({ status: 200, headers: {}, body: "ab\u0000cd" }),
+        });
         assert.ok(ok(await h.call(GET)).endsWith("\n\n(binary body, 5 bytes)"));
     });
 });

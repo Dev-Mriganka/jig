@@ -13,43 +13,72 @@ before(async () => {
 after(() => h.close());
 beforeEach(() => h.reset());
 
-const POST = { method: "POST", path: "/v1/items?dryRun=true", body: { name: "Zed" }, headers: { "X-Request-Id": "t1" } };
+const POST = {
+    method: "POST",
+    path: "/v1/items?dryRun=true",
+    body: { name: "Zed" },
+    headers: { "X-Request-Id": "t1" },
+};
 
 /** The preview of a call, as jig-core asks the tool for it. */
 async function previewOf(input: Record<string, unknown>) {
     return h.declaration.preview?.(h.input(input), new AbortController().signal);
 }
-const fingerprintOf = async (input: Record<string, unknown>): Promise<string | undefined> => (await previewOf(input))?.fingerprint;
+const fingerprintOf = async (input: Record<string, unknown>): Promise<string | undefined> =>
+    (await previewOf(input))?.fingerprint;
 
 describe("what the preview shows", () => {
     test("the request, the sign-in, the method, the full address, the headers and the body", async () => {
         const preview = await previewOf(POST);
         assert.equal(preview?.summary, `POST ${h.api.origin}/v1/items?dryRun=true`);
         assert.equal(preview?.format, "text");
-        assert.equal(preview?.body, [
-            "Request: call (base) in Staging (staging)",
-            "Sign-in: none",
-            "Method: POST",
-            `URL: ${h.api.origin}/v1/items?dryRun=true`,
-            "Headers:",
-            "  X-Request-Id: t1",
-            "  Content-Type: application/json",
-            "Body (JSON, 14 bytes):",
-            "{",
-            '  "name": "Zed"',
-            "}",
-        ].join("\n"));
+        assert.equal(
+            preview?.body,
+            [
+                "Request: call (base) in Staging (staging)",
+                "Sign-in: none",
+                "Method: POST",
+                `URL: ${h.api.origin}/v1/items?dryRun=true`,
+                "Headers:",
+                "  X-Request-Id: t1",
+                "  Content-Type: application/json",
+                "Body (JSON, 14 bytes):",
+                "{",
+                '  "name": "Zed"',
+                "}",
+            ].join("\n"),
+        );
         assert.match(preview?.fingerprint ?? "", /^[0-9a-f]{32}$/);
     });
 
     test("a call with no headers and no body shows neither", async () => {
         const preview = await previewOf({ method: "DELETE", path: "/v1/items/7" });
-        assert.equal(preview?.body, ["Request: call (base) in Staging (staging)", "Sign-in: none", "Method: DELETE", `URL: ${h.api.origin}/v1/items/7`].join("\n"));
+        assert.equal(
+            preview?.body,
+            [
+                "Request: call (base) in Staging (staging)",
+                "Sign-in: none",
+                "Method: DELETE",
+                `URL: ${h.api.origin}/v1/items/7`,
+            ].join("\n"),
+        );
     });
 
     test("the body is re-indented with its numbers untouched, and a body that is not an object is shown as it is", async () => {
-        assert.match((await previewOf({ method: "PUT", path: "/x", body: { id: 12345678901234, price: 1.5, ok: true, none: null, list: [] } }))?.body ?? "", /\{\n {2}"id": 12345678901234,\n {2}"price": 1\.5,\n {2}"ok": true,\n {2}"none": null,\n {2}"list": \[\]\n\}$/);
-        assert.match((await previewOf({ method: "PUT", path: "/x", body: "text" }))?.body ?? "", /Body \(JSON, 6 bytes\):\n"text"$/);
+        assert.match(
+            (
+                await previewOf({
+                    method: "PUT",
+                    path: "/x",
+                    body: { id: 12345678901234, price: 1.5, ok: true, none: null, list: [] },
+                })
+            )?.body ?? "",
+            /\{\n {2}"id": 12345678901234,\n {2}"price": 1\.5,\n {2}"ok": true,\n {2}"none": null,\n {2}"list": \[\]\n\}$/,
+        );
+        assert.match(
+            (await previewOf({ method: "PUT", path: "/x", body: "text" }))?.body ?? "",
+            /Body \(JSON, 6 bytes\):\n"text"$/,
+        );
     });
 
     test("a long body is cut to 200 lines, says how many are left, and the whole body is still what is sent", async () => {
@@ -83,7 +112,12 @@ describe("what the preview shows", () => {
     });
 
     test("is made from the call and the configuration alone: nothing is resolved, signed in, sent or asked", async () => {
-        for (const auth of [{ bearer: SECRET_REFERENCE }, { oauthPassword: h.oauth() }, { signIn: "company-sso" }, { transport: "company-proxy" }]) {
+        for (const auth of [
+            { bearer: SECRET_REFERENCE },
+            { oauthPassword: h.oauth() },
+            { signIn: "company-sso" },
+            { transport: "company-proxy" },
+        ]) {
             h.configure(h.section(auth));
             await previewOf(POST);
         }
@@ -105,7 +139,10 @@ describe("the fingerprint", () => {
         const first = await fingerprintOf({ method: "POST", path: "/x", headers: { "X-A": "1", "X-B": "2" } });
         assert.equal(await fingerprintOf({ method: "POST", path: "/x", headers: { "X-A": "1", "X-B": "2" } }), first);
         assert.equal(await fingerprintOf({ method: "POST", path: "/x", headers: { "X-B": "2", "x-a": "1" } }), first);
-        assert.equal(await fingerprintOf({ method: "POST", path: "/x", headers: { "X-A": "1", "X-B": "2" }, timeoutSec: 5 }), first);
+        assert.equal(
+            await fingerprintOf({ method: "POST", path: "/x", headers: { "X-A": "1", "X-B": "2" }, timeoutSec: 5 }),
+            first,
+        );
     });
 
     test("changes with anything that is sent", async () => {
@@ -160,7 +197,8 @@ describe("the fingerprint", () => {
 });
 
 describe("changed since the preview", () => {
-    const refusal = (call: string) => `${call}: changed since the preview; run it again to see the new preview. Nothing was sent.`;
+    const refusal = (call: string) =>
+        `${call}: changed since the preview; run it again to see the new preview. Nothing was sent.`;
 
     test("a body, a path, a header or a method that a later hook changed is not sent", async () => {
         // What a later hook changes, and the call as the refusal names it: the call as it would now be sent.
@@ -168,11 +206,18 @@ describe("changed since the preview", () => {
             ["the body", (input) => void (input.body = { name: "Other" }), "api call POST /v1/items"],
             ["the path", (input) => void (input.url = `${h.api.origin}/v1/other`), "api call POST /v1/other"],
             ["a header", (input) => void (input.headers = { "X-Request-Id": "t2" }), "api call POST /v1/items"],
-            ["an added header", (input) => void (input.headers = { "X-Request-Id": "t1", "X-More": "1" }), "api call POST /v1/items"],
+            [
+                "an added header",
+                (input) => void (input.headers = { "X-Request-Id": "t1", "X-More": "1" }),
+                "api call POST /v1/items",
+            ],
             ["the method", (input) => void (input.method = "DELETE"), "api call DELETE /v1/items"],
         ];
         for (const [what, change, call] of changes) {
-            const result = await h.call({ method: "POST", path: "/v1/items", body: { name: "Zed" }, headers: { "X-Request-Id": "t1" } }, { between: change });
+            const result = await h.call(
+                { method: "POST", path: "/v1/items", body: { name: "Zed" }, headers: { "X-Request-Id": "t1" } },
+                { between: change },
+            );
             assert.equal(result.error?.message, refusal(call), what);
         }
         assert.equal(h.api.requests.length, 0, "nothing was sent");
@@ -191,15 +236,26 @@ describe("changed since the preview", () => {
             assert.equal(result.error?.message, refusal("api call POST /v1/items"), what);
         }
         h.configure(h.section({ bearer: SECRET_REFERENCE }));
-        const rebound = await h.call(POST, { between: () => h.configure(h.section({ bearer: "pass:api/other-token" })) });
+        const rebound = await h.call(POST, {
+            between: () => h.configure(h.section({ bearer: "pass:api/other-token" })),
+        });
         assert.equal(rebound.error?.message, refusal("api call POST /v1/items"), "the reference");
         assert.equal(h.api.requests.length, 0);
     });
 
     test("the refusal names the call without its body, its query or its headers", async () => {
-        const result = await h.call({ method: "POST", path: "/v1/items?token=QUERY-SECRET", body: { password: "BODY-SECRET" }, headers: { "X-Key": "HEADER-SECRET" } }, { between: (input) => void (input.body = {}) });
+        const result = await h.call(
+            {
+                method: "POST",
+                path: "/v1/items?token=QUERY-SECRET",
+                body: { password: "BODY-SECRET" },
+                headers: { "X-Key": "HEADER-SECRET" },
+            },
+            { between: (input) => void (input.body = {}) },
+        );
         assert.match(result.error?.message ?? "", /run it again to see the new preview/);
-        for (const secret of ["BODY-SECRET", "QUERY-SECRET", "HEADER-SECRET", "token="]) assert.ok(!(result.error?.message ?? "").includes(secret), secret);
+        for (const secret of ["BODY-SECRET", "QUERY-SECRET", "HEADER-SECRET", "token="])
+            assert.ok(!(result.error?.message ?? "").includes(secret), secret);
     });
 
     test("running the call again shows the new preview, and a call that then matches goes through", async () => {
@@ -219,14 +275,23 @@ describe("changed since the preview", () => {
     });
 
     test("a call that did not ask has nothing to compare, and runs as it finds the configuration", async () => {
-        const result = await h.call({ method: "GET", path: "/v1/x" }, { between: () => h.configure(h.section({ none: true }, { environment: "qa" })) });
+        const result = await h.call(
+            { method: "GET", path: "/v1/x" },
+            { between: () => h.configure(h.section({ none: true }, { environment: "qa" })) },
+        );
         assert.equal(result.preview, undefined);
         assert.match(ok(result), /Request: call \(base\) in Staging \(qa\)/);
     });
 
     test("a preview that could not be built has no fingerprint, and the person's choice stands", async () => {
         h.jig.approved.set("manual-1", { summary: "preview unavailable: it took longer than 15 s" });
-        const result = await h.tool.execute("manual-1", h.input({ method: "POST", path: "/v1/items" }) as never, undefined, undefined, {} as never);
+        const result = await h.tool.execute(
+            "manual-1",
+            h.input({ method: "POST", path: "/v1/items" }) as never,
+            undefined,
+            undefined,
+            {} as never,
+        );
         assert.match(result.content[0]?.type === "text" ? result.content[0].text : "", /-> HTTP 200 OK/);
         assert.equal(h.api.requests.length, 1);
     });
@@ -242,10 +307,16 @@ describe("a call that cannot run is not asked about", () => {
     test("invalid input in a write blocks the call with the reason, and nothing is sent", async () => {
         const cases: Array<[Record<string, unknown>, RegExp]> = [
             [{ method: "POST", path: "/a/%252e%252e/b" }, /the path must hold only letters/],
-            [{ method: "POST", path: "/x", headers: { Authorization: "Bearer x" } }, /header Authorization is set by the tool/],
+            [
+                { method: "POST", path: "/x", headers: { Authorization: "Bearer x" } },
+                /header Authorization is set by the tool/,
+            ],
             [{ method: "POST", path: "/x", body: { s: "a".repeat(300_000) } }, /body is larger than 256 KiB/],
             [{ method: "POST", path: "/x", timeoutSec: 500 }, /timeoutSec must be a whole number from 1 to 120/],
-            [{ method: "POST", path: "/x", extra: 1 }, /api call does not use extra\. Usage: api call \{environment, method, url/],
+            [
+                { method: "POST", path: "/x", extra: 1 },
+                /api call does not use extra\. Usage: api call \{environment, method, url/,
+            ],
             [{ method: "TRACE", path: "/x" }, /method must be one of GET, HEAD, OPTIONS, POST, PUT, PATCH, DELETE/],
         ];
         for (const [input, reason] of cases) {
@@ -265,7 +336,10 @@ describe("a call that cannot run is not asked about", () => {
         try {
             await assert.rejects(
                 previewOf(POST),
-                (error: unknown) => error instanceof Error && !(error instanceof TypeError) && error.message === "internal error: a bug",
+                (error: unknown) =>
+                    error instanceof Error &&
+                    !(error instanceof TypeError) &&
+                    error.message === "internal error: a bug",
             );
         } finally {
             h.jig.api.config.section = real;

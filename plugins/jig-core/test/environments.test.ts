@@ -5,7 +5,10 @@ import { buildEnvironments } from "../src/environments.ts";
 
 describe("environment kinds", () => {
     const { environments } = buildEnvironments([
-        { source: "company", environments: { staging: { kind: "test" }, qa: { kind: "test", mask: true }, prod: { kind: "production" } } },
+        {
+            source: "company",
+            environments: { staging: { kind: "test" }, qa: { kind: "test", mask: true }, prod: { kind: "production" } },
+        },
     ]);
 
     test("the built-in names", () => {
@@ -42,7 +45,10 @@ describe("environment kinds", () => {
 
 describe("masking", () => {
     const { environments } = buildEnvironments([
-        { source: "company", environments: { staging: { kind: "test" }, qa: { kind: "test", mask: true }, prod: { kind: "production" } } },
+        {
+            source: "company",
+            environments: { staging: { kind: "test" }, qa: { kind: "test", mask: true }, prod: { kind: "production" } },
+        },
     ]);
 
     test("production is always masked, and so is a name nobody defined", () => {
@@ -66,7 +72,14 @@ describe("layers", () => {
     test("a later layer can add a mask, but never remove one or lower production", () => {
         const merged = buildEnvironments([
             { source: "company", environments: { a: { kind: "test", mask: true }, b: { kind: "production" } } },
-            { source: "personal", environments: { a: { kind: "test", mask: false }, b: { kind: "test" }, c: { kind: "test", mask: true } } },
+            {
+                source: "personal",
+                environments: {
+                    a: { kind: "test", mask: false },
+                    b: { kind: "test" },
+                    c: { kind: "test", mask: true },
+                },
+            },
         ]);
         assert.equal(merged.environments.masks("a"), true, "the mask stays");
         assert.equal(merged.environments.kindOf("b"), "production", "production stays");
@@ -87,7 +100,9 @@ describe("layers", () => {
     });
 
     test("the built-in names cannot be redefined", () => {
-        const merged = buildEnvironments([{ source: "personal", environments: { local: { kind: "production" }, external: { kind: "test" } } }]);
+        const merged = buildEnvironments([
+            { source: "personal", environments: { local: { kind: "production" }, external: { kind: "test" } } },
+        ]);
         assert.equal(merged.problems.length, 2);
         assert.equal(merged.environments.kindOf("local"), "local");
         assert.equal(merged.environments.kindOf("external"), "external");

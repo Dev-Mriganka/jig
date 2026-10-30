@@ -119,7 +119,13 @@ function person(user: FakeUser, flavor: Flavor): Record<string, unknown> {
 function fixtures(flavor: Flavor, users: FakeUser[]): Map<string, FakeIssue> {
     const [jane, sam] = users as [FakeUser, FakeUser];
     const stamp = (day: string): string => `2026-10-${day}.000+0000`;
-    const comment = (id: string, author: FakeUser, body: string, created: string, updated = created): FakeComment => ({ id, author, body, created, updated });
+    const comment = (id: string, author: FakeUser, body: string, created: string, updated = created): FakeComment => ({
+        id,
+        author,
+        body,
+        created,
+        updated,
+    });
     const issues = new Map<string, FakeIssue>();
     issues.set("PROJ-1", {
         key: "PROJ-1",
@@ -138,18 +144,27 @@ function fixtures(flavor: Flavor, users: FakeUser[]): Map<string, FakeIssue> {
             updated: stamp("12T14:03:22"),
             description: DESCRIPTION,
             parent: { key: "PROJ-10", fields: { summary: "Safari support", status: { name: "In Progress" } } },
-            issuelinks: [{
-                id: "10100",
-                type: { name: "Blocks", inward: "is blocked by", outward: "blocks" },
-                outwardIssue: { key: "PROJ-3", fields: { summary: "Release 1.2", status: { name: "Open" } } },
-            }],
+            issuelinks: [
+                {
+                    id: "10100",
+                    type: { name: "Blocks", inward: "is blocked by", outward: "blocks" },
+                    outwardIssue: { key: "PROJ-3", fields: { summary: "Release 1.2", status: { name: "Open" } } },
+                },
+            ],
             subtasks: [{ key: "PROJ-4", fields: { summary: "Add a regression test", status: { name: "Open" } } }],
             customfield_10016: 5,
             customfield_10500: "https://git.example.test/org/app/pull/42",
-            attachment: [{
-                id: "20001", filename: "crash.log", size: 2048, mimeType: "text/plain", created: stamp("02T08:10:00"),
-                author: person(sam, flavor), content: "https://jira.example.test/secure/attachment/20001/crash.log",
-            }],
+            attachment: [
+                {
+                    id: "20001",
+                    filename: "crash.log",
+                    size: 2048,
+                    mimeType: "text/plain",
+                    created: stamp("02T08:10:00"),
+                    author: person(sam, flavor),
+                    content: "https://jira.example.test/secure/attachment/20001/crash.log",
+                },
+            ],
         },
         comments: [
             comment("10001", sam, "Reproduced on Safari 17.\n\nSteps are in the description.", stamp("02T08:00:00")),
@@ -162,10 +177,20 @@ function fixtures(flavor: Flavor, users: FakeUser[]): Map<string, FakeIssue> {
             { id: "41", name: "Back to Open", to: "Open" },
         ],
         histories: [
-            { id: "30001", author: person(jane, flavor), created: stamp("03T09:00:00"), items: [{ field: "status", fromString: "Open", toString: "In Progress" }] },
             {
-                id: "30002", author: person(sam, flavor), created: stamp("04T12:30:00"),
-                items: [{ field: "priority", fromString: "Medium", toString: "High" }, { field: "labels", fromString: "", toString: "safari" }],
+                id: "30001",
+                author: person(jane, flavor),
+                created: stamp("03T09:00:00"),
+                items: [{ field: "status", fromString: "Open", toString: "In Progress" }],
+            },
+            {
+                id: "30002",
+                author: person(sam, flavor),
+                created: stamp("04T12:30:00"),
+                items: [
+                    { field: "priority", fromString: "Medium", toString: "High" },
+                    { field: "labels", fromString: "", toString: "safari" },
+                ],
             },
         ],
     });
@@ -222,12 +247,29 @@ const SCREENS: Record<string, Array<Record<string, unknown>>> = {
         { fieldId: "summary", name: "Summary", required: true, schema: { type: "string" } },
         { fieldId: "description", name: "Description", required: false, schema: { type: "string" } },
         {
-            fieldId: "priority", name: "Priority", required: false, schema: { type: "priority" },
-            allowedValues: [{ id: "1", name: "Highest" }, { id: "2", name: "High" }, { id: "3", name: "Medium" }, { id: "4", name: "Low" }],
+            fieldId: "priority",
+            name: "Priority",
+            required: false,
+            schema: { type: "priority" },
+            allowedValues: [
+                { id: "1", name: "Highest" },
+                { id: "2", name: "High" },
+                { id: "3", name: "Medium" },
+                { id: "4", name: "Low" },
+            ],
         },
         { fieldId: "labels", name: "Labels", required: false, schema: { type: "array", items: "string" } },
         { fieldId: "assignee", name: "Assignee", required: false, schema: { type: "user" } },
-        { fieldId: "components", name: "Components", required: false, schema: { type: "array", items: "component" }, allowedValues: [{ id: "10000", name: "Web" }, { id: "10001", name: "Billing" }] },
+        {
+            fieldId: "components",
+            name: "Components",
+            required: false,
+            schema: { type: "array", items: "component" },
+            allowedValues: [
+                { id: "10000", name: "Web" },
+                { id: "10001", name: "Billing" },
+            ],
+        },
         { fieldId: "customfield_10016", name: "Story Points", required: false, schema: { type: "number" } },
         { fieldId: "reporter", name: "Reporter", required: true, schema: { type: "user" } },
     ],
@@ -235,7 +277,16 @@ const SCREENS: Record<string, Array<Record<string, unknown>>> = {
         ...FIXED_FIELDS,
         { fieldId: "summary", name: "Summary", required: true, schema: { type: "string" } },
         { fieldId: "description", name: "Description", required: false, schema: { type: "string" } },
-        { fieldId: "components", name: "Components", required: true, schema: { type: "array", items: "component" }, allowedValues: [{ id: "10000", name: "Web" }, { id: "10001", name: "Billing" }] },
+        {
+            fieldId: "components",
+            name: "Components",
+            required: true,
+            schema: { type: "array", items: "component" },
+            allowedValues: [
+                { id: "10000", name: "Web" },
+                { id: "10001", name: "Billing" },
+            ],
+        },
     ],
     "10003": [
         ...FIXED_FIELDS,
@@ -264,7 +315,10 @@ interface Reply {
 }
 
 const notFound = (message: string): Reply => ({ status: 404, body: { errorMessages: [message], errors: {} } });
-const badRequest = (errors: Record<string, string>, messages: string[] = []): Reply => ({ status: 400, body: { errorMessages: messages, errors } });
+const badRequest = (errors: Record<string, string>, messages: string[] = []): Reply => ({
+    status: 400,
+    body: { errorMessages: messages, errors },
+});
 
 export async function startFakeJira(flavor: Flavor = "cloud"): Promise<FakeJira> {
     const users = (): FakeUser[] => structuredClone(flavor === "cloud" ? CLOUD_USERS : DATACENTER_USERS);
@@ -285,7 +339,12 @@ export async function startFakeJira(flavor: Flavor = "cloud"): Promise<FakeJira>
         inlineComments: Number.POSITIVE_INFINITY,
         createScreen: true,
         misbehave: (rule) => void rules.push(rule),
-        sent: (method, path) => fake.requests.filter((request) => request.method === method && (typeof path === "string" ? request.path === path : path.test(request.path))),
+        sent: (method, path) =>
+            fake.requests.filter(
+                (request) =>
+                    request.method === method &&
+                    (typeof path === "string" ? request.path === path : path.test(request.path)),
+            ),
         reset() {
             fake.requests = [];
             fake.users = users();
@@ -301,33 +360,54 @@ export async function startFakeJira(flavor: Flavor = "cloud"): Promise<FakeJira>
             nextIssue = 100;
             nextComment = 10100;
         },
-        close: () => new Promise((resolve) => {
-            server.close(() => resolve());
-            server.closeAllConnections();
-        }),
+        close: () =>
+            new Promise((resolve) => {
+                server.close(() => resolve());
+                server.closeAllConnections();
+            }),
     };
 
     const userJson = (user: FakeUser): Record<string, unknown> => person(user, flavor);
     const findUser = (reference: unknown): FakeUser | undefined => {
         const wanted = reference as Record<string, string> | null;
-        return fake.users.find((user) => wanted !== null && (user.accountId === wanted.accountId && wanted.accountId !== undefined || user.name === wanted.name && wanted.name !== undefined));
+        return fake.users.find(
+            (user) =>
+                wanted !== null &&
+                ((user.accountId === wanted.accountId && wanted.accountId !== undefined) ||
+                    (user.name === wanted.name && wanted.name !== undefined)),
+        );
     };
     const issueJson = (issue: FakeIssue, query: Record<string, string>): Record<string, unknown> => {
         const wanted = (query.fields ?? "*all").split(",");
         const fields: Record<string, unknown> = {};
-        for (const [name, value] of Object.entries(issue.fields)) if (wanted.includes("*all") || wanted.includes(name)) fields[name] = value;
+        for (const [name, value] of Object.entries(issue.fields))
+            if (wanted.includes("*all") || wanted.includes(name)) fields[name] = value;
         if (wanted.includes("*all") || wanted.includes("comment")) {
             const inline = issue.comments.slice(0, fake.inlineComments);
-            fields.comment = { comments: inline.map((c) => commentJson(c)), total: issue.comments.length, maxResults: inline.length, startAt: 0 };
+            fields.comment = {
+                comments: inline.map((c) => commentJson(c)),
+                total: issue.comments.length,
+                maxResults: inline.length,
+                startAt: 0,
+            };
         }
-        const json: Record<string, unknown> = { id: `1${issue.key.replace(/\D/g, "")}`, key: issue.key, self: `${fake.origin}/rest/api/2/issue/${issue.key}`, fields };
+        const json: Record<string, unknown> = {
+            id: `1${issue.key.replace(/\D/g, "")}`,
+            key: issue.key,
+            self: `${fake.origin}/rest/api/2/issue/${issue.key}`,
+            fields,
+        };
         if ((query.expand ?? "").includes("changelog")) {
             json.changelog = { startAt: 0, maxResults: 100, total: issue.histories.length, histories: issue.histories };
         }
         return json;
     };
     const commentJson = (comment: FakeComment): Record<string, unknown> => ({
-        id: comment.id, author: userJson(comment.author), body: comment.body, created: comment.created, updated: comment.updated,
+        id: comment.id,
+        author: userJson(comment.author),
+        body: comment.body,
+        created: comment.created,
+        updated: comment.updated,
     });
 
     /** Answers a request from the fixtures, applying writes to them. */
@@ -343,7 +423,9 @@ export async function startFakeJira(flavor: Flavor = "cloud"): Promise<FakeJira>
         if (method === "GET" && path === "/field") return { status: 200, body: fake.fields };
 
         if (method === "GET" && (match = /^\/project\/([A-Z]+)$/.exec(path))) {
-            return match[1] === "PROJ" ? { status: 200, body: { key: "PROJ", name: "Project" } } : notFound(`No project could be found with key '${match[1]}'.`);
+            return match[1] === "PROJ"
+                ? { status: 200, body: { key: "PROJ", name: "Project" } }
+                : notFound(`No project could be found with key '${match[1]}'.`);
         }
         if (method === "GET" && (match = /^\/issue\/createmeta\/([A-Z]+)\/issuetypes(?:\/(\d+))?$/.exec(path))) {
             if (match[1] !== "PROJ") return notFound(`No project could be found with key '${match[1]}'.`);
@@ -351,23 +433,51 @@ export async function startFakeJira(flavor: Flavor = "cloud"): Promise<FakeJira>
             const rows = match[2] === undefined ? TYPES : SCREENS[match[2]];
             if (rows === undefined) return notFound("Issue type not found");
             const name = flavor === "cloud" ? (match[2] === undefined ? "issueTypes" : "fields") : "values";
-            return { status: 200, body: { startAt: 0, maxResults: 100, total: rows.length, ...(flavor === "datacenter" ? { isLast: true } : {}), [name]: rows } };
+            return {
+                status: 200,
+                body: {
+                    startAt: 0,
+                    maxResults: 100,
+                    total: rows.length,
+                    ...(flavor === "datacenter" ? { isLast: true } : {}),
+                    [name]: rows,
+                },
+            };
         }
 
         if (method === "GET" && path === "/user/assignable/search") {
             const text = (query.query ?? query.username ?? "").toLowerCase();
-            const found = fake.users.filter((user) => text === "" || [user.displayName, user.name, user.accountId, user.key].some((value) => value?.toLowerCase().includes(text)));
+            const found = fake.users.filter(
+                (user) =>
+                    text === "" ||
+                    [user.displayName, user.name, user.accountId, user.key].some((value) =>
+                        value?.toLowerCase().includes(text),
+                    ),
+            );
             return { status: 200, body: found.map(userJson) };
         }
 
         if (method === "GET" && (path === "/search" || path === "/search/jql")) {
             const enhanced = path === "/search/jql";
-            if (enhanced && flavor === "datacenter") return { status: 404, body: { message: "null for uri: /rest/api/2/search/jql", "status-code": 404 } };
-            if (!enhanced && flavor === "cloud") return { status: 410, body: { errorMessages: ["The requested API has been removed. Please migrate to the /rest/api/2/search/jql API."], errors: {} } };
+            if (enhanced && flavor === "datacenter")
+                return { status: 404, body: { message: "null for uri: /rest/api/2/search/jql", "status-code": 404 } };
+            if (!enhanced && flavor === "cloud")
+                return {
+                    status: 410,
+                    body: {
+                        errorMessages: [
+                            "The requested API has been removed. Please migrate to the /rest/api/2/search/jql API.",
+                        ],
+                        errors: {},
+                    },
+                };
             const jql = query.jql ?? "";
             const unknown = fake.unknownFields.find((name) => jql.includes(name));
-            if (unknown !== undefined) return badRequest({}, [`Field '${unknown}' does not exist or you do not have permission to view it.`]);
-            const matching = /summary ~/.test(jql) ? fake.duplicates.flatMap((key) => fake.issues.get(key) ?? []) : [...fake.issues.values()];
+            if (unknown !== undefined)
+                return badRequest({}, [`Field '${unknown}' does not exist or you do not have permission to view it.`]);
+            const matching = /summary ~/.test(jql)
+                ? fake.duplicates.flatMap((key) => fake.issues.get(key) ?? [])
+                : [...fake.issues.values()];
             const size = Number(query.maxResults ?? 50);
             const start = Number(enhanced ? (query.nextPageToken ?? 0) : (query.startAt ?? 0));
             const page = matching.slice(start, start + size).map((issue) => issueJson(issue, query));
@@ -382,19 +492,27 @@ export async function startFakeJira(flavor: Flavor = "cloud"): Promise<FakeJira>
 
         if (method === "POST" && path === "/issue") {
             const fields = (body?.fields ?? {}) as Record<string, any>;
-            if (fields.summary === undefined) return badRequest({ summary: "You must specify a summary of the issue." });
+            if (fields.summary === undefined)
+                return badRequest({ summary: "You must specify a summary of the issue." });
             const key = `PROJ-${nextIssue++}`;
             fake.issues.set(key, {
                 key,
                 fields: {
                     ...fields,
                     status: { name: "Open" },
-                    issuetype: { name: fields.issuetype?.name ?? TYPES.find((type) => type.id === fields.issuetype?.id)?.name },
+                    issuetype: {
+                        name: fields.issuetype?.name ?? TYPES.find((type) => type.id === fields.issuetype?.id)?.name,
+                    },
                     created: "2026-10-30T10:00:00.000+0000",
                 },
-                comments: [], transitions: [{ id: "21", name: "Start Progress", to: "In Progress" }], histories: [],
+                comments: [],
+                transitions: [{ id: "21", name: "Start Progress", to: "In Progress" }],
+                histories: [],
             });
-            return { status: 201, body: { id: `1${key.replace(/\D/g, "")}`, key, self: `${fake.origin}/rest/api/2/issue/${key}` } };
+            return {
+                status: 201,
+                body: { id: `1${key.replace(/\D/g, "")}`, key, self: `${fake.origin}/rest/api/2/issue/${key}` },
+            };
         }
 
         if ((match = /^\/issue\/([A-Z]+-\d+)(?:\/(comment|transitions)(?:\/(\d+))?)?$/.exec(path)) !== null) {
@@ -406,7 +524,11 @@ export async function startFakeJira(flavor: Flavor = "cloud"): Promise<FakeJira>
                 if (method === "PUT") {
                     const fields = (body?.fields ?? {}) as Record<string, any>;
                     const known = new Set([...fake.fields.map((field) => field.id), "status"]);
-                    for (const id of Object.keys(fields)) if (!known.has(id)) return badRequest({ [id]: `Field '${id}' cannot be set. It is not on the appropriate screen, or unknown.` });
+                    for (const id of Object.keys(fields))
+                        if (!known.has(id))
+                            return badRequest({
+                                [id]: `Field '${id}' cannot be set. It is not on the appropriate screen, or unknown.`,
+                            });
                     for (const [id, value] of Object.entries(fields)) {
                         if (id === "assignee" && value !== null) {
                             const user = findUser(value);
@@ -424,16 +546,31 @@ export async function startFakeJira(flavor: Flavor = "cloud"): Promise<FakeJira>
                     const start = Number(query.startAt ?? 0);
                     const size = Number(query.maxResults ?? 50);
                     const page = issue.comments.slice(start, start + size);
-                    return { status: 200, body: { startAt: start, maxResults: size, total: issue.comments.length, comments: page.map(commentJson) } };
+                    return {
+                        status: 200,
+                        body: {
+                            startAt: start,
+                            maxResults: size,
+                            total: issue.comments.length,
+                            comments: page.map(commentJson),
+                        },
+                    };
                 }
                 if (id === undefined && method === "POST") {
                     const now = "2026-10-30T10:00:00.000+0000";
-                    const created: FakeComment = { id: String(nextComment++), author: fake.me, body: String(body?.body ?? ""), created: now, updated: now };
+                    const created: FakeComment = {
+                        id: String(nextComment++),
+                        author: fake.me,
+                        body: String(body?.body ?? ""),
+                        created: now,
+                        updated: now,
+                    };
                     issue.comments.push(created);
                     return { status: 201, body: commentJson(created) };
                 }
                 const existing = issue.comments.find((comment) => comment.id === id);
-                if (id !== undefined && existing === undefined) return notFound(`Can't find a comment with the id ${id}`);
+                if (id !== undefined && existing === undefined)
+                    return notFound(`Can't find a comment with the id ${id}`);
                 if (existing !== undefined && method === "GET") return { status: 200, body: commentJson(existing) };
                 if (existing !== undefined && method === "PUT") {
                     existing.body = String(body?.body ?? "");
@@ -447,15 +584,29 @@ export async function startFakeJira(flavor: Flavor = "cloud"): Promise<FakeJira>
             }
             if (part === "transitions") {
                 if (method === "GET") {
-                    return { status: 200, body: { expand: "transitions", transitions: issue.transitions.map((t) => ({ id: t.id, name: t.name, to: { id: t.to, name: t.to }, hasScreen: false })) } };
+                    return {
+                        status: 200,
+                        body: {
+                            expand: "transitions",
+                            transitions: issue.transitions.map((t) => ({
+                                id: t.id,
+                                name: t.name,
+                                to: { id: t.to, name: t.to },
+                                hasScreen: false,
+                            })),
+                        },
+                    };
                 }
                 if (method === "POST") {
                     const chosen = issue.transitions.find((t) => t.id === body?.transition?.id);
-                    if (chosen === undefined) return badRequest({}, [`Transition id '${body?.transition?.id}' is not valid for this issue.`]);
+                    if (chosen === undefined)
+                        return badRequest({}, [`Transition id '${body?.transition?.id}' is not valid for this issue.`]);
                     const from = (issue.fields.status as { name: string }).name;
                     issue.fields.status = { name: chosen.to };
                     issue.histories.push({
-                        id: String(40000 + issue.histories.length), author: userJson(fake.me), created: "2026-10-30T10:00:00.000+0000",
+                        id: String(40000 + issue.histories.length),
+                        author: userJson(fake.me),
+                        created: "2026-10-30T10:00:00.000+0000",
                         items: [{ field: "status", fromString: from, toString: chosen.to }],
                     });
                     return { status: 204 };
@@ -469,7 +620,8 @@ export async function startFakeJira(flavor: Flavor = "cloud"): Promise<FakeJira>
         void (async () => {
             const url = new URL(incoming.url ?? "/", "http://127.0.0.1");
             const headers: Record<string, string> = {};
-            for (const [name, value] of Object.entries(incoming.headers)) headers[name] = Array.isArray(value) ? value.join(", ") : (value ?? "");
+            for (const [name, value] of Object.entries(incoming.headers))
+                headers[name] = Array.isArray(value) ? value.join(", ") : (value ?? "");
             const text = await readBody(incoming);
             const request: Recorded = {
                 method: incoming.method ?? "GET",
@@ -490,9 +642,17 @@ export async function startFakeJira(flavor: Flavor = "cloud"): Promise<FakeJira>
             }
             const timer = setTimeout(() => {
                 if (rule.drop === true) incoming.socket.destroy();
-                else if (rule.html !== undefined) outgoing.writeHead(rule.status ?? 200, { "content-type": "text/html" }).end(rule.html);
-                else if (rule.redirect !== undefined) outgoing.writeHead(rule.status ?? 302, { location: rule.redirect }).end();
-                else send(outgoing, rule.status === undefined ? (reply ?? { status: 200, body: {} }) : { status: rule.status, body: { errorMessages: ["Service Unavailable"] } });
+                else if (rule.html !== undefined)
+                    outgoing.writeHead(rule.status ?? 200, { "content-type": "text/html" }).end(rule.html);
+                else if (rule.redirect !== undefined)
+                    outgoing.writeHead(rule.status ?? 302, { location: rule.redirect }).end();
+                else
+                    send(
+                        outgoing,
+                        rule.status === undefined
+                            ? (reply ?? { status: 200, body: {} })
+                            : { status: rule.status, body: { errorMessages: ["Service Unavailable"] } },
+                    );
             }, rule.afterMs ?? 5_000);
             timer.unref();
             incoming.socket.on("close", () => clearTimeout(timer));

@@ -10,7 +10,12 @@ export const PREVIEW_TIMEOUT_MS = 15_000;
 const MAX_ARGS_CHARS = 200;
 
 /** `git · push · external · write`: the line every question starts with. */
-export function describeCall(call: { tool: string; action?: string; environment: EnvironmentName; effect: Effect }): string {
+export function describeCall(call: {
+    tool: string;
+    action?: string;
+    environment: EnvironmentName;
+    effect: Effect;
+}): string {
     return [call.tool, ...(call.action === undefined ? [] : [call.action]), call.environment, call.effect].join(" · ");
 }
 
@@ -39,9 +44,12 @@ export function defaultSummary(
 function isPreview(value: unknown): value is Preview {
     if (typeof value !== "object" || value === null) return false;
     const preview = value as Record<string, unknown>;
-    return typeof preview.summary === "string" && preview.summary !== ""
-        && (preview.body === undefined || typeof preview.body === "string")
-        && (preview.html === undefined || typeof preview.html === "string");
+    return (
+        typeof preview.summary === "string" &&
+        preview.summary !== "" &&
+        (preview.body === undefined || typeof preview.body === "string") &&
+        (preview.html === undefined || typeof preview.html === "string")
+    );
 }
 
 /** The tool's preview found the input invalid. Asking the user about a call that cannot run would waste their time,
@@ -71,7 +79,11 @@ export async function buildPreview(
     const tooSlow = new Promise<never>((_, reject) => {
         timer = setTimeout(() => {
             controller.abort();
-            reject(new Error(`it took longer than ${timeoutMs >= 1000 ? `${Math.round(timeoutMs / 1000)} s` : `${timeoutMs} ms`}`));
+            reject(
+                new Error(
+                    `it took longer than ${timeoutMs >= 1000 ? `${Math.round(timeoutMs / 1000)} s` : `${timeoutMs} ms`}`,
+                ),
+            );
         }, timeoutMs);
     });
     try {

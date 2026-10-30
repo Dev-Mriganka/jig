@@ -117,17 +117,25 @@ export function screenField(screen: Screen, name: string): ScreenField | undefin
 const labelOf = (allowed: Obj): string => str(allowed.value) || str(allowed.name) || str(allowed.id);
 
 function listAllowed(field: ScreenField): string {
-    return shortList(field.allowed.map(labelOf).filter((label) => label !== ""), ", ", 80);
+    return shortList(
+        field.allowed.map(labelOf).filter((label) => label !== ""),
+        ", ",
+        80,
+    );
 }
 
 /** What a field takes, for an error that asks for a missing one. */
 export function expectation(field: ScreenField): string {
     if (field.allowed.length > 0) return `one of ${listAllowed(field)}`;
     switch (field.type === "array" ? field.items : field.type) {
-        case "date": return "a date as YYYY-MM-DD";
-        case "number": return "a number";
-        case "user": return "a user id from assignable";
-        default: return "text";
+        case "date":
+            return "a date as YYYY-MM-DD";
+        case "number":
+            return "a number";
+        case "user":
+            return "a user id from assignable";
+        default:
+            return "text";
     }
 }
 

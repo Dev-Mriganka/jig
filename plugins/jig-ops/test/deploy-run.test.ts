@@ -15,15 +15,20 @@ beforeEach(() => {
 });
 afterEach(() => h.close());
 
-const run = (version: string, where: Record<string, unknown> = ORDERS, options = {}) => h.deploy.call({ action: "run", ...where, version }, options);
-const rollback = (where: Record<string, unknown> = ORDERS, options = {}) => h.deploy.call({ action: "rollback", ...where }, options);
+const run = (version: string, where: Record<string, unknown> = ORDERS, options = {}) =>
+    h.deploy.call({ action: "run", ...where, version }, options);
+const rollback = (where: Record<string, unknown> = ORDERS, options = {}) =>
+    h.deploy.call({ action: "rollback", ...where }, options);
 const started = (file: string) => h.jig.started.filter((one) => one.file === file);
 
 describe("run with helm", () => {
     test("starts helm upgrade --install once, with the release and chart of the catalog, the context and namespace of its cluster, and the version", async () => {
         h.cluster.answer(orders("1.4.2"));
         const result = await run("1.4.3");
-        assert.deepEqual(h.cluster.helmCalls().map((call) => call.argv), [upgradeArgs("1.4.3")]);
+        assert.deepEqual(
+            h.cluster.helmCalls().map((call) => call.argv),
+            [upgradeArgs("1.4.3")],
+        );
         assert.deepEqual(result.cls, { action: "run", environment: "staging", effect: "write" });
         assert.deepEqual(h.jig.facts.get(result.id), [{ method: "helm", outcome: "started" }]);
     });
@@ -61,34 +66,69 @@ describe("run with helm", () => {
             if (saved === undefined) delete process.env.KUBECONFIG;
             else process.env.KUBECONFIG = saved;
         }
-        assert.deepEqual(started("helm").map((one) => one.options.env), [{ KUBECONFIG: "/tmp/some/kubeconfig" }]);
-        assert.deepEqual(h.cluster.helmCalls().map((call) => call.kubeconfig), ["/tmp/some/kubeconfig"]);
+        assert.deepEqual(
+            started("helm").map((one) => one.options.env),
+            [{ KUBECONFIG: "/tmp/some/kubeconfig" }],
+        );
+        assert.deepEqual(
+            h.cluster.helmCalls().map((call) => call.kubeconfig),
+            ["/tmp/some/kubeconfig"],
+        );
     });
 
     test("adds the values file and the --set pairs of the catalog, and puts the version after them so that nothing can win over it", async () => {
-        h.configure(withDeploy("orders-api", "staging", {
-            valuesFile: "deploy/values-staging.yaml",
-            set: { replicaCount: 2, "ingress.host": "orders.staging.example.com", debug: true },
-        }));
+        h.configure(
+            withDeploy("orders-api", "staging", {
+                valuesFile: "deploy/values-staging.yaml",
+                set: { replicaCount: 2, "ingress.host": "orders.staging.example.com", debug: true },
+            }),
+        );
         h.cluster.answer(orders("1.4.2"));
         ok(await run("1.4.3"));
-        assert.deepEqual(h.cluster.helmCalls().map((call) => call.argv), [
+        assert.deepEqual(
+            h.cluster.helmCalls().map((call) => call.argv),
             [
-                "upgrade", "--install", "orders-api", "deploy/chart",
-                "--kube-context", "test-cluster", "--namespace", "orders-staging",
-                "--values", "deploy/values-staging.yaml",
-                "--set", "replicaCount=2", "--set", "ingress.host=orders.staging.example.com", "--set", "debug=true",
-                "--set", "image.tag=1.4.3",
-                "--wait=false",
+                [
+                    "upgrade",
+                    "--install",
+                    "orders-api",
+                    "deploy/chart",
+                    "--kube-context",
+                    "test-cluster",
+                    "--namespace",
+                    "orders-staging",
+                    "--values",
+                    "deploy/values-staging.yaml",
+                    "--set",
+                    "replicaCount=2",
+                    "--set",
+                    "ingress.host=orders.staging.example.com",
+                    "--set",
+                    "debug=true",
+                    "--set",
+                    "image.tag=1.4.3",
+                    "--wait=false",
+                ],
             ],
-        ]);
+        );
     });
 
     test("never takes the release, the chart, the context, the namespace or a value from the call", async () => {
         h.cluster.answer(orders("1.4.2"));
-        for (const extra of [{ release: "other" }, { chart: "evil/chart" }, { context: "prod-cluster" }, { namespace: "kube-system" }, { set: "x=y" }, { valuesFile: "/etc/passwd" }]) {
+        for (const extra of [
+            { release: "other" },
+            { chart: "evil/chart" },
+            { context: "prod-cluster" },
+            { namespace: "kube-system" },
+            { set: "x=y" },
+            { valuesFile: "/etc/passwd" },
+        ]) {
             const result = await h.deploy.call({ action: "run", ...ORDERS, version: "1.4.3", ...extra });
-            assert.match(result.blocked ?? "", /^Blocked by jig-core: deploy cannot run with this input: deploy run does not use /, JSON.stringify(extra));
+            assert.match(
+                result.blocked ?? "",
+                /^Blocked by jig-core: deploy cannot run with this input: deploy run does not use /,
+                JSON.stringify(extra),
+            );
         }
         assert.deepEqual(h.cluster.helmCalls(), []);
         assert.deepEqual(h.jig.started, []);
@@ -107,7 +147,10 @@ describe("run with kubectl set image", () => {
             ].join("\n"),
         );
         const sets = h.cluster.calls().filter((call) => call.argv[3] === "set");
-        assert.deepEqual(sets.map((call) => call.argv), [setImageArgs("registry.example.test/shop/billing:2.1.0")]);
+        assert.deepEqual(
+            sets.map((call) => call.argv),
+            [setImageArgs("registry.example.test/shop/billing:2.1.0")],
+        );
         assert.deepEqual(result.cls, { action: "run", environment: "staging", effect: "write" });
         assert.deepEqual(h.cluster.helmCalls(), []);
     });
@@ -128,46 +171,97 @@ describe("run with kubectl set image", () => {
             ["registry.example.test:5000/shop/billing:latest", "registry.example.test:5000/shop/billing:2.1.0"],
             ["billing", "billing:2.1.0"],
         ] as const) {
-            const spec = workload("billing", { service: "billing", kind: "Deployment" }) as { spec: { template: { spec: { containers: Array<{ name: string; image: string }> } } } };
+            const spec = workload("billing", { service: "billing", kind: "Deployment" }) as {
+                spec: { template: { spec: { containers: Array<{ name: string; image: string }> } } };
+            };
             (spec.spec.template.spec.containers[0] as { image: string }).image = image;
             h.cluster.answer(billing("2.0.0", { workload: { stdout: spec as never } }));
             ok(await run("2.1.0", BILLING));
-            const set = h.cluster.calls().filter((call) => call.argv[3] === "set").at(-1);
+            const set = h.cluster
+                .calls()
+                .filter((call) => call.argv[3] === "set")
+                .at(-1);
             assert.equal(set?.argv[6], `billing=${expected}`, image);
         }
     });
 
     test("a container the workload lacks says which setting to fix, and nothing is changed", async () => {
-        h.configure(withEnvironment("billing", "staging", { deploy: { method: "kubectl-image", workload: "deployment/billing", container: "api" } }));
+        h.configure(
+            withEnvironment("billing", "staging", {
+                deploy: { method: "kubectl-image", workload: "deployment/billing", container: "api" },
+            }),
+        );
         h.cluster.answer(billing("2.0.0"));
         const result = await run("2.1.0", BILLING);
-        assert.equal(result.error?.message, 'deployment/billing has no container api (it has billing, mesh-proxy): fix "container" in the ops catalog of jig.json (deploy)');
-        assert.deepEqual(h.cluster.calls().filter((call) => call.argv[3] === "set"), []);
+        assert.equal(
+            result.error?.message,
+            'deployment/billing has no container api (it has billing, mesh-proxy): fix "container" in the ops catalog of jig.json (deploy)',
+        );
+        assert.deepEqual(
+            h.cluster.calls().filter((call) => call.argv[3] === "set"),
+            [],
+        );
     });
 
     test("an image that could be read as a flag is not one a tag is put on", async () => {
-        const spec = workload("billing", { service: "billing", kind: "Deployment" }) as { spec: { template: { spec: { containers: Array<{ name: string; image: string }> } } } };
+        const spec = workload("billing", { service: "billing", kind: "Deployment" }) as {
+            spec: { template: { spec: { containers: Array<{ name: string; image: string }> } } };
+        };
         (spec.spec.template.spec.containers[0] as { image: string }).image = "--force/billing:2.0.0";
         h.cluster.answer(billing("2.0.0", { workload: { stdout: spec as never } }));
-        assert.equal((await run("2.1.0", BILLING)).error?.message, "The image of billing in deployment/billing is not one a deploy can put a tag on");
-        assert.deepEqual(h.cluster.calls().filter((call) => call.argv[3] === "set"), []);
+        assert.equal(
+            (await run("2.1.0", BILLING)).error?.message,
+            "The image of billing in deployment/billing is not one a deploy can put a tag on",
+        );
+        assert.deepEqual(
+            h.cluster.calls().filter((call) => call.argv[3] === "set"),
+            [],
+        );
     });
 
     test("a stateful set is deployed the same way", async () => {
-        h.configure(withEnvironment("billing", "staging", { deploy: { method: "kubectl-image", workload: "statefulset/ledger", container: "ledger" } }));
-        h.cluster.answer(billing("2.0.0", { workload: { stdout: workload("ledger", { service: "ledger", kind: "StatefulSet" }) } }));
+        h.configure(
+            withEnvironment("billing", "staging", {
+                deploy: { method: "kubectl-image", workload: "statefulset/ledger", container: "ledger" },
+            }),
+        );
+        h.cluster.answer(
+            billing("2.0.0", { workload: { stdout: workload("ledger", { service: "ledger", kind: "StatefulSet" }) } }),
+        );
         ok(await run("1.5.0", BILLING));
         const set = h.cluster.calls().find((call) => call.argv[3] === "set");
-        assert.deepEqual(set?.argv.slice(3), ["set", "image", "statefulset/ledger", "ledger=registry.example.test/shop/ledger:1.5.0"]);
+        assert.deepEqual(set?.argv.slice(3), [
+            "set",
+            "image",
+            "statefulset/ledger",
+            "ledger=registry.example.test/shop/ledger:1.5.0",
+        ]);
     });
 });
 
 describe("what is refused", () => {
     test("a version that could be read as a flag, a second argument or another image is blocked before anything is read", async () => {
         h.cluster.answer(orders("1.4.2"));
-        for (const version of ["-f", "--set=image.tag=x", "1.4.3 --force", "1.4.3;rm", "$(id)", "x/y", "x:y", "x@sha256:abc", "..", ".x", "a".repeat(129), ""]) {
+        for (const version of [
+            "-f",
+            "--set=image.tag=x",
+            "1.4.3 --force",
+            "1.4.3;rm",
+            "$(id)",
+            "x/y",
+            "x:y",
+            "x@sha256:abc",
+            "..",
+            ".x",
+            "a".repeat(129),
+            "",
+        ]) {
             const result = await run(version);
-            assert.match(result.blocked ?? "", /^Blocked by jig-core: deploy cannot run with this input: deploy run(: version must be an image tag| needs version)/, JSON.stringify(version));
+            assert.match(
+                result.blocked ?? "",
+                /^Blocked by jig-core: deploy cannot run with this input: deploy run(: version must be an image tag| needs version)/,
+                JSON.stringify(version),
+            );
         }
         assert.deepEqual(h.jig.started, []);
         assert.deepEqual(h.cluster.helmCalls(), []);
@@ -176,7 +270,10 @@ describe("what is refused", () => {
     test("production is blocked in classify, and nothing is read or started", async () => {
         h.cluster.answer(orders("1.4.2"));
         const result = await run("1.4.3", { service: "orders-api", environment: "production" });
-        assert.equal(result.blocked, "Blocked by jig-core: deploy cannot run with this input: deploy run is refused: orders-api in production is production: the agent never changes production");
+        assert.equal(
+            result.blocked,
+            "Blocked by jig-core: deploy cannot run with this input: deploy run is refused: orders-api in production is production: the agent never changes production",
+        );
         assert.equal(result.cls, undefined);
         assert.deepEqual(h.jig.started, []);
     });
@@ -185,14 +282,20 @@ describe("what is refused", () => {
         h.configure(withEnvironment("orders-api", "staging", { deploy: undefined }));
         h.cluster.answer(orders("1.4.2"));
         const result = await run("1.4.3");
-        assert.equal(result.blocked, "Blocked by jig-core: deploy cannot run with this input: deploy run is refused: the catalog gives orders-api in staging no deploy method: the agent deploys only where the catalog names one");
+        assert.equal(
+            result.blocked,
+            "Blocked by jig-core: deploy cannot run with this input: deploy run is refused: the catalog gives orders-api in staging no deploy method: the agent deploys only where the catalog names one",
+        );
         assert.deepEqual(h.jig.started, []);
     });
 
     test("an environment jig-core counts as production is blocked, whatever it is called", async () => {
         h.jig.setKinds({ staging: "production" });
         const result = await run("1.4.3");
-        assert.match(result.blocked ?? "", /^Blocked by jig-core: deploy cannot run with this input: deploy run is refused: orders-api in staging is production: the agent never changes production\. jig-core counts a name it does not know as production: if staging is a test environment, define it under "environments" in jig\.json with kind test$/);
+        assert.match(
+            result.blocked ?? "",
+            /^Blocked by jig-core: deploy cannot run with this input: deploy run is refused: orders-api in staging is production: the agent never changes production\. jig-core counts a name it does not know as production: if staging is a test environment, define it under "environments" in jig\.json with kind test$/,
+        );
         assert.deepEqual(h.jig.started, []);
     });
 
@@ -206,42 +309,98 @@ describe("what is refused", () => {
     test("run without jig-core's check is refused the same way, and starts nothing", async () => {
         h.cluster.answer(orders("1.4.2"));
         await assert.rejects(
-            h.deploy.tool.execute("direct", { action: "run", service: "orders-api", environment: "production", version: "1.4.3" } as never, undefined, undefined, {} as never),
-            (error: unknown) => error instanceof TypeError && /^deploy run is refused: orders-api in production is production/.test(error.message),
+            h.deploy.tool.execute(
+                "direct",
+                { action: "run", service: "orders-api", environment: "production", version: "1.4.3" } as never,
+                undefined,
+                undefined,
+                {} as never,
+            ),
+            (error: unknown) =>
+                error instanceof TypeError &&
+                /^deploy run is refused: orders-api in production is production/.test(error.message),
         );
         await assert.rejects(
-            h.deploy.tool.execute("direct", { action: "rollback", service: "orders-api", environment: "production" } as never, undefined, undefined, {} as never),
-            (error: unknown) => error instanceof TypeError && /^deploy rollback is refused: orders-api in production is production/.test(error.message),
+            h.deploy.tool.execute(
+                "direct",
+                { action: "rollback", service: "orders-api", environment: "production" } as never,
+                undefined,
+                undefined,
+                {} as never,
+            ),
+            (error: unknown) =>
+                error instanceof TypeError &&
+                /^deploy rollback is refused: orders-api in production is production/.test(error.message),
         );
         assert.deepEqual(h.jig.started, []);
     });
 
     test("an unknown service or environment is blocked with the names there are", async () => {
         const result = await run("1.4.3", { service: "nope", environment: "staging" });
-        assert.equal(result.blocked, 'Blocked by jig-core: deploy cannot run with this input: deploy: no service named "nope". Known services: orders-api (staging, production), billing (staging)');
+        assert.equal(
+            result.blocked,
+            'Blocked by jig-core: deploy cannot run with this input: deploy: no service named "nope". Known services: orders-api (staging, production), billing (staging)',
+        );
     });
 });
 
 describe("when a command fails", () => {
     test("helm exiting with an error is the model's to read, once: the first line of helm's complaint, and no second try", async () => {
-        h.cluster.answer(orders("1.4.2", { helmUpgrade: { code: 1, stderr: "Error: UPGRADE FAILED: an error occurred while finding last successful release manifest\nsecond line" } }));
+        h.cluster.answer(
+            orders("1.4.2", {
+                helmUpgrade: {
+                    code: 1,
+                    stderr: "Error: UPGRADE FAILED: an error occurred while finding last successful release manifest\nsecond line",
+                },
+            }),
+        );
         const result = await run("1.4.3");
-        assert.equal(result.error?.message, "helm upgrade failed (exit 1): Error: UPGRADE FAILED: an error occurred while finding last successful release manifest; second line");
+        assert.equal(
+            result.error?.message,
+            "helm upgrade failed (exit 1): Error: UPGRADE FAILED: an error occurred while finding last successful release manifest; second line",
+        );
         assert.equal(h.cluster.helmCalls().length, 1);
         assert.deepEqual(h.jig.facts.get(result.id), [{ method: "helm", outcome: "failed" }]);
     });
 
     test("a locked release is told as the user's to look at", async () => {
-        h.cluster.answer(orders("1.4.2", { helmUpgrade: { code: 1, stderr: "Error: UPGRADE FAILED: another operation (install/upgrade/rollback) is in progress" } }));
-        assert.match((await run("1.4.3")).error?.message ?? "", /^helm says another operation on the release of orders-api in staging is in progress/);
+        h.cluster.answer(
+            orders("1.4.2", {
+                helmUpgrade: {
+                    code: 1,
+                    stderr: "Error: UPGRADE FAILED: another operation (install/upgrade/rollback) is in progress",
+                },
+            }),
+        );
+        assert.match(
+            (await run("1.4.3")).error?.message ?? "",
+            /^helm says another operation on the release of orders-api in staging is in progress/,
+        );
         assert.equal(h.cluster.helmCalls().length, 1);
     });
 
     test("a sign-in that expired is the user's to fix, and a user who may not change the cluster is told so", async () => {
-        h.cluster.answer(orders("1.4.2", { helmUpgrade: { code: 1, stderr: "Error: Kubernetes cluster unreachable: getting credentials: exec: Token has expired" } }));
+        h.cluster.answer(
+            orders("1.4.2", {
+                helmUpgrade: {
+                    code: 1,
+                    stderr: "Error: Kubernetes cluster unreachable: getting credentials: exec: Token has expired",
+                },
+            }),
+        );
         assert.match((await run("1.4.3")).error?.message ?? "", /^kubectl is not signed in to context test-cluster/);
-        h.cluster.answer(billing("2.0.0", { setImage: { code: 1, stderr: 'Error from server (Forbidden): deployments.apps "billing" is forbidden: User "u" cannot patch resource "deployments"' } }));
-        assert.match((await run("2.1.0", BILLING)).error?.message ?? "", /^The kubeconfig user is not allowed to change billing in staging/);
+        h.cluster.answer(
+            billing("2.0.0", {
+                setImage: {
+                    code: 1,
+                    stderr: 'Error from server (Forbidden): deployments.apps "billing" is forbidden: User "u" cannot patch resource "deployments"',
+                },
+            }),
+        );
+        assert.match(
+            (await run("2.1.0", BILLING)).error?.message ?? "",
+            /^The kubeconfig user is not allowed to change billing in staging/,
+        );
         assert.equal(h.cluster.calls().filter((call) => call.argv[3] === "set").length, 1);
     });
 
@@ -251,11 +410,17 @@ describe("when a command fails", () => {
         const result = await run("1.4.3");
         assert.equal(result.error?.message, "helm is not installed or not on PATH");
         h.jig.script = undefined;
-        assert.match(ok(await h.deploy.call({ action: "status", ...ORDERS })), /^No deploy or rollback was run from here/);
+        assert.match(
+            ok(await h.deploy.call({ action: "status", ...ORDERS })),
+            /^No deploy or rollback was run from here/,
+        );
     });
 
     test("a cluster that cannot be read stops the deploy before anything is changed", async () => {
-        h.cluster.answer({ pods: { code: 1, stderr: "Unable to connect to the server: dial tcp: i/o timeout" }, helmUpgrade: { stdout: UPGRADED } });
+        h.cluster.answer({
+            pods: { code: 1, stderr: "Unable to connect to the server: dial tcp: i/o timeout" },
+            helmUpgrade: { stdout: UPGRADED },
+        });
         const result = await run("1.4.3");
         assert.match(result.error?.message ?? "", /^Cannot reach the cluster of context test-cluster/);
         assert.deepEqual(h.cluster.helmCalls(), []);
@@ -283,16 +448,43 @@ describe("rollback with helm", () => {
     test("finds the revision before the current one and what it ran, and starts helm rollback for the release", async () => {
         h.cluster.answer(helmWorld());
         const result = await rollback();
-        const history_ = ["history", "orders-api", "--kube-context", "test-cluster", "--namespace", "orders-staging", "--max", "2", "-o", "json"];
-        const values_ = ["get", "values", "orders-api", "--revision", "4", "--all", "-o", "json", "--kube-context", "test-cluster", "--namespace", "orders-staging"];
+        const history_ = [
+            "history",
+            "orders-api",
+            "--kube-context",
+            "test-cluster",
+            "--namespace",
+            "orders-staging",
+            "--max",
+            "2",
+            "-o",
+            "json",
+        ];
+        const values_ = [
+            "get",
+            "values",
+            "orders-api",
+            "--revision",
+            "4",
+            "--all",
+            "-o",
+            "json",
+            "--kube-context",
+            "test-cluster",
+            "--namespace",
+            "orders-staging",
+        ];
         // The preview reads the history and the values, and the run reads them again before it rolls back.
-        assert.deepEqual(h.cluster.helmCalls().map((call) => call.argv), [
-            history_,
-            values_,
-            history_,
-            values_,
-            ["rollback", "orders-api", "--kube-context", "test-cluster", "--namespace", "orders-staging"],
-        ]);
+        assert.deepEqual(
+            h.cluster.helmCalls().map((call) => call.argv),
+            [
+                history_,
+                values_,
+                history_,
+                values_,
+                ["rollback", "orders-api", "--kube-context", "test-cluster", "--namespace", "orders-staging"],
+            ],
+        );
         assert.deepEqual(result.cls, { action: "rollback", environment: "staging", effect: "write" });
         assert.equal(
             ok(result),
@@ -306,7 +498,10 @@ describe("rollback with helm", () => {
     test("says so when the revision's version cannot be read, and still goes back", async () => {
         h.cluster.answer(helmWorld({ helmGetValues: values() }));
         const result = await rollback();
-        assert.match(ok(result), /^Started the rollback of orders-api in staging with helm to revision 4 \(its version could not be read\) \(it was running 1\.4\.3\)\. Nothing waits for the rollout: runtime rollout shows how it goes\./);
+        assert.match(
+            ok(result),
+            /^Started the rollback of orders-api in staging with helm to revision 4 \(its version could not be read\) \(it was running 1\.4\.3\)\. Nothing waits for the rollout: runtime rollout shows how it goes\./,
+        );
     });
 
     test("reads a numeric image tag as the text it is", async () => {
@@ -317,7 +512,10 @@ describe("rollback with helm", () => {
     test("a release with one revision has nothing to go back to", async () => {
         h.cluster.answer(helmWorld({ helmHistory: history({ revision: 1, status: "deployed" }) }));
         const result = await rollback();
-        assert.equal(result.error?.message, "The Helm release orders-api has one revision, so there is nothing to go back to");
+        assert.equal(
+            result.error?.message,
+            "The Helm release orders-api has one revision, so there is nothing to go back to",
+        );
         assert.equal(h.cluster.helmCalls().filter((call) => call.argv[0] === "rollback").length, 0);
     });
 
@@ -327,7 +525,14 @@ describe("rollback with helm", () => {
     });
 
     test("helm failing to roll back is told, and not tried again", async () => {
-        h.cluster.answer(helmWorld({ helmRollback: { code: 1, stderr: "Error: rollback failed: another operation (install/upgrade/rollback) is in progress" } }));
+        h.cluster.answer(
+            helmWorld({
+                helmRollback: {
+                    code: 1,
+                    stderr: "Error: rollback failed: another operation (install/upgrade/rollback) is in progress",
+                },
+            }),
+        );
         const result = await rollback();
         assert.match(result.error?.message ?? "", /^helm says another operation on the release/);
         assert.equal(h.cluster.helmCalls().filter((call) => call.argv[0] === "rollback").length, 1);
@@ -351,7 +556,19 @@ describe("rollback with kubectl rollout undo", () => {
         h.cluster.answer(deployments());
         const result = await rollback(BILLING);
         const undos = h.cluster.calls().filter((call) => call.argv[3] === "rollout");
-        assert.deepEqual(undos.map((call) => call.argv), [["--request-timeout=50s", "--context=test-cluster", "--namespace=billing-staging", "rollout", "undo", "deployment/billing"]]);
+        assert.deepEqual(
+            undos.map((call) => call.argv),
+            [
+                [
+                    "--request-timeout=50s",
+                    "--context=test-cluster",
+                    "--namespace=billing-staging",
+                    "rollout",
+                    "undo",
+                    "deployment/billing",
+                ],
+            ],
+        );
         assert.equal(
             ok(result),
             [
@@ -362,13 +579,29 @@ describe("rollback with kubectl rollout undo", () => {
     });
 
     test("reads the replica sets of this deployment and no other", async () => {
-        h.cluster.answer(deployments({ replicasets: list(replicaSet("other-d4", { service: "billing", owner: "other", revision: 9, tag: "9.9.9" })) }));
-        assert.equal((await rollback(BILLING)).error?.message, "deployment/billing has no earlier revision to go back to (or it does not exist)");
-        assert.deepEqual(h.cluster.calls().filter((call) => call.argv[3] === "rollout"), []);
+        h.cluster.answer(
+            deployments({
+                replicasets: list(
+                    replicaSet("other-d4", { service: "billing", owner: "other", revision: 9, tag: "9.9.9" }),
+                ),
+            }),
+        );
+        assert.equal(
+            (await rollback(BILLING)).error?.message,
+            "deployment/billing has no earlier revision to go back to (or it does not exist)",
+        );
+        assert.deepEqual(
+            h.cluster.calls().filter((call) => call.argv[3] === "rollout"),
+            [],
+        );
     });
 
     test("a stateful set goes back through its controller revisions", async () => {
-        h.configure(withEnvironment("billing", "staging", { deploy: { method: "kubectl-image", workload: "statefulset/ledger", container: "ledger" } }));
+        h.configure(
+            withEnvironment("billing", "staging", {
+                deploy: { method: "kubectl-image", workload: "statefulset/ledger", container: "ledger" },
+            }),
+        );
         h.cluster.answer(
             billing("2.1.0", {
                 controllerrevisions: list(
@@ -381,13 +614,29 @@ describe("rollback with kubectl rollout undo", () => {
         );
         const result = await rollback(BILLING);
         assert.match(ok(result), /to revision 2, which ran 1\.1\.0 \(it was running 2\.1\.0\)/);
-        assert.deepEqual(h.cluster.calls().find((call) => call.argv[3] === "rollout")?.argv.slice(3), ["rollout", "undo", "statefulset/ledger"]);
+        assert.deepEqual(
+            h.cluster
+                .calls()
+                .find((call) => call.argv[3] === "rollout")
+                ?.argv.slice(3),
+            ["rollout", "undo", "statefulset/ledger"],
+        );
     });
 
     test("kubectl failing to roll back is told, and not tried again", async () => {
-        h.cluster.answer(deployments({ rolloutUndo: { code: 1, stderr: 'error: you cannot rollback a paused deployment; resume it first with "kubectl rollout resume deployment/billing" and try again' } }));
+        h.cluster.answer(
+            deployments({
+                rolloutUndo: {
+                    code: 1,
+                    stderr: 'error: you cannot rollback a paused deployment; resume it first with "kubectl rollout resume deployment/billing" and try again',
+                },
+            }),
+        );
         const result = await rollback(BILLING);
-        assert.match(result.error?.message ?? "", /^kubectl rollout failed \(exit 1\): error: you cannot rollback a paused deployment/);
+        assert.match(
+            result.error?.message ?? "",
+            /^kubectl rollout failed \(exit 1\): error: you cannot rollback a paused deployment/,
+        );
         assert.equal(h.cluster.calls().filter((call) => call.argv[3] === "rollout").length, 1);
     });
 });
@@ -395,16 +644,29 @@ describe("rollback with kubectl rollout undo", () => {
 describe("rollback is for test environments only", () => {
     test("production is blocked, as for a deploy", async () => {
         const result = await rollback({ service: "orders-api", environment: "production" });
-        assert.equal(result.blocked, "Blocked by jig-core: deploy cannot run with this input: deploy rollback is refused: orders-api in production is production: the agent never changes production");
+        assert.equal(
+            result.blocked,
+            "Blocked by jig-core: deploy cannot run with this input: deploy rollback is refused: orders-api in production is production: the agent never changes production",
+        );
         assert.deepEqual(h.jig.started, []);
     });
 
     test("an environment that is not a test one is blocked, though a deploy there is not: this machine, and outside services", async () => {
-        h.cluster.answer(orders("1.4.3", { helmHistory: history({ revision: 4 }, { revision: 5 }), helmGetValues: values("1.4.2"), helmRollback: { stdout: "ok\n" } }));
+        h.cluster.answer(
+            orders("1.4.3", {
+                helmHistory: history({ revision: 4 }, { revision: 5 }),
+                helmGetValues: values("1.4.2"),
+                helmRollback: { stdout: "ok\n" },
+            }),
+        );
         for (const kind of ["local", "external"] as const) {
             h.jig.setKinds({ staging: kind });
             const blocked = await rollback();
-            assert.equal(blocked.blocked, `Blocked by jig-core: deploy cannot run with this input: deploy rollback is refused: a rollback works in test environments only, and staging is ${kind} for jig-core`, kind);
+            assert.equal(
+                blocked.blocked,
+                `Blocked by jig-core: deploy cannot run with this input: deploy rollback is refused: a rollback works in test environments only, and staging is ${kind} for jig-core`,
+                kind,
+            );
             const deployed = await run("1.4.3");
             assert.equal(deployed.blocked, undefined, `a deploy to a ${kind} environment is not refused by the tool`);
         }
@@ -414,16 +676,28 @@ describe("rollback is for test environments only", () => {
     test("an environment without a deploy method is blocked", async () => {
         h.configure(withEnvironment("orders-api", "staging", { deploy: undefined }));
         const result = await rollback();
-        assert.match(result.blocked ?? "", /deploy rollback is refused: the catalog gives orders-api in staging no deploy method/);
+        assert.match(
+            result.blocked ?? "",
+            /deploy rollback is refused: the catalog gives orders-api in staging no deploy method/,
+        );
         assert.deepEqual(h.jig.started, []);
     });
 });
 
 describe("what kubectl is asked", () => {
     test("a deploy and a rollback start kubectl with nothing but get, set image or rollout undo", async () => {
-        h.cluster.answer(billing("2.0.0", { replicasets: list(replicaSet("billing-a1", { service: "billing", owner: "billing", revision: 1 }), replicaSet("billing-b2", { service: "billing", owner: "billing", revision: 2 })), rolloutUndo: { stdout: "ok\n" } }));
+        h.cluster.answer(
+            billing("2.0.0", {
+                replicasets: list(
+                    replicaSet("billing-a1", { service: "billing", owner: "billing", revision: 1 }),
+                    replicaSet("billing-b2", { service: "billing", owner: "billing", revision: 2 }),
+                ),
+                rolloutUndo: { stdout: "ok\n" },
+            }),
+        );
         ok(await run("2.1.0", BILLING));
         ok(await rollback(BILLING));
-        for (const call of h.cluster.calls()) assert.ok(["get", "set", "rollout"].includes(call.argv[3] ?? ""), call.argv.join(" "));
+        for (const call of h.cluster.calls())
+            assert.ok(["get", "set", "rollout"].includes(call.argv[3] ?? ""), call.argv.join(" "));
     });
 });

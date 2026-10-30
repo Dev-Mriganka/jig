@@ -31,5 +31,5 @@ test("no tracked file holds a credential-shaped literal, fake or real", () => {
         }
         for (const [name, shape] of SHAPES) if (shape.test(text)) found.push(`${file}: ${name}`);
     }
-    assert.deepEqual(found, [], "build fake credentials at run time from parts, such as [\"PMAK\", \"1a2b\"].join(\"-\")");
+    assert.deepEqual(found, [], 'build fake credentials at run time from parts, such as ["PMAK", "1a2b"].join("-")');
 });

@@ -27,8 +27,9 @@ export function credentialsOf(headers: Readonly<Record<string, string>>): string
 /** The answer with every one of the secrets removed from its headers and its body. */
 export function scrubbed(answer: Answer, secrets: readonly string[]): Answer {
     // The longest first: a value that contains a shorter one is replaced as a whole.
-    const needles = [...new Set(secrets.filter((secret) => secret.length >= MIN_LENGTH).flatMap(formsOf))]
-        .sort((a, b) => b.length - a.length);
+    const needles = [...new Set(secrets.filter((secret) => secret.length >= MIN_LENGTH).flatMap(formsOf))].sort(
+        (a, b) => b.length - a.length,
+    );
     if (needles.length === 0) return answer;
     const clean = (text: string): string =>
         needles.reduce((out, needle) => (out.includes(needle) ? out.split(needle).join(REDACTED) : out), text);

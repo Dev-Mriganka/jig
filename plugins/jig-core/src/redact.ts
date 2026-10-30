@@ -127,7 +127,12 @@ export function mapStrings<T>(input: T, change: (text: string) => string): T {
                 const base = change(key);
                 let name = base;
                 for (let n = 2; Object.hasOwn(out, name); n++) name = `${base}#${n}`;
-                Object.defineProperty(out, name, { value: walk(item, depth + 1), enumerable: true, writable: true, configurable: true });
+                Object.defineProperty(out, name, {
+                    value: walk(item, depth + 1),
+                    enumerable: true,
+                    writable: true,
+                    configurable: true,
+                });
             }
             return out;
         } finally {

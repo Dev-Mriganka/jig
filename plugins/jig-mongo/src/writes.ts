@@ -308,10 +308,10 @@ function planBulk(call: Call, access: Access): WriteRun {
                         );
                     }
                     const found =
-                    checks.length === 0
-                        ? "the operations were inserts only; read the documents to see them"
-                        : checks.join("; ");
-                return `Read once per operation to check: ${found}.`;
+                        checks.length === 0
+                            ? "the operations were inserts only; read the documents to see them"
+                            : checks.join("; ");
+                    return `Read once per operation to check: ${found}.`;
                 },
             };
         },

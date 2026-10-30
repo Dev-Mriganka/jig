@@ -1,629 +1,576 @@
 {
-  "openapi": "3.1.0",
-  "info": {
-    "title": "Acme Orders",
-    "version": "1.0.0",
-    "description": "The example orders API."
-  },
-  "servers": [
-    {
-      "url": "https://api.acme.example.test/v1",
-      "description": "Production"
+    "openapi": "3.1.0",
+    "info": {
+        "title": "Acme Orders",
+        "version": "1.0.0",
+        "description": "The example orders API."
     },
-    {
-      "url": "https://api.staging.acme.example.test/v1",
-      "description": "Staging"
-    }
-  ],
-  "security": [
-    {
-      "bearerAuth": []
-    }
-  ],
-  "tags": [
-    {
-      "name": "Orders"
-    },
-    {
-      "name": "Smoke"
-    },
-    {
-      "name": "Partner"
-    }
-  ],
-  "paths": {
-    "/orders": {
-      "get": {
-        "operationId": "listOrders",
-        "tags": [
-          "Orders"
-        ],
-        "summary": "List orders",
-        "description": "Newest first.",
-        "parameters": [
-          {
-            "name": "status",
-            "in": "query",
-            "description": "Only orders in this status.",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "open",
-                "shipped",
-                "cancelled"
-              ]
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100
-            }
-          },
-          {
-            "name": "filter[customer]",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "labels",
-            "in": "query",
-            "description": "Several labels.",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          },
-          {
-            "name": "X-Request-Id",
-            "in": "header",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The orders."
-          }
-        }
-      },
-      "post": {
-        "operationId": "createOrder",
-        "tags": [
-          "Orders"
-        ],
-        "summary": "Create an order",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/NewOrder"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Created."
-          }
-        }
-      }
-    },
-    "/orders/{orderId}": {
-      "parameters": [
+    "servers": [
         {
-          "$ref": "#/components/parameters/OrderId"
+            "url": "https://api.acme.example.test/v1",
+            "description": "Production"
+        },
+        {
+            "url": "https://api.staging.acme.example.test/v1",
+            "description": "Staging"
         }
-      ],
-      "get": {
-        "operationId": "getOrder",
-        "tags": [
-          "Orders"
-        ],
-        "summary": "Get an order",
-        "responses": {
-          "200": {
-            "description": "The order."
-          }
+    ],
+    "security": [
+        {
+            "bearerAuth": []
         }
-      },
-      "delete": {
-        "operationId": "cancelOrder",
-        "tags": [
-          "Orders"
-        ],
-        "deprecated": true,
-        "responses": {
-          "204": {
-            "description": "Cancelled."
-          }
+    ],
+    "tags": [
+        {
+            "name": "Orders"
+        },
+        {
+            "name": "Smoke"
+        },
+        {
+            "name": "Partner"
         }
-      }
-    },
-    "/orders/search": {
-      "post": {
-        "operationId": "searchOrders",
-        "tags": [
-          "Orders"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "text"
+    ],
+    "paths": {
+        "/orders": {
+            "get": {
+                "operationId": "listOrders",
+                "tags": ["Orders"],
+                "summary": "List orders",
+                "description": "Newest first.",
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Only orders in this status.",
+                        "schema": {
+                            "type": "string",
+                            "enum": ["open", "shipped", "cancelled"]
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "filter[customer]",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "labels",
+                        "in": "query",
+                        "description": "Several labels.",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    {
+                        "name": "X-Request-Id",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
                 ],
-                "properties": {
-                  "text": {
-                    "type": "string"
-                  }
+                "responses": {
+                    "200": {
+                        "description": "The orders."
+                    }
                 }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Matches."
-          }
-        }
-      }
-    },
-    "/orders/{orderId}/receipt": {
-      "post": {
-        "operationId": "uploadReceipt",
-        "tags": [
-          "Orders"
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/OrderId"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "receipt": {
-                    "type": "string",
-                    "format": "binary"
-                  }
+            },
+            "post": {
+                "operationId": "createOrder",
+                "tags": ["Orders"],
+                "summary": "Create an order",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/NewOrder"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created."
+                    }
                 }
-              }
             }
-          }
         },
-        "responses": {
-          "204": {
-            "description": "Stored."
-          }
-        }
-      }
-    },
-    "/orders/import": {
-      "put": {
-        "operationId": "importOrders",
-        "tags": [
-          "Orders"
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "text/csv": {
-              "schema": {
-                "type": "string"
-              }
-            }
-          }
-        },
-        "responses": {
-          "204": {
-            "description": "Imported."
-          }
-        }
-      }
-    },
-    "/orders/{orderId}/items": {
-      "get": {
-        "operationId": "listItems",
-        "tags": [
-          "Orders"
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/OrderId"
-          },
-          {
-            "name": "Accept",
-            "in": "header",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "Authorization",
-            "in": "header",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "X-Api-Key",
-            "in": "header",
-            "required": true,
-            "description": "The key of the caller.",
-            "schema": {
-              "type": "string",
-              "example": "sk-live-EXAMPLE-DO-NOT-USE-0042"
-            }
-          },
-          {
-            "name": "session",
-            "in": "cookie",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The items."
-          }
-        }
-      }
-    },
-    "/customers/{id}/notes": {
-      "post": {
-        "operationId": "addNote",
-        "tags": [
-          "Orders"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "id",
-                  "note"
-                ],
-                "properties": {
-                  "id": {
-                    "type": "string"
-                  },
-                  "note": {
-                    "type": "string"
-                  }
+        "/orders/{orderId}": {
+            "parameters": [
+                {
+                    "$ref": "#/components/parameters/OrderId"
                 }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Added."
-          }
-        }
-      }
-    },
-    "/health": {
-      "get": {
-        "operationId": "getHealth",
-        "tags": [
-          "Smoke"
-        ],
-        "security": [],
-        "responses": {
-          "200": {
-            "description": "Alive."
-          }
-        }
-      }
-    },
-    "/status": {
-      "get": {
-        "operationId": "getPartnerStatus",
-        "tags": [
-          "Partner"
-        ],
-        "security": [
-          {
-            "basicAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Status."
-          }
-        }
-      }
-    },
-    "/status-key": {
-      "get": {
-        "operationId": "getKeyStatus",
-        "tags": [
-          "Partner"
-        ],
-        "security": [
-          {
-            "apiKeyAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Status."
-          }
-        }
-      }
-    },
-    "/status-key-query": {
-      "get": {
-        "operationId": "getKeyInQuery",
-        "tags": [
-          "Partner"
-        ],
-        "security": [
-          {
-            "queryKeyAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Status."
-          }
-        }
-      }
-    },
-    "/stock": {
-      "get": {
-        "operationId": "getPartnerStock",
-        "tags": [
-          "Partner"
-        ],
-        "security": [
-          {
-            "clientCredentials": [
-              "stock.read"
-            ]
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Stock."
-          }
-        }
-      }
-    },
-    "/stock-password": {
-      "get": {
-        "operationId": "getPasswordStock",
-        "tags": [
-          "Partner"
-        ],
-        "security": [
-          {
-            "passwordFlow": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Stock."
-          }
-        }
-      }
-    },
-    "/stock-browser": {
-      "get": {
-        "operationId": "getBrowserStock",
-        "tags": [
-          "Partner"
-        ],
-        "security": [
-          {
-            "browserFlow": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Stock."
-          }
-        }
-      }
-    },
-    "/stock-offsite": {
-      "get": {
-        "operationId": "getOffsiteStock",
-        "tags": [
-          "Partner"
-        ],
-        "security": [
-          {
-            "offsiteToken": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Stock."
-          }
-        }
-      }
-    },
-    "/stock-either": {
-      "get": {
-        "operationId": "getEitherStock",
-        "tags": [
-          "Partner"
-        ],
-        "security": [
-          {
-            "browserFlow": []
-          },
-          {
-            "apiKeyAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Stock."
-          }
-        }
-      }
-    },
-    "/legacy/ping": {
-      "get": {
-        "summary": "Legacy ping",
-        "responses": {
-          "200": {
-            "description": "Pong."
-          }
-        }
-      }
-    }
-  },
-  "components": {
-    "parameters": {
-      "OrderId": {
-        "name": "orderId",
-        "in": "path",
-        "required": true,
-        "description": "The order's id.",
-        "schema": {
-          "type": "string"
-        }
-      }
-    },
-    "schemas": {
-      "NewOrder": {
-        "type": "object",
-        "required": [
-          "customerId",
-          "sku",
-          "quantity"
-        ],
-        "properties": {
-          "customerId": {
-            "type": "string"
-          },
-          "sku": {
-            "type": "string",
-            "description": "Stock keeping unit."
-          },
-          "quantity": {
-            "type": "integer",
-            "minimum": 1
-          },
-          "gift": {
-            "type": "boolean"
-          },
-          "note": {
-            "type": "string"
-          },
-          "address": {
-            "type": "object",
-            "required": [
-              "city"
             ],
-            "properties": {
-              "street": {
-                "type": "string"
-              },
-              "city": {
-                "type": "string"
-              }
+            "get": {
+                "operationId": "getOrder",
+                "tags": ["Orders"],
+                "summary": "Get an order",
+                "responses": {
+                    "200": {
+                        "description": "The order."
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "cancelOrder",
+                "tags": ["Orders"],
+                "deprecated": true,
+                "responses": {
+                    "204": {
+                        "description": "Cancelled."
+                    }
+                }
             }
-          },
-          "lines": {
-            "type": "array",
-            "items": {
-              "type": "object"
+        },
+        "/orders/search": {
+            "post": {
+                "operationId": "searchOrders",
+                "tags": ["Orders"],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["text"],
+                                "properties": {
+                                    "text": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Matches."
+                    }
+                }
             }
-          }
+        },
+        "/orders/{orderId}/receipt": {
+            "post": {
+                "operationId": "uploadReceipt",
+                "tags": ["Orders"],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/OrderId"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "receipt": {
+                                        "type": "string",
+                                        "format": "binary"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "204": {
+                        "description": "Stored."
+                    }
+                }
+            }
+        },
+        "/orders/import": {
+            "put": {
+                "operationId": "importOrders",
+                "tags": ["Orders"],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "text/csv": {
+                            "schema": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "204": {
+                        "description": "Imported."
+                    }
+                }
+            }
+        },
+        "/orders/{orderId}/items": {
+            "get": {
+                "operationId": "listItems",
+                "tags": ["Orders"],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/OrderId"
+                    },
+                    {
+                        "name": "Accept",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "Authorization",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "X-Api-Key",
+                        "in": "header",
+                        "required": true,
+                        "description": "The key of the caller.",
+                        "schema": {
+                            "type": "string",
+                            "example": "sk-live-EXAMPLE-DO-NOT-USE-0042"
+                        }
+                    },
+                    {
+                        "name": "session",
+                        "in": "cookie",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The items."
+                    }
+                }
+            }
+        },
+        "/customers/{id}/notes": {
+            "post": {
+                "operationId": "addNote",
+                "tags": ["Orders"],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["id", "note"],
+                                "properties": {
+                                    "id": {
+                                        "type": "string"
+                                    },
+                                    "note": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Added."
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "operationId": "getHealth",
+                "tags": ["Smoke"],
+                "security": [],
+                "responses": {
+                    "200": {
+                        "description": "Alive."
+                    }
+                }
+            }
+        },
+        "/status": {
+            "get": {
+                "operationId": "getPartnerStatus",
+                "tags": ["Partner"],
+                "security": [
+                    {
+                        "basicAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Status."
+                    }
+                }
+            }
+        },
+        "/status-key": {
+            "get": {
+                "operationId": "getKeyStatus",
+                "tags": ["Partner"],
+                "security": [
+                    {
+                        "apiKeyAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Status."
+                    }
+                }
+            }
+        },
+        "/status-key-query": {
+            "get": {
+                "operationId": "getKeyInQuery",
+                "tags": ["Partner"],
+                "security": [
+                    {
+                        "queryKeyAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Status."
+                    }
+                }
+            }
+        },
+        "/stock": {
+            "get": {
+                "operationId": "getPartnerStock",
+                "tags": ["Partner"],
+                "security": [
+                    {
+                        "clientCredentials": ["stock.read"]
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Stock."
+                    }
+                }
+            }
+        },
+        "/stock-password": {
+            "get": {
+                "operationId": "getPasswordStock",
+                "tags": ["Partner"],
+                "security": [
+                    {
+                        "passwordFlow": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Stock."
+                    }
+                }
+            }
+        },
+        "/stock-browser": {
+            "get": {
+                "operationId": "getBrowserStock",
+                "tags": ["Partner"],
+                "security": [
+                    {
+                        "browserFlow": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Stock."
+                    }
+                }
+            }
+        },
+        "/stock-offsite": {
+            "get": {
+                "operationId": "getOffsiteStock",
+                "tags": ["Partner"],
+                "security": [
+                    {
+                        "offsiteToken": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Stock."
+                    }
+                }
+            }
+        },
+        "/stock-either": {
+            "get": {
+                "operationId": "getEitherStock",
+                "tags": ["Partner"],
+                "security": [
+                    {
+                        "browserFlow": []
+                    },
+                    {
+                        "apiKeyAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Stock."
+                    }
+                }
+            }
+        },
+        "/legacy/ping": {
+            "get": {
+                "summary": "Legacy ping",
+                "responses": {
+                    "200": {
+                        "description": "Pong."
+                    }
+                }
+            }
         }
-      }
     },
-    "securitySchemes": {
-      "bearerAuth": {
-        "type": "http",
-        "scheme": "bearer",
-        "bearerFormat": "JWT"
-      },
-      "basicAuth": {
-        "type": "http",
-        "scheme": "basic"
-      },
-      "apiKeyAuth": {
-        "type": "apiKey",
-        "in": "header",
-        "name": "X-Api-Key"
-      },
-      "queryKeyAuth": {
-        "type": "apiKey",
-        "in": "query",
-        "name": "api_key"
-      },
-      "clientCredentials": {
-        "type": "oauth2",
-        "flows": {
-          "clientCredentials": {
-            "tokenUrl": "/oauth/token",
-            "scopes": {
-              "stock.read": "Read stock."
+    "components": {
+        "parameters": {
+            "OrderId": {
+                "name": "orderId",
+                "in": "path",
+                "required": true,
+                "description": "The order's id.",
+                "schema": {
+                    "type": "string"
+                }
             }
-          }
+        },
+        "schemas": {
+            "NewOrder": {
+                "type": "object",
+                "required": ["customerId", "sku", "quantity"],
+                "properties": {
+                    "customerId": {
+                        "type": "string"
+                    },
+                    "sku": {
+                        "type": "string",
+                        "description": "Stock keeping unit."
+                    },
+                    "quantity": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "gift": {
+                        "type": "boolean"
+                    },
+                    "note": {
+                        "type": "string"
+                    },
+                    "address": {
+                        "type": "object",
+                        "required": ["city"],
+                        "properties": {
+                            "street": {
+                                "type": "string"
+                            },
+                            "city": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "lines": {
+                        "type": "array",
+                        "items": {
+                            "type": "object"
+                        }
+                    }
+                }
+            }
+        },
+        "securitySchemes": {
+            "bearerAuth": {
+                "type": "http",
+                "scheme": "bearer",
+                "bearerFormat": "JWT"
+            },
+            "basicAuth": {
+                "type": "http",
+                "scheme": "basic"
+            },
+            "apiKeyAuth": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-Api-Key"
+            },
+            "queryKeyAuth": {
+                "type": "apiKey",
+                "in": "query",
+                "name": "api_key"
+            },
+            "clientCredentials": {
+                "type": "oauth2",
+                "flows": {
+                    "clientCredentials": {
+                        "tokenUrl": "/oauth/token",
+                        "scopes": {
+                            "stock.read": "Read stock."
+                        }
+                    }
+                }
+            },
+            "passwordFlow": {
+                "type": "oauth2",
+                "flows": {
+                    "password": {
+                        "tokenUrl": "https://api.acme.example.test/v1/oauth/password-token",
+                        "scopes": {}
+                    }
+                }
+            },
+            "browserFlow": {
+                "type": "oauth2",
+                "flows": {
+                    "authorizationCode": {
+                        "authorizationUrl": "https://auth.other.example.test/authorize",
+                        "tokenUrl": "https://auth.other.example.test/token",
+                        "scopes": {}
+                    }
+                }
+            },
+            "offsiteToken": {
+                "type": "oauth2",
+                "flows": {
+                    "clientCredentials": {
+                        "tokenUrl": "https://auth.other.example.test/token",
+                        "scopes": {}
+                    }
+                }
+            }
         }
-      },
-      "passwordFlow": {
-        "type": "oauth2",
-        "flows": {
-          "password": {
-            "tokenUrl": "https://api.acme.example.test/v1/oauth/password-token",
-            "scopes": {}
-          }
-        }
-      },
-      "browserFlow": {
-        "type": "oauth2",
-        "flows": {
-          "authorizationCode": {
-            "authorizationUrl": "https://auth.other.example.test/authorize",
-            "tokenUrl": "https://auth.other.example.test/token",
-            "scopes": {}
-          }
-        }
-      },
-      "offsiteToken": {
-        "type": "oauth2",
-        "flows": {
-          "clientCredentials": {
-            "tokenUrl": "https://auth.other.example.test/token",
-            "scopes": {}
-          }
-        }
-      }
     }
-  }
 }

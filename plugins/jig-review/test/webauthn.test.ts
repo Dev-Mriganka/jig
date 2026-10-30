@@ -49,7 +49,13 @@ function registered(algorithm: "ES256" | "RS256" = "ES256") {
     return { auth, key };
 }
 
-function assertion(auth: FakeAuthenticator, key: ReturnType<typeof registered>["key"], faults: Faults = {}, storedSignCount = 0, expected?: Buffer) {
+function assertion(
+    auth: FakeAuthenticator,
+    key: ReturnType<typeof registered>["key"],
+    faults: Faults = {},
+    storedSignCount = 0,
+    expected?: Buffer,
+) {
     const challenge = randomBytes(32);
     const asserted = auth.get({ challenge, origin: ORIGIN }, faults);
     return () =>
@@ -84,7 +90,9 @@ test("registration: a wrong challenge, a wrong origin and the wrong ceremony are
     failsWith("challenge", () => verifyRegistration(register(auth, { challenge: randomBytes(32) }).input));
     failsWith("origin", () => verifyRegistration(register(auth, { origin: "http://localhost:9999" }).input));
     failsWith("origin", () => verifyRegistration(register(auth, { origin: "https://evil.example" }).input));
-    failsWith("origin", () => verifyRegistration(register(auth, { origin: "http://localhost.evil.example:4321" }).input));
+    failsWith("origin", () =>
+        verifyRegistration(register(auth, { origin: "http://localhost.evil.example:4321" }).input),
+    );
     failsWith("origin", () => verifyRegistration(register(auth, { crossOrigin: true }).input));
     failsWith("type", () => verifyRegistration(register(auth, { type: "webauthn.get" }).input));
 });
@@ -103,23 +111,52 @@ test("registration: authenticatorData with trailing bytes, or with no credential
     // An assertion's authenticatorData carries no credential: it is not an attestation.
     const challenge = randomBytes(32);
     const asserted = auth.get({ challenge, origin: ORIGIN });
-    failsWith("type", () => verifyRegistration({ clientDataJSON: fromBase64Url(asserted.response.clientDataJSON), attestationObject: Buffer.from("x"), expectedChallenge: challenge, allowedOrigins: ALLOWED }));
+    failsWith("type", () =>
+        verifyRegistration({
+            clientDataJSON: fromBase64Url(asserted.response.clientDataJSON),
+            attestationObject: Buffer.from("x"),
+            expectedChallenge: challenge,
+            allowedOrigins: ALLOWED,
+        }),
+    );
 });
 
 test("registration: only P-256 and RSA of 2048 bits or more are accepted", () => {
     const p384 = generateKeyPairSync("ec", { namedCurve: "secp384r1" });
     const jwk = p384.publicKey.export({ format: "jwk" }) as { x: string; y: string };
-    const cose = { map: [[1, 2], [3, -7], [-1, 2], [-2, Buffer.from(jwk.x, "base64url")], [-3, Buffer.from(jwk.y, "base64url")]] } as never;
+    const cose = {
+        map: [
+            [1, 2],
+            [3, -7],
+            [-1, 2],
+            [-2, Buffer.from(jwk.x, "base64url")],
+            [-3, Buffer.from(jwk.y, "base64url")],
+        ],
+    } as never;
     failsWith("key", () => verifyRegistration(registerWithCose(new FakeAuthenticator(), cose)));
 
     // A 1024-bit RSA key signs fine, but is too short to trust.
     const weak = new FakeAuthenticator("RS256", { modulusLength: 1024 });
     failsWith("key", () => verifyRegistration(register(weak).input));
     // EdDSA (-8) is not offered by the page, so a credential with it is not accepted.
-    const eddsa = { map: [[1, 1], [3, -8], [-1, 6], [-2, Buffer.alloc(32, 1)]] } as never;
+    const eddsa = {
+        map: [
+            [1, 1],
+            [3, -8],
+            [-1, 6],
+            [-2, Buffer.alloc(32, 1)],
+        ],
+    } as never;
     failsWith("key", () => verifyRegistration(registerWithCose(new FakeAuthenticator(), eddsa)));
     // An ES256 label on an RSA key does not turn it into one.
-    const mislabelled = { map: [[1, 3], [3, -7], [-1, Buffer.alloc(256, 1)], [-2, Buffer.from([1, 0, 1])]] } as never;
+    const mislabelled = {
+        map: [
+            [1, 3],
+            [3, -7],
+            [-1, Buffer.alloc(256, 1)],
+            [-2, Buffer.from([1, 0, 1])],
+        ],
+    } as never;
     failsWith("key", () => verifyRegistration(registerWithCose(new FakeAuthenticator(), mislabelled)));
 });
 
@@ -132,7 +169,15 @@ test("registration: a point that is not on the curve is refused", () => {
     const good = new FakeAuthenticator().publicKey.export({ format: "jwk" }) as { x: string; y: string };
     const y = Buffer.from(good.y, "base64url");
     y[31]! ^= 0xff;
-    const off = { map: [[1, 2], [3, -7], [-1, 1], [-2, Buffer.from(good.x, "base64url")], [-3, y]] } as never;
+    const off = {
+        map: [
+            [1, 2],
+            [3, -7],
+            [-1, 1],
+            [-2, Buffer.from(good.x, "base64url")],
+            [-3, y],
+        ],
+    } as never;
     failsWith("key", () => verifyRegistration(registerWithCose(new FakeAuthenticator(), off)));
 });
 
@@ -140,8 +185,17 @@ test("registration: a damaged attestation is refused, not guessed at", () => {
     const auth = new FakeAuthenticator();
     const { created, challenge } = register(auth);
     const bytes = fromBase64Url(created.response.attestationObject);
-    for (const damaged of [bytes.subarray(0, bytes.length - 3), Buffer.concat([bytes, Buffer.from([0])]), Buffer.from([0xa0]), Buffer.from([0x9f, 0xff]), Buffer.alloc(0)]) {
-        assert.throws(() => verifyRegistration({ ...registrationInput(created, challenge), attestationObject: damaged }), WebAuthnError);
+    for (const damaged of [
+        bytes.subarray(0, bytes.length - 3),
+        Buffer.concat([bytes, Buffer.from([0])]),
+        Buffer.from([0xa0]),
+        Buffer.from([0x9f, 0xff]),
+        Buffer.alloc(0),
+    ]) {
+        assert.throws(
+            () => verifyRegistration({ ...registrationInput(created, challenge), attestationObject: damaged }),
+            WebAuthnError,
+        );
     }
 });
 
@@ -183,7 +237,10 @@ test("assertion: the ceremony type, the relying party id hash and the user's pre
 test("assertion: a bad signature, a signature by another key and trailing data are refused", () => {
     const { auth, key } = registered();
     failsWith("signature", assertion(auth, key, { badSignature: true }));
-    failsWith("signature", assertion(auth, key, { signWith: generateKeyPairSync("ec", { namedCurve: "prime256v1" }).privateKey }));
+    failsWith(
+        "signature",
+        assertion(auth, key, { signWith: generateKeyPairSync("ec", { namedCurve: "prime256v1" }).privateKey }),
+    );
     // The signature covers authenticatorData: bytes added to it after signing do not verify (or do not parse).
     assert.throws(assertion(auth, key, { trailing: Buffer.from("x") }), WebAuthnError);
     // The signature covers clientDataJSON: another challenge there, signed for the first, does not verify.
@@ -214,7 +271,10 @@ test("a stored key loads under the same rules as a registered one", () => {
     assert.equal(publicKeyFromSpki(key.spki).algorithm, "ES256");
     const weak = generateKeyPairSync("rsa", { modulusLength: 1024 }).publicKey.export({ type: "spki", format: "der" });
     failsWith("key", () => publicKeyFromSpki(weak));
-    const p384 = generateKeyPairSync("ec", { namedCurve: "secp384r1" }).publicKey.export({ type: "spki", format: "der" });
+    const p384 = generateKeyPairSync("ec", { namedCurve: "secp384r1" }).publicKey.export({
+        type: "spki",
+        format: "der",
+    });
     failsWith("key", () => publicKeyFromSpki(p384));
     failsWith("key", () => publicKeyFromSpki(Buffer.from("not a key")));
     failsWith("key", () => publicKeyFromCose("nope" as never));
@@ -224,15 +284,22 @@ test("authenticator data is exact: too short, a credential cut short, and a bad 
     failsWith("malformed", () => parseAuthenticatorData(Buffer.alloc(36)));
     const header = Buffer.concat([randomBytes(32), Buffer.from([0x45]), Buffer.alloc(4)]);
     failsWith("malformed", () => parseAuthenticatorData(header));
-    failsWith("malformed", () => parseAuthenticatorData(Buffer.concat([header, Buffer.alloc(16), Buffer.from([0, 0])])));
-    failsWith("malformed", () => parseAuthenticatorData(Buffer.concat([header, Buffer.alloc(16), Buffer.from([0xff, 0xff])])));
+    failsWith("malformed", () =>
+        parseAuthenticatorData(Buffer.concat([header, Buffer.alloc(16), Buffer.from([0, 0])])),
+    );
+    failsWith("malformed", () =>
+        parseAuthenticatorData(Buffer.concat([header, Buffer.alloc(16), Buffer.from([0xff, 0xff])])),
+    );
 });
 
 test("base64url is strict, and a fingerprint is shown in groups", () => {
     assert.equal(toBase64Url(Buffer.from([251, 255])), "-_8");
     assert.deepEqual(fromBase64Url("-_8"), Buffer.from([251, 255]));
     for (const bad of ["a=", "a b", "a+b", "a/b", 5, undefined]) failsWith("malformed", () => fromBase64Url(bad));
-    assert.equal(formatFingerprint("0123456789abcdef".repeat(4)), "01234567 89abcdef 01234567 89abcdef 01234567 89abcdef 01234567 89abcdef");
+    assert.equal(
+        formatFingerprint("0123456789abcdef".repeat(4)),
+        "01234567 89abcdef 01234567 89abcdef 01234567 89abcdef 01234567 89abcdef",
+    );
     failsWith("malformed", () => challengeOf(Buffer.from("not json")));
     failsWith("malformed", () => challengeOf(Buffer.from("[]")));
 });

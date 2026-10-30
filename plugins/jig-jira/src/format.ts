@@ -21,8 +21,23 @@ const person = (value: unknown, missing: string): string =>
 
 /** The fields `get` asks Jira for, besides any the call names. */
 export const ISSUE_FIELDS = [
-    "summary", "issuetype", "status", "priority", "resolution", "assignee", "reporter", "labels", "components",
-    "fixVersions", "created", "updated", "description", "parent", "issuelinks", "subtasks", "comment",
+    "summary",
+    "issuetype",
+    "status",
+    "priority",
+    "resolution",
+    "assignee",
+    "reporter",
+    "labels",
+    "components",
+    "fixVersions",
+    "created",
+    "updated",
+    "description",
+    "parent",
+    "issuelinks",
+    "subtasks",
+    "comment",
 ];
 
 function refLine(value: unknown): string {
@@ -33,7 +48,10 @@ function refLine(value: unknown): string {
 
 function commentBlock(comment: Comment, max: number, full: boolean): string {
     const edited = comment.updated !== "" && comment.updated !== comment.created ? " (edited)" : "";
-    const body = cap(comment.body, max, full).split("\n").map((line) => (line === "" ? "" : `  ${line}`)).join("\n");
+    const body = cap(comment.body, max, full)
+        .split("\n")
+        .map((line) => (line === "" ? "" : `  ${line}`))
+        .join("\n");
     return `#${comment.id} ${comment.author.displayName || "unknown"}, ${day(comment.created)}${edited}\n${body}`;
 }
 
@@ -49,16 +67,31 @@ export function formatIssue(issue: Obj, view: IssueView): string {
     const f = obj(issue.fields);
     const resolution = nameOf(f.resolution);
     const lines = [
-        [str(issue.key), nameOf(f.issuetype), nameOf(f.status), nameOf(f.priority) || "no priority"].join(" | ")
-            + (resolution === "" ? "" : ` | resolved: ${resolution}`),
+        [str(issue.key), nameOf(f.issuetype), nameOf(f.status), nameOf(f.priority) || "no priority"].join(" | ") +
+            (resolution === "" ? "" : ` | resolved: ${resolution}`),
         str(f.summary),
         `Assignee: ${person(f.assignee, "unassigned")} | Reporter: ${person(f.reporter, "unknown")}`,
         `Created: ${day(f.created)} | Updated: ${day(f.updated)}`,
     ];
     const tags = [
-        ["Labels", arr(f.labels).map(str).filter((label) => label !== "")],
-        ["Components", arr(f.components).map(nameOf).filter((name) => name !== "")],
-        ["Fix versions", arr(f.fixVersions).map(nameOf).filter((name) => name !== "")],
+        [
+            "Labels",
+            arr(f.labels)
+                .map(str)
+                .filter((label) => label !== ""),
+        ],
+        [
+            "Components",
+            arr(f.components)
+                .map(nameOf)
+                .filter((name) => name !== ""),
+        ],
+        [
+            "Fix versions",
+            arr(f.fixVersions)
+                .map(nameOf)
+                .filter((name) => name !== ""),
+        ],
     ] as const;
     const present = tags
         .filter(([, names]) => names.length > 0)
@@ -66,12 +99,14 @@ export function formatIssue(issue: Obj, view: IssueView): string {
     if (present.length > 0) lines.push(present.join(" | "));
     if (isObject(f.parent)) lines.push(`Parent: ${refLine(f.parent)}`);
 
-    const links = arr(f.issuelinks).map(obj).map((link) => {
-        const type = obj(link.type);
-        const outward = isObject(link.outwardIssue);
-        const phrase = str(outward ? type.outward : type.inward) || str(type.name);
-        return `- ${phrase} ${refLine(outward ? link.outwardIssue : link.inwardIssue)}`;
-    });
+    const links = arr(f.issuelinks)
+        .map(obj)
+        .map((link) => {
+            const type = obj(link.type);
+            const outward = isObject(link.outwardIssue);
+            const phrase = str(outward ? type.outward : type.inward) || str(type.name);
+            return `- ${phrase} ${refLine(outward ? link.outwardIssue : link.inwardIssue)}`;
+        });
     if (links.length > 0) lines.push("Links:", ...links);
     const subtasks = arr(f.subtasks).map(refLine);
     if (subtasks.length > 0) lines.push("Subtasks:", ...subtasks.map((line) => `- ${line}`));
@@ -84,7 +119,10 @@ export function formatIssue(issue: Obj, view: IssueView): string {
     } else {
         const shown = view.comments.length;
         const count = shown < view.commentTotal ? `last ${shown} of ${view.commentTotal}` : String(shown);
-        lines.push(`Comments (${count}):`, ...view.comments.map((comment) => commentBlock(comment, COMMENT_CAP, view.full)));
+        lines.push(
+            `Comments (${count}):`,
+            ...view.comments.map((comment) => commentBlock(comment, COMMENT_CAP, view.full)),
+        );
     }
     return lines.join("\n");
 }
@@ -97,8 +135,13 @@ export function formatSearch(
     const rows = page.issues.flatMap((issue) => {
         const f = obj(issue.fields);
         const columns = [
-            str(issue.key), nameOf(f.status), nameOf(f.issuetype), nameOf(f.priority), person(f.assignee, "unassigned"),
-            day(f.updated), oneLine(str(f.summary), 120),
+            str(issue.key),
+            nameOf(f.status),
+            nameOf(f.issuetype),
+            nameOf(f.priority),
+            person(f.assignee, "unassigned"),
+            day(f.updated),
+            oneLine(str(f.summary), 120),
         ];
         return [columns.join(" | "), ...extra.map(({ id, label }) => `    ${label}: ${describeValue(f[id])}`)];
     });
@@ -107,18 +150,20 @@ export function formatSearch(
     const first = (page.start ?? 0) + 1;
     const last = (page.start ?? 0) + page.issues.length;
     const count = `${page.issues.length} ${page.issues.length === 1 ? "issue" : "issues"}`;
-    const header = page.total === undefined
-        ? `${count}${page.next === undefined ? "" : " (more follow)"} for: ${where}`
-        : `${first}-${last} of ${page.total} for: ${where}`;
+    const header =
+        page.total === undefined
+            ? `${count}${page.next === undefined ? "" : " (more follow)"} for: ${where}`
+            : `${first}-${last} of ${page.total} for: ${where}`;
     const more = page.next === undefined ? [] : [`More: repeat with page=${JSON.stringify(page.next)}`];
     return [header, ...rows, ...more].join("\n");
 }
 
 export function formatComments(key: string, comments: Comment[], total: number, full: boolean): string {
     if (comments.length === 0) return `No comments on ${key}.`;
-    const header = comments.length < total
-        ? `${key}: newest ${comments.length} of ${total} comments, newest last`
-        : `${key}: ${comments.length} comments, newest last`;
+    const header =
+        comments.length < total
+            ? `${key}: newest ${comments.length} of ${total} comments, newest last`
+            : `${key}: ${comments.length} comments, newest last`;
     return [header, ...comments.map((comment) => commentBlock(comment, COMMENT_CAP, full))].join("\n");
 }
 
@@ -133,19 +178,23 @@ export function formatTransitions(key: string, transitions: Transition[]): strin
 
 /** The change history of an issue, from the `changelog` Jira sends with it: oldest first, so the newest is last. */
 export function formatChangelog(key: string, changelog: Obj, limit: number): string {
-    const histories = arr(changelog.histories).map(obj).sort((a, b) => str(a.created).localeCompare(str(b.created)));
+    const histories = arr(changelog.histories)
+        .map(obj)
+        .sort((a, b) => str(a.created).localeCompare(str(b.created)));
     if (histories.length === 0) return `${key}: no changes recorded.`;
     const shown = histories.slice(-limit);
     const value = (text: unknown): string => (str(text) === "" ? "(none)" : oneLine(str(text), 60));
     const lines = shown.map((history) => {
-        const changes = arr(history.items).map(obj)
+        const changes = arr(history.items)
+            .map(obj)
             .map((item) => `${str(item.field)} ${value(item.fromString)} -> ${value(item.toString)}`);
         return `${minute(history.created)} ${userOf(history.author).displayName || "unknown"}: ${changes.join("; ")}`;
     });
     const total = Math.max(int(changelog.total), histories.length);
-    const header = shown.length < total
-        ? `${key} history (newest ${shown.length} of ${total} changes, newest last):`
-        : `${key} history (${shown.length} changes, newest last):`;
+    const header =
+        shown.length < total
+            ? `${key} history (newest ${shown.length} of ${total} changes, newest last):`
+            : `${key} history (${shown.length} changes, newest last):`;
     // Jira sends part of a long history with the issue; the rest is not read.
     const partial = histories.length < total ? [`(Jira sent ${histories.length} of the ${total} changes)`] : [];
     return [header, ...lines, ...partial].join("\n");
@@ -158,12 +207,21 @@ function sizeText(bytes: number): string {
 
 export function formatAttachments(key: string, attachments: unknown[]): string {
     if (attachments.length === 0) return `${key} has no attachments.`;
-    const rows = attachments.map(obj).map((file) => [
-        str(file.id), str(file.filename), sizeText(int(file.size)), str(file.mimeType), day(file.created),
-        userOf(file.author).displayName,
-    ].join(" | "));
-    return [`${key} attachments (id | name | size | type | date | author; files are not downloaded):`, ...rows]
-        .join("\n");
+    const rows = attachments
+        .map(obj)
+        .map((file) =>
+            [
+                str(file.id),
+                str(file.filename),
+                sizeText(int(file.size)),
+                str(file.mimeType),
+                day(file.created),
+                userOf(file.author).displayName,
+            ].join(" | "),
+        );
+    return [`${key} attachments (id | name | size | type | date | author; files are not downloaded):`, ...rows].join(
+        "\n",
+    );
 }
 
 export function formatUsers(key: string, users: User[], id: (user: User) => string): string {

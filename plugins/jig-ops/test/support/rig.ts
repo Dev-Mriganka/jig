@@ -35,7 +35,8 @@ export function rig(): Rig {
     };
     const target = (service?: string, name?: string): Target => {
         const found = environment(service, name).kubernetes;
-        if (found === undefined) throw new Error(`no Kubernetes runtime for ${service ?? "orders-api"}/${name ?? "staging"}`);
+        if (found === undefined)
+            throw new Error(`no Kubernetes runtime for ${service ?? "orders-api"}/${name ?? "staging"}`);
         return found;
     };
     return {

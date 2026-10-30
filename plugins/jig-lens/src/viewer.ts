@@ -53,8 +53,19 @@ export function homeUrl(viewer: Viewer, settings: LensSettings): string {
  * reach it.
  */
 const PASSED = [
-    "PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "TZ", "TMPDIR",
-    "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME", "GRAFANA_HOME",
+    "PATH",
+    "HOME",
+    "USER",
+    "LOGNAME",
+    "LANG",
+    "LC_ALL",
+    "TZ",
+    "TMPDIR",
+    "XDG_CONFIG_HOME",
+    "XDG_DATA_HOME",
+    "XDG_STATE_HOME",
+    "XDG_CACHE_HOME",
+    "GRAFANA_HOME",
 ];
 
 function passedEnv(env: NodeJS.ProcessEnv): Record<string, string> {
@@ -138,9 +149,12 @@ export function datasetteCommand(
         file: program,
         args: [
             paths.index,
-            "--host", "127.0.0.1",
-            "--port", String(settings.port),
-            "--metadata", paths.datasetteMetadata,
+            "--host",
+            "127.0.0.1",
+            "--port",
+            String(settings.port),
+            "--metadata",
+            paths.datasetteMetadata,
         ],
         env: passedEnv(env),
         cwd: paths.lens,

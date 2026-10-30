@@ -10,12 +10,19 @@ import { InputError } from "./values.ts";
 /** Builds the plan for a write. `preview` is true when a person will read it, which is when it also looks for duplicates. */
 export function buildPlan(env: Env, call: Call, preview: boolean): Promise<Plan> {
     switch (call.action) {
-        case "create": return planCreate(env, call, preview);
-        case "comment": return planComment(env, call);
-        case "edit_comment": return planEditComment(env, call);
-        case "delete_comment": return planDeleteComment(env, call);
-        case "transition": return planTransition(env, call);
-        case "update": return planUpdate(env, call);
-        default: throw new InputError(`jira ${call.action} is a read, so it has no plan`);
+        case "create":
+            return planCreate(env, call, preview);
+        case "comment":
+            return planComment(env, call);
+        case "edit_comment":
+            return planEditComment(env, call);
+        case "delete_comment":
+            return planDeleteComment(env, call);
+        case "transition":
+            return planTransition(env, call);
+        case "update":
+            return planUpdate(env, call);
+        default:
+            throw new InputError(`jira ${call.action} is a read, so it has no plan`);
     }
 }

@@ -3,7 +3,14 @@
 // preview and the facts. Everything the plugin tells jig-core or asks of it is recorded for the tests.
 import { publishJig, withdrawJig } from "../../../jig-core/src/client.ts";
 import type {
-    Facts, JigApi, Preview, SignInRequest, ToolDeclaration, Transport, TransportRequest, TransportResponse,
+    Facts,
+    JigApi,
+    Preview,
+    SignInRequest,
+    ToolDeclaration,
+    Transport,
+    TransportRequest,
+    TransportResponse,
 } from "../../../jig-core/src/contract.ts";
 
 export interface FakeJig {
@@ -33,7 +40,11 @@ export interface FakeJig {
 
 /** What jig-core does with a transport's answer: it checks the shape, and names the header fields in lower case. */
 function checked(value: TransportResponse): TransportResponse {
-    return { status: value.status, headers: Object.fromEntries(Object.entries(value.headers).map(([name, text]) => [name.toLowerCase(), text])), body: value.body };
+    return {
+        status: value.status,
+        headers: Object.fromEntries(Object.entries(value.headers).map(([name, text]) => [name.toLowerCase(), text])),
+        body: value.body,
+    };
 }
 
 export function installFakeJig(): FakeJig {
@@ -73,7 +84,12 @@ export function installFakeJig(): FakeJig {
             },
         },
         environments: {
-            kindOf: (name: string) => (name === "local" || name === "external" ? name : name === "production" || name === "prod" ? "production" : "test"),
+            kindOf: (name: string) =>
+                name === "local" || name === "external"
+                    ? name
+                    : name === "production" || name === "prod"
+                      ? "production"
+                      : "test",
         },
         tunnels: {
             register: () => {},
@@ -86,11 +102,14 @@ export function installFakeJig(): FakeJig {
             request: async (name, request, signal) => {
                 transportCalls.push({ name, request });
                 const transport = transports.get(name);
-                if (transport === undefined) throw new Error(`no transport named "${name}" (none is registered); a company plugin registers it`);
+                if (transport === undefined)
+                    throw new Error(`no transport named "${name}" (none is registered); a company plugin registers it`);
                 try {
                     return checked(await transport.request(request, signal));
                 } catch (error) {
-                    throw new Error(`transport "${name}" failed: ${error instanceof Error ? error.message : String(error)}`);
+                    throw new Error(
+                        `transport "${name}" failed: ${error instanceof Error ? error.message : String(error)}`,
+                    );
                 }
             },
         },
@@ -114,7 +133,9 @@ export function installFakeJig(): FakeJig {
                 const value = values.get(name);
                 const validate = sections.get(name);
                 // As in jig-core: a section with errors is reported at start-up, and then reads as absent.
-                return value !== undefined && (validate === undefined || validate(value).length === 0) ? value : undefined;
+                return value !== undefined && (validate === undefined || validate(value).length === 0)
+                    ? value
+                    : undefined;
             },
         },
         exec: {

@@ -20,9 +20,7 @@ export interface Leaf {
     doc: string;
 }
 
-export type Shape =
-    | { kind: "leaf"; leaf: Leaf }
-    | { kind: "object"; fields: Array<{ key: string; shape: Shape }> };
+export type Shape = { kind: "leaf"; leaf: Leaf } | { kind: "object"; fields: Array<{ key: string; shape: Shape }> };
 
 export interface BodyShape {
     root: Extract<Shape, { kind: "object" }> | undefined;
@@ -40,7 +38,11 @@ const MAX_MERGE = 8;
 const text = (value: unknown): string => (typeof value === "string" ? value : "");
 
 /** The properties of an object schema, with those of the schemas it is made of (`allOf`) merged in. */
-function objectOf(schema: unknown, deref: Deref, depth = 0): { properties: Map<string, unknown>; required: Set<string> } | undefined {
+function objectOf(
+    schema: unknown,
+    deref: Deref,
+    depth = 0,
+): { properties: Map<string, unknown>; required: Set<string> } | undefined {
     const found = deref(schema);
     if (!isObject(found) || depth > MAX_MERGE) return undefined;
     const properties = new Map<string, unknown>();
@@ -52,8 +54,10 @@ function objectOf(schema: unknown, deref: Deref, depth = 0): { properties: Map<s
             for (const key of merged?.required ?? []) required.add(key);
         }
     }
-    if (isObject(found.properties)) for (const [key, value] of Object.entries(found.properties)) properties.set(key, value);
-    if (Array.isArray(found.required)) for (const key of found.required as unknown[]) if (typeof key === "string") required.add(key);
+    if (isObject(found.properties))
+        for (const [key, value] of Object.entries(found.properties)) properties.set(key, value);
+    if (Array.isArray(found.required))
+        for (const key of found.required as unknown[]) if (typeof key === "string") required.add(key);
     return properties.size === 0 ? undefined : { properties, required };
 }
 
@@ -61,7 +65,8 @@ function objectOf(schema: unknown, deref: Deref, depth = 0): { properties: Map<s
 export function typeOf(schema: Record<string, unknown>): string | undefined {
     const given = Array.isArray(schema.type) ? (schema.type as unknown[]).find((item) => item !== "null") : schema.type;
     if (typeof given === "string") return given;
-    if (Array.isArray(schema.enum) && schema.enum.length > 0) return schema.enum.every((item) => typeof item === "number") ? "number" : "string";
+    if (Array.isArray(schema.enum) && schema.enum.length > 0)
+        return schema.enum.every((item) => typeof item === "number") ? "number" : "string";
     return undefined;
 }
 
@@ -70,7 +75,8 @@ export function describeScalar(schema: Record<string, unknown>): string {
     const type = typeOf(schema) ?? "string";
     const listed = Array.isArray(schema.enum) ? (schema.enum as unknown[]) : [];
     const values = listed.filter((item) => ["string", "number", "boolean"].includes(typeof item)).map(String);
-    if (values.length > 0) return `${type}, one of ${values.slice(0, 12).join(" | ")}${values.length > 12 ? " | ..." : ""}`;
+    if (values.length > 0)
+        return `${type}, one of ${values.slice(0, 12).join(" | ")}${values.length > 12 ? " | ..." : ""}`;
     return typeof schema.format === "string" ? `${type} (${schema.format})` : type;
 }
 
@@ -118,7 +124,8 @@ export function shapeOf(schema: unknown, deref: Deref, required: boolean): BodyS
                 continue;
             }
             const choice = Array.isArray(schema.oneOf) || Array.isArray(schema.anyOf);
-            const objectLike = !choice && (typeOf(schema) === "object" || isObject(schema.properties) || Array.isArray(schema.allOf));
+            const objectLike =
+                !choice && (typeOf(schema) === "object" || isObject(schema.properties) || Array.isArray(schema.allOf));
             const nested = objectLike && path.length + 1 < MAX_DEPTH ? objectOf(schema, deref) : undefined;
             if (nested !== undefined) {
                 const inner = build(nested, where, mine);
@@ -127,15 +134,22 @@ export function shapeOf(schema: unknown, deref: Deref, required: boolean): BodyS
                 continue;
             }
             const why = objectLike
-                ? (path.length + 1 < MAX_DEPTH ? "an object with no properties" : "an object nested too deep")
+                ? path.length + 1 < MAX_DEPTH
+                    ? "an object with no properties"
+                    : "an object nested too deep"
                 : whyNotScalar(schema);
             if (why !== undefined) {
-                if (mine) unsupported ??= `its JSON body needs the property ${name}, which is ${why} and cannot be filled from a variable`;
-                else notes.push(`the optional property ${name} is left out: it is ${why}, and cannot be filled from a variable`);
+                if (mine)
+                    unsupported ??= `its JSON body needs the property ${name}, which is ${why} and cannot be filled from a variable`;
+                else
+                    notes.push(
+                        `the optional property ${name} is left out: it is ${why}, and cannot be filled from a variable`,
+                    );
                 continue;
             }
             const type = typeOf(schema) ?? "string";
-            const written = type === "integer" || type === "number" ? "number" : type === "boolean" ? "boolean" : "string";
+            const written =
+                type === "integer" || type === "number" ? "number" : type === "boolean" ? "boolean" : "string";
             const leaf: Leaf = { path: where, type: written, required: mine, doc: describeLeaf(schema, where) };
             leaves.push(leaf);
             fields.push({ key, shape: { kind: "leaf", leaf } });

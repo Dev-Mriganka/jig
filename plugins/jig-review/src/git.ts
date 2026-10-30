@@ -65,7 +65,9 @@ export class GitReviewSource {
     public async getChangedFiles(selection: ReviewFileSelection): Promise<string[]> {
         const files = Array.from(new Set(await this.getRawChangedFiles(selection)));
         const reviewable =
-            selection.scope === "touched" ? await this.filterTouchedFiles(files) : await this.filterReviewableFiles(files);
+            selection.scope === "touched"
+                ? await this.filterTouchedFiles(files)
+                : await this.filterReviewableFiles(files);
         return reviewable.sort((a, b) => a.localeCompare(b));
     }
 
@@ -84,7 +86,10 @@ export class GitReviewSource {
             case "staged":
                 return this.names(["diff", "--name-only", "-z", "--cached", "HEAD", "--"]);
             case "unstaged":
-                return [...(await this.names(["diff", "--name-only", "-z", "--"])), ...(await this.getUntrackedFileNames())];
+                return [
+                    ...(await this.names(["diff", "--name-only", "-z", "--"])),
+                    ...(await this.getUntrackedFileNames()),
+                ];
             case "touched":
                 return selection.files ?? [];
             case "all":
@@ -145,7 +150,9 @@ export class GitReviewSource {
 
     private async getUntrackedFiles(files: string[]): Promise<string[]> {
         const allowed = new Set(files);
-        return (await this.filterReviewableFiles(await this.getUntrackedFileNames())).filter((file) => allowed.has(file));
+        return (await this.filterReviewableFiles(await this.getUntrackedFileNames())).filter((file) =>
+            allowed.has(file),
+        );
     }
 
     private async getAddedFileDiff(file: string): Promise<string> {

@@ -4,13 +4,23 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "no
 import path from "node:path";
 import { after, before, describe, test } from "node:test";
 import {
-    callRecord, cleanFacts, cleanupRecords, formatDuration, oneLine, recordsFile, summarize, turnRecord, writeRecord,
+    callRecord,
+    cleanFacts,
+    cleanupRecords,
+    formatDuration,
+    oneLine,
+    recordsFile,
+    summarize,
+    turnRecord,
+    writeRecord,
 } from "../src/records.ts";
 import type { CallInput } from "../src/records.ts";
 import { rawRecords, readRecords, tempState } from "./support/state.ts";
 
 const state = tempState();
-before(() => { state.start(); });
+before(() => {
+    state.start();
+});
 after(() => state.stop());
 
 const NOW = new Date("2026-10-30T12:34:56.789Z");
@@ -44,10 +54,32 @@ describe("a call record", () => {
     test("has every field", () => {
         const record = callRecord(FULL, NOW, { JIG_PARENT_SESSION: "parent-9", JIG_AGENT_ROLE: "reviewer" });
         assert.deepEqual(Object.keys(record), [
-            "id", "kind", "time", "session", "parentSession", "agentRole", "ticket",
-            "tool", "action", "plugin", "environment", "environmentKind", "effect", "decision", "decisionSource",
-            "approval", "answer", "waitedMs", "outcome", "errorKind", "error", "durationMs",
-            "toolCallId", "parentToolCallId", "spill", "facts",
+            "id",
+            "kind",
+            "time",
+            "session",
+            "parentSession",
+            "agentRole",
+            "ticket",
+            "tool",
+            "action",
+            "plugin",
+            "environment",
+            "environmentKind",
+            "effect",
+            "decision",
+            "decisionSource",
+            "approval",
+            "answer",
+            "waitedMs",
+            "outcome",
+            "errorKind",
+            "error",
+            "durationMs",
+            "toolCallId",
+            "parentToolCallId",
+            "spill",
+            "facts",
         ]);
         assert.match(record.id, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
         assert.equal(record.kind, "call");
@@ -62,7 +94,12 @@ describe("a call record", () => {
     });
 
     test("every line has its own id", () => {
-        const ids = new Set([callRecord(FULL, NOW, {}).id, callRecord(FULL, NOW, {}).id, turnRecord({ session: "s", model: "m", input: 1, output: 1, cacheRead: 0, cacheWrite: 0, cost: 0 }, NOW, {}).id]);
+        const ids = new Set([
+            callRecord(FULL, NOW, {}).id,
+            callRecord(FULL, NOW, {}).id,
+            turnRecord({ session: "s", model: "m", input: 1, output: 1, cacheRead: 0, cacheWrite: 0, cost: 0 }, NOW, {})
+                .id,
+        ]);
         assert.equal(ids.size, 3);
     });
 
@@ -76,15 +113,48 @@ describe("a call record", () => {
     });
 
     test("fields that do not apply are left out, not written empty", () => {
-        const record = callRecord({ session: "s", tool: "read", environment: "local", environmentKind: "local", effect: "read", decision: "allow", decisionSource: "table", outcome: "ok", toolCallId: "c" }, NOW, {});
-        for (const absent of ["ticket", "action", "plugin", "approval", "answer", "waitedMs", "errorKind", "error", "durationMs", "parentToolCallId", "spill", "facts", "parentSession"]) {
+        const record = callRecord(
+            {
+                session: "s",
+                tool: "read",
+                environment: "local",
+                environmentKind: "local",
+                effect: "read",
+                decision: "allow",
+                decisionSource: "table",
+                outcome: "ok",
+                toolCallId: "c",
+            },
+            NOW,
+            {},
+        );
+        for (const absent of [
+            "ticket",
+            "action",
+            "plugin",
+            "approval",
+            "answer",
+            "waitedMs",
+            "errorKind",
+            "error",
+            "durationMs",
+            "parentToolCallId",
+            "spill",
+            "facts",
+            "parentSession",
+        ]) {
             assert.equal(absent in record, false, absent);
         }
     });
 
     test("a call that was never classified has no environment, effect or decision", () => {
-        const record = callRecord({ session: "s", tool: "gone", outcome: "error", errorKind: "not-run", toolCallId: "c" }, NOW, {});
-        for (const absent of ["environment", "environmentKind", "effect", "decision", "decisionSource"]) assert.equal(absent in record, false, absent);
+        const record = callRecord(
+            { session: "s", tool: "gone", outcome: "error", errorKind: "not-run", toolCallId: "c" },
+            NOW,
+            {},
+        );
+        for (const absent of ["environment", "environmentKind", "effect", "decision", "decisionSource"])
+            assert.equal(absent in record, false, absent);
     });
 
     test("empty facts are left out", () => {
@@ -93,7 +163,16 @@ describe("a call record", () => {
 
     test("holds no arguments and no output, even when the input carries them", () => {
         const marker = "MARKER-ARGUMENT-OR-OUTPUT-7f3a";
-        const sneaky = { ...FULL, arguments: { text: marker }, args: marker, input: { x: marker }, output: marker, result: { content: [{ text: marker }] }, content: marker, details: marker } as unknown as CallInput;
+        const sneaky = {
+            ...FULL,
+            arguments: { text: marker },
+            args: marker,
+            input: { x: marker },
+            output: marker,
+            result: { content: [{ text: marker }] },
+            content: marker,
+            details: marker,
+        } as unknown as CallInput;
         const line = JSON.stringify(callRecord(sneaky, NOW, {}));
         assert.ok(!line.includes(marker), line);
     });
@@ -101,11 +180,40 @@ describe("a call record", () => {
 
 describe("a turn record", () => {
     test("has the model, the token counts and the cost", () => {
-        const record = turnRecord({ session: "session-1", ticket: "T-1", model: "claude-test-1", input: 1200, output: 300, cacheRead: 5000, cacheWrite: 700, cost: 0.0421 }, NOW, { JIG_AGENT_ROLE: "scout" });
-        assert.deepEqual(Object.keys(record), ["id", "kind", "time", "session", "agentRole", "ticket", "model", "input", "output", "cacheRead", "cacheWrite", "cost"]);
+        const record = turnRecord(
+            {
+                session: "session-1",
+                ticket: "T-1",
+                model: "claude-test-1",
+                input: 1200,
+                output: 300,
+                cacheRead: 5000,
+                cacheWrite: 700,
+                cost: 0.0421,
+            },
+            NOW,
+            { JIG_AGENT_ROLE: "scout" },
+        );
+        assert.deepEqual(Object.keys(record), [
+            "id",
+            "kind",
+            "time",
+            "session",
+            "agentRole",
+            "ticket",
+            "model",
+            "input",
+            "output",
+            "cacheRead",
+            "cacheWrite",
+            "cost",
+        ]);
         assert.equal(record.kind, "turn");
         assert.equal(record.agentRole, "scout");
-        assert.deepEqual([record.model, record.input, record.output, record.cacheRead, record.cacheWrite, record.cost], ["claude-test-1", 1200, 300, 5000, 700, 0.0421]);
+        assert.deepEqual(
+            [record.model, record.input, record.output, record.cacheRead, record.cacheWrite, record.cost],
+            ["claude-test-1", 1200, 300, 5000, 700, 0.0421],
+        );
     });
 });
 
@@ -128,7 +236,13 @@ describe("facts", () => {
     const same = (text: string) => text;
 
     test("keep numbers, flags and short codes", () => {
-        assert.deepEqual(cleanFacts({ passed: 3, failed: 0, green: true, run: "success", rate: 0.5 }, same), { passed: 3, failed: 0, green: true, run: "success", rate: 0.5 });
+        assert.deepEqual(cleanFacts({ passed: 3, failed: 0, green: true, run: "success", rate: 0.5 }, same), {
+            passed: 3,
+            failed: 0,
+            green: true,
+            run: "success",
+            rate: 0.5,
+        });
     });
 
     test("drop strings over 64 characters", () => {
@@ -136,7 +250,23 @@ describe("facts", () => {
     });
 
     test("drop anything that is not a number, a flag or a string", () => {
-        assert.deepEqual(cleanFacts({ nested: { a: 1 }, list: [1], nothing: null, missing: undefined, nan: Number.NaN, inf: Number.POSITIVE_INFINITY, big: 10n, fn: () => 1, ok: 1 }, same), { ok: 1 });
+        assert.deepEqual(
+            cleanFacts(
+                {
+                    nested: { a: 1 },
+                    list: [1],
+                    nothing: null,
+                    missing: undefined,
+                    nan: Number.NaN,
+                    inf: Number.POSITIVE_INFINITY,
+                    big: 10n,
+                    fn: () => 1,
+                    ok: 1,
+                },
+                same,
+            ),
+            { ok: 1 },
+        );
     });
 
     test("drop keys that are too long, and everything past 50", () => {
@@ -146,7 +276,10 @@ describe("facts", () => {
     });
 
     test("redact string facts, in case a code is a secret", () => {
-        assert.deepEqual(cleanFacts({ code: "secret-1234" }, (text) => text.replace("secret-1234", "[redacted]")), { code: "[redacted]" });
+        assert.deepEqual(
+            cleanFacts({ code: "secret-1234" }, (text) => text.replace("secret-1234", "[redacted]")),
+            { code: "[redacted]" },
+        );
     });
 
     test("none left means nothing", () => {
@@ -179,7 +312,15 @@ describe("the files", () => {
     test("old files are deleted by the day in their name, and other files are left alone", () => {
         const dir = path.join(state.dir, "records");
         mkdirSync(dir, { recursive: true });
-        for (const name of ["2026-07-01.jsonl", "2026-07-31.jsonl", "2026-08-01.jsonl", "2026-10-29.jsonl", "notes.txt", "2026-7-1.jsonl"]) writeFileSync(path.join(dir, name), "{}\n");
+        for (const name of [
+            "2026-07-01.jsonl",
+            "2026-07-31.jsonl",
+            "2026-08-01.jsonl",
+            "2026-10-29.jsonl",
+            "notes.txt",
+            "2026-7-1.jsonl",
+        ])
+            writeFileSync(path.join(dir, name), "{}\n");
         // 90 days before 2026-10-30 is 2026-08-01: that day is kept, the days before it are not.
         assert.equal(cleanupRecords(90, NOW), 2);
         assert.equal(existsSync(path.join(dir, "2026-07-01.jsonl")), false);
@@ -194,13 +335,28 @@ describe("the files", () => {
 describe("the summary", () => {
     test("counts calls, errors, blocked calls, questions asked, time waited and turns", () => {
         const day = new Date("2026-11-05T10:00:00.000Z");
-        const call = (extra: Partial<CallInput>) => writeRecord(callRecord({ ...FULL, answer: undefined, waitedMs: undefined, approval: undefined, outcome: "ok", ...extra }, day, {}), day);
+        const call = (extra: Partial<CallInput>) =>
+            writeRecord(
+                callRecord(
+                    { ...FULL, answer: undefined, waitedMs: undefined, approval: undefined, outcome: "ok", ...extra },
+                    day,
+                    {},
+                ),
+                day,
+            );
         call({});
         call({ outcome: "error" });
         call({ outcome: "blocked" });
         call({ approval: "dialog", answer: "allow", waitedMs: 1500 });
         call({ approval: "review", answer: "decline", waitedMs: 2500, outcome: "blocked" });
-        writeRecord(turnRecord({ session: "s", model: "m", input: 1, output: 1, cacheRead: 0, cacheWrite: 0, cost: 0 }, day, {}), day);
+        writeRecord(
+            turnRecord(
+                { session: "s", model: "m", input: 1, output: 1, cacheRead: 0, cacheWrite: 0, cost: 0 },
+                day,
+                {},
+            ),
+            day,
+        );
         appendTruncatedLine(recordsFile(day));
         const summary = summarize(day);
         assert.equal(summary.exists, true);

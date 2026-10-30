@@ -169,7 +169,9 @@ export class ReviewCoordinator {
         if (ctx === undefined || !ctx.hasUI || isHeadless(ctx)) return "unavailable";
         this.asking = new AbortController();
         try {
-            return (await ctx.ui.confirm(title, message, { timeout: ASK_TIMEOUT_MS, signal: this.asking.signal })) ? "yes" : "no";
+            return (await ctx.ui.confirm(title, message, { timeout: ASK_TIMEOUT_MS, signal: this.asking.signal }))
+                ? "yes"
+                : "no";
         } catch {
             // The session ended or was replaced while the question was open.
             return "unavailable";
@@ -190,9 +192,9 @@ export class ReviewCoordinator {
         // the diff touched stood, so a clean repository next to it is not named as reviewed.
         const repos =
             approvedHeads ??
-            (await this.workspace.getHeads({ folder: approved.folder, ticket: approved.ticket }).catch(() => [])).filter(
-                (head) => head.repo === "" || files.some((file) => file.startsWith(`${head.repo}/`)),
-            );
+            (
+                await this.workspace.getHeads({ folder: approved.folder, ticket: approved.ticket }).catch(() => [])
+            ).filter((head) => head.repo === "" || files.some((file) => file.startsWith(`${head.repo}/`)));
         const event: ReviewApprovedEvent = {
             reviewId: approved.id,
             scope: approved.fileScope,
@@ -311,7 +313,9 @@ export class ReviewCoordinator {
 
         try {
             const after = await snapshotWorkspace(this.cwd, () => used, undefined, this.git);
-            const usedHeads = Object.fromEntries(Object.entries(start?.heads ?? {}).filter(([root]) => used.some((repo) => repo.root === root)));
+            const usedHeads = Object.fromEntries(
+                Object.entries(start?.heads ?? {}).filter(([root]) => used.some((repo) => repo.root === root)),
+            );
             const committed = await committedSince(usedHeads, this.git);
             for (const file of new Set([...changedBetween(before, after), ...committed])) {
                 if (this.isCodeWrite(file)) {
@@ -358,7 +362,11 @@ export class ReviewCoordinator {
         if (shouldReview) await this.startOrOpenReview(ctx, settings.autoOpenBrowser, offer);
     }
 
-    private async startOrOpenReview(ctx: ExtensionContext, shouldOpenBrowser: boolean, selection: ReviewFileSelection): Promise<ReviewStart> {
+    private async startOrOpenReview(
+        ctx: ExtensionContext,
+        shouldOpenBrowser: boolean,
+        selection: ReviewFileSelection,
+    ): Promise<ReviewStart> {
         try {
             const resolvedSelection = resolveSelectionFiles(selection, this.lastTouchedFiles, this.lastRunSince);
             await this.workspace.requireGitRepo(resolvedSelection);
@@ -389,7 +397,11 @@ export class ReviewCoordinator {
     }
 
     private async getReviewToOpen(selection: ReviewFileSelection): Promise<ReviewRecord> {
-        if (this.currentReview === undefined || this.currentReview.status === "approved" || this.currentReview.status === "abandoned") {
+        if (
+            this.currentReview === undefined ||
+            this.currentReview.status === "approved" ||
+            this.currentReview.status === "abandoned"
+        ) {
             return this.createReview(selection);
         }
         if (this.currentReview.status === "awaiting-agent") return this.currentReview;
@@ -399,11 +411,14 @@ export class ReviewCoordinator {
             (this.currentReview.folder ?? "") === (selection.folder ?? "") &&
             (this.currentReview.ticket ?? "") === (selection.ticket ?? "");
         if (!sameTarget) return this.replaceCurrentReview(selection);
-        return (await this.isCurrentReviewStillFresh(this.currentReview, selection)) ? this.currentReview : this.replaceCurrentReview(selection);
+        return (await this.isCurrentReviewStillFresh(this.currentReview, selection))
+            ? this.currentReview
+            : this.replaceCurrentReview(selection);
     }
 
     private async replaceCurrentReview(selection: ReviewFileSelection): Promise<ReviewRecord> {
-        if (this.currentReview !== undefined) this.currentReview = await this.reviewStore.abandonOrDelete(this.currentReview);
+        if (this.currentReview !== undefined)
+            this.currentReview = await this.reviewStore.abandonOrDelete(this.currentReview);
         return this.createReview(selection);
     }
 
@@ -422,14 +437,22 @@ export class ReviewCoordinator {
         const multi = heads.includes("@");
         const headSha = multi ? (selection.ticket ?? selection.folder ?? "workspace") : heads;
         const target = { folder: selection.folder, ticket: selection.ticket };
-        const diff = await this.workspace.getDiff({ files: changedFiles, scope: selection.scope, ...target, ...(selection.since ? { since: selection.since } : {}) });
+        const diff = await this.workspace.getDiff({
+            files: changedFiles,
+            scope: selection.scope,
+            ...target,
+            ...(selection.since ? { since: selection.since } : {}),
+        });
 
         // Files can change and change back (or a review can find nothing left to show): never open an empty review.
         if (diff.trim() === "") throw new Error("No git changes found to review.");
 
         // A new review is nobody's request until the agent's start tool says so (ids are per second, so not a safe key).
         this.agentRequestedReviewId = undefined;
-        this.currentReview = await this.reviewStore.create(headSha, diff, selection.scope, { ...target, ...(multi ? { heads } : {}) });
+        this.currentReview = await this.reviewStore.create(headSha, diff, selection.scope, {
+            ...target,
+            ...(multi ? { heads } : {}),
+        });
         return this.currentReview;
     }
 
@@ -481,7 +504,10 @@ export class ReviewCoordinator {
             return;
         }
         if (ctx.hasUI) {
-            const shouldReview = await ctx.ui.confirm("Review updated changes?", "The agent addressed review feedback. Reopen the browser review?");
+            const shouldReview = await ctx.ui.confirm(
+                "Review updated changes?",
+                "The agent addressed review feedback. Reopen the browser review?",
+            );
             if (shouldReview) await this.startOrOpenReview(ctx, settings.autoOpenBrowser, { scope, folder, ticket });
         } else if (settings.autoOpenBrowser) {
             await this.startOrOpenReview(ctx, true, { scope, folder, ticket });
@@ -493,7 +519,10 @@ export class ReviewCoordinator {
         const settings = await this.getSettings();
         const { passkeys, problems, problem } = this.approval.passkeys();
         for (const line of [...problems, ...(problem ? [problem] : [])]) ctx.ui.notify(line, "warning");
-        const choice = await ctx.ui.select("Interactive code review setting", formatSettingsOptions(settings, passkeys));
+        const choice = await ctx.ui.select(
+            "Interactive code review setting",
+            formatSettingsOptions(settings, passkeys),
+        );
         if (choice === undefined) return;
 
         const key = passkeyToRemove(choice, passkeys);
@@ -516,7 +545,11 @@ export class ReviewCoordinator {
 
 /** The ticket jig-memory marked active in this session, if any. */
 export function activeTicket(ctx: Pick<ExtensionContext, "sessionManager">): string | undefined {
-    const entries = ctx.sessionManager.getEntries() as unknown as Array<{ type?: string; customType?: string; data?: { key?: unknown } }>;
+    const entries = ctx.sessionManager.getEntries() as unknown as Array<{
+        type?: string;
+        customType?: string;
+        data?: { key?: unknown };
+    }>;
     for (let i = entries.length - 1; i >= 0; i--) {
         const entry = entries[i];
         if (entry?.type === "custom" && entry.customType === TICKET_ENTRY) {

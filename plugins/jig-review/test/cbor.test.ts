@@ -18,7 +18,13 @@ test("decodes integers, strings, arrays and maps (RFC 8949 appendix A examples)"
     assert.equal(decodeCborExactly(hex("63 616263")), "abc");
     assert.deepEqual(decodeCborExactly(hex("44 01020304")), Uint8Array.from([1, 2, 3, 4]));
     assert.deepEqual(decodeCborExactly(hex("83 01 02 03")), [1, 2, 3]);
-    assert.deepEqual([...(decodeCborExactly(hex("a2 01 02 03 04")) as Map<number, number>)], [[1, 2], [3, 4]]);
+    assert.deepEqual(
+        [...(decodeCborExactly(hex("a2 01 02 03 04")) as Map<number, number>)],
+        [
+            [1, 2],
+            [3, 4],
+        ],
+    );
     assert.equal(decodeCborExactly(hex("f4")), false);
     assert.equal(decodeCborExactly(hex("f5")), true);
     assert.equal(decodeCborExactly(hex("f6")), null);
@@ -26,7 +32,15 @@ test("decodes integers, strings, arrays and maps (RFC 8949 appendix A examples)"
 });
 
 test("round-trips what the fake authenticator encodes, with text and integer keys", () => {
-    const value = decodeCborExactly(encodeCbor({ map: [["fmt", "none"], [-2, Buffer.from("xy")], [3, [1, -1, "z"]]] })) as Map<string | number, unknown>;
+    const value = decodeCborExactly(
+        encodeCbor({
+            map: [
+                ["fmt", "none"],
+                [-2, Buffer.from("xy")],
+                [3, [1, -1, "z"]],
+            ],
+        }),
+    ) as Map<string | number, unknown>;
     assert.equal(value.get("fmt"), "none");
     assert.deepEqual(value.get(-2), Uint8Array.from(Buffer.from("xy")));
     assert.deepEqual(value.get(3), [1, -1, "z"]);

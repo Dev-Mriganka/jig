@@ -42,8 +42,12 @@ export function renderWiki(source: string): string {
     const text = escapeHtml(source.replace(/\r\n?/g, "\n").replace(CONTROL, ""));
     const finished: string[] = [];
     // Code and noformat are verbatim, so they are taken out before anything else can look inside them.
-    const taken = takeBlock(takeBlock(text, "code", finished, (params, inner) => codeBlock(params, inner)),
-        "noformat", finished, (_params, inner) => `<pre class="noformat">${trimNewlines(inner)}</pre>`);
+    const taken = takeBlock(
+        takeBlock(text, "code", finished, (params, inner) => codeBlock(params, inner)),
+        "noformat",
+        finished,
+        (_params, inner) => `<pre class="noformat">${trimNewlines(inner)}</pre>`,
+    );
     return renderBlocks(taken, finished, 0);
 }
 
@@ -59,8 +63,11 @@ function takeBlock(
     render: (params: string, inner: string) => string,
 ): string {
     const pattern = new RegExp(`\\{${name}(?::([^}\\n]*))?\\}([\\s\\S]*?)\\{${name}\\}`, "g");
-    return text.replace(pattern, (_match, params: string | undefined, inner: string) =>
-        `\n${BLOCK_OPEN}${finished.push(render(params ?? "", inner)) - 1}${BLOCK_CLOSE}\n`);
+    return text.replace(
+        pattern,
+        (_match, params: string | undefined, inner: string) =>
+            `\n${BLOCK_OPEN}${finished.push(render(params ?? "", inner)) - 1}${BLOCK_CLOSE}\n`,
+    );
 }
 
 /** `java`, `title=Notes|borderColor=#ccc`: a leading bare word and the name=value pairs. */
@@ -79,8 +86,10 @@ function codeBlock(params: string, inner: string): string {
     const { first, named } = macroParams(params);
     const language = named.get("language") ?? first;
     const title = named.get("title");
-    return `<pre class="code"${language !== undefined && LANGUAGE.test(language) ? ` data-lang="${language}"` : ""}>` +
-        `${title === undefined ? "" : `<span class="title">${title}</span>`}<code>${trimNewlines(inner)}</code></pre>`;
+    return (
+        `<pre class="code"${language !== undefined && LANGUAGE.test(language) ? ` data-lang="${language}"` : ""}>` +
+        `${title === undefined ? "" : `<span class="title">${title}</span>`}<code>${trimNewlines(inner)}</code></pre>`
+    );
 }
 
 function panelBlock(params: string, inner: string, finished: string[], depth: number): string {
@@ -99,9 +108,16 @@ function panelBlock(params: string, inner: string, finished: string[], depth: nu
             .map(([name, value]) => `${name}:${value}`);
         return used.length === 0 ? "" : ` style="${used.join(";")}"`;
     };
-    return `<div class="panel"${style([["border-color", border], ["background", background]])}>` +
-        (title === undefined ? "" : `<div class="panel-title"${style([["background", titleBackground]])}>${title}</div>`) +
-        `<div class="panel-body">${renderBlocks(inner, finished, depth + 1)}</div></div>`;
+    return (
+        `<div class="panel"${style([
+            ["border-color", border],
+            ["background", background],
+        ])}>` +
+        (title === undefined
+            ? ""
+            : `<div class="panel-title"${style([["background", titleBackground]])}>${title}</div>`) +
+        `<div class="panel-body">${renderBlocks(inner, finished, depth + 1)}</div></div>`
+    );
 }
 
 // ---- blocks -----------------------------------------------------------------------------------------------------------
@@ -116,8 +132,12 @@ const BLOCK_LINE = new RegExp(`^${BLOCK_OPEN}(\\d+)${BLOCK_CLOSE}$`);
 function renderBlocks(text: string, finished: string[], depth: number): string {
     let source = text;
     if (depth < MAX_DEPTH) {
-        source = takeBlock(source, "quote", finished, (_params, inner) =>
-            `<blockquote>${renderBlocks(inner, finished, depth + 1)}</blockquote>`);
+        source = takeBlock(
+            source,
+            "quote",
+            finished,
+            (_params, inner) => `<blockquote>${renderBlocks(inner, finished, depth + 1)}</blockquote>`,
+        );
         source = takeBlock(source, "panel", finished, (params, inner) => panelBlock(params, inner, finished, depth));
     }
     const lines = source.split("\n");
@@ -128,7 +148,7 @@ function renderBlocks(text: string, finished: string[], depth: number): string {
         paragraph = [];
     };
 
-    for (let index = 0; index < lines.length;) {
+    for (let index = 0; index < lines.length; ) {
         const line = lines[index] ?? "";
         const trimmed = line.trim();
         const block = BLOCK_LINE.exec(trimmed);
@@ -234,9 +254,13 @@ function cellsOf(row: string): Cell[] {
         while (end < row.length) {
             const character = row[end];
             if (character === "\\") end += 2;
-            else if (character === "[") { brackets++; end++; }
-            else if (character === "]" && brackets > 0) { brackets--; end++; }
-            else if (character === "|" && brackets === 0) break;
+            else if (character === "[") {
+                brackets++;
+                end++;
+            } else if (character === "]" && brackets > 0) {
+                brackets--;
+                end++;
+            } else if (character === "|" && brackets === 0) break;
             else end++;
         }
         const text = row.slice(at, Math.min(end, row.length));
@@ -263,7 +287,12 @@ function renderTable(rows: string[], finished: string[], depth: number): string 
 
 /** (name, tag) in the order they are applied: an outer mark first, so `*bold _and italic_*` nests the right way. */
 const MARKS: ReadonlyArray<readonly [string, string]> = [
-    ["*", "strong"], ["_", "em"], ["-", "del"], ["+", "ins"], ["^", "sup"], ["~", "sub"],
+    ["*", "strong"],
+    ["_", "em"],
+    ["-", "del"],
+    ["+", "ins"],
+    ["^", "sup"],
+    ["~", "sub"],
 ];
 
 const IMAGE = /!([^\s!|\u0001-\u0004]+\.[A-Za-z0-9]{2,5}|https?:\/\/[^\s!|\u0001-\u0004]+)(?:\|[^!\n]*)?!/g;
@@ -272,8 +301,24 @@ const BARE_URL = /\bhttps?:\/\/(?:(?!&(?:lt|gt|quot|#39);)[^\s\u0001-\u0004]){1,
 // Emoticons are shown as the text they are written as. They are taken out before the marks, so that `(*)` or `(-)` is
 // never read as the start of a bold or strike-through run.
 const EMOTICONS = [
-    "(/)", "(x)", "(!)", "(+)", "(-)", "(?)", "(on)", "(off)", "(y)", "(n)", "(i)", "(flag)", "(flagoff)",
-    "(*)", "(*r)", "(*g)", "(*b)", "(*y)",
+    "(/)",
+    "(x)",
+    "(!)",
+    "(+)",
+    "(-)",
+    "(?)",
+    "(on)",
+    "(off)",
+    "(y)",
+    "(n)",
+    "(i)",
+    "(flag)",
+    "(flagoff)",
+    "(*)",
+    "(*r)",
+    "(*g)",
+    "(*b)",
+    "(*y)",
 ];
 const EMOTICON = new RegExp(
     String.raw`(?<![\w])(?:${EMOTICONS.map(escapeRegExp).join("|")}|[:;]-?[)(PD])(?![\w])`,

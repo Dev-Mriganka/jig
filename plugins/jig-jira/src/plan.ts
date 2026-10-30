@@ -46,7 +46,9 @@ export const about = (head: IssueHead): string => `${head.key} "${oneLine(head.s
 function canonical(value: unknown): string {
     if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
     if (value !== null && typeof value === "object") {
-        const entries = Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical((value as Obj)[key])}`);
+        const entries = Object.keys(value)
+            .sort()
+            .map((key) => `${JSON.stringify(key)}:${canonical((value as Obj)[key])}`);
         return `{${entries.join(",")}}`;
     }
     return JSON.stringify(value) ?? "null";
@@ -54,5 +56,8 @@ function canonical(value: unknown): string {
 
 /** A digest of what would be sent and of what the person relied on. */
 export function fingerprintOf(plan: Plan): string {
-    return createHash("sha256").update(canonical({ send: plan.send, basis: plan.basis })).digest("hex").slice(0, 32);
+    return createHash("sha256")
+        .update(canonical({ send: plan.send, basis: plan.basis }))
+        .digest("hex")
+        .slice(0, 32);
 }

@@ -47,7 +47,9 @@ export function saveEvidence(folder: string, key: string, call: EvidenceCall, no
 
 /** Results saved for the ticket: the lines of evidence/index.md. */
 export function indexCount(folder: string, key: string): number {
-    return readText(ticketPaths(folder, key).index).split("\n").filter((line) => line.startsWith("- ")).length;
+    return readText(ticketPaths(folder, key).index)
+        .split("\n")
+        .filter((line) => line.startsWith("- ")).length;
 }
 
 /** The action of a call when it is a short word of letters, `-` or `_`. Anything else, such as a token typed into the
@@ -56,4 +58,8 @@ function actionOf(value: unknown): string | undefined {
     return typeof value === "string" && /^[A-Za-z][A-Za-z_-]{0,31}$/.test(value) ? value : undefined;
 }
 
-const slug = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+const slug = (value: string) =>
+    value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");

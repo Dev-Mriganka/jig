@@ -503,4 +503,3 @@ test("a literal pattern matches its text exactly, whatever regular-expression ch
     }
     assert.ok(!new RegExp(`^${literalPattern("a.b")}$`).test("axb"), "a dot is a dot, not any character");
 });
-

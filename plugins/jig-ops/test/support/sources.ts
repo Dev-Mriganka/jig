@@ -18,7 +18,8 @@ function walk(folder: string, below: string): Source[] {
     for (const entry of fs.readdirSync(folder, { withFileTypes: true })) {
         const file = below === "" ? entry.name : `${below}/${entry.name}`;
         if (entry.isDirectory()) found.push(...walk(path.join(folder, entry.name), file));
-        else if (entry.name.endsWith(".ts")) found.push({ file, text: fs.readFileSync(path.join(folder, entry.name), "utf8") });
+        else if (entry.name.endsWith(".ts"))
+            found.push({ file, text: fs.readFileSync(path.join(folder, entry.name), "utf8") });
     }
     return found.sort((a, b) => (a.file < b.file ? -1 : 1));
 }
@@ -30,5 +31,8 @@ export function sources(): Source[] {
 
 /** The code of a file without its comments. */
 export function codeOf(text: string): string {
-    return text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "").replace(/\s\/\/ .*$/gm, "");
+    return text
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^\s*\/\/.*$/gm, "")
+        .replace(/\s\/\/ .*$/gm, "");
 }
