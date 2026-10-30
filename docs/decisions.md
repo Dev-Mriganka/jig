@@ -80,6 +80,17 @@ generic: no company is named.
   - **The user can be a secret reference,** like the password; plain text still
     works. A value that starts with the name of a secret backend and a colon is
     read as a reference.
+- **More personal-data field names are masked by default.** Telecom names that
+  were found unmasked: `ani`, `dnis`, `cli`, `btn`, `fax`, `mobile`, `cell` and
+  the `...Number` forms (`faxNumber`, `callerNumber`, `destinationNumber`),
+  `tnList`, `portingTn` and `callerId` are phone fields; `sipUri` and the contact
+  fields (`contact`, `billToContact`, ...) are `personal` tokens.
+  - **In the word-based rules, not a flat list.** The short names match as the
+    whole name only, so `client` is not `cli`. A descriptor still keeps a field
+    out (`mobileType`).
+  - **A contact masks only a scalar,** through a new `contact` kind: an object
+    under it is read field by field, so a `billToContact` record keeps its ids.
+  - **The corpus said `contact` was kept;** it is masked now, on purpose.
 - **A connection failure is no longer described twice.** The line for a database
   that could not be reached was turned into "the database driver failed" by a
   second pass, so `jig-mongo` now says "cannot reach the staging/orders database".

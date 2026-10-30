@@ -66,7 +66,7 @@
     },
     {
         "field": "contact",
-        "sensitive": false,
+        "sensitive": true,
         "value": "Synthetic Value"
     },
     {
