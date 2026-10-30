@@ -1,10 +1,12 @@
-// The one request function. A search is one HTTP POST with a JSON body, and it travels one of two ways: straight to the
-// backend over HTTPS, or through a transport that a company plugin registered. Everything above this file builds the
-// same request and reads the same reply, so the query, bucketing and parsing code never knows which way it went.
+// The one request function. A search is one HTTP request that the backend's adapter described (see `Wire`), and it
+// travels one of two ways: straight to the backend over HTTPS, or through a transport that a company plugin registered.
+// Everything above this file builds the same request and reads the same reply, so the query, bucketing and parsing code
+// never knows which way it went, nor which kind of backend is at the other end.
 //
 // Credentials are resolved when a request is made and live only in this file's local variables. No message made here
 // holds one: an error names what failed (a status, an error code) and never the headers or the body that were sent.
 import { jig } from "../../jig-core/src/client.ts";
+import type { Wire } from "./backends/backend.ts";
 import type { Auth, Backend } from "./config.ts";
 import { RequestError } from "./failure.ts";
 
@@ -19,8 +21,8 @@ export interface Reply {
     body: string;
 }
 
-/** Sends one search body to the index of the environment it was made for. */
-export type Send = (body: object) => Promise<Reply>;
+/** Sends one request to the backend of the environment it was made for. */
+export type Send = (request: object) => Promise<Reply>;
 
 export interface SenderOptions {
     /** The call's own signal: stopping the call stops the request. */
@@ -31,28 +33,39 @@ export interface SenderOptions {
     fetch?: typeof fetch;
 }
 
-const JSON_HEADERS = { "content-type": "application/json", accept: "application/json" };
+/** What every request asks for, and says about its body when it has one. The adapter's own headers come after. */
+function headersOf(wire: Wire): Record<string, string> {
+    return {
+        accept: "application/json",
+        ...(wire.body === undefined ? {} : { "content-type": "application/json" }),
+        ...wire.headers,
+    };
+}
 
 /** Network errors that mean the connection broke while the backend was working, as it does under load. */
 const CONNECTION_LOST = new Set(["ECONNRESET", "EPIPE", "UND_ERR_SOCKET"]);
 
-export function sender(backend: Backend, index: string, options: SenderOptions = {}): Send {
-    const url = `${backend.url}/${index}/_search`;
+/** `wire` says how a request of the environment travels (see `LogBackend.wire`); this adds the address and sign-in. */
+export function sender(backend: Backend, wire: (request: object) => Wire, options: SenderOptions = {}): Send {
     const timeoutMs = options.timeoutMs ?? REQUEST_TIMEOUT_MS;
 
     if (backend.kind === "transport") {
         const { transport } = backend;
-        return (body) =>
-            timed(options.signal, timeoutMs, (signal) => viaTransport(transport, url, JSON.stringify(body), signal));
+        return (request) => {
+            const http = wire(request);
+            return timed(options.signal, timeoutMs, (signal) =>
+                viaTransport(transport, `${backend.url}${http.path}`, http, signal),
+            );
+        };
     }
 
     const signIn = credentials(backend.auth);
-    return async (body) => {
+    return async (request) => {
+        const http = wire(request);
+        const url = `${backend.url}${http.path}`;
         // The timeout starts after the credential is in hand: unlocking a secret store may wait for the user.
         const auth = await signIn(url, options.signal);
-        return timed(options.signal, timeoutMs, (signal) =>
-            direct(url, JSON.stringify(body), auth, signal, options.fetch ?? fetch),
-        );
+        return timed(options.signal, timeoutMs, (signal) => direct(url, http, auth, signal, options.fetch ?? fetch));
     };
 }
 
@@ -94,15 +107,15 @@ function networkCode(error: Error): string | undefined {
 
 async function direct(
     url: string,
-    body: string,
+    wire: Wire,
     auth: Readonly<Record<string, string>>,
     signal: AbortSignal,
     fetchImpl: typeof fetch,
 ): Promise<Reply> {
     const response = await fetchImpl(url, {
-        method: "POST",
-        headers: { ...JSON_HEADERS, ...auth },
-        body,
+        method: wire.method,
+        headers: { ...headersOf(wire), ...auth },
+        ...(wire.body === undefined ? {} : { body: wire.body }),
         signal,
         // A redirect would carry the credential to an address the configuration never named.
         redirect: "manual",
@@ -130,8 +143,14 @@ async function readText(response: Response): Promise<string> {
     return text + decoder.decode();
 }
 
-async function viaTransport(name: string, url: string, body: string, signal: AbortSignal): Promise<Reply> {
-    const request = { system: "logs", method: "POST", url, headers: JSON_HEADERS, body } as const;
+async function viaTransport(name: string, url: string, wire: Wire, signal: AbortSignal): Promise<Reply> {
+    const request = {
+        system: "logs",
+        method: wire.method,
+        url,
+        headers: headersOf(wire),
+        ...(wire.body === undefined ? {} : { body: wire.body }),
+    } as const;
     const reply = await untilAborted(jig().transports.request(name, request, signal), signal);
     if (Buffer.byteLength(reply.body) > MAX_REPLY_BYTES) throw new RequestError("response_too_large");
     return { status: reply.status, body: reply.body };

@@ -1,11 +1,13 @@
-# Query grammar: what a search sends
+# Query grammar: what a search sends to Elasticsearch
 
-What a `logs` call asks the backend, and what the model's text can reach. Back to
+What a `logs` call asks an Elasticsearch or OpenSearch backend, and what the
+model's text can reach. What it asks Loki is on the [Loki](loki.md) page. Back to
 the [jig-logs overview](../README.md).
 
 ## The request body
 
-Every body is built in one place, `src/query.ts`, from one short list of parts:
+Every body is built in one place, `src/backends/elasticsearch.ts`, from one short
+list of parts:
 
 ```text
 { size, timeout, track_total_hits, query: { bool: { filter: [...], must: [...] } }, sort, _source }

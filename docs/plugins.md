@@ -29,7 +29,7 @@ parts live in a private company plugin kept at the company.
 | [`jig-memory`](../plugins/jig-memory/README.md) | built | no tools: ticket folders, notes and evidence, and the `/ticket` command; later cards and recall | ticket key patterns, folder location | 3 |
 | [`jig-mongo`](../plugins/jig-mongo/README.md) | design | `mongo`: describe, count, find, distinct, aggregate | connection routes (for example through a bastion host or a VPN), approved collections and fields | 4 |
 | [`jig-jira`](../plugins/jig-jira/README.md) | built | `jira`: get, search, comments, transitions, changelog, attachments, assignable, find_field · create, comment, edit_comment, delete_comment, transition, update | the Jira site and its sign-in | 5 |
-| [`jig-logs`](../plugins/jig-logs/README.md) | built | `logs`: search by phrase or query, time window, filters, paging | the log backend: address, indexes, environment names, sign-in | 6 |
+| [`jig-logs`](../plugins/jig-logs/README.md) | built | `logs`: search by phrase or query, time window, filters, paging | the log backend: its type and address, indexes or selectors, environment names, sign-in | 6 |
 | [`jig-http`](../plugins/jig-http/README.md) | built | `http`: a method, path, body and headers to a named target | the named targets and their sign-in | 7 |
 | [`jig-ops`](../plugins/jig-ops/README.md) | design | `ci`: status, runs, log, rerun, trigger, watch · `deploy`: plan, run, status, rollback, watch · `runtime`: pods, rollout, logs, events, health | the service catalog, its CI systems and deploy methods, transports | 7 |
 | [`jig-review`](../plugins/jig-review/README.md) | design | `start_interactive_code_review`, `record_interactive_review_resolution` | none | 8 |

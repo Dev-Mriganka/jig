@@ -3,6 +3,8 @@
 // jig-core masks production text line by line and withholds a line it cannot read, so nothing here repeats what the
 // model sent: a `match` term such as `{"id"` would read as the start of a JSON payload, and the line that echoed it
 // would be replaced. The filters are described by their count, never by their terms.
+import { backendOf } from "./backends/index.ts";
+import type { LogBackend } from "./backends/index.ts";
 import { closedOffMarkers } from "./clip.ts";
 import { nextStep } from "./failure.ts";
 import type { FailureReason } from "./failure.ts";
@@ -74,7 +76,7 @@ function filterWords(view: View): string {
 }
 
 /** The windows that were not fully searched. Neighbours with the same reason read as one. */
-function gapLines(windows: WindowReport[]): string[] {
+function gapLines(windows: WindowReport[], backend: LogBackend): string[] {
     const groups: { from: string; to: string; reason: FailureReason | undefined }[] = [];
     for (const window of windows) {
         if (window.state === "searched") continue;
@@ -94,15 +96,15 @@ function gapLines(windows: WindowReport[]): string[] {
     ];
     return [
         `Gaps: ${shownGroups.join("; ")}${more}`,
-        ...reasons.slice(0, 3).map((reason) => `Next: ${nextStep(reason)}`),
+        ...reasons.slice(0, 3).map((reason) => `Next: ${nextStep(reason, backend)}`),
     ];
 }
 
 function availabilityLine(availability: Availability): string {
     const caveat = "This only shows the window has data and proves nothing about retention.";
     if (availability.state === "documents") {
-        const holds = `the window holds ${plural(availability.count ?? 0, "document")} in this environment`;
-        return `Availability: ${holds} without your phrase or query. ${caveat}`;
+        const some = availability.count === undefined ? "documents" : plural(availability.count, "document");
+        return `Availability: the window holds ${some} in this environment without your phrase or query. ${caveat}`;
     }
     if (availability.state === "none") {
         return `Availability: no documents at all in this environment and window. ${caveat}`;
@@ -195,7 +197,7 @@ export function summarize(query: LogQuery, outcome: SearchOutcome, view: View): 
     const lines = page.map((position) => describeHit(outcome.hits[position] as Source, fields, shape));
     const filtered = view.match !== undefined || view.exclude !== undefined;
 
-    const out = [headerLine(query, outcome, lines.length), ...gapLines(outcome.windows)];
+    const out = [headerLine(query, outcome, lines.length), ...gapLines(outcome.windows, backendOf(query.target))];
     if (outcome.availability !== undefined) out.push(availabilityLine(outcome.availability));
     const notice = cutNotice(lines, shape.chars ?? DEFAULT_CHARS);
     if (notice !== undefined) out.push(notice);

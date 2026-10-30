@@ -1,61 +1,104 @@
-# Backends: how a request travels
+# Backends: what an adapter does
 
-The search is `POST <url>/<index>/_search` with a JSON body. There is one request
-function, and everything above it (the query, the buckets, the reading of
-replies) does not know which way a request travels. Back to the
+`jig-logs` searches one kind of log store at a time, named by `logs.backend.type`.
+Everything that differs between stores is behind one interface, `LogBackend` in
+`src/backends/backend.ts`, and each store has one file in `src/backends/`. This
+page says what an adapter must do, so that a contributor can add one. Back to the
 [jig-logs overview](../README.md).
 
-## Directly
+## The built backends
 
-Over HTTPS, signed in with one of four kinds of `auth`. Redirects are not
-followed, so a credential never goes to an address the configuration did not
-name.
+| `type` | Store | Files | `query` is written in |
+|---|---|---|---|
+| `elasticsearch` (the default) | Elasticsearch and OpenSearch | `elasticsearch.ts` | Lucene (see [Query grammar](query-grammar.md)) |
+| `loki` | Grafana Loki | `loki.ts`, `logql.ts` | LogQL (see [Loki](loki.md)) |
 
-| `auth` | What is sent |
+`phrase`, `match` and `exclude` are portable. An adapter turns `phrase` into the
+store's own filter. `match` and `exclude` are applied to the hits fetched, and an
+adapter that can may send them to the store too (Loki does). `query` is in the
+language of the store, which the model learns from the logs skill and from the
+`Next:` line of a rejected query. Stores differ in what they can promise, and the
+result says so: Elasticsearch counts exactly, and Loki cannot count, so its totals
+are lower bounds ("at least").
+
+## What is shared, and what an adapter owns
+
+The search does not know which store it talks to. It decides what to ask next; the
+adapter says how to ask, and how to read the answer.
+
+| Shared, the same for every backend | The adapter's |
 |---|---|
-| `{ "username": "reader", "password": "pass:logs/reader" }` | `Authorization: Basic ...`. The user name cannot hold a colon |
-| `{ "apiKey": "pass:logs/api-key" }` | `Authorization: ApiKey <the secret>`. The secret is the key as Elasticsearch gives it (`encoded`) |
-| `{ "token": "pass:logs/token" }` | `Authorization: Bearer <the secret>` |
-| `{ "signIn": "<service name>" }` | The headers of the company sign-in service of that name (for example a single sign-on gateway), asked for on every request |
+| The checks on a call, windows, buckets, halving and retrying, the budgets | The settings an environment needs, and their checks |
+| Paging, excerpts around a term, clipping, hit lines | The request for one bucket, and the check for data |
+| The sender: sign-in, secrets, transports, timeouts, the size of a reply | How a request travels: method, path, body, headers |
+| The words of a failure, and the facts a call records | Reading a reply into hits |
+| | What an error reply means |
+| | The limits of the store |
 
-The request also carries `content-type: application/json` and `accept:
-application/json`. A sign-in service is asked for the system `logs` and the full
-address of the request. The tool uses Node's certificate store, so
-`NODE_EXTRA_CA_CERTS` applies to a private certificate authority as it does to
-the rest of Pi.
+## What an adapter must do
 
-## Through a transport
+An adapter is an object of the type `LogBackend`. Its members, in the order a call
+uses them:
 
-A company plugin registers a transport with `jig-core`: code that carries the
-request, for example through a local sign-in proxy that holds the session. Every
-request goes to `jig().transports.request(name, { system: "logs", method: "POST",
-url, headers, body })`, with the same two JSON headers. No authorization header is
-added, because the transport signs in. What it answers is read like a direct
-reply.
+| Member | It must |
+|---|---|
+| `type` | Be the value of `logs.backend.type` that selects it, and the key it is listed under in `src/backends/index.ts` |
+| `config` | Name the fields it adds to `logs.backend` and to each environment, say what an environment needs at least (`"an index"`), and give an example address for the messages |
+| `checkBackendFields`, `checkEnvironmentFields` | Report every problem in its own fields, one message each, each starting with the key (`logs.environments.staging.index must be ...`). Never repeat a value that may be a secret |
+| `environment` | Fill in the defaults and return the environment as the search reads it. `jigEnvironment` defaults to the environment's name. Add no key the settings did not need |
+| `limits` | Say the most hits one request returns (never below the tool's `size` limit, 200: a test fails if it is) and the longest time span one request may cover (`Number.POSITIVE_INFINITY` for none). Buckets are cut to the span |
+| `checkQuery` | Only when the language of `query` can reach beyond what configuration allows (Loki's can name another stream selector). Throw an `InputError`, a `TypeError`: it is called when the call is classified, so `jig-core` blocks the call without asking, and when the request is built. Omit it when the text can only ever be a value in the request |
+| `search` | Build the request for one bucket: the time range from `from` up to, not including, `to`; the environment's own scope; the phrase or the query; up to `size` hits in the call's order. With `size` 0 it only counts; a store that cannot count asks for one hit |
+| `probe` | Build the check for data: the time range and the environment's scope, and nothing the model wrote |
+| `wire` | Say how a request of one environment travels: `GET` or `POST`, a path that starts with `/` (and may end in a query string), an optional JSON body, optional headers. The sender adds `backend.url` and the sign-in, so no address or credential belongs in it |
+| `parse` | Read the body of a successful reply into a page: how many hits there are, whether that count is exact or a lower bound (`gte`; a store that cannot count says `gte` whenever the request filled its limit), the hits with their time, message and other fields, and `incomplete` when the store says it lost data. Return `undefined` for anything that is not a result, even when only one part of it is wrong, so that no hit is dropped quietly. Never throw |
+| `classify` | Say what an error reply means in the store's words, as a `Failure` (see below). Return `undefined` to leave it to the HTTP rules, which cover sign-in, redirects, timeouts, busy and rejected |
+| `words` | Name the store in four messages: what a refused sign-in lacked access to, which settings to check after a 401, the `Next:` line for a rejected query, and for an HTTP 404 |
 
-## Time and cancellation
+A `Failure` says why a request gave no usable answer: `transient(reason)` for a
+bucket that a smaller request may get past (it is halved and tried again), and
+`final(reason, fatal)` for one that halving does not help, `fatal` when every other
+window would fail the same way. The reasons are in
+[Failures](failures.md#gaps-and-their-reasons); an adapter picks the closest one
+and does not invent a message.
 
-Each request has 30 seconds, whichever way it travels.
-- **Directly,** the 30 seconds start once the credential is in hand. They do not
-  run while a secret is being unlocked or a sign-in service is working.
-- **Through a transport,** they cover the whole exchange, because the transport
-  signs in inside it.
-- **A transport that ignores its signal** neither holds the call past the 30
-  seconds nor makes stopping the call wait for it.
+## Rules an adapter keeps
 
-Stopping the call stops the request, and the wait for a secret, at once.
+- **The model's text lands in one value of the request,** such as a phrase in a
+  query clause, and never becomes a key, a field name or another clause.
+- **No secret and no reply in a message.** A message names what failed (a
+  status, a reason) and never repeats a header, a body, an address or the reply:
+  a rejected query's text repeats the query.
+- **Configuration is where scope comes from.** An index, a selector or a filter
+  is written by the person who configures, never by the model.
+- **No import from `jig-core`, and none from another adapter or from the search.**
+  An adapter sees the shared types and helpers. A test checks this.
+- **Erasable TypeScript only,** as in the rest of the plugin.
 
-## Secrets and sign-in
+## Checklist for a new adapter
 
-A secret reference is resolved once per call, by `jig-core`, and only through a
-backend that its `secrets.backends` allows. A search of many buckets asks the
-secret store once, and the next call asks again: nothing is kept between calls. A
-lookup that failed is made again by the next request. A sign-in service is asked
-for every request, because it is the one that knows when a token has run out. A
-mistake in a reference never repeats the value.
-
-## Replies
-
-A reply over 16 MiB is refused, whichever way it came. A direct reply is read as
-it arrives, so the rest of it is dropped before it is all in memory. The window
-becomes a `response_too_large` gap (see [Failures](failures.md#gaps-and-their-reasons)).
+1. Write down what you rely on: the request, the reply, the errors and the limits
+   of the store, each with the address of the page that states it, in
+   [Not verified yet](not-verified.md). What you could not source is listed there
+   as unverified.
+2. Add the type to `BackendType` in `src/config.ts`, and the shape of its
+   environments next to `Target`, which is a union told apart by `type` (an
+   Elasticsearch environment has none). The fields of the other kinds are
+   `undefined` on it, so that `index` or `selector` can be read on any target.
+3. Write `src/backends/<name>.ts` and list it in `src/backends/index.ts`; an
+   environment finds its backend by its `type`. Helpers for the store's language
+   go in a file of their own in the folder, as `logql.ts` does. `elasticsearch.ts`
+   and `loki.ts` are the two examples to read.
+4. Test configuration: every field valid and invalid, a field of another type
+   reported by name, the defaults.
+5. Test requests with golden files in `test/golden/`: a phrase, a query, a bucket
+   that only counts, the check for data. Test that hostile text stays in one value.
+6. Test replies from fixtures: a result, no result, several parts, a lower-bound
+   count, and replies that are not results.
+7. Test errors, one mapping each, and that no message repeats the reply.
+8. Run the whole tool against a fake of the store on 127.0.0.1: buckets, halving,
+   paging, every way of signing in and the transport.
+9. `test/backend.test.ts` checks every listed adapter against the interface; it
+   needs the least a `jig.json` can say for your type, listed in that file.
+10. Document it: a row in the README's Backends table, the language of `query` in
+    the logs skill, and a page of its own if it has more to say.

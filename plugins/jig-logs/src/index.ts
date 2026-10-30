@@ -1,5 +1,5 @@
-// jig-logs: log search for the agent. One tool, `logs`, that reads an OpenSearch or Elasticsearch index. The tool only
-// says what each call does; jig-core decides whether it runs and masks what comes back.
+// jig-logs: log search for the agent. One tool, `logs`, that reads the logs of an Elasticsearch, OpenSearch or Loki
+// backend. The tool only says what each call does; jig-core decides whether it runs and masks what comes back.
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { withJig } from "../../jig-core/src/client.ts";
 import { validateLogsSection } from "./config.ts";
