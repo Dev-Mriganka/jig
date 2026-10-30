@@ -78,3 +78,19 @@ export function withDeploy(service: string, environment: string, change: Raw): R
     Object.assign(entryOf(raw, service, environment).deploy as Raw, change);
     return raw;
 }
+
+/** A copy of the default section where orders-api in production has no address and checks its health inside a pod. */
+export function podHealthInProduction(): Raw {
+    const raw = withEnvironment("orders-api", "production", { health: undefined });
+    const runtime = entryOf(raw, "orders-api", "production").runtime as { kubernetes: Raw };
+    Object.assign(runtime.kubernetes, { container: "orders-api", port: 8080, healthPath: "/actuator/health" });
+    return raw;
+}
+
+/** A copy of a section with an environment added to a service, as a copy of one it already has. */
+export function withCopy(raw: Raw, service: string, from: string, name: string): Raw {
+    const environments = (raw.services as Services)[service]?.environments;
+    if (environments === undefined || environments[from] === undefined) throw new Error(`no entry ${service}/${from}`);
+    environments[name] = structuredClone(environments[from]);
+    return raw;
+}

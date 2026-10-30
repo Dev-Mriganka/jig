@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, test } from "node:test";
 import { controllerRevision, history, list, replicaSet, values, workload } from "./support/fixtures.ts";
 import { ok, setupHarness } from "./support/harness.ts";
 import type { Harness } from "./support/harness.ts";
-import { section, withDeploy, withEnvironment } from "./support/section.ts";
+import { section, withCopy, withDeploy, withEnvironment } from "./support/section.ts";
 import { BILLING, billing, ORDERS, orders, setImageArgs, UPGRADED, upgradeArgs } from "./support/worlds.ts";
 
 let h: Harness;
@@ -197,10 +197,7 @@ describe("what is refused", () => {
     });
 
     test("a name jig-core has never heard of counts as production, so a deploy there is blocked", async () => {
-        const raw = section();
-        const orders_ = (raw.services as Record<string, { environments: Record<string, unknown> }>)["orders-api"] as { environments: Record<string, unknown> };
-        orders_.environments.preview = orders_.environments.staging;
-        h.configure(raw);
+        h.configure(withCopy(section(), "orders-api", "staging", "preview"));
         const result = await run("1.4.3", { service: "orders-api", environment: "preview" });
         assert.match(result.blocked ?? "", /orders-api in preview is production/);
         assert.deepEqual(h.jig.started, []);

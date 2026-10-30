@@ -6,7 +6,7 @@ import { createRuntimeTool } from "../src/runtime/tool.ts";
 import { list, pod, workload } from "./support/fixtures.ts";
 import { ok, setupHarness } from "./support/harness.ts";
 import type { Harness } from "./support/harness.ts";
-import { section, withEnvironment } from "./support/section.ts";
+import { section, withCopy, withEnvironment } from "./support/section.ts";
 
 let h: Harness;
 beforeEach(() => {
@@ -55,19 +55,13 @@ describe("classification", () => {
     });
 
     test("an environment is classified under its own name, which is the name jig-core knows it by", () => {
-        const raw = section();
-        const orders = (raw.services as Record<string, { environments: Record<string, unknown> }>)["orders-api"] as { environments: Record<string, unknown> };
-        orders.environments.qa = orders.environments.staging;
-        h.configure(raw);
+        h.configure(withCopy(section(), "orders-api", "staging", "qa"));
         assert.equal(h.runtime.declaration.classify({ action: "pods", service: "orders-api", environment: "qa" })?.environment, "qa");
     });
 
     test("is made from the catalog of the moment", () => {
         assert.throws(() => h.runtime.declaration.classify({ action: "pods", service: "orders-api", environment: "qa" }), TypeError);
-        const raw = section();
-        const orders = (raw.services as Record<string, { environments: Record<string, unknown> }>)["orders-api"] as { environments: Record<string, unknown> };
-        orders.environments.qa = orders.environments.staging;
-        h.configure(raw);
+        h.configure(withCopy(section(), "orders-api", "staging", "qa"));
         assert.equal(h.runtime.declaration.classify({ action: "pods", service: "orders-api", environment: "qa" })?.environment, "qa");
     });
 

@@ -6,7 +6,7 @@ import { curlArgs } from "../src/runtime/kubernetes/inpod.ts";
 import { list, pod } from "./support/fixtures.ts";
 import { ok, setupHarness } from "./support/harness.ts";
 import type { Harness } from "./support/harness.ts";
-import { section, withEntry, withEnvironment } from "./support/section.ts";
+import { podHealthInProduction, section, withCopy, withEntry } from "./support/section.ts";
 
 let h: Harness;
 beforeEach(() => {
@@ -150,19 +150,12 @@ describe("what the model controls", () => {
 });
 
 describe("where it is refused", () => {
-    /** orders-api in production, with its address taken away: only the check in a pod is left. */
-    const podOnlyInProduction = () => {
-        const raw = withEnvironment("orders-api", "production", { health: undefined });
-        const runtime = (((raw.services as Record<string, { environments: Record<string, Record<string, unknown>> }>)["orders-api"] as { environments: Record<string, Record<string, unknown>> }).environments.production as { runtime: { kubernetes: Record<string, unknown> } }).runtime;
-        Object.assign(runtime.kubernetes, { container: "orders-api", port: 8080, healthPath: "/actuator/health" });
-        return raw;
-    };
     const PRODUCTION = { action: "health", service: "orders-api", environment: "production" };
     const message =
         'runtime health is refused in production (orders-api in production): without a health address it would run curl inside a pod, and nothing is run in a production pod. Add "health" (an https address) to its entry in the ops catalog';
 
     test("in production: blocked in classify by the kind of the environment, and nothing is asked of the cluster", async () => {
-        h.configure(podOnlyInProduction());
+        h.configure(podHealthInProduction());
         const result = await h.runtime.call(PRODUCTION);
         assert.equal(result.blocked, `Blocked by jig-core: runtime cannot run with this input: ${message}`);
         assert.equal(result.error, undefined, "the tool did not run");
@@ -179,11 +172,7 @@ describe("where it is refused", () => {
     });
 
     test("in a name jig-core has never heard of, which counts as production", async () => {
-        const raw = section();
-        const services = raw.services as Record<string, { environments: Record<string, unknown> }>;
-        const orders = services["orders-api"] as { environments: Record<string, unknown> };
-        orders.environments.edge = orders.environments.staging;
-        h.configure(raw);
+        h.configure(withCopy(section(), "orders-api", "staging", "edge"));
         h.cluster.answer({ pods: list(pod("orders-api-0")), exec: { stdout: curlOut("{}", 200) } });
         const result = await h.runtime.call({ action: "health", service: "orders-api", environment: "edge" });
         assert.match(result.blocked ?? "", /^Blocked by jig-core: runtime cannot run with this input: runtime health is refused in production \(orders-api in edge\)/);
@@ -191,7 +180,7 @@ describe("where it is refused", () => {
     });
 
     test("when the tool is run without jig-core's check, it refuses the same way and starts nothing", async () => {
-        h.configure(podOnlyInProduction());
+        h.configure(podHealthInProduction());
         h.cluster.answer({ pods: list(pod("orders-api-0")), exec: { stdout: curlOut("{}", 200) } });
         await assert.rejects(
             h.runtime.tool.execute("direct", PRODUCTION as never, undefined, undefined, {} as never),

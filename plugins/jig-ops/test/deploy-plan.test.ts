@@ -6,7 +6,7 @@ import { list, pod, workload } from "./support/fixtures.ts";
 import { ok, setupHarness } from "./support/harness.ts";
 import type { Harness } from "./support/harness.ts";
 import { BILLING, billing, ORDERS, orders } from "./support/worlds.ts";
-import { withEnvironment } from "./support/section.ts";
+import { section, withCopy, withEnvironment } from "./support/section.ts";
 
 let h: Harness;
 beforeEach(() => {
@@ -97,11 +97,7 @@ describe("plan", () => {
 
     test("an environment jig-core does not know counts as production, and the plan says how to fix that", async () => {
         h.cluster.answer(orders("1.4.2"));
-        h.jig.setKinds({});
-        const raw = withEnvironment("orders-api", "staging", {});
-        const orders_ = (raw.services as Record<string, { environments: Record<string, unknown> }>)["orders-api"] as { environments: Record<string, unknown> };
-        orders_.environments.preview = orders_.environments.staging;
-        h.configure(raw);
+        h.configure(withCopy(section(), "orders-api", "staging", "preview"));
         const text = ok(await plan("1.4.3", { service: "orders-api", environment: "preview" }));
         assert.match(text, /A deploy run would be refused: orders-api in preview is production: the agent never changes production\. jig-core counts a name it does not know as production: if preview is a test environment, define it under "environments" in jig\.json with kind test\./);
     });
