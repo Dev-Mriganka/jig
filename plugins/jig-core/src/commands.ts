@@ -93,6 +93,7 @@ export function statusLines(state: JigState): string[] {
 
     const lines = [
         `jig-core governs ${tools.length} tools${state.sessionId === undefined ? "" : ` in session ${state.sessionId}`}`,
+        sandboxLine(state),
         `Plugins: ${[...plugins].join(", ")}`,
         `Tools on the unknown default (they ask until classified): ${unclassified.length === 0 ? "none" : unclassified.join(", ")}`,
         watchesLine(state),
@@ -118,6 +119,26 @@ export function statusLines(state: JigState): string[] {
     const watchProblem = state.watches.problem();
     if (watchProblem !== undefined) lines.push(`Watches: ${watchProblem}`);
     return lines;
+}
+
+/**
+ * Whether `bash` is sandboxed, in a line. Without a sandbox plugin it is a plain warning: a shell command can read the
+ * credentials that Pi's file tools refuse to.
+ */
+export function sandboxLine(state: JigState): string {
+    const provider = state.sandbox;
+    if (provider === undefined) {
+        return (
+            "bash: NOT sandboxed. No sandbox is registered, so a shell command can read your credentials " +
+            "(Pi's file tools refuse them, bash does not). Install jig-sandbox, or run Pi inside a container."
+        );
+    }
+    try {
+        if (provider.active) return `bash: sandboxed${provider.mode === undefined ? "" : `, network ${provider.mode}`}`;
+        return `bash: NOT sandboxed${provider.note === undefined || provider.note === "" ? "" : `: ${provider.note}`}`;
+    } catch {
+        return "bash: the sandbox did not say whether it is on";
+    }
 }
 
 /** What `/jig` says about one registered section. */
@@ -146,40 +167,51 @@ export function ruleLines(state: JigState, only: string | undefined, hasUI: bool
     const names = [...new Set([...tools.map((tool) => tool.name), ...state.declarations.keys()])].sort();
     const lines: string[] = [];
 
+    const describeRule = (label: string, input: Record<string, unknown>, name: string): void => {
+        const classification = probe(state, name, input);
+        if (classification === undefined) {
+            lines.push(
+                `${label}: decided per call by its declaration (${state.declarations.get(name)?.plugin ?? "unknown plugin"})`,
+            );
+            return;
+        }
+        const verdict = decide({
+            call: {
+                tool: name,
+                ...(classification.action === undefined ? {} : { action: classification.action }),
+                environment: classification.environment,
+                environmentKind: policy.environments.kindOf(classification.environment),
+                effect: classification.effect,
+                ...(classification.atLeast === undefined ? {} : { atLeast: classification.atLeast }),
+                unknown: classification.source === "unknown",
+            },
+            rules: policy.rules,
+            sessionAllows: state.sessionAllows,
+            hasUI,
+        });
+        const flag =
+            classification.source === "unknown"
+                ? "  <- not classified: add a classify rule, or a rule that names it"
+                : "";
+        const where = `${classification.environment} ${classification.effect} -> ${verdict.decision}`;
+        const because = `decision: ${verdict.source}; classified by: ${CLASS_LABEL[classification.source]}`;
+        lines.push(`${label}: ${where} (${because})${flag}`);
+    };
+
     for (const name of names) {
         if (only !== undefined && name !== only) continue;
         const info = tools.find((tool) => tool.name === name);
         const actions = actionsOf(info);
         for (const action of actions.length === 0 ? [undefined] : actions) {
-            const classification = probe(state, name, action === undefined ? {} : { action });
-            const label = action === undefined ? name : `${name} ${action}`;
-            if (classification === undefined) {
-                lines.push(
-                    `${label}: decided per call by its declaration (${state.declarations.get(name)?.plugin ?? "unknown plugin"})`,
-                );
-                continue;
-            }
-            const verdict = decide({
-                call: {
-                    tool: name,
-                    ...(classification.action === undefined ? {} : { action: classification.action }),
-                    environment: classification.environment,
-                    environmentKind: policy.environments.kindOf(classification.environment),
-                    effect: classification.effect,
-                    ...(classification.atLeast === undefined ? {} : { atLeast: classification.atLeast }),
-                    unknown: classification.source === "unknown",
-                },
-                rules: policy.rules,
-                sessionAllows: state.sessionAllows,
-                hasUI,
-            });
-            const flag =
-                classification.source === "unknown"
-                    ? "  <- not classified: add a classify rule, or a rule that names it"
-                    : "";
-            const where = `${classification.environment} ${classification.effect} -> ${verdict.decision}`;
-            const because = `decision: ${verdict.source}; classified by: ${CLASS_LABEL[classification.source]}`;
-            lines.push(`${label}: ${where} (${because})${flag}`);
+            describeRule(
+                action === undefined ? name : `${name} ${action}`,
+                action === undefined ? {} : { action },
+                name,
+            );
+        }
+        // Actions a tool picks from its input and not from an `action` parameter, such as `bash` run outside its sandbox.
+        for (const [action, input] of Object.entries(state.declarations.get(name)?.examples ?? {})) {
+            describeRule(`${name} ${action}`, { ...input }, name);
         }
     }
     if (lines.length === 0) return [only === undefined ? "No tools are registered." : `No tool named ${only}.`];

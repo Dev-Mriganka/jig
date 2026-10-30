@@ -14,7 +14,7 @@ import type { ExtensionAPI, ExtensionContext, ExtensionFactory } from "@earendil
 import { buildApi } from "./api.ts";
 import { publishJig, withdrawJig } from "./client.ts";
 import { cleanupSpill } from "./cap.ts";
-import { registerCommands } from "./commands.ts";
+import { registerCommands, sandboxLine } from "./commands.ts";
 import { describeProblem } from "./config.ts";
 import { errorMessage } from "./errors.ts";
 import { gate } from "./gate.ts";
@@ -78,6 +78,8 @@ function startSession(state: JigState, ctx: ExtensionContext): void {
         );
     }
 
+    announceSandbox(state, ctx);
+
     // Old records, spill files and preview pages are removed when a session starts.
     const { config } = state.personal;
     for (const clean of [
@@ -91,6 +93,25 @@ function startSession(state: JigState, ctx: ExtensionContext): void {
             // Cleaning up is a courtesy; a session should still start.
         }
     }
+}
+
+/**
+ * Says whether `bash` is sandboxed, and in which network mode. A sandbox plugin starts after this, so its state is read
+ * once it says it is ready; with none registered, the warning comes at once.
+ */
+function announceSandbox(state: JigState, ctx: ExtensionContext): void {
+    if (!ctx.hasUI) return;
+    const provider = state.sandbox;
+    const say = (): void => {
+        try {
+            const line = sandboxLine(state);
+            ctx.ui.notify(line, line.startsWith("bash: sandboxed") ? "info" : "warning");
+        } catch {
+            // The screen of a session that has ended; there is nobody to tell.
+        }
+    };
+    if (provider?.whenReady === undefined) say();
+    else provider.whenReady().then(say, say);
 }
 
 export default jigCore();

@@ -48,7 +48,8 @@ function isPreview(value: unknown): value is Preview {
         typeof preview.summary === "string" &&
         preview.summary !== "" &&
         (preview.body === undefined || typeof preview.body === "string") &&
-        (preview.html === undefined || typeof preview.html === "string")
+        (preview.html === undefined || typeof preview.html === "string") &&
+        (preview.answers === undefined || (typeof preview.answers === "object" && preview.answers !== null))
     );
 }
 

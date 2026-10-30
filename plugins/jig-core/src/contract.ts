@@ -46,6 +46,9 @@ export interface Preview {
     /** A digest of what was shown. The tool reads the approved preview with `approvedPreview()` and refuses to
      *  run if what it would do now has a different digest ("changed since the preview"). */
     fingerprint?: string;
+    /** The words on the three buttons of a dialog, when the usual ones (`Allow`, `Allow for this session`, `Decline`)
+     *  would mislead: "This exact command, this session" says what the session answer covers. */
+    answers?: { allow?: string; session?: string; decline?: string };
 }
 
 /** A Jig tool's description of itself, given to jig-core once per load with `declareTool`. */
@@ -64,6 +67,9 @@ export interface ToolDeclaration {
     preview?(input: Readonly<Record<string, unknown>>, signal: AbortSignal): Promise<Preview>;
     /** True when the tool masks its own production results, so jig-core's backstop leaves them alone. */
     masksOwnResults?: boolean;
+    /** Inputs that show `/jig rules` the actions this tool picks from its input rather than from an `action` parameter,
+     *  by action name: `{ outside: { outside: true, reason: "x" } }`. Used only to display the rules. */
+    examples?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 }
 
 /** Facts a tool adds to its own record: a few named numbers, flags or short codes, never free text.
@@ -77,6 +83,10 @@ export interface Rule {
     action?: string;
     environment?: EnvironmentName;
     effect?: Effect;
+    /** A pattern for the `command` the call carries (a `bash` command), where `*` stands for any run of characters that
+     *  holds no `;`, `&`, `|`, `<`, `>`, backquote, `$(` or line break, so an allowed command cannot carry another. A call
+     *  with no `command` never matches a rule that has one. */
+    command?: string;
     decision: Decision;
     approval?: ApprovalKind;
 }
@@ -354,6 +364,35 @@ export interface HttpErrorInfo extends Error {
     readonly notSent: boolean;
 }
 
+/** One path that Pi's file tools must not touch, as `protectedPaths.list()` gives it. */
+export interface ProtectedPathInfo {
+    /** Absolute, as it is matched. */
+    path: string;
+    /** For messages: the path with the home folder written as `~`. */
+    shown: string;
+    /** `secret` is neither read nor written; `guarded` can be read but not written. */
+    kind: "secret" | "guarded";
+    /** Where the entry came from: the built-in list, your `jig.json`, or a company plugin. */
+    source: "default" | "personal" | "company";
+}
+
+/** The network a sandboxed `bash` has. */
+export type SandboxNetworkMode = "open" | "filtered" | "ask" | "off";
+
+/** What a sandbox plugin tells jig-core about the `bash` it runs. Fields are read when they are needed, so they may change. */
+export interface SandboxProvider {
+    /** True while `bash` commands run inside the sandbox. False when it is switched off, or could not start. */
+    readonly active: boolean;
+    /** The network mode, while active. */
+    readonly mode?: SandboxNetworkMode;
+    /** One line for `/jig` that says why the sandbox is not active, or anything else the user should know. */
+    readonly note?: string;
+    /** Whether a command in the sandbox can write this path: absolute, links followed. A program there is not one Jig may run. */
+    canWrite(path: string): boolean;
+    /** Settles when the sandbox has started, or failed to, so that session start can say which. */
+    whenReady?(): Promise<void>;
+}
+
 /** jig-core's run-time API, reached through `jig()` in client.ts. */
 export interface JigApi {
     readonly version: 1;
@@ -488,8 +527,24 @@ export interface JigApi {
         section(name: string): unknown;
     };
 
+    /** The paths Pi's file tools must not touch, so that a sandbox for `bash` can hide the same ones. */
+    readonly protectedPaths: {
+        /** Every entry, with its kind and where it came from: the built-in ones, your `jig.json` and company plugins. */
+        list(): readonly ProtectedPathInfo[];
+    };
+
+    /** The sandbox around `bash`, when a plugin provides one. */
+    readonly sandbox: {
+        /** Says that `bash` runs in this sandbox. `/jig` and session start report it, and `exec.run` refuses a program in a
+         *  place the sandbox can write. Registering again replaces the provider. */
+        register(provider: SandboxProvider): void;
+    };
+
     /** Runs programs from an argument list, never a shell. */
     readonly exec: {
+        /** Refuses a program whose real path is in a folder the agent's shell can write: the working folder, and with a
+         *  sandbox registered, every place the sandbox lets `bash` write. A program planted there would run with your
+         *  credentials. */
         run(file: string, args: readonly string[], options?: RunOptions): Promise<RunResult>;
         /** git with hooks, `core.fsmonitor` and prompts off. Refuses to run when the repository's `.git/config`
          *  holds a setting that would run a command, because the agent's shell can write that file. */

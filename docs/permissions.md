@@ -44,6 +44,7 @@ Pi's own tools:
 | `read`, `ls`, `find`, `grep` | local | read | allow, except a protected path (see the floor) |
 | `write`, `edit` | local | write | allow, except a protected path (see the floor) |
 | `bash` | local, inside the sandbox | write | allow (the sandbox is the protection, see Architecture) |
+| `bash` with `outside: true` | local, outside the sandbox: action `outside` | write | **ask**; only a rule naming it allows it (see the floor) |
 | `powershell` | local | write | allow |
 | question tools: `ask_user_question`, `ask_questions` | local | read | allow, so a question never asks first |
 
@@ -60,7 +61,10 @@ You can change any cell, or set rules for a single tool or action. For
 example:
 - ask before `git push`;
 - allow writes to a test environment without asking;
-- ask before `bash` commands that match a pattern.
+- ask before `bash` commands that match a pattern (`command` in a rule);
+- allow one command to run outside the sandbox without asking, by naming it:
+  `{ "tool": "bash", "action": "outside", "command": "docker compose *",
+  "decision": "allow" }`.
 
 ## The floor: what configuration cannot change
 
@@ -70,7 +74,8 @@ example:
 | `production` results are always masked | Masking is how customer data stays out of the model's context and the session files |
 | With no screen to ask on (headless runs, child agents without a dialog), "ask" becomes "deny" | Nobody can approve, so nothing that needs approval runs |
 | An unknown tool cannot be allowed by default; it needs a rule naming it | A new package must not get unchecked writes |
-| Credentials stay hidden from `bash` | That is the sandbox's job, and configuration does not reach into it |
+| Credentials stay hidden from `bash` | That is the sandbox's job, and configuration does not reach into it. `/jig` says whether `bash` is sandboxed, and with no sandbox it says plainly that it is not |
+| `bash` run outside its sandbox asks | Only a rule naming the tool `bash`, the action `outside` and a command pattern allows it without asking; no wildcard and no default does. With no screen it is refused |
 | Pi's file tools refuse **protected paths** (see below) | A credential the agent can read leaks a login, and a folder it can write could load code or loosen a rule |
 
 Configuration can always add strictness. For example, it can mask a test
@@ -105,8 +110,9 @@ paths.
   - `write` and `edit` are refused inside a secret or a guarded path.
 - **Only additions.** Your `jig.json` (`protectedPaths`) and company plugins
   (`config.addProtectedPaths`) can add paths. Nothing removes a default.
-- **Where it stops.** It covers Pi's file tools. `bash` is the sandbox's job:
-  until the sandbox runs, a shell command can still reach these paths.
+- **Where it stops.** It covers Pi's file tools. `bash` is the sandbox's job
+  (`jig-sandbox` hides the same list from it): without a sandbox, a shell command
+  can still reach these paths, and `/jig` and session start say so.
 
 ## Configuration file
 

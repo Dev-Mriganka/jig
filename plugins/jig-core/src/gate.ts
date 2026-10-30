@@ -85,6 +85,7 @@ async function decideCall(
     // Only a label for the records: a tool without source information must not be blocked for lack of one.
     const plugin = classification.plugin ?? toolInfo(event.toolName)?.sourceInfo?.source;
 
+    const command = typeof input.command === "string" ? input.command : undefined;
     const verdict = decide({
         call: {
             tool: event.toolName,
@@ -94,6 +95,7 @@ async function decideCall(
             effect: classification.effect,
             ...(classification.atLeast === undefined ? {} : { atLeast: classification.atLeast }),
             ...(classification.approval === undefined ? {} : { approval: classification.approval }),
+            ...(command === undefined ? {} : { command }),
             unknown: classification.source === "unknown",
         },
         rules: policy.rules,
@@ -183,6 +185,7 @@ async function askUser(
                 tool: call.tool,
                 ...(classification.action === undefined ? {} : { action: classification.action }),
                 environment: classification.environment,
+                ...(typeof input.command === "string" ? { command: input.command } : {}),
             }),
         );
     }

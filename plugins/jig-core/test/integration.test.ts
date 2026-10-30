@@ -34,12 +34,15 @@ const CONFIG = {
 };
 const ALLOW: FakeUiScript = { select: () => "Allow" };
 
+/** The notice about the sandbox comes at every session start and is tested elsewhere; this is about the others. */
+const isProblemNotice = (notice: { message: string }): boolean => !notice.message.startsWith("bash: ");
+
 describe("writes", () => {
     test("a production write is blocked, even with a personal rule that tries to allow it", async () => {
         const rule = { tool: "fake_tool", environment: "prod", effect: "write", decision: "allow" };
         const w = await begin({ config: { ...CONFIG, rules: [rule] }, ui: ALLOW });
         // The rule was refused when the file loaded, and the user was told.
-        assert.equal(w.ui?.notifications.length, 1);
+        assert.equal(w.ui?.notifications.filter(isProblemNotice).length, 1);
         assert.match(
             w.ui?.notifications[0]?.message ?? "",
             /jig\.json: rules\[0\]\.decision:.*production writes.*always denied/,
@@ -508,7 +511,7 @@ describe("plugin sections of jig.json", () => {
     test("a registered section that is valid is handed to its plugin at session start", async () => {
         const w = await begin({ config: { ...CONFIG, fake: { level: 3 } }, ui: ALLOW });
         assert.deepEqual(w.log.section, { level: 3 });
-        assert.deepEqual(w.ui?.notifications, []);
+        assert.deepEqual(w.ui?.notifications.filter(isProblemNotice), []);
     });
 
     test("an invalid one is reported, the plugin gets undefined, and jig-core's own settings stay", async () => {
