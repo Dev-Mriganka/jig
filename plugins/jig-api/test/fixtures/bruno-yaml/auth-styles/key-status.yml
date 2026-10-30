@@ -1,0 +1,14 @@
+info:
+  name: Key status
+  type: http
+  seq: 1
+http:
+  method: GET
+  url: "{{baseUrl}}/status"
+  auth:
+    type: apikey
+    key: X-Api-Key
+    value: "{{apiKey}}"
+    placement: header
+settings:
+  encodeUrl: true

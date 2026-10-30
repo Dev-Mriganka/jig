@@ -1,0 +1,20 @@
+meta {
+  name: Digest status
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/status
+  body: none
+  auth: digest
+}
+
+auth:digest {
+  username: {{serviceUser}}
+  password: {{servicePassword}}
+}
+
+settings {
+  encodeUrl: true
+}

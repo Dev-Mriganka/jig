@@ -1,0 +1,10 @@
+info:
+  name: Cancel order
+  type: http
+  seq: 5
+http:
+  method: DELETE
+  url: "{{baseUrl}}/{{apiVersion}}/orders/{{orderId}}"
+  auth: inherit
+settings:
+  encodeUrl: true

@@ -1,0 +1,19 @@
+meta {
+  name: Import orders
+  type: http
+  seq: 9
+}
+
+put {
+  url: {{baseUrl}}/{{apiVersion}}/orders/import
+  body: file
+  auth: inherit
+}
+
+body:file {
+  file1: @file(files/receipt.txt) @contentType(text/csv)
+}
+
+settings {
+  encodeUrl: true
+}

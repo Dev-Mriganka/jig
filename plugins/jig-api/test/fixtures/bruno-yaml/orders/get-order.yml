@@ -1,0 +1,28 @@
+info:
+  name: Get order
+  type: http
+  seq: 1
+http:
+  method: GET
+  url: "{{baseUrl}}/{{apiVersion}}/orders/:orderId"
+  params:
+    - name: orderId
+      value: ""
+      type: path
+  auth: inherit
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("it is there", function () {
+          expect(res.status).to.equal(200);
+        });
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.id
+      operator: isDefined
+settings:
+  encodeUrl: true
+docs: Reads one order by its id.

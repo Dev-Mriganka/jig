@@ -23,5 +23,10 @@ The tool tables of `jig-git` and `jig-jira` are read by their tests.
 - **Approvals happen inside the waiting tool call.** Never add a web endpoint
   that approves.
 - **Checks:** `npm run check` (types) and `npm test` must pass before a commit.
+- **No secret-shaped literals, even fake ones.** A test value that looks like a
+  real credential (a GitHub token, a Postman key, an AWS key, a private-key
+  block) is built at run time from parts, such as `["PMAK", "1a2b"].join("-")`.
+  Push protection rejects a commit that holds one, and history must then be
+  rewritten. `plugins/jig-core/test/no-secret-literals.test.ts` checks this.
 - **Git:** clear commit messages, no `Co-Authored-By` lines. Push only when
   asked.

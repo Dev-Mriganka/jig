@@ -281,7 +281,7 @@ function jobLog(): string {
         (_, i) => `2026-10-30T10:00:${String(i % 60).padStart(2, "0")}.0000000Z line ${i + 1}`,
     );
     lines[598] = "2026-10-30T10:01:00.0000000Z \u001b[31m##[error]\u001b[0mProcess completed with exit code 1.";
-    lines[10] = "2026-10-30T10:00:11.0000000Z export TOKEN=ghp_abcdefghijklmnopqrstuvwxyz0123456789 done";
+    lines[10] = "2026-10-30T10:00:11.0000000Z export TOKEN=gh" + "p_abcdefghijklmnopqrstuvwxyz0123456789 done";
     return `${lines.join("\n")}\n`;
 }
 

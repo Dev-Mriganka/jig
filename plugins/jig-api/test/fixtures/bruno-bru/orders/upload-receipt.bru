@@ -1,0 +1,20 @@
+meta {
+  name: Upload receipt
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/{{apiVersion}}/orders/{{orderId}}/receipt
+  body: multipartForm
+  auth: inherit
+}
+
+body:multipart-form {
+  note: {{note}}
+  receipt: @file(files/receipt.txt) @contentType(text/plain)
+}
+
+settings {
+  encodeUrl: true
+}

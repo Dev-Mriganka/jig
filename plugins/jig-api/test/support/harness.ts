@@ -9,9 +9,10 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { ExtensionAPI, ExtensionToolContext, ToolDefinition } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionCommandContext, ExtensionToolContext, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import type { CallClass, Preview, ToolDeclaration } from "../../../jig-core/src/contract.ts";
 import { jigApi } from "../../src/index.ts";
+import type { ApiOptions } from "../../src/tool.ts";
 import { startFakeApi } from "./fake-api.ts";
 import type { FakeApi } from "./fake-api.ts";
 import { installFakeJig } from "./fake-jig.ts";
@@ -61,6 +62,14 @@ export interface CallResult {
     details?: unknown;
 }
 
+export type CommandHandler = (args: string, ctx: ExtensionCommandContext) => Promise<void>;
+
+/** What a slash command said to the person, in order. */
+export interface Notice {
+    text: string;
+    level: string;
+}
+
 export interface Harness {
     /** The fake API that the test environment points to. */
     api: FakeApi;
@@ -77,6 +86,12 @@ export interface Harness {
     /** The tool Pi registered and the declaration jig-core holds. Both are made again by `reset`. */
     tool: ToolDefinition;
     declaration: ToolDeclaration;
+    /** The slash commands Pi registered, by name. */
+    commands: Map<string, CommandHandler>;
+    /** The options the plugin was loaded with; a test may set `postmanApi` to point the cloud fetch at a fake server. */
+    options: ApiOptions;
+    /** Types a slash command, as the person would, and returns what it told them. */
+    command(line: string): Promise<Notice[]>;
     /** An `api` section of one collection, `base`, in the environment `Staging` (jig-core's `staging`), signed in as asked:
      *  `{ none: true }`, `{ bearer: ref }`, `{ oauthPassword: ... }`, `{ signIn: name }` or `{ transport: name }`. Its files
      *  are written to `dir`. `extra.environment` names the jig-core environment instead. */
@@ -115,15 +130,20 @@ export async function setupHarness(options: { timeoutScale?: number } = {}): Pro
     issueTokens();
 
     /** Loads the plugin into a fake Pi, as Pi does at start-up. A new load has learned nothing yet. */
-    function load(): { tool: ToolDefinition; declaration: ToolDeclaration } {
+    const apiOptions: ApiOptions = { now: () => clock.now, ...(options.timeoutScale === undefined ? {} : { timeoutScale: options.timeoutScale }) };
+    function load(): { tool: ToolDefinition; declaration: ToolDeclaration; commands: Harness["commands"] } {
         jig.publish();
         const tools: ToolDefinition[] = [];
-        const pi = { registerTool: (tool: ToolDefinition) => void tools.push(tool) } as unknown as ExtensionAPI;
-        void jigApi({ now: () => clock.now, ...(options.timeoutScale === undefined ? {} : { timeoutScale: options.timeoutScale }) })(pi);
+        const commands: Harness["commands"] = new Map();
+        const pi = {
+            registerTool: (tool: ToolDefinition) => void tools.push(tool),
+            registerCommand: (name: string, command: { handler: CommandHandler }) => void commands.set(name, command.handler),
+        } as unknown as ExtensionAPI;
+        void jigApi(apiOptions)(pi);
         const tool = tools[0];
         const declaration = jig.declared.get("api");
         if (tool === undefined || declaration === undefined) throw new Error("the plugin did not register its tool");
-        return { tool, declaration };
+        return { tool, declaration, commands };
     }
 
     const oauth = (extra: Record<string, unknown> = {}): Record<string, unknown> => ({
@@ -224,6 +244,17 @@ export async function setupHarness(options: { timeoutScale?: number } = {}): Pro
         section,
         oauth,
         configure,
+        options: apiOptions,
+        async command(line) {
+            jig.publish();
+            const [name, ...rest] = line.replace(/^\//, "").split(" ");
+            const handler = harness.commands.get(name ?? "");
+            if (handler === undefined) throw new Error(`the plugin registered no command named ${name}`);
+            const notices: Notice[] = [];
+            const context = { ui: { notify: (text: string, level = "info") => void notices.push({ text, level }) }, signal: undefined } as unknown as ExtensionCommandContext;
+            await handler(rest.join(" "), context);
+            return notices;
+        },
         input: (given) => (given.action === undefined ? adHoc(given) : given),
         reset() {
             api.reset();

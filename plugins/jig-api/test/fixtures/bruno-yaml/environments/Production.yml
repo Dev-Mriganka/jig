@@ -1,0 +1,21 @@
+name: Production
+variables:
+  - name: baseUrl
+    value: https://api.acme.example.test
+  - name: authUrl
+    value: https://auth.acme.example.test
+  - name: customerId
+    value: cust-prod-1
+  - name: clientId
+    value: acme-orders-cli
+  - name: serviceUser
+    value: svc-orders
+  - name: token
+    secret: true
+    value: plain-prod-token-0123456789
+  - name: clientSecret
+    secret: true
+  - name: servicePassword
+    secret: true
+  - name: apiKey
+    secret: true

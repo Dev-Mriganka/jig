@@ -22,7 +22,10 @@ import { planCall, planRequest } from "./planning.ts";
 import type { PlanContext } from "./planning.ts";
 import { listText, readsOf, showText } from "./show.ts";
 
-export type ApiOptions = HttpOptions;
+export interface ApiOptions extends HttpOptions {
+    /** For tests: where the Postman API is, in place of its hosts. */
+    postmanApi?: string;
+}
 
 const DESCRIPTION =
     "Run your team's saved API requests by name, filling only their variables: list, show, run, run-folder. " +

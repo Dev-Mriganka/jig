@@ -8,11 +8,11 @@ sign-in or transport that replaces this:
 
 | Form | Signs in with | Where it comes from |
 |---|---|---|
-| none | Nothing | `noauth`, or no sign-in at all |
-| Bearer | `Authorization: Bearer <token>` | Postman `bearer`; a `.http` header |
-| Basic | `Authorization: Basic <user:password>` | Postman `basic`; a `.http` `Basic user password` |
-| API key | The key in the header the collection names | Postman `apikey` in a header |
-| OAuth | A token from the token address, sent as a Bearer token | Postman `oauth2`, `client_credentials` or `password_credentials` |
+| none | Nothing | `noauth`, or no sign-in at all; Bruno `none`; an OpenAPI `security: []` |
+| Bearer | `Authorization: Bearer <token>` | Postman and Bruno `bearer`; OpenAPI `http` `bearer`; a `.http` header |
+| Basic | `Authorization: Basic <user:password>` | Postman, Bruno and OpenAPI `basic`; a `.http` `Basic user password` |
+| API key | The key in the header the collection names | Postman and Bruno `apikey`, OpenAPI `apiKey`, in a header |
+| OAuth | A token from the token address, sent as a Bearer token | Postman `oauth2`, Bruno `oauth2` and OpenAPI `oauth2`, `client_credentials` or the password grant |
 | Sign-in service | The headers of the company service of that name, asked for again on every request | `"signIn"` in `api.environments` |
 | Transport | The whole request goes through the company transport of that name | `"transport"` in `api.environments` |
 
@@ -47,6 +47,10 @@ characters, and for a write the outcome is then unknown (see [Writes](writes.md#
 registered means that nothing was sent.
 
 ## OAuth without a browser
+
+Bruno and OpenAPI say the same in their own words: `access_token_url` / `tokenUrl`, `client_id`, `client_secret`, `username`,
+`password`, `scope`, and where the client signs in (`credentials_placement`: `basic_auth_header` or `body`; an OpenAPI client signs
+in with HTTP Basic). The table is Postman's.
 
 | Postman field | Meaning |
 |---|---|

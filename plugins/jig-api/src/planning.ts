@@ -20,6 +20,7 @@ import { byteLengthOf, displayOf, isUpload, joined, plainOf, upload } from "./en
 import type { Text, Upload } from "./engine/text.ts";
 import { InputError, shortList, shown } from "./engine/values.ts";
 import type { Auth, Body, Collection, Environment, FileRef, SavedRequest } from "./model.ts";
+import { pruned } from "./optional.ts";
 import { agentValues, createResolver, secretNamesOf } from "./resolve.ts";
 import type { Resolver, Slot } from "./resolve.ts";
 import { confined } from "./sources/files.ts";
@@ -252,6 +253,22 @@ function signInOf(auth: Auth, resolver: Resolver, endpoint: (template: string, w
     }
 }
 
+/**
+ * A collection that is opt-in (OpenAPI) runs in production only when its configuration says so. What counts as production is
+ * asked of jig-core, and a name that `api.environments` does not map counts as production, so a forgotten mapping is stricter.
+ * Writes in production are denied by the floor whatever this says.
+ */
+function checkProduction(ctx: PlanContext, collection: Collection, request: string, label: string): void {
+    if (collection.productionReads !== false) return;
+    const jigEnvironment = jigEnvironmentOf(ctx.settings, label);
+    if (ctx.kindOf(jigEnvironment) !== "production") return;
+    const why = ctx.settings.environments.has(label) ? "" : ` because api.environments does not map ${quoted(label)}`;
+    throw new InputError(
+        `${request} does not run in ${label}, which counts as ${jigEnvironment}${why}: ` +
+            `${collection.name} runs in production only with "allowProductionReads": true`,
+    );
+}
+
 /** What an environment's mapping replaces the request's own sign-in with, if anything. */
 function overrideOf(ctx: PlanContext, label: string): SignIn | undefined {
     const mapping = ctx.settings.environments.get(label);
@@ -282,19 +299,27 @@ export function planRequest(ctx: PlanContext, request: SavedRequest, input: RunI
 
     const environment = ctx.catalog.environment(collection, input.environment);
     const label = input.environment as string;
+    if (environment.unavailable !== undefined) throw new InputError(`${name} cannot run in ${label}: ${environment.unavailable}`);
+    checkProduction(ctx, collection, name, label);
     const secretNames = secretNamesOf(collection, ctx.settings.secrets);
     const agent = agentValues(request, input.variables, secretNames);
     const resolver = createResolver({ collection, environment, label, request, secrets: ctx.settings.secrets, agent });
     const hosts = environmentHosts(ctx, collection, environment, label);
     const endpoint = (template: string, what: string): string => destination(ctx, resolver.address(template).url, hosts, label, what);
 
-    const url = endpoint(request.url, `the address of ${name}`);
+    // An optional variable that nobody gave a value is left out of the request, with whatever hangs on it.
+    const given = (variable: string): boolean =>
+        agent.has(variable) || environment.variables.get(variable)?.secret === false || request.defaults.has(variable) ||
+            collection.variables.has(variable);
+    const left = pruned(request, new Set((request.optional ?? []).filter((variable) => !given(variable))));
+
+    const url = endpoint(left.url, `the address of ${name}`);
     const headers: Array<readonly [string, Text]> = [];
-    if (request.headers.length > MAX_HEADERS) throw new InputError(`${name} has more than ${MAX_HEADERS} headers`);
-    for (const [header, value] of request.headers) {
+    if (left.headers.length > MAX_HEADERS) throw new InputError(`${name} has more than ${MAX_HEADERS} headers`);
+    for (const [header, value] of left.headers) {
         headers.push(checkedHeader(header, resolver.text(value, "header"), SAVED_REFUSED_HEADERS, request.name));
     }
-    const body = request.body === undefined ? undefined : bodyOf(request.body, resolver, collection, headers, request.name);
+    const body = left.body === undefined ? undefined : bodyOf(left.body, resolver, collection, headers, request.name);
     const override = overrideOf(ctx, label);
     const signIn = override ?? signInOf(request.auth, resolver, endpoint, request.name);
     resolver.finish();

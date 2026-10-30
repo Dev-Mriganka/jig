@@ -138,7 +138,7 @@ describe("secret shapes nobody registered", () => {
     }
 
     test("a private key block cut short, with no END line, is removed to the end of the text", () => {
-        const cut = ["before", "-----BEGIN PRIVATE KEY-----", "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7"].join("\n");
+        const cut = ["before", "-----BEGIN " + "PRIVATE KEY-----", "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7"].join("\n");
         assert.equal(redactor.text(cut), `before\n${REDACTED}`);
     });
 

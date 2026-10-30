@@ -1,0 +1,9 @@
+info:
+  name: Watch orders
+  type: websocket
+  seq: 2
+websocket:
+  url: ws://stream.staging.acme.example.test/orders
+  auth: inherit
+settings:
+  encodeUrl: true

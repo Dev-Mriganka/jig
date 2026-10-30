@@ -70,6 +70,16 @@ export interface SavedRequest {
     signsIn: readonly string[];
     /** Values only this request has, such as the `@name = value` lines of a `.http` file. They are the weakest. */
     defaults: ReadonlyMap<string, string>;
+    /**
+     * The used variables that may stay unset. When nobody gives one a value, the query pair, the header or the JSON property
+     * that hangs on it is left out of the request (see optional.ts). Every other variable must have a value. Only the
+     * sources that describe parameters, such as OpenAPI, say which are optional.
+     */
+    optional?: readonly string[];
+    /** What a variable is, in a few words (where it goes, its type, its allowed values), for `show`. */
+    variableDocs?: ReadonlyMap<string, string>;
+    /** What the collection says the answer must be, as `expression operator value`. Shown by `show`; nothing checks them yet. */
+    assertions?: readonly string[];
     /** A script that would have to run before the request. Scripts never run, so such a request is refused. */
     scripts: { prerequest: boolean; /** Whose it is: "the request", "the folder Setup" or "the collection". */ where?: string };
     /** Why the request cannot run at all: a protocol, a method or a sign-in this plugin does not send. */
@@ -91,6 +101,9 @@ export interface Environment {
     /** The file it came from, for messages. */
     file: string;
     variables: ReadonlyMap<string, Variable>;
+    /** Set when the source lists the environment but nothing can run in it, such as an OpenAPI environment with no server. The
+     *  reason, in words that tell what to change. */
+    unavailable?: string;
 }
 
 /** Something wrong in a file, found while reading it. Reported by file and by key, and never fatal to the rest. */
@@ -116,6 +129,9 @@ export interface Collection {
     auth: Auth;
     /** Set when that sign-in is one this plugin does not send (Digest, AWS signing, a browser OAuth flow): its name. */
     authRefused?: string;
+    /** Set by a source that is opt-in per environment (OpenAPI): whether its reads may run in production. Without this field, the
+     *  collection is not governed here, and `jig-core`'s rules alone decide. Writes in production are denied by the floor. */
+    productionReads?: boolean;
     problems: readonly Problem[];
 }
 

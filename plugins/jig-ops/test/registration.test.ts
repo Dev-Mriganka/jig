@@ -246,8 +246,9 @@ describe("the package", () => {
     });
 
     test("the plugin adds no run-time dependency", () => {
-        const all = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")) as Record<string, unknown>;
-        assert.equal(all.dependencies, undefined);
+        const all = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")) as { dependencies?: Record<string, string> };
+        // The one package of the repository is jig-api's `yaml`.
+        assert.deepEqual(Object.keys(all.dependencies ?? {}), ["yaml"]);
     });
 
     test("the skill has a name that is its folder and a description that says when to use it, and teaches the order of work", () => {

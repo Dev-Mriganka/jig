@@ -1,0 +1,11 @@
+info:
+  name: Signed export
+  type: http
+  seq: 6
+http:
+  method: GET
+  url: "{{baseUrl}}/export"
+  auth:
+    type: awsv4
+settings:
+  encodeUrl: true

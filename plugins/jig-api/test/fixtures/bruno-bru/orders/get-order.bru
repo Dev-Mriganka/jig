@@ -1,0 +1,34 @@
+meta {
+  name: Get order
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/{{apiVersion}}/orders/:orderId
+  body: none
+  auth: inherit
+}
+
+params:path {
+  orderId: 
+}
+
+assert {
+  res.status: eq 200
+  res.body.id: isDefined
+}
+
+tests {
+  test("it is there", function () {
+    expect(res.status).to.equal(200);
+  });
+}
+
+docs {
+  Reads one order by its id.
+}
+
+settings {
+  encodeUrl: true
+}

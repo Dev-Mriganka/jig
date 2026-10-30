@@ -14,6 +14,9 @@ Back to the [jig-api overview](../README.md).
 A variable with no value is invalid input and is named, every missing one at once:
 `no value for sku, quantity in Staging: pass the ones the request uses in variables, or define them in the environment`.
 
+An OpenAPI spec marks some variables **optional**: a parameter or a body property it does not require. One that nobody gives a value
+is left out of the request with whatever hangs on it, and is not an error ([OpenAPI](openapi.md#parameters-and-the-body)).
+
 A value of the environment may use other variables (`{{scheme}}://{{host}}/{{version}}`). The agent's values are not offered to
 them, so the agent can only change what the request itself names, and a variable that refers to itself is refused.
 
@@ -41,8 +44,9 @@ together. The hosts a request may reach are the environment's own (see [Safety](
 
 ## Secrets
 
-A variable is a secret if an environment file declares it so (a Postman `secret` type, any key of `http-client.private.env.json`)
-or if `api.secrets` names it. Its value comes from the reference in `api.secrets`, resolved by `jig-core` at the moment the request
+A variable is a secret if an environment file declares it so (a Postman `secret` type, any key of `http-client.private.env.json`, a
+Bruno `vars:secret` or `secret: true`), if the format makes it one (Bruno's `{{process.env.NAME}}`, which is the secret named
+`process.env.NAME`; an OpenAPI security scheme, whose slots are named for it), or if `api.secrets` names it. Its value comes from the reference in `api.secrets`, resolved by `jig-core` at the moment the request
 is sent, and from nowhere else. A value for it in a file is refused and never sent.
 
 ```json

@@ -1,0 +1,20 @@
+info:
+  name: Place order (form)
+  type: http
+  seq: 8
+http:
+  method: POST
+  url: "{{baseUrl}}/{{apiVersion}}/orders/form"
+  body:
+    type: form-urlencoded
+    data:
+      - name: customer
+        value: "{{customerId}}"
+      - name: note
+        value: "{{note}}"
+      - name: old
+        value: legacy
+        disabled: true
+  auth: inherit
+settings:
+  encodeUrl: true
