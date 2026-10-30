@@ -15,7 +15,10 @@
         "test": "node --import ./test/support/host.mjs --test \"plugins/*/test/*.test.ts\"",
         "check": "node test/support/link-host.mjs && tsc -p tsconfig.json && biome ci .",
         "format": "biome format --write .",
-        "lint": "biome lint ."
+        "lint": "biome lint .",
+        "check:web": "npm --prefix plugins/jig-review/web run check",
+        "test:web": "npm --prefix plugins/jig-review/web test",
+        "check:dist": "node test/support/check-web-dist.mjs"
     },
     "dependencies": {
         "@hono/node-server": "2.1.3",
