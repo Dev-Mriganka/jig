@@ -31,11 +31,11 @@ parts live in a private company plugin kept at the company.
 | [`jig-jira`](../plugins/jig-jira/README.md) | built | `jira`: get, search, comments, transitions, changelog, attachments, assignable, find_field · create, comment, edit_comment, delete_comment, transition, update | the Jira site and its sign-in | 5 |
 | [`jig-logs`](../plugins/jig-logs/README.md) | built | `logs`: search by phrase or query, time window, filters, paging | the log backend: address, indexes, environment names, sign-in | 6 |
 | [`jig-http`](../plugins/jig-http/README.md) | built | `http`: a method, path, body and headers to a named target | the named targets and their sign-in | 7 |
-| [`jig-k8s`](../plugins/jig-k8s/README.md) | design | `k8s`: pods, status, logs, api | the service map: for each service and environment, the cluster context, namespace and pod selector | 7 |
+| [`jig-ops`](../plugins/jig-ops/README.md) | design | `ci`: status, runs, log, rerun, trigger, watch · `deploy`: plan, run, status, rollback, watch · `runtime`: pods, rollout, logs, events, health | the service catalog, its CI systems and deploy methods, transports | 7 |
 | [`jig-review`](../plugins/jig-review/README.md) | design | `start_interactive_code_review`, `record_interactive_review_resolution` | none | 8 |
 | [`jig-agents`](../plugins/jig-agents/README.md) | design | `subagent`, `subagent_message`, `subagent_status`, `subagent_interrupt`, `subagent_done`, `caller_ping` | which model each role uses | 8, unless a store package replaces it |
 
-`jig-k8s` is being built.
+`jig-ops` is being built, starting with its Kubernetes runtime adapter.
 
 ## How company parts plug in
 

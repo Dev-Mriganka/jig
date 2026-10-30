@@ -49,7 +49,8 @@
 | **Acceptance scenario** | A numbered check in a ticket's plan. It is passed or failed, and a pass needs evidence. |
 | **Checker agent** | A read-only agent in a fresh context that reviews a change before you do. Planned. |
 | **Review ledger** | Planned: every review comment, from the review page, the pull request or chat, with how it was handled. |
-| **Service map** | For each service and environment, the cluster context, the namespace and the pod selector. A company plugin supplies it to `jig-k8s`. |
+| **Service catalog** | Each service described once for `jig-ops`: its repository, its CI, and per environment how it deploys, where it runs and its health address. |
+| **Adapter** | A small piece of a plugin that speaks one outside system, such as one CI system or one log backend, behind the plugin's common verbs. |
 | **Subagent** | A child agent: a full Pi session that another session starts in its own terminal pane. |
 | **Agent file** | A file that sets a subagent's role, its tools and its model, such as a planner, a reviewer, a scout or a worker. |
 | **Pin** | A hash of a script's folder. A script whose folder changed is refused until you pin it again. |

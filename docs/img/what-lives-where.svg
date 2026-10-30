@@ -81,7 +81,7 @@
   <rect x="202" y="422" width="146" height="32" rx="4" fill="#5C9CAB"/>
   <text x="275" y="442.55" font-size="13" fill="#FFFFFF" text-anchor="middle">jig-http</text>
   <rect x="358" y="422" width="146" height="32" rx="4" fill="#5C9CAB"/>
-  <text x="431" y="442.55" font-size="13" fill="#FFFFFF" text-anchor="middle">jig-k8s</text>
+  <text x="431" y="442.55" font-size="13" fill="#FFFFFF" text-anchor="middle">jig-ops</text>
   <rect x="514" y="422" width="146" height="32" rx="4" fill="#5C9CAB"/>
   <text x="587" y="442.55" font-size="13" fill="#FFFFFF" text-anchor="middle">jig-review</text>
   <rect x="670" y="422" width="146" height="32" rx="4" fill="#5C9CAB"/>

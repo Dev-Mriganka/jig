@@ -2,6 +2,22 @@
 
 Dated so the reasons stay attached.
 
+## 2026-10-30: jig-ops, one plugin for build, deploy and run
+
+- **`jig-k8s` alone was too small.** The real use is the loop: the change
+  built, deploy it to `staging`, check it is healthy, read the logs if not.
+- **`jig-ops` covers it with three tools:** `ci`, `deploy` and `runtime`. Each
+  is generic, with one small adapter per system: GitHub Actions, GitLab CI and
+  Jenkins; Helm, `kubectl set image`, a GitOps pull request and a CI deploy job;
+  Kubernetes first.
+- **A service catalog describes each service once:** repository, CI, and per
+  environment its deploy method, runtime and health address. An environment
+  without a deploy method cannot be deployed to, and the floor denies
+  production writes anyway.
+- **CI moves here from `jig-git`,** which keeps git, pull requests, reviews and
+  releases.
+- **Docker comes later,** with care: access to Docker is root on the machine.
+
 ## 2026-10-30: jig-flow becomes jig-workflow, and workflows are named files
 
 - **Renamed** to `jig-workflow`, with its tool `workflow`.
