@@ -1,0 +1,13 @@
+# The Jig dashboards, loaded from the files in this plugin. The start-up sets JIG_LENS_DASHBOARDS to their folder.
+apiVersion: 1
+providers:
+  - name: jig-lens
+    orgId: 1
+    folder: Jig
+    type: file
+    disableDeletion: true
+    # A change made in the browser is not saved; save a copy under another name to keep one.
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: $JIG_LENS_DASHBOARDS

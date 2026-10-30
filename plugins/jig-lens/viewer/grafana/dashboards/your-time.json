@@ -1,0 +1,516 @@
+{
+  "uid": "jig-time",
+  "title": "Jig: your time",
+  "description": "How often the agent had to ask you, and how long its calls waited for your answer.",
+  "tags": [
+    "jig"
+  ],
+  "timezone": "utc",
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "",
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "links": [
+    {
+      "type": "dashboards",
+      "title": "Jig",
+      "tags": [
+        "jig"
+      ],
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": true,
+      "icon": "external link"
+    }
+  ],
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Questions asked",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT count(*) AS questions\nFROM call\nWHERE answer IS NOT NULL AND time >= $__from / 1000 AND time < $__to / 1000",
+          "queryText": "SELECT count(*) AS questions\nFROM call\nWHERE answer IS NOT NULL AND time >= $__from / 1000 AND time < $__to / 1000",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Time calls waited for you",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT coalesce(sum(waitedMs), 0) AS waited\nFROM call\nWHERE answer IS NOT NULL AND time >= $__from / 1000 AND time < $__to / 1000",
+          "queryText": "SELECT coalesce(sum(waitedMs), 0) AS waited\nFROM call\nWHERE answer IS NOT NULL AND time >= $__from / 1000 AND time < $__to / 1000",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 8,
+        "y": 0
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Longest wait",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT coalesce(max(waitedMs), 0) AS longest\nFROM call\nWHERE answer IS NOT NULL AND time >= $__from / 1000 AND time < $__to / 1000",
+          "queryText": "SELECT coalesce(max(waitedMs), 0) AS longest\nFROM call\nWHERE answer IS NOT NULL AND time >= $__from / 1000 AND time < $__to / 1000",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 16,
+        "y": 0
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Questions per day",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "time series",
+          "rawQueryText": "SELECT CAST(time / 86400 AS INTEGER) * 86400 AS day, count(*) AS questions\nFROM call\nWHERE answer IS NOT NULL AND time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY day\nORDER BY day",
+          "queryText": "SELECT CAST(time / 86400 AS INTEGER) * 86400 AS day, count(*) AS questions\nFROM call\nWHERE answer IS NOT NULL AND time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY day\nORDER BY day",
+          "timeColumns": [
+            "day"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "min": 0,
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Time waited for you, per day",
+      "description": "The time between a call asking and your answer. It includes time in the queue behind other questions.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "time series",
+          "rawQueryText": "SELECT CAST(time / 86400 AS INTEGER) * 86400 AS day, sum(waitedMs) AS waited\nFROM call\nWHERE answer IS NOT NULL AND time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY day\nORDER BY day",
+          "queryText": "SELECT CAST(time / 86400 AS INTEGER) * 86400 AS day, sum(waitedMs) AS waited\nFROM call\nWHERE answer IS NOT NULL AND time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY day\nORDER BY day",
+          "timeColumns": [
+            "day"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "min": 0,
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      }
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Questions per tool",
+      "description": "Each question is a call that asked. A tool that asks often is a candidate for a rule.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT tool,\n       coalesce(action, '') AS action,\n       count(*) AS questions,\n       sum(answer = 'allow') AS allowed,\n       sum(answer = 'allow-session') AS \"allowed for the session\",\n       sum(answer = 'decline') AS declined,\n       sum(waitedMs) AS waited,\n       round(avg(waitedMs)) AS \"average wait\"\nFROM call\nWHERE answer IS NOT NULL AND time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY tool, action\nORDER BY questions DESC, tool, action",
+          "queryText": "SELECT tool,\n       coalesce(action, '') AS action,\n       count(*) AS questions,\n       sum(answer = 'allow') AS allowed,\n       sum(answer = 'allow-session') AS \"allowed for the session\",\n       sum(answer = 'decline') AS declined,\n       sum(waitedMs) AS waited,\n       round(avg(waitedMs)) AS \"average wait\"\nFROM call\nWHERE answer IS NOT NULL AND time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY tool, action\nORDER BY questions DESC, tool, action",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "minWidth": 60
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "waited"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "average wait"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      }
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "Questions per ticket",
+      "description": "A ticket is one change, so this is how often each change needed you.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT coalesce(ticket, '(none)') AS ticket,\n       count(*) AS questions,\n       sum(waitedMs) AS waited\nFROM call\nWHERE answer IS NOT NULL AND time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY ticket\nORDER BY questions DESC, ticket",
+          "queryText": "SELECT coalesce(ticket, '(none)') AS ticket,\n       count(*) AS questions,\n       sum(waitedMs) AS waited\nFROM call\nWHERE answer IS NOT NULL AND time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY ticket\nORDER BY questions DESC, ticket",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "minWidth": 60
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "waited"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 9,
+        "x": 0,
+        "y": 19
+      }
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "title": "Longest waits",
+      "description": "Click a session to see the calls around it.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT time,\n       session,\n       tool,\n       coalesce(action, '') AS action,\n       approval AS \"asked with\",\n       answer,\n       waitedMs AS waited\nFROM call\nWHERE answer IS NOT NULL AND time >= $__from / 1000 AND time < $__to / 1000\nORDER BY waitedMs DESC, time\nLIMIT 50",
+          "queryText": "SELECT time,\n       session,\n       tool,\n       coalesce(action, '') AS action,\n       approval AS \"asked with\",\n       answer,\n       waitedMs AS waited\nFROM call\nWHERE answer IS NOT NULL AND time >= $__from / 1000 AND time < $__to / 1000\nORDER BY waitedMs DESC, time\nLIMIT 50",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "minWidth": 60
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "time"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 170
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "session"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 290
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open this session",
+                    "url": "/d/jig-session?var-session=${__value.raw}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "waited"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 15,
+        "x": 9,
+        "y": 19
+      }
+    }
+  ]
+}

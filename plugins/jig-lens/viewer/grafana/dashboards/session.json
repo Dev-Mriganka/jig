@@ -1,0 +1,681 @@
+{
+  "uid": "jig-session",
+  "title": "Jig: session",
+  "description": "Every call and model turn of one session, in order. Choose the session above, or follow a link from another dashboard.",
+  "tags": [
+    "jig"
+  ],
+  "timezone": "utc",
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "",
+  "time": {
+    "from": "now-90d",
+    "to": "now"
+  },
+  "links": [
+    {
+      "type": "dashboards",
+      "title": "Jig",
+      "tags": [
+        "jig"
+      ],
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": true,
+      "icon": "external link"
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "session",
+        "label": "Session",
+        "type": "query",
+        "datasource": {
+          "type": "frser-sqlite-datasource",
+          "uid": "jig-lens"
+        },
+        "query": "SELECT strftime('%Y-%m-%d %H:%M', max(time), 'unixepoch') || '  ' || min(agentRole) || '  ' || substr(session, 1, 8) AS __text,\n       session AS __value\nFROM (SELECT session, agentRole, time FROM call UNION ALL SELECT session, agentRole, time FROM turn)\nGROUP BY session\nORDER BY max(time) DESC",
+        "definition": "SELECT strftime('%Y-%m-%d %H:%M', max(time), 'unixepoch') || '  ' || min(agentRole) || '  ' || substr(session, 1, 8) AS __text,\n       session AS __value\nFROM (SELECT session, agentRole, time FROM call UNION ALL SELECT session, agentRole, time FROM turn)\nGROUP BY session\nORDER BY max(time) DESC",
+        "refresh": 1,
+        "sort": 0,
+        "multi": false,
+        "includeAll": false,
+        "hide": 0,
+        "options": [],
+        "current": {}
+      }
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Cost",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT round(coalesce(sum(cost), 0), 4) AS cost\nFROM turn\nWHERE session = ${session:singlequote}",
+          "queryText": "SELECT round(coalesce(sum(cost), 0), 4) AS cost\nFROM turn\nWHERE session = ${session:singlequote}",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 4
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Model turns",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT count(*) AS turns\nFROM turn\nWHERE session = ${session:singlequote}",
+          "queryText": "SELECT count(*) AS turns\nFROM turn\nWHERE session = ${session:singlequote}",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 5,
+        "y": 0
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Tool calls",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT count(*) AS calls\nFROM call\nWHERE session = ${session:singlequote}",
+          "queryText": "SELECT count(*) AS calls\nFROM call\nWHERE session = ${session:singlequote}",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 9,
+        "y": 0
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Calls that failed or were refused",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT count(*) AS failed\nFROM call\nWHERE session = ${session:singlequote} AND outcome != 'ok'",
+          "queryText": "SELECT count(*) AS failed\nFROM call\nWHERE session = ${session:singlequote} AND outcome != 'ok'",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 13,
+        "y": 0
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Waited for you",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT coalesce(sum(waitedMs), 0) AS waited\nFROM call\nWHERE session = ${session:singlequote}",
+          "queryText": "SELECT coalesce(sum(waitedMs), 0) AS waited\nFROM call\nWHERE session = ${session:singlequote}",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 19,
+        "y": 0
+      }
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "This session",
+      "description": "A child agent's session names the session that started it; click it to open that one.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT min(agentRole) AS role,\n       max(ticket) AS ticket,\n       max(parentSession) AS \"parent session\",\n       min(time) AS started,\n       max(time) AS \"last record\"\nFROM (\n    SELECT agentRole, ticket, parentSession, time FROM call WHERE session = ${session:singlequote}\n    UNION ALL\n    SELECT agentRole, ticket, parentSession, time FROM turn WHERE session = ${session:singlequote}\n)",
+          "queryText": "SELECT min(agentRole) AS role,\n       max(ticket) AS ticket,\n       max(parentSession) AS \"parent session\",\n       min(time) AS started,\n       max(time) AS \"last record\"\nFROM (\n    SELECT agentRole, ticket, parentSession, time FROM call WHERE session = ${session:singlequote}\n    UNION ALL\n    SELECT agentRole, ticket, parentSession, time FROM turn WHERE session = ${session:singlequote}\n)",
+          "timeColumns": [
+            "started",
+            "last record"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "minWidth": 60
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "started"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 170
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "last record"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 170
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "role"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ticket"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 130
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "parent session"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 290
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open this session",
+                    "url": "/d/jig-session?var-session=${__value.raw}"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 4
+      }
+    },
+    {
+      "id": 7,
+      "type": "barchart",
+      "title": "Cost of each turn",
+      "description": "One bar for each model turn of the session, in order.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT CAST(row_number() OVER (ORDER BY time) AS TEXT) AS turn, cost\nFROM turn\nWHERE session = ${session:singlequote}\nORDER BY time",
+          "queryText": "SELECT CAST(row_number() OVER (ORDER BY time) AS TEXT) AS turn, cost\nFROM turn\nWHERE session = ${session:singlequote}\nORDER BY time",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 80
+          },
+          "min": 0,
+          "decimals": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cost"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 4
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "xField": "turn",
+        "orientation": "vertical",
+        "showValue": "never",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      }
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "title": "Every call and turn, in order",
+      "description": "A call row shows what was called, how it was decided and how it ended. A turn row is one model response, with its cost.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT time,\n       'call' AS kind,\n       tool || coalesce(' ' || action, '') AS what,\n       environment,\n       decision,\n       decisionSource AS \"decided by\",\n       answer,\n       outcome,\n       errorKind,\n       durationMs AS duration,\n       waitedMs AS waited,\n       NULL AS cost,\n       error\nFROM call\nWHERE session = ${session:singlequote}\nUNION ALL\nSELECT time,\n       'turn',\n       model,\n       NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,\n       cost,\n       NULL\nFROM turn\nWHERE session = ${session:singlequote}\nORDER BY time, kind",
+          "queryText": "SELECT time,\n       'call' AS kind,\n       tool || coalesce(' ' || action, '') AS what,\n       environment,\n       decision,\n       decisionSource AS \"decided by\",\n       answer,\n       outcome,\n       errorKind,\n       durationMs AS duration,\n       waitedMs AS waited,\n       NULL AS cost,\n       error\nFROM call\nWHERE session = ${session:singlequote}\nUNION ALL\nSELECT time,\n       'turn',\n       model,\n       NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,\n       cost,\n       NULL\nFROM turn\nWHERE session = ${session:singlequote}\nORDER BY time, kind",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "minWidth": 60
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "time"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 170
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "kind"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 70
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "environment"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "decision"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "decided by"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "answer"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "outcome"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "duration"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "waited"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cost"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "duration"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "waited"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cost"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 4
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "gridPos": {
+        "h": 16,
+        "w": 24,
+        "x": 0,
+        "y": 15
+      }
+    }
+  ]
+}

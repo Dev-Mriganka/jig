@@ -1,0 +1,668 @@
+{
+  "uid": "jig-overview",
+  "title": "Jig: overview",
+  "description": "What the agent cost and how its tool calls went. Days are UTC days, like the record files.",
+  "tags": [
+    "jig"
+  ],
+  "timezone": "utc",
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "",
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "links": [
+    {
+      "type": "dashboards",
+      "title": "Jig",
+      "tags": [
+        "jig"
+      ],
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": true,
+      "icon": "external link"
+    }
+  ],
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Cost",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT round(coalesce(sum(cost), 0), 4) AS cost\nFROM turn\nWHERE time >= $__from / 1000 AND time < $__to / 1000",
+          "queryText": "SELECT round(coalesce(sum(cost), 0), 4) AS cost\nFROM turn\nWHERE time >= $__from / 1000 AND time < $__to / 1000",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Model turns",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT count(*) AS turns\nFROM turn\nWHERE time >= $__from / 1000 AND time < $__to / 1000",
+          "queryText": "SELECT count(*) AS turns\nFROM turn\nWHERE time >= $__from / 1000 AND time < $__to / 1000",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Tool calls",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT count(*) AS calls\nFROM call\nWHERE time >= $__from / 1000 AND time < $__to / 1000",
+          "queryText": "SELECT count(*) AS calls\nFROM call\nWHERE time >= $__from / 1000 AND time < $__to / 1000",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Calls that failed",
+      "description": "Calls whose tool ran and failed, or that never reached it (outcome error).",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT count(*) AS errors\nFROM call\nWHERE outcome = 'error' AND time >= $__from / 1000 AND time < $__to / 1000",
+          "queryText": "SELECT count(*) AS errors\nFROM call\nWHERE outcome = 'error' AND time >= $__from / 1000 AND time < $__to / 1000",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Cost per day",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "time series",
+          "rawQueryText": "SELECT CAST(time / 86400 AS INTEGER) * 86400 AS day, round(sum(cost), 4) AS cost\nFROM turn\nWHERE time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY day\nORDER BY day",
+          "queryText": "SELECT CAST(time / 86400 AS INTEGER) * 86400 AS day, round(sum(cost), 4) AS cost\nFROM turn\nWHERE time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY day\nORDER BY day",
+          "timeColumns": [
+            "day"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "min": 0,
+          "unit": "currencyUSD",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Calls and errors per day",
+      "description": "Each bar is the calls of a day, split by how they ended. An error ran and failed or never ran; blocked means a rule refused it or you declined.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "time series",
+          "rawQueryText": "SELECT CAST(time / 86400 AS INTEGER) * 86400 AS day,\n       sum(outcome = 'ok') AS ok,\n       sum(outcome = 'error') AS errors,\n       sum(outcome = 'blocked') AS blocked\nFROM call\nWHERE time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY day\nORDER BY day",
+          "queryText": "SELECT CAST(time / 86400 AS INTEGER) * 86400 AS day,\n       sum(outcome = 'ok') AS ok,\n       sum(outcome = 'error') AS errors,\n       sum(outcome = 'blocked') AS blocked\nFROM call\nWHERE time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY day\nORDER BY day",
+          "timeColumns": [
+            "day"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ok"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "errors"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "blocked"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      }
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "Cost per model",
+      "description": "Cache hit is the share of prompt tokens that were read from the cache.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT model,\n       round(sum(cost), 4) AS cost,\n       count(*) AS turns,\n       sum(input) AS input,\n       sum(output) AS output,\n       sum(cacheRead) AS \"cache read\",\n       sum(cacheWrite) AS \"cache write\",\n       round(100.0 * sum(cacheRead) / nullif(sum(input) + sum(cacheRead) + sum(cacheWrite), 0), 1) AS \"cache hit %\"\nFROM turn\nWHERE time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY model\nORDER BY cost DESC, model",
+          "queryText": "SELECT model,\n       round(sum(cost), 4) AS cost,\n       count(*) AS turns,\n       sum(input) AS input,\n       sum(output) AS output,\n       sum(cacheRead) AS \"cache read\",\n       sum(cacheWrite) AS \"cache write\",\n       round(100.0 * sum(cacheRead) / nullif(sum(input) + sum(cacheRead) + sum(cacheWrite), 0), 1) AS \"cache hit %\"\nFROM turn\nWHERE time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY model\nORDER BY cost DESC, model",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "minWidth": 60
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cost"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 4
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      }
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "title": "Cost per agent role",
+      "description": "The main agent is main; a child agent has the role it was started with, such as a reviewer.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT agentRole AS role,\n       round(sum(cost), 4) AS cost,\n       count(*) AS turns,\n       count(DISTINCT session) AS sessions\nFROM turn\nWHERE time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY agentRole\nORDER BY cost DESC, role",
+          "queryText": "SELECT agentRole AS role,\n       round(sum(cost), 4) AS cost,\n       count(*) AS turns,\n       count(DISTINCT session) AS sessions\nFROM turn\nWHERE time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY agentRole\nORDER BY cost DESC, role",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "minWidth": 60
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cost"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 4
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 18
+      }
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "Cost per ticket",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT coalesce(ticket, '(none)') AS ticket,\n       round(sum(cost), 4) AS cost,\n       count(DISTINCT session) AS sessions,\n       count(*) AS turns\nFROM turn\nWHERE time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY ticket\nORDER BY cost DESC, ticket",
+          "queryText": "SELECT coalesce(ticket, '(none)') AS ticket,\n       round(sum(cost), 4) AS cost,\n       count(DISTINCT session) AS sessions,\n       count(*) AS turns\nFROM turn\nWHERE time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY ticket\nORDER BY cost DESC, ticket",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "minWidth": 60
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cost"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 4
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 18
+      }
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "title": "Sessions, by cost",
+      "description": "Click a session to see every call and turn in it.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "table",
+          "rawQueryText": "WITH events AS (\n    SELECT session, agentRole, ticket, time, cost, 0 AS calls, 0 AS errors\n    FROM turn\n    WHERE time >= $__from / 1000 AND time < $__to / 1000\n    UNION ALL\n    SELECT session, agentRole, ticket, time, 0.0, 1, outcome = 'error'\n    FROM call\n    WHERE time >= $__from / 1000 AND time < $__to / 1000\n)\nSELECT session,\n       min(agentRole) AS role,\n       max(ticket) AS ticket,\n       min(time) AS started,\n       round(sum(cost), 4) AS cost,\n       sum(calls) AS calls,\n       sum(errors) AS errors\nFROM events\nGROUP BY session\nORDER BY sum(cost) DESC, session\nLIMIT 100",
+          "queryText": "WITH events AS (\n    SELECT session, agentRole, ticket, time, cost, 0 AS calls, 0 AS errors\n    FROM turn\n    WHERE time >= $__from / 1000 AND time < $__to / 1000\n    UNION ALL\n    SELECT session, agentRole, ticket, time, 0.0, 1, outcome = 'error'\n    FROM call\n    WHERE time >= $__from / 1000 AND time < $__to / 1000\n)\nSELECT session,\n       min(agentRole) AS role,\n       max(ticket) AS ticket,\n       min(time) AS started,\n       round(sum(cost), 4) AS cost,\n       sum(calls) AS calls,\n       sum(errors) AS errors\nFROM events\nGROUP BY session\nORDER BY sum(cost) DESC, session\nLIMIT 100",
+          "timeColumns": [
+            "started"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "minWidth": 60
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "started"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 170
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "session"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 290
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open this session",
+                    "url": "/d/jig-session?var-session=${__value.raw}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cost"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 4
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      }
+    }
+  ]
+}

@@ -1,0 +1,443 @@
+{
+  "uid": "jig-tools",
+  "title": "Jig: tools",
+  "description": "How often each tool was called, how often it failed and why, how long it took, and what a rule refused.",
+  "tags": [
+    "jig"
+  ],
+  "timezone": "utc",
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "",
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "links": [
+    {
+      "type": "dashboards",
+      "title": "Jig",
+      "tags": [
+        "jig"
+      ],
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": true,
+      "icon": "external link"
+    }
+  ],
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "table",
+      "title": "Calls and failures per tool",
+      "description": "Errors ran and failed or never ran; blocked calls were refused by a rule or declined by you.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT tool,\n       coalesce(action, '') AS action,\n       count(*) AS calls,\n       sum(outcome = 'error') AS errors,\n       sum(outcome = 'blocked') AS blocked,\n       round(100.0 * sum(outcome = 'error') / count(*), 1) AS \"error %\"\nFROM call\nWHERE time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY tool, action\nORDER BY errors DESC, calls DESC, tool, action",
+          "queryText": "SELECT tool,\n       coalesce(action, '') AS action,\n       count(*) AS calls,\n       sum(outcome = 'error') AS errors,\n       sum(outcome = 'blocked') AS blocked,\n       round(100.0 * sum(outcome = 'error') / count(*), 1) AS \"error %\"\nFROM call\nWHERE time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY tool, action\nORDER BY errors DESC, calls DESC, tool, action",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "minWidth": 60
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 16,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": 2,
+      "type": "barchart",
+      "title": "Failures per error kind",
+      "description": "Why calls did not succeed: denied, no-screen, declined, invalid, dismissed, internal, tool, withheld, not-run.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT errorKind, count(*) AS calls\nFROM call\nWHERE errorKind IS NOT NULL AND time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY errorKind\nORDER BY calls DESC, errorKind",
+          "queryText": "SELECT errorKind, count(*) AS calls\nFROM call\nWHERE errorKind IS NOT NULL AND time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY errorKind\nORDER BY calls DESC, errorKind",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 80
+          },
+          "min": 0,
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "xField": "errorKind",
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 16,
+        "y": 0
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Failures per day, by error kind",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "time series",
+          "rawQueryText": "SELECT CAST(time / 86400 AS INTEGER) * 86400 AS day, errorKind, count(*) AS calls\nFROM call\nWHERE errorKind IS NOT NULL AND time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY day, errorKind\nORDER BY day",
+          "queryText": "SELECT CAST(time / 86400 AS INTEGER) * 86400 AS day, errorKind, count(*) AS calls\nFROM call\nWHERE errorKind IS NOT NULL AND time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY day, errorKind\nORDER BY day",
+          "timeColumns": [
+            "day"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          },
+          "min": 0,
+          "displayName": "${__field.labels.errorKind}"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 10,
+        "x": 0,
+        "y": 9
+      }
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "Slowest tools",
+      "description": "By average time the tool ran. Calls refused before they ran have no time.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT tool,\n       coalesce(action, '') AS action,\n       count(*) AS calls,\n       round(avg(durationMs)) AS \"average\",\n       max(durationMs) AS \"slowest\"\nFROM call\nWHERE durationMs IS NOT NULL AND time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY tool, action\nORDER BY avg(durationMs) DESC, tool, action\nLIMIT 15",
+          "queryText": "SELECT tool,\n       coalesce(action, '') AS action,\n       count(*) AS calls,\n       round(avg(durationMs)) AS \"average\",\n       max(durationMs) AS \"slowest\"\nFROM call\nWHERE durationMs IS NOT NULL AND time >= $__from / 1000 AND time < $__to / 1000\nGROUP BY tool, action\nORDER BY avg(durationMs) DESC, tool, action\nLIMIT 15",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "minWidth": 60
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "average"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "slowest"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 14,
+        "x": 10,
+        "y": 9
+      }
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Calls refused by a rule",
+      "description": "Calls with decision deny. Click a session to see the calls around it.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT time,\n       session,\n       tool,\n       coalesce(action, '') AS action,\n       environment,\n       decisionSource AS \"decided by\",\n       error\nFROM call\nWHERE decision = 'deny' AND time >= $__from / 1000 AND time < $__to / 1000\nORDER BY time DESC\nLIMIT 100",
+          "queryText": "SELECT time,\n       session,\n       tool,\n       coalesce(action, '') AS action,\n       environment,\n       decisionSource AS \"decided by\",\n       error\nFROM call\nWHERE decision = 'deny' AND time >= $__from / 1000 AND time < $__to / 1000\nORDER BY time DESC\nLIMIT 100",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "minWidth": 60
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "time"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 170
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "session"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 290
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open this session",
+                    "url": "/d/jig-session?var-session=${__value.raw}"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      }
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Recent failures",
+      "description": "Calls whose tool ran and failed, or that never reached it. Click a session to see the calls around it.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "jig-lens"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "jig-lens"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT time,\n       session,\n       tool,\n       coalesce(action, '') AS action,\n       errorKind,\n       error,\n       durationMs AS duration\nFROM call\nWHERE outcome = 'error' AND time >= $__from / 1000 AND time < $__to / 1000\nORDER BY time DESC\nLIMIT 100",
+          "queryText": "SELECT time,\n       session,\n       tool,\n       coalesce(action, '') AS action,\n       errorKind,\n       error,\n       durationMs AS duration\nFROM call\nWHERE outcome = 'error' AND time >= $__from / 1000 AND time < $__to / 1000\nORDER BY time DESC\nLIMIT 100",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "minWidth": 60
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "time"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 170
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "session"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 290
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open this session",
+                    "url": "/d/jig-session?var-session=${__value.raw}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "duration"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 25
+      }
+    }
+  ]
+}
