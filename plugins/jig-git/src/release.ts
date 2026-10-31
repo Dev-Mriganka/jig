@@ -1,9 +1,12 @@
-// The `release` tool: tags and releases. Creating a tag is local. Pushing a tag and creating a GitHub release change GitHub,
-// so they ask. A tag is never deleted or moved from here, and a pushed tag is never forced.
+// The `release` tool: tags and releases. Creating a tag is local. Pushing a tag and creating a release on GitHub or GitLab change
+// the forge, so they ask. A tag is never deleted or moved from here, and a pushed tag is never forced. Tags are git; the releases
+// go to the forge of the repository, through gh or glab (see forge.ts).
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import type { CallClass } from "../../jig-core/src/contract.ts";
+import { forgeOf } from "./forge.ts";
 import { afterLostReply, gh, ghFailure, ghJson, ghWrite, repoFlags, requireSlug } from "./github.ts";
+import { planReleaseCreate as planGitlabReleaseCreate, planReleases as planGitlabReleases } from "./gitlab-release.ts";
 import { checkBody, checkCommitMessage, checkRemote, checkRev, checkTag, checkTitle } from "./names.ts";
 import { describeActions } from "./params.ts";
 import type { ActionTable } from "./params.ts";
@@ -24,7 +27,7 @@ export const RELEASE_ACTIONS = {
     tag_create: { summary: "an annotated tag, locally", required: ["tag", "message"], optional: ["repo", "target"] },
     tag_push: { summary: "push a tag (asks)", required: ["tag"], optional: ["repo", "remote"] },
     release_create: {
-        summary: "a GitHub release (asks)",
+        summary: "a GitHub or GitLab release (asks)",
         required: ["tag"],
         optional: ["repo", "title", "notes", "target", "draft", "prerelease", "generate_notes"],
     },
@@ -78,9 +81,13 @@ const ReleaseParams = Type.Object(
                 description: "release_create: the release notes, Markdown.",
             }),
         ),
-        draft: Type.Optional(Type.Boolean({ description: "release_create: save it as a draft." })),
-        prerelease: Type.Optional(Type.Boolean({ description: "release_create: mark it as a pre-release." })),
-        generate_notes: Type.Optional(Type.Boolean({ description: "release_create: let GitHub write the notes." })),
+        draft: Type.Optional(Type.Boolean({ description: "release_create: save it as a draft. GitHub only." })),
+        prerelease: Type.Optional(
+            Type.Boolean({ description: "release_create: mark it as a pre-release. GitHub only." }),
+        ),
+        generate_notes: Type.Optional(
+            Type.Boolean({ description: "release_create: let GitHub write the notes. GitHub only." }),
+        ),
         pattern: Type.Optional(
             Type.String({ minLength: 1, maxLength: 100, description: "tags: a glob such as v1.*." }),
         ),
@@ -418,8 +425,17 @@ async function planReleaseCreate(params: CreateReleaseParams, call: Call): Promi
     };
 }
 
-function planRelease(params: Readonly<Record<string, unknown>>, call: Call): Promise<Planned> | Planned {
+async function planRelease(params: Readonly<Record<string, unknown>>, call: Call): Promise<Planned> {
     const p = params as never;
+    // The releases are the forge's; the repository says which forge. Tags are git and need no answer.
+    if (params.action === "releases" || params.action === "release_create") {
+        const repo = await resolveRepo(params.repo as string | undefined, call.signal);
+        const home = await forgeOf(repo, call.settings, call.signal);
+        if (home.forge === "gitlab")
+            return params.action === "releases"
+                ? planGitlabReleases(p, call, home)
+                : planGitlabReleaseCreate(p, call, home);
+    }
     switch (params.action) {
         case "tags":
             return planTags(p, call);
@@ -440,7 +456,7 @@ export const releaseTool: JigTool = buildTool({
     name: "release",
     label: "Release",
     description:
-        "Tags and GitHub releases: tags, releases, tag_create (local), tag_push and release_create (these ask). A tag is never moved, forced or deleted from here.",
+        "Tags and releases on GitHub or GitLab, by the repository's origin: tags, releases, tag_create (local), tag_push and release_create (these ask). A tag is never moved, forced or deleted from here.",
     promptSnippet: "Tags and releases: list, create, push",
     parameters: ReleaseParams,
     table: RELEASE_ACTIONS,
