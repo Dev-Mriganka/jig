@@ -89,7 +89,7 @@ describe("validateAgents", () => {
         assert.equal(validateAgents({ roles: { scout: { model: "a b/c" } } }).length, 1);
         assert.equal(validateAgents({ roles: { scout: { model: "/id" } } }).length, 1);
         assert.equal(validateAgents({ roles: { "my role": {} } }).length, 1);
-        assert.deepEqual(validateAgents({ roles: { scout: { model: "bedrock/anthropic.claude-v2:0" } } }), []);
+        assert.deepEqual(validateAgents({ roles: { scout: { model: "cloud/vendor.model-v2:0" } } }), []);
     });
 
     test("approvals are forward or deny; folders are absolute or home-relative; env holds variable names", () => {
@@ -182,10 +182,10 @@ describe("parseModel", () => {
             id: "claude-sonnet",
             thinking: "high",
         });
-        assert.deepEqual(parseModel("bedrock/anthropic.claude-v2:0"), {
-            model: "bedrock/anthropic.claude-v2:0",
-            provider: "bedrock",
-            id: "anthropic.claude-v2:0",
+        assert.deepEqual(parseModel("cloud/vendor.model-v2:0"), {
+            model: "cloud/vendor.model-v2:0",
+            provider: "cloud",
+            id: "vendor.model-v2:0",
         });
         assert.equal(parseModel("nothing"), undefined);
         assert.equal(parseModel(""), undefined);
