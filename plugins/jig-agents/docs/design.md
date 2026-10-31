@@ -334,9 +334,9 @@ model can run commands, and a command changes only the environment of its own ch
 that runs it another variable. What is assumed:
 - **Only trusted code runs inside the Pi process.** Extensions can change `process.env`, and they are the user's own
   packages, loaded from places the model cannot write.
-- **The sandbox keeps a command from the child's memory and `/proc`.** Writing `/proc/<pid>/mem` or attaching with `ptrace`
-  would change the process; the sandbox gives a command its own process space ([Not verified](not-verified.md) says
-  what has not been proved of `ptrace_scope`).
+- **The sandbox keeps a command away from the child's process.** A test shows that a command cannot read the Pi process's
+  environment through `/proc`. Writing its memory or attaching with `ptrace` would be needed to change it, and what has
+  not been proved of `ptrace_scope` is on the [Not verified](not-verified.md) page.
 - **The gate was registered before any call.** It is registered when the plugin loads, before a session starts.
 
 ### The gate
