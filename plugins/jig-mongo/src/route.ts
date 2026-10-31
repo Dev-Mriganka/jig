@@ -86,11 +86,13 @@ export function classifySshFailure(code: number | null, stderr: string): RouteEr
             "the bastion's host key is not trusted: connect to it once with ssh yourself to add it to known_hosts",
         );
     }
-    if (/permission denied|too many authentication failures/i.test(stderr)) {
-        return new RouteError("the bastion refused the SSH key: check the key behind the key reference and the user");
-    }
+    // A key ssh cannot load is reported first: it then has no other key to try, so it always ends with "Permission denied
+    // (publickey)" too, which would hide the cause.
     if (/invalid format|error in libcrypto|load key|bad permissions|passphrase/i.test(stderr)) {
         return new RouteError("the SSH key could not be read: it must be an unencrypted private key");
+    }
+    if (/permission denied|too many authentication failures/i.test(stderr)) {
+        return new RouteError("the bastion refused the SSH key: check the key behind the key reference and the user");
     }
     if (/could not resolve|timed out|no route to host|connection refused|network is unreachable/i.test(stderr)) {
         return new RouteError("cannot reach the bastion: check the network and the VPN, then try again");
