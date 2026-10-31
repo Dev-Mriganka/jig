@@ -111,6 +111,9 @@ export interface LoadedConfig {
     /** Plugin sections that you have not written and whose company defaults are not valid alone, with the messages of
      *  the check: the plugin is not configured until you add your part. Not a problem, only a fact for `/jig`. */
     incomplete: Map<string, string[]>;
+    /** Plugin sections the file has and the plugin does not get, because they failed their check. A section the file
+     *  does not have is not here: it is simply not set. */
+    invalid: Set<string>;
 }
 
 /** Reads and checks the file. Never throws: every failure becomes a problem, and the defaults apply. `checks` holds the
@@ -125,6 +128,7 @@ export function loadConfigFile(
         found,
         config: defaultConfig(),
         problems,
+        invalid: new Set(),
         // A file that cannot be read still leaves the company's defaults.
         ...companyOnly(checks, layers, new Set()),
     });
@@ -156,16 +160,23 @@ export function parseConfig(
     source: string,
     checks: ReadonlyMap<string, SectionCheck> = new Map(),
     layers: SectionLayers = NO_LAYERS,
-): { config: JigConfig; problems: Problem[]; sections: Map<string, unknown>; incomplete: Map<string, string[]> } {
+): {
+    config: JigConfig;
+    problems: Problem[];
+    sections: Map<string, unknown>;
+    incomplete: Map<string, string[]>;
+    invalid: Set<string>;
+} {
     const problems: Problem[] = [];
     const fail: Fail = (key, message) => problems.push({ source, key, message });
     const sectionProblems: Problem[] = [];
     const sections = new Map<string, unknown>();
+    const invalid = new Set<string>();
     const config = defaultConfig();
 
     if (!isObject(value)) {
         fail("(file)", "must hold one JSON object");
-        return { config, problems, ...companyOnly(checks, layers, new Set()) };
+        return { config, problems, invalid, ...companyOnly(checks, layers, new Set()) };
     }
     const written = new Set<string>();
     for (const [key, raw] of Object.entries(value)) {
@@ -178,6 +189,7 @@ export function parseConfig(
         written.add(key);
         const read = readSection(key, raw, check, layers);
         if (read.use) sections.set(key, read.value);
+        else invalid.add(key);
         for (const message of read.messages) sectionProblems.push({ source, key: printable(key), message });
     }
     const company = companyOnly(checks, layers, written);
@@ -197,6 +209,7 @@ export function parseConfig(
         problems: [...problems, ...sectionProblems],
         sections,
         incomplete: company.incomplete,
+        invalid,
     };
 }
 

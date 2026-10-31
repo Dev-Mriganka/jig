@@ -228,9 +228,35 @@ describe("/jig", () => {
         const status = await jigCommand(harness);
         assert.match(
             status,
-            /Plugin sections in the file: git \(loaded\), lens \(not set or invalid\), flow \(not set or invalid\)/,
+            /Plugin sections in the file: git \(loaded\), lens \(not set or invalid\), flow \(not set\)/,
         );
         assert.match(status, /jig\.json: lens: lens\.port must be a number/);
+    });
+
+    test("a section nothing set, with no file at all, is plainly not set", async () => {
+        const harness = await begin({ plugins: (api) => api.config.registerSection("git", () => []) });
+        assert.match(await jigCommand(harness), /Plugin sections in the file: git \(not set\)$/m);
+    });
+
+    test("a section the file has that fails its check is not set or invalid, and one it lacks is not set", async () => {
+        const harness = await begin({
+            config: { lens: { port: "high" } },
+            plugins: (api) => {
+                api.config.registerSection("lens", () => ["lens.port must be a number"]);
+                api.config.registerSection("flow", () => []);
+            },
+        });
+        assert.match(await jigCommand(harness), /lens \(not set or invalid\), flow \(not set\)\n/);
+    });
+
+    test("when the file cannot be read as a whole, its sections are not called simply not set", async () => {
+        const harness = await begin({
+            config: "not an object",
+            plugins: (api) => api.config.registerSection("git", () => []),
+        });
+        const status = await jigCommand(harness);
+        assert.match(status, /Plugin sections in the file: git \(not set or invalid\)\n/);
+        assert.match(status, /\(file\): must hold one JSON object/);
     });
 
     test("lists the environments by who defined them, with the kind of each that is not built in", async () => {

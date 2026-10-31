@@ -33,11 +33,17 @@ the environment variables. Back to the [jig-core overview](../README.md#configur
 
 - **`/jig`** shows the tools governed, whether `bash` is sandboxed and in which
   network mode (with no sandbox it says plainly that it is not), the plugins
-  loaded, the tools still on the unknown default, and the open watches (and how many are paused or wait
+  loaded, the environments and who defined them, the tools still on the unknown
+  default, and the open watches (and how many are paused or wait
   for their plugin). It also shows the configuration file with the state of each
   plugin section, lines that plugins registered (such as `jig-mongo` saying that
   its index check is off), configuration errors, a failed records write, and
   problems with saved watches.
+  - **A section is `loaded`,** `company defaults incomplete` (waiting for the part
+    only you can give), or `not set`: no company default and nothing in your file.
+  - **`not set or invalid`** means your file has the section and it failed the
+    plugin's check (the problem is listed under it), or the file could not be read
+    at all.
 - **`/jig rules [tool]`** shows the effective decision per tool and action,
   with where each came from: declaration, rule, hint or default.
   - A tool whose schema lists its actions gets a line for each.

@@ -184,6 +184,7 @@ export function createState(pi: ExtensionAPI, options: JigCoreOptions = {}): Jig
             problems: [],
             sections: new Map(),
             incomplete: new Map(),
+            invalid: new Set(),
         },
         company: emptyAdditions(),
         sectionChecks: new Map(),

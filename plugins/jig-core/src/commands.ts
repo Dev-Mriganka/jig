@@ -190,10 +190,17 @@ export function environmentsLine(state: JigState): string {
     return `Environments (any other name counts as production): ${groups.join("; ")}`;
 }
 
-/** What `/jig` says about one registered section. */
+/**
+ * What `/jig` says about one registered section: loaded, waiting for the part only you can give, "not set" when nothing
+ * (no company defaults, nothing in the file) set it, and otherwise a section that did not load. A file that could not be
+ * read as a whole says nothing of its sections, so they are not called "not set".
+ */
 function sectionState(state: JigState, name: string): string {
-    if (state.personal.sections.has(name)) return "loaded";
-    return state.personal.incomplete.has(name) ? "company defaults incomplete" : "not set or invalid";
+    const { personal } = state;
+    if (personal.sections.has(name)) return "loaded";
+    if (personal.incomplete.has(name)) return "company defaults incomplete";
+    const unreadable = personal.problems.some((problem) => problem.key === "(file)");
+    return personal.invalid.has(name) || unreadable ? "not set or invalid" : "not set";
 }
 
 /** `Open watches: 3 (1 paused, 1 waiting for its plugin)`: each watch not finished, and why some do not poll. */
