@@ -22,7 +22,7 @@ starts a watch if it knows the repository (see [Events](#events)). The one
 watch here is on the comments of a pull request: what people write on GitHub
 reaches the agent without being asked for ([Comment watch](docs/comments-watch.md)).
 
-![How a jig-git call runs: jig-core decides, local git and gh do the work, guarded steps ask or refuse, and a push is announced as jig-git:pushed for jig-ops](../../docs/img/git-flow.svg)
+![How a jig-git call runs: jig-core decides, local git does the work, gh does it on GitHub and glab on GitLab, guarded steps ask or refuse, and a push is announced as jig-git:pushed for jig-ops](../../docs/img/git-flow.svg)
 
 *How a call runs. `jig-core` decides first: reads and local writes run, writes to GitHub or GitLab ask you. `git push`, the `pr` writes and a protected branch each have a guard, and after a push or a new pull request the plugin announces `jig-git:pushed` for `jig-ops`.*
 
