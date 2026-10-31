@@ -200,7 +200,8 @@ its login in.
 
 A gate is a check that a plugin registers with `gates.register({ name, plugin, check })`. `jig-core` asks every
 gate about each call once the rules have decided ([What asks](approval-screens.md)), so a plugin can hold a
-call without any tool reading its files. `jig-workflow` holds `git push` until the tests pass this way.
+call without any tool reading its files. `jig-workflow` holds `git push` until the tests pass this way, and `jig-agents`
+registers one in every child agent, `role-policy`, which refuses what the child's role does not allow.
 
 `check(call, signal)` gets a frozen `GateCall`:
 

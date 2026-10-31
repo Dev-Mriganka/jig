@@ -120,16 +120,17 @@ sandbox. This is the sandbox's half: it makes that `bash` read-only.
 
 - **The seam is the rules, not the runtime.** `SandboxSettings` has a `readOnly` flag that the section of `jig.json` cannot
   set. `index.ts` sets it when the environment holds a policy (`JIG_ROLE_POLICY`, read by jig-core's kit) whose role does
-  not write, and `computeRules` then adds two locked rules, for the home folder and for the working folder of each
-  command. Everything downstream (the runtime's `denyWrite`, `canWrite`, the audit, the explanations, `/sandbox`) already
-  knows locked rules, so nothing else changed.
+  not write, and `computeRules` then adds two locked rules, for the home folder and for the working folder of each command.
+- **Nothing downstream changed.** The runtime's `denyWrite`, `canWrite`, the audit, the explanations and `/sandbox` already
+  know locked rules.
 - **It only adds.** The flag is laid over the settings after they are read, so no field of `jig.json` removes it.
   `share` is ignored in a read-only agent, because a shared folder is writable and a role's lock is the floor.
 - **A policy that is there and unreadable counts as read-only.** The sandbox locks more, never less, when it is not sure.
 - **The caches are locked, not carved out.** The runtime emits `denyWrite` last, so it covers a writable mount inside it:
-  a lock on the home folder makes `~/.npm`, `~/.gradle/caches` and `~/.m2/repository` read-only as well. That is a loss for
-  a role that wants to build, and a gain: the one risk this sandbox leaves for a writing agent, a changed file in a cache
-  that a later build outside uses, is closed for an agent that may not write. A role that must build is a writing role.
+  a lock on the home folder makes `~/.npm`, `~/.gradle/caches` and `~/.m2/repository` read-only as well.
+- **That is a loss and a gain.** A role that wants to build cannot. The one risk this sandbox leaves for a writing agent, a
+  changed file in a cache that a later build outside uses, is closed for an agent that may not write. A role that must build
+  is a writing role.
 - **The gate is the other half.** The sandbox cannot tell a read from a write in a shell string. `jig-agents` lets a
   read-only role call `bash` only while the sandbox is active, and refuses `bash` with `outside: true`, which runs
   outside it.

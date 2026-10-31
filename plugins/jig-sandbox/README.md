@@ -44,9 +44,11 @@ entry and its reason is in [The rules](docs/rules.md).
 ## A child agent that may not write
 
 A child started by [jig-agents](../jig-agents/README.md) from a role with `writes: false`, such as `scout` or `reviewer`, may
-have `bash`, and its `bash` is read-only. The parent puts the role's policy in the child's environment
-(`JIG_ROLE_POLICY`), and the sandbox in the child **locks** its home folder and its working folder: a command reads them
-and writes neither. `/tmp` stays writable, for the scratch files a tool needs.
+have `bash`, and its `bash` is read-only.
+
+The parent puts the role's policy in the child's environment (`JIG_ROLE_POLICY`), and the sandbox in the child **locks**
+its home folder and its working folder: a command reads them and writes neither. `/tmp` stays writable, for the scratch
+files a tool needs.
 - **The build caches are locked too.** They live in the home folder, and the runtime lays a read-only mount over a
   folder after the writable ones. A read-only agent cannot poison a cache that a later build outside the sandbox uses.
 - **Only more is locked.** `lock` in your section adds to it, and nothing in `jig.json` takes it away; `share` is ignored.

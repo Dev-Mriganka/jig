@@ -56,7 +56,8 @@ changes, the other changes in the same commit. Tests read the tool tables of
   (`npm install -g @earendil-works/pi-coding-agent@1.4.0`; `JIG_AGENTS_TEST_PI` names another) as a child,
   with this repository's `jig-core` and `jig-agents` and Pi's own scripted model, so it calls no model. It skips
   with the reason when there is no Pi 1.x, and runs in CI, where Pi is installed. It uses a temporary agent
-  folder and home, never `~/.pi/agent`, and never the `pi` on `PATH`, which may be a wrapper that signs in.
+  folder and home, never `~/.pi/agent`, and never the `pi` on `PATH`, which may be a wrapper that signs in. Two tests also
+  load `jig-sandbox` for a read-only `bash`, and skip with the reason when the sandbox's programs are missing.
 - **Checks:** `npm run check` (types, Biome), `npm test` and the review page's
   checks (`npm run check:web`, `npm run test:web`, `npm run check:dist`) must
   pass before a commit; CI runs all of them on every push and pull request.
