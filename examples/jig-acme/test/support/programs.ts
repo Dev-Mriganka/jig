@@ -48,7 +48,12 @@ if (mode === "hang") {
 } else {
     // -L 127.0.0.1:<local>:<host>:<port>
     const spec = process.argv[process.argv.indexOf("-L") + 1].split(":");
-    net.createServer((socket) => socket.end("fake-db " + spec[2] + ":" + spec[3] + "\\n")).listen(Number(spec[1]), "127.0.0.1");
+    net.createServer((socket) => {
+        // A client that hangs up at once (the readiness probe does) makes the reply fail with a reset. Unhandled, that error ends this
+        // process, and the next client, which was accepted a moment before, is reset too: this only shows when the machine is busy.
+        socket.on("error", () => {});
+        socket.end("fake-db " + spec[2] + ":" + spec[3] + "\\n");
+    }).listen(Number(spec[1]), "127.0.0.1");
 }
 `;
 

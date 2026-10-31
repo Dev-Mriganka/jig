@@ -333,22 +333,35 @@ describe("waking the agent from real output", () => {
         assert.deepEqual(wake(s)[0]?.options, { triggerTurn: false });
     });
 
-    test("output the agent already read does not wake it again", async () => {
-        const s = await begin();
+    test("output the agent already read does not wake it again, but the end of the task does", async () => {
+        // The burst is held for a second and a half here, a wide margin for the agent's read on a busy machine: it has to be read
+        // before the burst is sent, and the task's own end is what shows, without a fixed wait, that the burst was sent.
+        const s = await begin({
+            options: {
+                background: {
+                    shell: () => ({ shell: "/bin/bash", args: ["-c"] }),
+                    timing: { flushMs: 1_500, inFlightMs: 400, errorGapMs: 30_000, errorWakeups: 3 },
+                    graceMs: 300,
+                },
+            },
+        });
+        // A name of its own, because the header of a read repeats the command, and the command holds the line that is waited for.
         await s.tool("bash", {
-            command: "echo 'READY now'; sleep 30",
+            command: "echo 'READY now'; sleep 0.3; exit 0",
             background: true,
+            name: "server",
             notifyOn: { ready: ["READY"] },
         });
-        // The agent reads the output before the one-second wait of the burst is over.
-        await new Promise((resolve) => setTimeout(resolve, 5));
-        const read = await until(async () => {
-            const result = await s.tool("bg_output", { id: "bg-1", tail: 5 });
-            return result.text.includes("READY now") ? result : undefined;
-        }, 3000);
-        void read;
-        await new Promise((resolve) => setTimeout(resolve, 300));
-        assert.equal(wake(s).length, 0);
+        await until(
+            async () => (await s.tool("bg_output", { id: "bg-1", tail: 5 })).text.includes("READY now") || undefined,
+            8000,
+            "the matching line to be there to read",
+        );
+        await until(() => wake(s).length > 0, 8000, "the message that ends the burst");
+        assert.equal(wake(s).length, 1);
+        const content = String(wake(s)[0]?.message.content);
+        assert.match(content, /bg-1 "server": exited \(code 0\)/);
+        assert.doesNotMatch(content, /: READY, matched/, "the line was read, so it is not told as news");
     });
 });
 

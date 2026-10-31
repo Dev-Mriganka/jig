@@ -50,6 +50,18 @@ function readFrom(port: number): Promise<string> {
     });
 }
 
+/** Connects and hangs up at once, without reading. */
+function hangUp(port: number): Promise<void> {
+    return new Promise((resolve) => {
+        const socket = connect({ host: "127.0.0.1", port });
+        socket.once("connect", () => {
+            socket.destroy();
+            resolve();
+        });
+        socket.once("error", () => resolve());
+    });
+}
+
 async function refused(port: number, withinMs = 3000): Promise<boolean> {
     const until = Date.now() + withinMs;
     while (Date.now() < until) {
@@ -99,6 +111,18 @@ describe("a tunnel through the bastion", () => {
         try {
             assert.equal(tunnel.kind, "forward");
             assert.ok(tunnel.port > 0);
+            assert.equal(await readFrom(tunnel.port), "fake-db mongo.staging.acme.example:27017\n");
+        } finally {
+            await tunnel.close();
+        }
+    });
+
+    test("a connection that hangs up at once, as the readiness probe does, does not take the forward down", async () => {
+        world = await startWorld({ personal, acme: { tunnel: { readyTimeoutMs: 5000, pollMs: 20 } } });
+        const tunnel = await world.api.tunnels.open(BASTION_TUNNEL, TARGET);
+        try {
+            // Many at once, so that the fake's replies reach sockets that are already gone, as they do when the machine is busy.
+            await Promise.all(Array.from({ length: 300 }, () => hangUp(tunnel.port)));
             assert.equal(await readFrom(tunnel.port), "fake-db mongo.staging.acme.example:27017\n");
         } finally {
             await tunnel.close();
