@@ -4,6 +4,7 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 
 ## Contents
 
+- [2026-10-31: jig-git talks to GitLab through glab api, and the repository decides the forge](#2026-10-31-jig-git-talks-to-gitlab-through-glab-api-and-the-repository-decides-the-forge)
 - [2026-10-31: jig-workflow, evidence and holds: a gate in jig-core, tests in the sandbox](#2026-10-31-jig-workflow-evidence-and-holds-a-gate-in-jig-core-tests-in-the-sandbox)
 - [2026-10-31: an example company plugin, jig-acme, proves the generic plugins need no company code](#2026-10-31-an-example-company-plugin-jig-acme-proves-the-generic-plugins-need-no-company-code)
 - [2026-10-31: production reads need an index, and pull request comments reach the agent](#2026-10-31-production-reads-need-an-index-and-pull-request-comments-reach-the-agent)
@@ -37,6 +38,33 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 - [2026-10-30: jig-git's tools, and a watch that knows when it is done](#2026-10-30-jig-gits-tools-and-a-watch-that-knows-when-it-is-done)
 - [2026-10-30: built clean, beside the existing harness](#2026-10-30-built-clean-beside-the-existing-harness)
 - [Earlier decisions that still hold (2026-10-29)](#earlier-decisions-that-still-hold-2026-10-29)
+
+## 2026-10-31: jig-git talks to GitLab through glab api, and the repository decides the forge
+
+Teams on GitLab use the same `pr` and `release` tools. A merge request is a pull request, and the actions keep their names.
+
+- **The host of `origin` decides the forge,** with `git.forges` for a self-hosted host. The model never chooses it, so a call cannot
+  send one forge's request with the other's sign-in. A host that is neither is refused with the setting that fixes it; an origin
+  with no host stays on GitHub, as it was.
+- **Every request is `glab api`,** not `glab mr`. glab's commands prompt and choose for themselves (`glab mr merge` turns on
+  auto-merge while a pipeline runs; `glab release create` updates a release that exists), and a preview can promise only what is
+  sent. The REST API is documented, takes a JSON body on standard input and gives JSON. Its `mr note` commands are experimental.
+- **Sign-in is glab's.** Jig never signs in and never sees a token; `~/.config/glab-cli` was already protected. `GITLAB_TOKEN` is
+  not on the short list of variables a program gets.
+- **jig-core vets git and gh, not glab,** but glab starts git in its folder and reads its configuration. jig-git asks jig-core to
+  vet the folder with a harmless git call before each glab call, and runs glab in the repository. Teaching jig-core's `exec.run`
+  to treat `glab` like `gh` would be the cleaner fix; it was left, because this change is to jig-git.
+- **What GitLab has no equivalent for is refused in one line** that names the GitLab way: a rebase in a merge, and a draft,
+  pre-release or generated release notes. A draft merge request is a title prefix; a review is `draft_notes/bulk_publish` with
+  `reviewer_state`, which refuses while the user has drafts pending, because they would be published too.
+- **A thread is `<number>:<discussion id>`** because GitLab addresses a discussion by both.
+- **The comment watch reads discussions.** GitLab has no `updated_after` for them and its notes endpoint leaves out the notes inside
+  threads, so the discussions are read in full (up to 500 threads) and what was told is remembered by id. ETags are sent; a `304`
+  counts against GitLab's rate limit, so they save the transfer and not the request.
+- **Not verified:** there is no GitLab account. The tests run a fake `glab` over recorded answers, and the few real checks are in
+  [Not verified yet](../plugins/jig-git/docs/not-verified.md#gitlab-not-verified).
+- **Left:** `jig-ops` matches `jig-git:pushed` on `owner/name`, so a project in a subgroup starts no CI watch yet; `jig-workflow`'s
+  `pull-request-open` reads `gh pr view`; `clone` is GitHub only; an ssh alias is not a GitLab host.
 
 ## 2026-10-31: jig-workflow, evidence and holds: a gate in jig-core, tests in the sandbox
 

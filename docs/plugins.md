@@ -74,7 +74,8 @@ Each plugin's README has the full table of its tool's actions.
 
 `jig-ops` has one adapter per system: `ci` has GitHub Actions, GitLab CI and
 Jenkins, `deploy` has Helm and `kubectl set image`, and `runtime` has
-Kubernetes. `jig-git` keeps git, pull requests, reviews and releases. CI and the
+Kubernetes. `jig-git` keeps git, pull requests and merge requests (GitHub and
+GitLab), reviews and releases. CI and the
 watch that waits for it are in `jig-ops`, and the two meet in one event,
 `jig-git:pushed`.
 
@@ -86,8 +87,8 @@ walks through the seams, and [`jig-acme`](../examples/jig-acme/README.md) is a
 tested example that supplies a part for every plugin that has one:
 - **`jig-core`:** environments, classification rules, extra field names for
   masking, sign-in services, transports, secret commands and protected paths.
-- **`jig-git`:** the GitHub organization, branch names, protected branches and
-  the pull request template.
+- **`jig-git`:** the GitHub organization or GitLab host, branch names, protected
+  branches and the pull request template.
 - **`jig-lens`:** names for the models in `/lens usage`, through the
   `jig-lens:model-names` event.
 - **`jig-workflow`:** its workflow files in a folder it gives through section

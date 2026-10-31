@@ -16,7 +16,7 @@ The host of `origin` decides. The model cannot choose it, so a call cannot send 
 | `gitlab.com` or `altssh.gitlab.com` | GitLab, through `glab`, on `gitlab.com` |
 | A host named in `git.forges` | What the setting says |
 | No host (a local path, or no origin) | GitHub, as before: `gh` reads the repository's own remotes |
-| Any other host | Refused, with the line that names it |
+| Any other host | `pr` and `release` refuse it, with the line that names it |
 
 ```json
 { "git": { "forges": { "gitlab.example.com": "gitlab" } } }
@@ -25,8 +25,8 @@ The host of `origin` decides. The model cannot choose it, so a call cannot send 
 - **The refusal for an unknown host** says which host it was and shows the setting that names it, as in `origin of orders-api is on
   git.example.com, which jig-git does not know as GitHub or GitLab; name it in jig.json, such as "git": { "forges": {
   "git.example.com": "gitlab" } }`.
-- **A host set to `"github"`** is accepted as GitHub, for a GitHub Enterprise Server that was refused before. `gh` then finds the
-  repository from the remotes, as it did for any host it did not recognise.
+- **A host set to `"github"`** is accepted as GitHub, which is how a GitHub Enterprise Server host is told apart from the refused
+  ones. `gh` then finds the repository from the remotes, as it did before any host was refused.
 - **Nested groups** work: `platform/payments/orders-api` is a project path of three parts, and `origin` may use https, ssh or scp
   form. The host is the one `origin` names, so an ssh alias from `~/.ssh/config` is not a GitLab host: use the real name.
 
@@ -42,8 +42,10 @@ A call that finds `glab` not signed in says so in one line, with the command to 
 ## How a call runs
 
 Every request is `glab api --hostname <host> <endpoint>` on GitLab's REST API (v4), with the project's path encoded in the address
-and a JSON body on standard input. glab's own commands (`glab mr merge`, `glab mr create`) prompt, and choose for themselves, such as
-turning on auto-merge while a pipeline runs; a request says exactly what it does, so a preview can promise it.
+and a JSON body on standard input. A request says exactly what it does, so a preview can promise it.
+
+glab's own commands (`glab mr merge`, `glab mr create`) prompt and choose for themselves, such as turning on auto-merge while a
+pipeline runs, so none of them is used.
 
 - **glab runs in the repository.** It starts git there and reads its configuration. `jig-core` vets a repository for `git` and `gh`;
   it does not know `glab`, so each glab call is preceded by a harmless git call through `jig-core`, which refuses a repository whose
@@ -59,12 +61,12 @@ turning on auto-merge while a pipeline runs; a request says exactly what it does
 | `list` | Merge requests by state, author or source branch; `@me` is `scope=created_by_me` |
 | `comments` | The discussions: threads with their notes, and single comments; system notes are left out |
 | `create` | `POST merge_requests`; a draft is a title with the prefix `Draft: ` |
-| `edit` | `PUT merge_requests/:iid`; labels are added; reviewers are looked up by username and added to those there |
+| `edit` | `PUT merge_requests/:iid`; labels are added; reviewers are looked up by username and added |
 | `ready` | `PUT merge_requests/:iid` with the `Draft: ` prefix taken off the title |
 | `comment` | `POST merge_requests/:iid/notes` |
 | `reply` | `POST merge_requests/:iid/discussions/:id/notes` |
 | `resolve` | `PUT merge_requests/:iid/discussions/:id` with `resolved: true` |
-| `review` | `POST merge_requests/:iid/draft_notes/bulk_publish` with the text and the state `reviewed` or `requested_changes` |
+| `review` | `POST …/draft_notes/bulk_publish` with the text and the state `reviewed` or `requested_changes` |
 | `merge` | `PUT merge_requests/:iid/merge` with `sha` (the head you saw), `squash`, and `auto_merge` for `auto` |
 | `watch` | A background poll of the merge request and its discussions ([Comment watch](comments-watch.md)) |
 

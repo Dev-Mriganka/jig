@@ -20,7 +20,7 @@ In short:
   it: an environment variable, a password manager, a command such as
   `gh auth token`, or a company's sign-in service. `jig-core` attaches it to the
   request, and no plugin sees its value.
-- **Code:** `jig-git` (git, pull requests, releases), `jig-review` (a code
+- **Code:** `jig-git` (git, GitHub and GitLab pull requests, releases), `jig-review` (a code
   review in the browser, approved with a passkey) and `jig-ops` (CI, deploy and
   what runs, from one service catalog).
 - **Other systems:** `jig-jira`, `jig-logs` (Elasticsearch, OpenSearch, Loki),
@@ -54,7 +54,7 @@ pi install git:github.com/Dev-Mriganka/jig
 
 Then start Pi and run `/jig`: it shows the rules in force and anything that
 needs fixing. Each plugin's README says what it needs in `~/.pi/agent/jig.json`
-and which programs it uses, such as `git` and `gh` for `jig-git`.
+and which programs it uses, such as `git`, `gh` and `glab` for `jig-git`.
 
 To load only some plugins, filter the package in Pi's settings. Keep `jig-core`
 first in the list, because every other plugin needs it:
@@ -92,7 +92,7 @@ first in the list, because every other plugin needs it:
 |---|---|---|
 | [`jig-core`](plugins/jig-core/README.md) | built | The tool manager: rules per environment, approvals, secrets, masking, watches, records |
 | [`jig-sandbox`](plugins/jig-sandbox/README.md) | built | The agent's `bash` in an operating-system sandbox: credentials hidden, start-up files locked, everything else as outside; background tasks; a filtered network |
-| [`jig-git`](plugins/jig-git/README.md) | built | Local git, GitHub pull requests and reviews, tags and releases |
+| [`jig-git`](plugins/jig-git/README.md) | built | Local git, GitHub pull requests and GitLab merge requests with reviews, tags and releases |
 | [`jig-lens`](plugins/jig-lens/README.md) | built | Cost, tool failures and time spent waiting for you, inside Pi; Grafana optional |
 | [`jig-workflow`](plugins/jig-workflow/README.md) | built | Named workflows you define: stages, exit conditions checked against evidence, holds, test runs in the sandbox |
 | [`jig-memory`](plugins/jig-memory/README.md) | built | Ticket folders, notes and evidence; a card per closed ticket, and recall of related tickets |

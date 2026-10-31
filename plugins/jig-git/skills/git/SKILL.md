@@ -1,13 +1,27 @@
 ---
 name: git
-description: How to work with the git, pr and release tools - branch, commit, push, open and review pull requests, and hand CI to the ci tool. Use for any change that ends in a pull request, and whenever you would reach for git or gh.
+description: How to work with the git, pr and release tools - branch, commit, push, open and review pull requests (GitHub) and merge requests (GitLab), and hand CI to the ci tool. Use for any change that ends in a pull request or merge request, and whenever you would reach for git, gh or glab.
 ---
 
 # Git, pull requests and CI
 
-Use the `git`, `pr` and `release` tools instead of `bash` for git and GitHub. The shell has no GitHub
-sign-in and cannot push. Reads and local changes run at once. Anything that changes GitHub asks the user first, and the
-user sees what it will send.
+Use the `git`, `pr` and `release` tools instead of `bash` for git, GitHub and GitLab. The shell has no GitHub or GitLab
+sign-in and cannot push. Reads and local changes run at once. Anything that changes GitHub or GitLab asks the user first, and
+the user sees what it will send.
+
+## GitHub and GitLab
+
+The repository decides which forge a call goes to, from the host of `origin`; you never choose it. On GitLab a pull request is a
+merge request, and `pr` and `release` work the same way with these differences:
+
+- A thread is `<number>:<id>`, such as `42:6a9c1750...`. `pr comments` lists them and `pr reply` and `pr resolve` take one as
+  `thread`. A single comment has a thread too, and replying to it makes it a thread.
+- `pr create` with `draft` makes a title that starts with `Draft: `. `pr ready` takes it off.
+- `pr merge` cannot `rebase`, and `release_create` cannot `draft`, `prerelease` or `generate_notes`: each is refused with a line
+  that says the GitLab way. Do not try to work around a refusal; tell the user.
+- `pr review` publishes a review. If the user has draft comments waiting in GitLab it refuses, because they would go out too.
+- If a call is refused because the host is not known, `git.forges` in `jig.json` must name it; ask the user to add it.
+- A call that finds `glab` not signed in says to run `glab auth login`; the user does that, never you.
 
 ## The order of work
 
