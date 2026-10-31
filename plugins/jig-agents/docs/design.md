@@ -1,7 +1,7 @@
 # Design
 
 How `jig-agents` starts a child, how a child's questions reach you, how its limits and
-its report work, and how it will be tested. Back to the [jig-agents overview](../README.md).
+its report work, and how it is tested. Back to the [jig-agents overview](../README.md).
 
 ## Principles
 
@@ -13,8 +13,9 @@ its report work, and how it will be tested. Back to the [jig-agents overview](..
 3. **Every failure is a no.** An answer that cannot be delivered, a check that cannot
    run, a message that cannot be read: the child is refused, cancelled or stopped.
 4. **Small.** Pi supplies the protocol, the session files, `abort` and `steer`;
-   `jig-core` supplies the watch engine that returns results. The plugin adds policy. The
-   estimate is about 1,000 lines and no dependency.
+   `jig-core` supplies the watch engine that returns results. The plugin adds policy. It
+   has no dependency. The source is about 3,000 lines with its comments: the estimate of
+   1,000 left out the checks, the cleaning of text and the orphan sweep.
 
 ## One child, end to end
 
@@ -22,7 +23,7 @@ its report work, and how it will be tested. Back to the [jig-agents overview](..
 agent calls subagent {action: "start", role: "scout", task: "..."}
   -> jig-core's rules (subagent start: a local write, allowed by default)
   -> jig-agents, in the parent
-       check    role, cwd, counts, writer lock, model (configuration, then enabledModels)
+       check    role, cwd, counts, model (configuration, then enabledModels), a worktree for a writer
        launch   Pi's own program with --mode rpc; stdin and stdout are pipes
        verify   get_commands lists jig-core's commands, or the child is stopped
        prompt   the task, the report format and the limits, as one prompt command
@@ -50,39 +51,55 @@ call or the project reaches it as a flag.
 |---|---|
 | `--mode rpc` | Dialogs, events, `abort` and `steer` as documented JSON lines |
 | `--session-id agent-<id>` | A session file Pi lists, `message` can resume, and `/lens usage` counts once |
-| `--model`, `--thinking` | From configuration, after the check against `enabledModels` |
+| `--model`, `--thinking` | From configuration, or the parent's own, after the check against `enabledModels` |
 | `--tools <list>` | The role's list, which can only narrow |
 | `--exclude-tools subagent,mcp__*` | No children of children; no MCP tools unless the role names one |
 | `--append-system-prompt <file>` | The role's prompt, from a file in the run folder |
 | `--no-approve` | A `.pi/` folder the model wrote in the project does not load in the child |
 
-**Never passed:** `--no-extensions`, `-ne`, `-e`, `--extension`, `--approve`. A test
-reads the command line the plugin builds and fails if any of them can appear.
+**Never passed:** `--no-extensions`, `-ne`, `-e`, `--extension`, `--approve`, `-a`. A test
+builds the command line for every shipped role and fails if any of them can appear.
 
-- **Which Pi.** The same program as the parent (`process.execPath` and Pi's own entry
-  file), not whichever `pi` comes first on `PATH`, which may be a wrapper. A single
+- **Which Pi.** The same program as the parent: `process.execPath` and Pi's own entry
+  file, found from `process.argv[1]` through any link and only when it sits in Pi's
+  package. Not whichever `pi` comes first on `PATH`, which may be a wrapper. A single
   compiled Pi has no entry file, and `process.execPath` alone is used; that is not checked.
+- **Which plugins.** The child reads the same agent folder as its parent, because
+  `PI_CODING_AGENT_DIR` (a `PI_*` name) and `HOME` reach it. Pi then loads the packages in
+  the same `settings.json`, and Jig reads the same `jig.json`. A plugin the parent got
+  another way, such as `-e` on its command line or a trusted project's `.pi/settings.json`,
+  is not in the child, and the check below refuses a child that lacks `jig-core` or, when
+  the parent has it, `jig-sandbox`.
+- **Which model.** The role's, from `agents.roles.<role>.model`; else the parent's own model
+  and thinking level, passed explicitly so a model switched in the session carries over.
 - **Working folder.** `cwd` must be inside the parent's working folder, because the
-  sandbox makes the working folder writable and a wider one would widen the child.
-- **Environment.** A list of names: `PATH`, `HOME`, `USER`, `LOGNAME`, `SHELL`, `TERM`,
-  `TZ`, `LANG`, `LC_*`, `XDG_*`, `PI_*`, proxy and certificate variables, and the names
-  in `agents.env`. Any other name is left behind, a key, token or password included;
-  Pi's own login in the agent folder needs no variable. The child gets `PI_SUBAGENT_ID`,
-  which `jig-theme` and `jig-review` already read.
+  sandbox makes the working folder writable and a wider one would widen the child. A role
+  that writes works in a worktree instead (see [Lifecycle](#lifecycle)).
+- **Environment.** A list of names: `PATH`, `HOME`, `USER`, `LOGNAME`, `SHELL`, `TERM`, `TZ`,
+  `LANG`, `TMPDIR`, `LC_*`, `XDG_*`, `PI_*`, `JIG_STATE_DIR`, proxy and certificate
+  variables, and the names in `agents.env`. Any other name is left behind, a key, token or
+  password included. Pi's own login in the agent folder needs no variable; a model provider
+  that does, such as `AWS_PROFILE`, is named in `agents.env`.
+- **Who the child is.** It gets `PI_SUBAGENT_ID`, which `jig-theme` and `jig-review` already
+  read, `JIG_PARENT_SESSION` and `JIG_AGENT_ROLE`, which `jig-core`'s records already read,
+  `PI_SUBAGENT_NAME`, `PI_SUBAGENT_PARENT_PID` and `PI_SKIP_VERSION_CHECK=1`.
 - **The task** goes in a `prompt` command on stdin, not on the command line, so it does
-  not show in `ps`. The run folder is created with private permissions.
+  not show in `ps`. It follows a line that names the role, so it never starts with `/`
+  and cannot run a command in the child. The run folder is created with private permissions.
 - **Process group.** The child leads its own group, so a stop can end its descendants,
-  such as the sandbox broker.
+  such as the sandbox broker, and a Ctrl-C meant for the parent does not reach it.
 
 ## Checking the child at start
 
 Before the task is sent, the plugin sends `get_commands` and `get_state` and checks:
 - the commands of `jig-core` are listed, and those of `jig-sandbox` when the parent has it;
-- the model is the one configured;
+- the model is the one configured, or the parent's;
 - no `extension_error` arrived.
 
 A child that fails is stopped and `start` says why. This catches a Pi that could not load
-its plugins, for example because of a broken settings file, which would run ungoverned.
+its plugins, for example because of a broken settings file, which would run ungoverned. A
+child that does not answer within 60 seconds, dies, or does not start a run for its task
+is refused the same way, and a worktree made for it is taken away again.
 
 ## Approvals in a child
 
@@ -92,11 +109,15 @@ its plugins, for example because of a broken settings file, which would run ungo
    with Pi's selector, as it does for any host without a terminal interface
    ([What asks](../../jig-core/docs/approval-screens.md#the-screens)).
 2. Pi writes `extension_ui_request` with a random id (`crypto.randomUUID()`) on stdout.
-3. The parent checks it and queues it behind other children's questions.
+3. The parent reads it without trusting it, and queues it in `jig-core`'s queue behind
+   its own questions and other children's (`approvals.inTurn`).
 4. The parent asks you with its own `ctx.ui.select` or `input`, under a header it writes.
 5. Your answer becomes `extension_ui_response` with the same id, written to stdin.
 6. The child's `jig-core` reads the answer inside the waiting call. A cancelled request
    reaches it as no answer, which it records and treats as a decline.
+
+If you decline, the child's `jig-core` asks one more thing, "Why decline?", as an `input`
+request; it is forwarded the same way, and what you type reaches the child's model.
 
 ### What the screen shows
 
@@ -110,19 +131,21 @@ Subagent "worker-1" (worker) asks. The text below comes from the child. (1 more 
 ```
 
 - **The first line is the plugin's.** The child's text follows, indented, so it cannot
-  pass as a header.
-- **The text is cleaned:** control characters and terminal escape codes removed, each
-  line cut at 200 characters, at most 30 lines, with a note where it was cut.
-- **Options pass through unchanged,** at most 5 of at most 100 characters each, except
-  that the stock "Allow for this session" is shown as "Allow for this subagent" and
-  mapped back. A request with more or longer options is cancelled.
+  pass as a header. The count is the questions waiting behind this one, from every child.
+- **The text is cleaned:** control characters, terminal escape codes (CSI, OSC and string
+  sequences), bidirectional overrides and zero-width marks removed, a carriage return
+  turned into a line break so a line cannot be redrawn, each line cut at 200 characters,
+  at most 30 lines, with a note where it was cut.
+- **Options pass through,** at most 5 of at most 100 characters each, except that the
+  stock "Allow for this session" is shown as "Allow for this subagent" and mapped back. A
+  request with more or longer options, or two that look the same once cleaned, is cancelled.
 
 ### What is forwarded
 
 | Request | What the parent does |
 |---|---|
 | `select`, `confirm`, `input` | Shows it as above, and answers |
-| `editor` | Cancels it. No Jig plugin uses it |
+| `editor` and any other method | Cancels it. No Jig plugin uses an editor |
 | `notify`, `setStatus`, `setWidget`, `setTitle`, `set_editor_text` | Ignores them. They are free text from the child |
 | A request with a missing or repeated id, or from a child that has finished | Ignores it |
 
@@ -131,8 +154,9 @@ Subagent "worker-1" (worker) asks. The text below comes from the child. (1 more 
 The request is cancelled, and nothing is allowed, when:
 - the parent has no screen (`ctx.hasUI` is false, as in a program that embeds Pi without one);
 - the role's `approvals` is `deny`;
-- the child has already asked `maxAsks` times;
-- no answer comes within `approvalWaitMinutes`, or the parent's run is aborted;
+- the child has already asked `maxAsks` times, or four of its questions are waiting;
+- no answer comes within `approvalWaitMinutes` of the request (the queue counts), or within
+  the `timeout` the child gave, or the child is stopped, or the parent's run is aborted;
 - the request does not parse, or the plugin throws while handling it.
 
 A parent that is itself an RPC host passes the question on to its own host. The root
@@ -142,14 +166,15 @@ screen decides, and a root without a screen cancels.
 
 | Attack | Why it does not work |
 |---|---|
-| The child's `bash` writes an answer to its own input | The id is random and never reaches the model; `bash` is sandboxed. Test it |
+| The child's `bash` reads its questions or writes an answer on its own pipes | The pipes are UNIX sockets, which `/proc/<pid>/fd` cannot reopen (a test opens them and gets `ENXIO`); the id is random and never reaches the model; `bash` is sandboxed. Other same-user routes, such as `ptrace` where `ptrace_scope` is 0, are for the sandbox ([Not verified](not-verified.md)) |
 | The child's text imitates the plugin's header | The header is the first line and the child's text is indented and cut |
 | A flood of questions wears you down | After `maxAsks` they are cancelled; each waits at most `approvalWaitMinutes` |
 | The parent agent answers through `message` | `message` sends a user message; it never answers a dialog |
 | One child pretends to be another | The label is the registry's name for the process that sent the request |
 | The child changes what it asked after you saw it | An answer is for one id; a tool compares the approved preview with what it runs |
-| A question arrives while the parent's own is on screen | The queue shows one at a time; Pi 1.4 also keeps both dialogs rather than losing one |
+| A question arrives while the parent's own is on screen | The queue shows one at a time; both dialogs are kept |
 | Allowing in a child lowers the floor | The floor is decided in the child's `jig-core`; a yes only settles an "ask" |
+| Two questions say the same words | An answer is matched by the request's id, never by text |
 
 ### Why this fits "inside the waiting call"
 
@@ -157,9 +182,6 @@ screen decides, and a root without a screen cancels.
 no token exists that the agent could reuse. Here the child's tool call is the waiting
 call. The answer is typed in Pi, and travels as a reply to one random id on a pipe that
 only the parent process holds. There is no file, no web endpoint and no cookie.
-
-That page lists "Approving from another session" under *Later*; this is that, for
-children. When this is built, that page gets a line about it.
 
 The forwarded question shows what the child's `jig-core` shows a host without a terminal
 interface: the first 20 lines of a long preview, and "(the rest is not shown here)".
@@ -174,22 +196,25 @@ by anything that can write the folder.
 | Limit | Measured by | Checked |
 |---|---|---|
 | Turns | `turn_end` events: one reply and its tool calls | At each turn end |
-| Minutes | A monotonic clock from the first prompt, minus time spent on your answers | By a timer, even in a long tool call |
+| Minutes | The clock from the first prompt, minus time spent on your answers | Every second, even in a long tool call |
 | Cost | `cost` from `get_session_stats`, which includes tool-reported usage | After each turn and at the end |
 
 - **The stop, in order:**
   1. a `steer` message: the limit is reached, write the final report from what you have,
      start it with "Stopped at the limit", and list what is unknown;
   2. two more turns or two more minutes, whichever comes first;
-  3. `abort`, and a wait of 5 seconds;
-  4. stdin is ended, with a wait of 5 seconds;
-  5. SIGTERM to the process group, and SIGKILL 5 seconds later.
+  3. `abort`, and a wait of 5 seconds for its answer;
+  4. the partial report is read with `get_last_assistant_text`;
+  5. stdin is ended, with a wait of 5 seconds;
+  6. SIGTERM to the process group, and SIGKILL 5 seconds later.
 - **The report is partial** and says which limit stopped it. The outcome carries it too.
-- **Cost can overrun by one turn,** because it is known only after the reply. The earlier
-  harness checked time only at a turn end, so a ten-minute tool call overran its
-  minutes; here a timer fires.
-- **An unpriced model reports no cost.** Then `status` shows "cost unknown" and only
-  turns and minutes bound the child. Tokens as a cap are under *Later*.
+  A child that finishes its report inside the grace ends at the limit without an abort.
+- **Cost can overrun by the turns in flight,** because it is known only after the reply.
+  The earlier harness checked time only at a turn end, so a ten-minute tool call overran
+  its minutes; here a timer fires.
+- **An unpriced model reports no cost.** A model counts as priced when Pi gives it a price
+  or it reports a cost above zero. Otherwise `status` shows "cost unknown" and only turns
+  and minutes bound the child. Tokens as a cap are under *Later*.
 - **A resumed child gets a fresh budget,** and counts again toward `maxStarted`.
 - **Ranges:** turns 1 to 500, minutes 1 to 480, cost above 0 up to 100. There is no "no
   limit".
@@ -197,33 +222,35 @@ by anything that can write the folder.
 ## Results
 
 A child is a watch of kind `subagent` in `jig-core`'s [watch engine](../../jig-core/docs/watches.md).
-That gives the parent its result without polling and without new code:
+That gives the parent its result without polling and with very little new code:
 
 - **One follow-up message that starts a turn,** combined and spaced with other results.
 - **Cleaning:** escape codes removed, secrets redacted, personal data masked, text cut.
-- **The `watch` tool** lists and stops children with every other watch, and `/jig` counts them.
+- **The `watch` tool** lists and stops children with every other watch, and `/jig` counts
+  them. A watch stopped there stops its child too (the plugin listens for `jig:watch-done`).
 - **A saved record.** After a restart the first poll finds no child and ends the watch
   with `error`: "the session restarted while this child ran". `message` can resume it from
   its saved session.
 
 `poll` only reads the plugin's own record, so it costs nothing. The engine's first poll is
-about 2 seconds after the start, and later ones are 5 seconds apart at least.
+about 2 seconds after the start, and later ones are 5 seconds apart at least. No progress
+`update` is sent: `status` shows progress when the agent wants it.
 
 | The child | Outcome | Summary |
 |---|---|---|
 | Finished by itself | `passed` | Turns, minutes, cost; the path of the full report |
 | Stopped at a limit | `failed` | Which limit; the partial report |
-| Ran out the engine's backstop | `timed-out` | The same |
+| Ran out the backstop | `timed-out` | The same: the poll itself ends it, stopping the child |
 | Stopped by `stop` | `stopped` | Nothing is sent |
-| Died, or could not start | `error` | The last stderr lines, cleaned |
+| Died, could not be read, or its model failed | `error` | The reason, and the last stderr lines, cleaned |
 
 The words are the engine's, and `passed` reads oddly for a scout. A `finished` outcome is
 a small change in `jig-core`, and can come later. The backstop is `maxMinutes` + 10 +
 `maxAsks` × `approvalWaitMinutes`, so waiting for you never makes it fire first.
 
-- **The message shows the first 10 detail lines,** an engine limit. A role's prompt puts
-  the answer first, and the summary names `report.md`, which holds the cleaned full text
-  that the agent can `read`.
+- **The message shows the first 10 detail lines,** an engine limit. They are the branch (for
+  a worker), the path of `report.md` with a note that the report is the child's text, and
+  then the report, whose first lines are its answer.
 - **The report is data.** A child's text can carry what it read from a file, a log or a
   ticket. The message says so, and the parent's skill says to treat it as input.
 - **No `usage` on the tool result.** `/lens usage` counts a tool result's usage and a
@@ -251,15 +278,19 @@ You implement the one task in the parent's message, in this folder, and report.
 
 - **Unknown fields are errors,** and so is a `model`, `thinking`, `limits` or
   `extensions` field: those belong to configuration or are not allowed at all.
-- **A role with `writes: false`** is refused if its `tools` list `bash`, `write`, `edit`,
-  or a tool that `/jig rules` shows as a write.
+- **A role with `writes: false`** needs a `tools` list, because the child's usual tools
+  include `bash`, `write` and `edit`, and is refused if the list names `bash`, `powershell`,
+  `write`, `edit` or `notebook_edit`. `jig-core`'s contract has no way to ask which other
+  tools write, so the child's own `jig-core` rules govern the rest: `scout` and `reviewer`
+  list `git`, whose commit and branch actions are local writes the rules allow.
 - **Where files are read,** lowest first: the plugin's `agents/`, `agents.folders`, then
   `~/.pi/agent/agents/`. A file with an earlier name replaces it. Project folders are
-  never read.
-- **When the agent delegates** is one rule in the tool description: if an answer needs
-  more than about five files or 20,000 tokens of output, start a scout; use `reviewer`
-  for a fresh look at your own change. The earlier harness measured that its agent
-  delegated only when asked, so `jig-workflow` can name `reviewer` in its review stage.
+  never read. The tool's description lists the roles, and is registered again at session
+  start when a company's or the user's files change the list.
+- **When the agent delegates** is one rule in the tool description and in the skill: if an
+  answer needs more than about five files or 20,000 tokens of output, start a scout; use
+  `reviewer` for a fresh look at your own change. The earlier harness measured that its
+  agent delegated only when asked, so `jig-workflow` can name `reviewer` in its review stage.
 - **No interactive roles.** The earlier harness's planner talked to you in its pane. A
   child here has no screen, so planning stays with the parent, in `jig-workflow`'s plan
   stage.
@@ -277,10 +308,12 @@ You implement the one task in the parent's message, in this folder, and report.
 | `approvalWaitMinutes`, `maxAsks` | 1 to 240, and 0 to 100 | 30, 10 |
 | `folders` | absolute paths of folders with agent files | none |
 | `env` | extra variable names, such as one a model provider needs | none |
+| `branch` | a branch name that holds `{name}` | `agent/{name}` |
 
 - **Models are checked** against `enabledModels` in Pi's global `settings.json`. Project
-  settings are never read, because the model can write there. A model outside the list,
-  or one Pi does not know, refuses the `start` with the allowed patterns.
+  settings are never read, because the model can write there. A model outside the list
+  refuses the `start` with the allowed patterns. Without the setting every model Pi knows
+  is allowed, which is what Pi itself means by it. A model Pi does not know is refused too.
 - **A role in the configuration with no agent file** is a warning in `/agents roles`.
 - **Company defaults** arrive through `config.addSectionDefaults("agents", ...)`, and the
   user's own section is laid over them.
@@ -288,59 +321,74 @@ You implement the one task in the parent's message, in this folder, and report.
 
 ## Lifecycle
 
-- **States:** starting, running, waiting for you, then finished, stopped, failed or lost.
+- **States:** starting, running, waiting for you (running, with a question open), then
+  finished, stopped, failed or lost.
 - **No orphans.** When the parent session shuts down, for any reason (`/new`, `/resume`,
-  `/fork`, `/reload` or quit), every child is aborted and ended. If the parent dies
-  without that, its pipe closes, and Pi's RPC mode shuts down when its input ends. In a
-  child the plugin also checks every 10 seconds that its parent still exists. A
-  `/reload` therefore ends running children; `message` resumes them from their sessions.
+  `/fork`, `/reload` or quit), every child's input is closed and its process group is
+  signalled, with SIGKILL after 3 seconds. If the parent dies without that, its pipe
+  closes, and Pi's RPC mode shuts down when its input ends. As a second line, at every
+  session start the plugin reads the run folders' `meta.json` files and stops a child that
+  is running while its parent is not; a process is touched only when its recorded start
+  time still matches, and a child whose parent is another live Pi is left alone. A child
+  also checks every 10 seconds that its parent still exists, asks Pi to shut down when it
+  does not, and leaves by itself 5 seconds later, because Pi in RPC mode only notes that
+  request and acts on it at the next command. A `/reload` therefore ends running children;
+  `message` resumes them from their sessions.
 - **Not in a session that will end.** In print or JSON mode `start` is refused, because
   a result would have nowhere to go.
-- **One writer per folder.** A `writes: true` role is refused in the parent's own folder
-  and in a folder another running child writes in. It needs a worktree.
+- **One writer per folder, and a worktree for a writer.** A `writes: true` role works in a
+  new worktree, made with `git worktree add -b <branch> <folder> HEAD` through `jig-core`'s
+  `exec.git` (hooks off), in a folder named `<repository>-<name>` beside the repository.
+  The branch comes from `agents.branch`; if it exists, the child's id is added. It is cut
+  from the parent's HEAD, so uncommitted changes are not in it. A start that fails takes
+  the worktree and its branch away again (`git` refuses if anything was done in it). The
+  report names both.
 - **Run folder:** `agents/<session>/<child>/` in `jig-core`'s state folder, with
   `meta.json`, `system-prompt.md` and `report.md`. Folders older than 14 days are
-  removed when a session starts. Pi's own session files are not touched.
+  removed when a session starts, unless the child is recorded as running. Pi's own session
+  files are not touched.
 - **Counts:** `maxRunning` children at once and `maxStarted` per session. A child has no
-  `subagent` tool, so nothing nests.
+  `subagent` tool, and the plugin in a child refuses `start`, so nothing nests.
 
 ## Records and the lens
 
-- **Each child's `jig-core` writes its own records** in its own session. The record of
-  the parent's `subagent` call adds the facts `role` and `child`, and never the task.
+- **Each child's `jig-core` writes its own records** in its own session, with the role
+  and parent session from the environment. The record of the parent's `subagent` call
+  has the action, and never the task.
 - **Each child's session file** is in Pi's usual sessions folder, so `pi -r` lists it and
   `/lens usage` counts its cost once.
 
 ## Tests
 
-1. **Unit tests** with a fake child that speaks the protocol: role files, configuration,
-   the limit arithmetic, the cleaning of forwarded text, the queue, and one case for each
-   line of "Every failure is a no".
-2. **A command-line test** that the launch arguments never hold an extension flag.
-3. **A real Pi 1.4 child with a scripted model,** as `jig-core` does for its own hooks.
-   It is the first thing built, before any other code. It proves, in order:
-   - a child's "ask" reaches a fake screen and the answer comes back;
-   - a child started without `jig-core` is stopped;
-   - a looping child is stopped by each limit;
-   - from the child's sandboxed `bash`, writing to its own input does nothing useful;
-   - ending the parent ends the child;
-   - two children's questions queue.
+1. **Unit tests** for the arithmetic of limits, the RPC client (framing, ids, bad lines),
+   the cleaning of text, the reading of requests, agent files, configuration, the command
+   line and the environment.
+2. **A parent session with a fake child.** `test/world.ts` runs a real Pi session (the
+   SDK with its scripted model) with the real `jig-core` and the plugin, and
+   `support/fake-child.mjs` stands in for Pi: a small Node program that speaks the protocol
+   of Pi's docs from a script. Every line of "Every failure is a no" has a test, and so have
+   the queue, each limit, steering, stopping, resuming, a worker's worktree, a child that
+   is not what was asked for, a child that dies or floods, the end of the session, the
+   sweep for orphans and the check in a child.
+3. **The stock Pi as a child.** `test/real-pi.test.ts` starts the Pi installed next to this
+   Node with this repository's `jig-core` and `jig-agents` loaded through `settings.json`,
+   and gives it a scripted model by an extension (`support/scripted-model.ts`) that
+   registers Pi's own faux provider. It runs in a temporary agent folder and home, with
+   `AWS_PROFILE` and every other name the plugin drops left out. It proves, in order:
+   - the flags and environment make a Pi that lists `jig-core`'s and `jig-agents`' commands,
+     honours `--session-id` and `--model`, and ends cleanly when its input closes;
+   - a child whose parent has gone shuts itself down;
+   - a child's "ask" reaches a fake screen, a yes lets the tool run and a no stops it, the
+     follow-up "Why decline?" is forwarded, and what you type reaches the child's model;
+   - "Allow for this subagent" covers that child's later calls and no other child's;
+   - no screen is a no; a turn limit stops a looping child and ends its process;
+   - ending the parent's session ends a child that is waiting on a question;
+   - a Pi started without `jig-core` is refused before it gets its task;
+   - the child's call records name its role and its parent's session.
 
-   It is skipped, with the reason, when no Pi 1.4 is installed.
+   It is skipped, with the reason, when no Pi 1.x is installed next to this Node
+   (`JIG_AGENTS_TEST_PI` names another).
 
-## Not verified
-
-- **Nothing has been run.** Every statement about Pi's RPC mode is from its documents
-  and source, and every statement about a package is from its README and code (see
-  [Options](options.md#not-verified)).
-- **`jig-core` has not been run in a real RPC child.** Its tests use a fake RPC context.
-- **The sandbox and the child's input.** Whether `bash` in `jig-sandbox` could reach the
-  child Pi's descriptors is not established; the random id is the defence either way.
-- **Secrets that prompt.** A child has no terminal, so a secret backend that asks for a
-  passphrase would hang. Working with an already unlocked backend is assumed.
-- **Several Pi processes and one tunnel.** Whether two children opening the same
-  `jig-core` tunnel clash is not known.
-- **Unpriced models.** Whether to cap by tokens instead is open.
-- **The size** of about 1,000 lines is an estimate.
+What these do not show is on the [Not verified](not-verified.md) page.
 
 Back to the [jig-agents overview](../README.md).

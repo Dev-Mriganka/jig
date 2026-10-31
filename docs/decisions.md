@@ -4,6 +4,7 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 
 ## Contents
 
+- [2026-10-31: jig-agents, as built](#2026-10-31-jig-agents-as-built)
 - [2026-10-31: jig-workflow, evidence and holds: a gate in jig-core, tests in the sandbox](#2026-10-31-jig-workflow-evidence-and-holds-a-gate-in-jig-core-tests-in-the-sandbox)
 - [2026-10-31: an example company plugin, jig-acme, proves the generic plugins need no company code](#2026-10-31-an-example-company-plugin-jig-acme-proves-the-generic-plugins-need-no-company-code)
 - [2026-10-31: production reads need an index, and pull request comments reach the agent](#2026-10-31-production-reads-need-an-index-and-pull-request-comments-reach-the-agent)
@@ -37,6 +38,37 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 - [2026-10-30: jig-git's tools, and a watch that knows when it is done](#2026-10-30-jig-gits-tools-and-a-watch-that-knows-when-it-is-done)
 - [2026-10-30: built clean, beside the existing harness](#2026-10-30-built-clean-beside-the-existing-harness)
 - [Earlier decisions that still hold (2026-10-29)](#earlier-decisions-that-still-hold-2026-10-29)
+
+## 2026-10-31: jig-agents, as built
+
+Built to the design of the entry below, and tested with a fake child and with the stock Pi 1.4 on its own
+scripted model. What building it changed or settled:
+- **A worker's worktree is made by the plugin,** with `git worktree add -b <branch> <folder> HEAD` through
+  `jig-core`'s `exec.git`, in a folder named `<repository>-<name>` beside the repository. The branch comes from
+  a new field, `agents.branch` (default `agent/{name}`). The design had left "a worktree made by `start`
+  through `jig-git`" for later; a worker cannot start without one. Through `jig-git` stays under *Later*.
+- **A read-only role needs a tools list, and the plugin refuses only the tools it can name.** The design said a
+  role that does not write is refused if its tools show as writes in `/jig rules`, but the plugin contract
+  cannot ask. `bash`, `powershell`, `write`, `edit` and `notebook_edit` are refused, and so is a missing list,
+  since the child's usual tools include them. `scout` and `reviewer` keep `git`, as the design's example lists it.
+- **Without `enabledModels` any model is allowed,** which is Pi's own meaning of the missing setting. A role's
+  model that Pi does not know is refused at `start`, before a process is made.
+- **A question's time counts from its request,** not from the moment it reaches the screen, so one stuck
+  behind another still runs out. The child's own `timeout` closes it too, and so does stopping the child.
+- **The environment keeps `JIG_STATE_DIR`** so a child writes its records where the parent does, and the plugin
+  sets `JIG_PARENT_SESSION` and `JIG_AGENT_ROLE`, which `jig-core`'s records already read.
+- **A child leaves by itself when its parent is gone.** Pi in RPC mode, idle, only notes a request to shut down
+  and acts on it at the next command, so the child's 10-second check asks Pi and then exits 5 seconds later.
+  The real-Pi test found it.
+- **The backstop ends the watch from the poll,** as `timed-out` with the partial report, instead of leaving
+  the engine's generic words. No progress `update` is sent: `status` is there for that.
+- **The size is about 3,000 lines with comments,** not 1,000. The estimate left out the checks, the cleaning of
+  text and the orphan sweep. There is still no dependency.
+- **The real Pi found what the fake child could not:** a child resumed soon after it ended was ended again by
+  its old process's late exit event, and the 10-second parent check did nothing in an idle RPC Pi. Each
+  process's events now answer only for that process, and the check ends the process itself.
+- **Holds do not reach a child.** The gate follows the active ticket of the session it runs in, and a child has
+  none. A workflow file can hold `subagent start` itself.
 
 ## 2026-10-31: jig-workflow, evidence and holds: a gate in jig-core, tests in the sandbox
 
