@@ -1,0 +1,25 @@
+{
+    "name": "bugfix",
+    "description": "A fix with a test that reproduces the bug first",
+    "match": { "ticket": "^BUG-\\d+$" },
+    "branch": "fix/{ticket}",
+    "stages": [
+        {
+            "id": "reproduce",
+            "goal": "Find the cause, write a failing test that shows the bug, and note both",
+            "exit": ["notes-updated"]
+        },
+        {
+            "id": "fix",
+            "goal": "Make the smallest change that fixes the cause, commit, and run the tests at the commit",
+            "exit": ["tests-pass-at-head"]
+        },
+        {
+            "id": "verify",
+            "goal": "Open the pull request and wait for its checks",
+            "exit": ["pull-request-open", "checks-pass"]
+        },
+        { "id": "done" }
+    ],
+    "holds": [{ "until": "tests-pass-at-head", "calls": ["git push"] }]
+}

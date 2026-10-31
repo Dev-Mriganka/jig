@@ -1,0 +1,18 @@
+{
+    "name": "investigation",
+    "description": "Find out what happened and explain it, without changing code",
+    "match": { "ticket": "^INV-\\d+$" },
+    "stages": [
+        {
+            "id": "gather",
+            "goal": "Collect facts from the tools, and save what matters in the notes",
+            "exit": ["notes-updated"]
+        },
+        {
+            "id": "explain",
+            "goal": "Write the explanation in the notes, with the evidence it rests on",
+            "exit": ["notes-updated", "you-approve"]
+        },
+        { "id": "done" }
+    ]
+}

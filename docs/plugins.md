@@ -55,7 +55,7 @@ Each plugin's README has the full table of its tool's actions.
   `reply`, `resolve`, `review`, `merge`.
 - **`release`:** `tags`, `releases`, `tag_create`, `tag_push`, `release_create`.
 - **`workflow`** (design): `list`, `status`, `start`, `bind`, `submit-plan`,
-  `test`, `scenario`, `advance`.
+  `test`, `scenario`, `advance`, `back`.
 - **`mongo`:** `databases`, `collections`, `schema`, `stats`, `indexes`,
   `index-stats`, `explain`, `count`, `find`, `distinct`, `sample`, `aggregate`,
   `insert`, `update`, `replace`, `delete`, `bulk`, `create-index`, `drop-index`.

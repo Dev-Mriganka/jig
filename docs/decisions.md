@@ -4,6 +4,7 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 
 ## Contents
 
+- [2026-10-31: jig-workflow, evidence and holds: a gate in jig-core, tests in the sandbox](#2026-10-31-jig-workflow-evidence-and-holds-a-gate-in-jig-core-tests-in-the-sandbox)
 - [2026-10-31: jig-agents is built by us, on Pi's RPC mode](#2026-10-31-jig-agents-is-built-by-us-on-pis-rpc-mode)
 - [2026-10-31: jig-memory cards and recall: the agent writes the prose, keys and keywords find it](#2026-10-31-jig-memory-cards-and-recall-the-agent-writes-the-prose-keys-and-keywords-find-it)
 - [2026-10-31: jig-sandbox, background tasks and the network modes, as built](#2026-10-31-jig-sandbox-background-tasks-and-the-network-modes-as-built)
@@ -34,6 +35,35 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 - [2026-10-30: jig-git's tools, and a watch that knows when it is done](#2026-10-30-jig-gits-tools-and-a-watch-that-knows-when-it-is-done)
 - [2026-10-30: built clean, beside the existing harness](#2026-10-30-built-clean-beside-the-existing-harness)
 - [Earlier decisions that still hold (2026-10-29)](#earlier-decisions-that-still-hold-2026-10-29)
+
+## 2026-10-31: jig-workflow, evidence and holds: a gate in jig-core, tests in the sandbox
+
+- **A condition is decided from evidence the plugin made,** not from what the agent says. The agent can
+  ask for a test run, a plan approval or a check; the plugin records the outcome against the commit or
+  the plan it is about, and an old result stops counting when either changes.
+- **Holds are a gate in `jig-core`:** `gates.register(gate)`. A gate sees each call after the rules have
+  decided and can answer `ask` or `deny`, never `allow`, so a wrong workflow file can make work slower and
+  not less safe. A failing gate denies, like every failure in `jig-core`. It is a new decision source, `gate`.
+- **Some calls always ask,** through the same gate: a plan to approve, a stage that needs you, a switch of
+  workflow, and a test run outside the sandbox. A rule or an "allow for this session" cannot answer them,
+  because the point is a fresh answer about this exact thing.
+- **Tests run in the sandbox.** `jig-core` gets `sandbox.run`, which `jig-sandbox` implements with the same
+  wrapping as `bash`. With no sandbox the run is never silent: it asks, naming each command, as
+  `bash` run outside does. Tests are the agent's own checks on its own work, and the sandbox is what makes
+  letting it run them safe.
+- **A test result belongs to a full commit on a clean tree.** A pass on a dirty tree is shown and never
+  counted, because it says nothing about what a push sends.
+- **The state is a file in the ticket folder, written only by the plugin** and guarded from Pi's file tools
+  and the sandbox. An agent that could edit it could mark anything passed. The workflow's definition is
+  not copied into it, so a mended workflow file applies at the next reload.
+- **Review and CI evidence come from events,** checked on arrival. `jig-review:approved` gets the
+  repository's folder (`root`), because a path from Pi's folder is ambiguous outside it, and `jig-ops` gets
+  `jig-ops:ci-finished`, because a watch's result names no commit. `pull-request-open` and the fallback for
+  `checks-pass` read `gh pr view` through `jig-core`'s `exec`.
+- **Examples, not company workflows.** `feature`, `bugfix` and `investigation` are in the plugin's
+  `examples/`. A company's files arrive through `jig-core`'s section defaults for `workflow.folders`,
+  which work in any load order.
+- **Left for later:** check tiers, a checker agent, the review ledger and one approval per change.
 
 ## 2026-10-31: jig-agents is built by us, on Pi's RPC mode
 
