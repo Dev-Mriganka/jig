@@ -1,6 +1,5 @@
 // The session's children: starting, steering, resuming and stopping them, counting them, and finding the ones an earlier session left
 // behind. One `Runtime` lives from the factory to the end of the plugin's load; a session starts and ends inside it.
-import { randomBytes } from "node:crypto";
 import { realpathSync, statSync } from "node:fs";
 import path from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
@@ -8,22 +7,24 @@ import { jig } from "../../jig-core/src/client.ts";
 import type { WatchDoneEvent } from "../../jig-core/src/contract.ts";
 import { oneLine, stripControl } from "./clean.ts";
 import { Child } from "./child.ts";
-import type { ChildContext, ChildSpec, Outcome } from "./child.ts";
-import { approvalsFor, limitsFor, NAME_PATTERN, settingsFrom } from "./config.ts";
+import type { ChildContext } from "./child.ts";
+import type { ChildSpec, Outcome } from "./child-types.ts";
+import { approvalsFor, limitsFor, settingsFrom } from "./config.ts";
 import type { AgentsSettings } from "./config.ts";
 import type { Screen } from "./forward.ts";
 import type { Host } from "./host.ts";
-import { chooseModel, childEnvironment, flagsFor, readEnabledModels, StartError } from "./launch.ts";
-import type { ModelChoice, ParentModel } from "./launch.ts";
+import { childEnvironment, flagsFor, StartError } from "./launch.ts";
+import type { ModelChoice } from "./launch.ts";
 import { recordedRunning, sweep, watchParent } from "./orphans.ts";
 import { loadRoles, roleFolders } from "./roles.ts";
 import type { LoadedRoles, Role } from "./roles.ts";
 import { agentDir, agentsRoot, listChildren, removeOld, runDirOf, stateDir, writeText } from "./store.ts";
+import { ChildWatches, WATCH_KIND } from "./watch.ts";
+import type { WatchSpec } from "./watch.ts";
+import { generateId, modelFor, nameFor, requiredCommands, resolveCwd, taskPrompt } from "./start-plan.ts";
 import { addWorktree, removeWorktree } from "./worktree.ts";
 import type { Worktree } from "./worktree.ts";
 
-/** The kind of watch every child is. */
-export const WATCH_KIND = "subagent";
 /** Run folders older than this are removed when a session starts. */
 const KEEP_MS = 14 * 24 * 60 * 60_000;
 const MAX_TASK_CHARS = 20_000;
@@ -44,21 +45,6 @@ export interface Started {
     watchId: string;
 }
 
-/** What a watch remembers about its child. */
-export interface WatchSpec {
-    id: string;
-    name: string;
-    /** When the plugin stops waiting for the child, in milliseconds since the epoch. */
-    deadline: number;
-}
-
-function generateId(taken: (id: string) => boolean): string {
-    for (;;) {
-        const id = randomBytes(4).toString("hex").slice(0, 6);
-        if (!taken(id)) return id;
-    }
-}
-
 export class Runtime {
     ctx: ExtensionContext | undefined;
     session = "";
@@ -68,9 +54,7 @@ export class Runtime {
     /** Starts and resumes counted against `maxStarted`. */
     started = 0;
     readonly queue = { waiting: 0 };
-    /** Which watch tells the agent about which child, and back. */
-    private readonly watchOf = new Map<string, string>();
-    private readonly childOfWatch = new Map<string, string>();
+    private readonly watches = new ChildWatches();
     /** The sweep for orphans that session start began, so a test can wait for it. */
     sweeping: Promise<unknown> = Promise.resolve();
     problem: string | undefined;
@@ -218,8 +202,7 @@ export class Runtime {
         if (this.exitHook !== undefined) process.off("exit", this.exitHook);
         this.exitHook = undefined;
         this.children.clear();
-        this.watchOf.clear();
-        this.childOfWatch.clear();
+        this.watches.clear();
         this.queue.waiting = 0;
     }
 
@@ -275,100 +258,6 @@ export class Runtime {
         }
     }
 
-    private nameFor(role: string, given: string | undefined): string {
-        const taken = (name: string): boolean => [...this.children.values()].some((child) => child.name === name);
-        if (given !== undefined) {
-            if (!NAME_PATTERN.test(given))
-                throw new StartError(`name "${oneLine(given, 40)}" must be letters, digits, - and _ (at most 40)`);
-            if (taken(given)) throw new StartError(`a child named ${given} exists already in this session`);
-            return given;
-        }
-        for (let n = 1; ; n++) {
-            const name = `${role}-${n}`;
-            if (!taken(name)) return name;
-        }
-    }
-
-    private resolveCwd(ctx: ExtensionContext, requested: string | undefined): string {
-        let base: string;
-        try {
-            base = realpathSync(ctx.cwd);
-        } catch {
-            throw new StartError(`the working folder ${ctx.cwd} cannot be read`);
-        }
-        if (requested === undefined) return base;
-        let target: string;
-        try {
-            target = realpathSync(path.resolve(base, requested));
-        } catch {
-            throw new StartError(`cwd ${oneLine(requested, 80)} does not exist`);
-        }
-        const relative = path.relative(base, target);
-        if (relative.startsWith("..") || path.isAbsolute(relative)) {
-            throw new StartError(`cwd must be inside the working folder ${base}: a wider folder would widen the child`);
-        }
-        if (!statSync(target).isDirectory()) throw new StartError(`cwd ${oneLine(requested, 80)} is not a folder`);
-        return target;
-    }
-
-    private parentModel(ctx: ExtensionContext): ParentModel | undefined {
-        const model = ctx.model;
-        if (model === undefined) return undefined;
-        const thinking =
-            ctx.thinkingLevel ??
-            (typeof this.pi.getThinkingLevel === "function" ? this.pi.getThinkingLevel() : undefined);
-        return { provider: model.provider, id: model.id, ...(thinking === undefined ? {} : { thinking }) };
-    }
-
-    private modelFor(ctx: ExtensionContext, role: string): ModelChoice | undefined {
-        const choice = chooseModel(
-            this.settings,
-            role,
-            this.parentModel(ctx),
-            readEnabledModels(agentDir(this.host.env())),
-        );
-        if (choice?.source === "role") {
-            const [provider = "", ...rest] = choice.model.split("/");
-            const known = ctx.modelRegistry?.find?.(provider, rest.join("/"));
-            if (typeof ctx.modelRegistry?.find === "function" && known === undefined) {
-                throw new StartError(
-                    `Pi does not know the model ${choice.model} that agents.roles.${role}.model names`,
-                );
-            }
-        }
-        return choice;
-    }
-
-    private requiredCommands(): string[] {
-        let have: string[] = [];
-        try {
-            have =
-                typeof this.pi.getCommands === "function" ? this.pi.getCommands().map((command) => command.name) : [];
-        } catch {
-            // The list is a check, and a parent that cannot give it checks jig-core's command alone.
-        }
-        return have.includes("sandbox") ? ["jig", "sandbox"] : ["jig"];
-    }
-
-    private taskPrompt(role: Role, name: string, task: string, spec: ChildSpec): string {
-        const lines = [
-            `Task from your parent agent. You are the "${role.name}" subagent "${name}".`,
-            "",
-            task,
-            "",
-            "---",
-            "Your last message is your report, and it is sent to the parent as it is. Put the answer first, then the evidence.",
-            `You may use at most ${spec.limits.maxTurns} turns, ${spec.limits.maxMinutes} minutes and $${spec.limits.maxCost} of model cost; at a limit you are told to write your report, and then you are stopped.`,
-            "If an action needs a person's permission, ask as you normally do: the question goes to the user, and a no is a no.",
-        ];
-        if (spec.branch !== undefined) {
-            lines.push(
-                `This folder is a git worktree on the branch ${spec.branch}, cut from the parent's HEAD. Changes the parent has not committed are not here. Commit your work on this branch.`,
-            );
-        }
-        return lines.join("\n");
-    }
-
     /** Starts a child from a role and a task, and returns once the child has been checked and has its task. */
     async start(input: StartInput, ctx: ExtensionContext, signal?: AbortSignal): Promise<Started> {
         this.touch(ctx);
@@ -381,10 +270,12 @@ export class Runtime {
         const task = input.task.trim();
         if (task === "" || task.length > MAX_TASK_CHARS)
             throw new StartError(`the task must be 1 to ${MAX_TASK_CHARS} characters`);
-        const name = this.nameFor(role.name, input.name);
+        const name = nameFor(role.name, input.name, (taken) =>
+            [...this.children.values()].some((child) => child.name === taken),
+        );
         this.checkCounts();
-        const cwd = this.resolveCwd(ctx, input.cwd);
-        const model = this.modelFor(ctx, role.name);
+        const cwd = resolveCwd(ctx, input.cwd);
+        const model = modelFor(ctx, this.pi, this.settings, agentDir(this.host.env()), role.name);
         signal?.throwIfAborted();
 
         // Everything above is checked without waiting, so two starts at once cannot both take the same name or the last place.
@@ -403,7 +294,7 @@ export class Runtime {
             model,
             generation: 1,
             startedAt: new Date(this.host.now()).toISOString(),
-            requireCommands: this.requiredCommands(),
+            requireCommands: requiredCommands(this.pi),
         };
         const child = new Child(spec, this.childContext());
         this.children.set(id, child);
@@ -429,9 +320,9 @@ export class Runtime {
             }
             signal?.throwIfAborted();
             const promptFile = writeText(dir, "system-prompt.md", `${role.prompt}\n`);
-            await this.run(child, role, model, promptFile, this.taskPrompt(role, name, task, child.spec));
+            await this.run(child, role, model, promptFile, taskPrompt(role, name, task, child.spec));
             signal?.throwIfAborted();
-            const watchId = this.watch(child);
+            const watchId = this.watches.start(child, this.watchSpec(child.id));
             return { child, model: child.snapshot().model, watchId };
         } catch (error) {
             await child.stop().catch(() => undefined);
@@ -476,40 +367,11 @@ export class Runtime {
         };
     }
 
-    /** The watch that tells the agent how the child ended. */
-    private watch(child: Child): string {
-        const { spec, timeoutMinutes, stallMinutes } = this.watchSpec(child.id);
-        const watchId = jig().watches.start({
-            kind: WATCH_KIND,
-            spec,
-            title: `child agent ${child.name} (${child.spec.role})`,
-            timeoutMinutes,
-            stallMinutes,
-        });
-        this.watchOf.set(child.id, watchId);
-        this.childOfWatch.set(watchId, child.id);
-        return watchId;
-    }
-
-    private unwatch(child: Child): void {
-        const watchId = this.watchOf.get(child.id);
-        if (watchId === undefined) return;
-        this.watchOf.delete(child.id);
-        this.childOfWatch.delete(watchId);
-        try {
-            jig().watches.stop(watchId);
-        } catch {
-            // It had ended already.
-        }
-    }
-
     /** `jig:watch-done`: a child's watch that was stopped from the `watch` tool ends the child too. */
     onWatchDone(event: WatchDoneEvent): void {
         if (event.kind !== WATCH_KIND) return;
-        const childId = this.childOfWatch.get(event.id);
+        const childId = this.watches.ended(event.id);
         if (childId === undefined) return;
-        this.childOfWatch.delete(event.id);
-        this.watchOf.delete(childId);
         const child = this.children.get(childId);
         if (child?.live === true && event.result.outcome === "stopped") void child.stop();
     }
@@ -542,7 +404,7 @@ export class Runtime {
         } catch {
             throw new StartError(`${child.name} worked in ${child.spec.cwd}, which is gone, so it cannot be resumed`);
         }
-        const model = this.modelFor(ctx, role.name);
+        const model = modelFor(ctx, this.pi, this.settings, agentDir(this.host.env()), role.name);
         const spec: ChildSpec = {
             ...child.spec,
             writes: role.writes,
@@ -551,10 +413,10 @@ export class Runtime {
             model,
             generation: child.spec.generation + 1,
             startedAt: new Date(this.host.now()).toISOString(),
-            requireCommands: this.requiredCommands(),
+            requireCommands: requiredCommands(this.pi),
         };
         signal?.throwIfAborted();
-        this.unwatch(child);
+        this.watches.stop(child);
         child.reset(spec);
         this.started++;
         try {
@@ -566,7 +428,7 @@ export class Runtime {
                 promptFile,
                 `Message from your parent agent:\n\n${body}\n\nYour last message is your report again; the limits start afresh.`,
             );
-            this.watch(child);
+            this.watches.start(child, this.watchSpec(child.id));
         } catch (error) {
             await child.stop().catch(() => undefined);
             this.started--;
@@ -580,7 +442,7 @@ export class Runtime {
         const child = this.require(ref);
         const was = child.live;
         const outcome = await child.stop();
-        if (was) this.unwatch(child);
+        if (was) this.watches.stop(child);
         return { child, outcome };
     }
 
