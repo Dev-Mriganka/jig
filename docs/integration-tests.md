@@ -23,7 +23,8 @@ such as Elasticsearch, MongoDB and Kubernetes, so a fake that is wrong about the
 
 No secret is needed. Every credential in a test is a throwaway value, either set in the workflow or made when the
 test runs, and none is shaped like a real token (see [AGENTS.md](../AGENTS.md)). The one token is the `GITHUB_TOKEN`
-that Actions gives each run, with read access only: it reads this repository's workflow runs and public repositories.
+that Actions gives each run, which the workflow hands to `gh` as `GH_TOKEN`. The job's `permissions` make it read only: it reads this
+repository's workflow runs and public repositories.
 
 ## How a suite is written
 
@@ -40,6 +41,14 @@ describeIt("jig-logs against Elasticsearch", { service: "elasticsearch", variabl
   other tests of that plugin use.
 - **Every suite makes its own data,** with names that include a random part, and removes it at the end, so two runs
   against one service do not meet.
+
+## What only CI runs
+
+- **A kind cluster.** `cluster.test.ts` needs a node that runs pods, for `logs`, `exec`, and the events a kubelet writes. The `deploy`
+  and `runtime` flows without those were also run here against a bare control plane (see the `jig-ops` section).
+- **Names that only a Docker network resolves.** The replica set's members are `mongo1` to `mongo3` there, so the check that this machine
+  cannot reach them without the tunnel skips anywhere else.
+- **An ssh key GitHub does not know.** `clone` over ssh to a repository a key can read was run once by hand; CI runs the refusal.
 
 ## Pinned versions
 
