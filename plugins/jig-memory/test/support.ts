@@ -1,13 +1,15 @@
 // Test support: a fake jig-core and a fake Pi, both recording what the plugin does. The plugin needs only Pi's types
 // at run time, so none of Pi's SDK is loaded: the fakes stand in for the handful of calls the plugin makes.
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { TestContext } from "node:test";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { publishJig, withdrawJig } from "../../jig-core/src/client.ts";
 import type { JigApi } from "../../jig-core/src/contract.ts";
+import { type CardFront, type CardSections, renderCard } from "../src/card.ts";
 import factory from "../src/index.ts";
+import { ticketPaths } from "../src/store.ts";
 
 /** A ticket key pattern for tests, as a company plugin or jig.json would set it. */
 export const PATTERN = "[A-Z][A-Z0-9]+-\\d+";
@@ -17,6 +19,28 @@ export function tempFolder(t: TestContext): string {
     const dir = mkdtempSync(path.join(os.tmpdir(), "jig-memory-"));
     t.after(() => rmSync(dir, { recursive: true, force: true }));
     return dir;
+}
+
+/** Writes a valid card for `ticket` into the tickets folder: front matter from `extra`, and the three sections. */
+export function writeCard(
+    folder: string,
+    ticket: string,
+    sections: CardSections,
+    extra: Partial<Omit<CardFront, "ticket">> = {},
+): string {
+    const file = ticketPaths(folder, ticket).card;
+    mkdirSync(ticketPaths(folder, ticket).dir, { recursive: true });
+    const front: CardFront = {
+        ticket,
+        closedAt: "2026-10-01T09:00:00.000Z",
+        repositories: [],
+        keys: [],
+        identifiers: [],
+        errors: [],
+        ...extra,
+    };
+    writeFileSync(file, renderCard(front, sections));
+    return file;
 }
 
 /** What the fake jig-core recorded. Only the members jig-memory uses are real; the rest of JigApi is never called. */
@@ -159,6 +183,11 @@ export class FakePi {
             isError: false,
             details: undefined,
         });
+    }
+
+    /** The agent has settled after a run. */
+    settle(aborted = false): unknown[] {
+        return this.fire("agent_settled", { aborted });
     }
 
     compact(): unknown[] {

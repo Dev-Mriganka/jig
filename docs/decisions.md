@@ -4,6 +4,7 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 
 ## Contents
 
+- [2026-10-31: jig-memory cards and recall: the agent writes the prose, keys and keywords find it](#2026-10-31-jig-memory-cards-and-recall-the-agent-writes-the-prose-keys-and-keywords-find-it)
 - [2026-10-31: jig-sandbox, as built](#2026-10-31-jig-sandbox-as-built)
 - [2026-10-31: jig-sandbox, built on Anthropic's sandbox runtime](#2026-10-31-jig-sandbox-built-on-anthropics-sandbox-runtime)
 - [2026-10-31: gaps a company plugin found in jig-core, closed](#2026-10-31-gaps-a-company-plugin-found-in-jig-core-closed)
@@ -31,6 +32,36 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 - [2026-10-30: jig-git's tools, and a watch that knows when it is done](#2026-10-30-jig-gits-tools-and-a-watch-that-knows-when-it-is-done)
 - [2026-10-30: built clean, beside the existing harness](#2026-10-30-built-clean-beside-the-existing-harness)
 - [Earlier decisions that still hold (2026-10-29)](#earlier-decisions-that-still-hold-2026-10-29)
+
+## 2026-10-31: jig-memory cards and recall: the agent writes the prose, keys and keywords find it
+
+- **A card per closed ticket, in two halves.** The plugin fills the front matter
+  (repositories, keys, identifiers, error lines) by fixed patterns from the notes and
+  evidence, so the half recall depends on is the same every time and needs no model.
+  The agent writes only Problem, Cause and Fix, up to 400 characters each, and the
+  plugin rejects a card that misses one or runs over.
+- **One request, one correction.** `/ticket close` sends one follow-up message and
+  checks the file when the agent settles. A card that fails gets one correction
+  message and then a warning, not a loop. A model often misjudges a character limit,
+  so a rejected card with no second try would be common.
+- **Recall is shared keys first, then BM25.** An error line, an identifier or a
+  ticket key two tickets share is strong evidence; a shared word is weak. Both add
+  up to one score with a threshold, so a quiet recall is a result and not a failure.
+  BM25 is a short function of our own, with no dependency.
+- **Files, not embeddings.** The cards are plain files and the index is a copy
+  (`.cards.json`) that rebuilds itself. Embeddings or a graph wait for a measurement
+  on real tickets that shows misses. The recall test in `test/recall-eval/` uses
+  invented tickets: it guards the scoring against regressions, and says nothing yet
+  about real ones.
+- **The threshold was tuned on the test.** The first run, at a `minScore` of 2.5, gave
+  recall 0.786 and precision 0.917. A sweep with nothing else changed showed 2 beat
+  2.5 on both (0.893 and 0.926), so 2 is the default. The test is 30 invented
+  queries, so the number is a starting point, and the sweep is in the recall page.
+- **Recall arrives as a message, not in the prompt.** The cache of the system prompt
+  stays valid, and the agent can ignore a hint that does not fit.
+- **Ticket text.** `jig-jira` does not publish an issue's summary and description on
+  Pi's event bus, so recall uses the activating message and the key. `jig-jira` was
+  left alone: a new event there is its own decision.
 
 ## 2026-10-31: jig-sandbox, as built
 

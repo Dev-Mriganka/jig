@@ -31,7 +31,7 @@ paths (see [Permissions](permissions.md#the-floor-what-configuration-cannot-chan
 | [`jig-lens`](../plugins/jig-lens/README.md) | built | none: the `/lens` command | 2 |
 | [`jig-sandbox`](../plugins/jig-sandbox/README.md) | built, in part | `bash` (replaces Pi's); the `/sandbox` command | 2 |
 | [`jig-workflow`](../plugins/jig-workflow/README.md) | design | `workflow` | 3 |
-| [`jig-memory`](../plugins/jig-memory/README.md) | built | none: ticket folders and the `/ticket` command | 3 |
+| [`jig-memory`](../plugins/jig-memory/README.md) | built | none: ticket folders, cards, recall and the `/ticket` command (`close`, `recall`) | 3 |
 | [`jig-mongo`](../plugins/jig-mongo/README.md) | built | `mongo` | 4 |
 | [`jig-jira`](../plugins/jig-jira/README.md) | built | `jira` | 5 |
 | [`jig-logs`](../plugins/jig-logs/README.md) | built | `logs` | 6 |

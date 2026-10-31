@@ -27,7 +27,8 @@ In short:
   `jig-api` (your saved API requests, run by name) and `jig-mongo` (MongoDB, with
   allow and deny lists).
 - **Seeing and remembering:** `jig-lens` shows cost, failures and the time spent
-  waiting for you. `jig-memory` keeps a folder of notes and evidence per ticket.
+  waiting for you. `jig-memory` keeps a folder of notes and evidence per ticket, writes a card when
+  a ticket closes, and brings related earlier tickets back when a new one starts.
 - **How Pi looks:** `jig-theme` gives six palettes, a one-line footer and your
   own colours.
 - **Checked on every push:** the type check, Biome, over 5,000 tests, the
@@ -88,7 +89,7 @@ first in the list, because every other plugin needs it:
 | [`jig-git`](plugins/jig-git/README.md) | built | Local git, GitHub pull requests and reviews, tags and releases |
 | [`jig-lens`](plugins/jig-lens/README.md) | built | Cost, tool failures and time spent waiting for you, inside Pi; Grafana optional |
 | [`jig-workflow`](plugins/jig-workflow/README.md) | design | Named workflows you define: stages, exit conditions, holds, test runs |
-| [`jig-memory`](plugins/jig-memory/README.md) | built | Ticket folders, notes and evidence; later, recall of related tickets |
+| [`jig-memory`](plugins/jig-memory/README.md) | built | Ticket folders, notes and evidence; a card per closed ticket, and recall of related tickets |
 | [`jig-mongo`](plugins/jig-mongo/README.md) | built | MongoDB: explore, query, aggregate and write, with allow and deny lists |
 | [`jig-jira`](plugins/jig-jira/README.md) | built | Jira issues: read, comment, transition, update, with rendered previews |
 | [`jig-logs`](plugins/jig-logs/README.md) | built | Log search over Elasticsearch, OpenSearch or Grafana Loki |

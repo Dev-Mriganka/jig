@@ -130,7 +130,7 @@ jig (this repository, generic)
   jig-logs   tool: log search (Elasticsearch, OpenSearch, Loki)
   jig-api    tool: your saved API requests, run by name
   jig-review tools: the code review in the browser, approved with a passkey
-  jig-memory ticket folders, notes and evidence; no tools
+  jig-memory ticket folders, notes, evidence, cards and recall; no tools
   jig-lens   observability: reads jig-core's records, local dashboard; no tools
   jig-theme  the look: palettes as Pi themes, a footer, the answer colour; no tools
   jig-sandbox the sandbox around the agent's bash, and the bash tool that replaces Pi's
