@@ -21,6 +21,8 @@
     "javascript": {
         "formatter": { "quoteStyle": "double", "trailingCommas": "all", "semicolons": "always" }
     },
+    "markdown": { "formatter": { "enabled": false } },
+    "yaml": { "formatter": { "enabled": false } },
     "assist": { "enabled": false },
     "linter": {
         "enabled": true,

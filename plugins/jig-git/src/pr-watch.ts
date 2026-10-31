@@ -309,7 +309,12 @@ async function collectGithub(
     if (talk.changed) {
         const items = list(talk.body);
         take("conversation", items);
-        const newest = items.map((item) => item.created_at ?? "").reduce((a, b) => (b > a ? b : a), state.since ?? "");
+        // ISO timestamps compare as strings; Math.max would turn them into NaN.
+        let newest = state.since ?? "";
+        for (const item of items) {
+            const at = item.created_at ?? "";
+            if (at > newest) newest = at;
+        }
         if (newest !== "") state.since = newest;
     }
     return found;
