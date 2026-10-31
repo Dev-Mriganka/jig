@@ -188,6 +188,10 @@ export function buildApi(state: JigState): JigApi {
             },
         },
 
+        approvals: {
+            inTurn: (job) => state.approvals.inTurn(job),
+        },
+
         exec: {
             run: (file, args, options) => run(file, args, options, guard),
             git: (repo, args, options) => git(repo, args, options, guard),

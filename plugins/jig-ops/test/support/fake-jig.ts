@@ -298,6 +298,7 @@ export function installFakeJig(): FakeJig {
         },
         protectedPaths: { list: () => [] },
         sandbox: { register: () => undefined },
+        approvals: { inTurn: (job) => job() },
         exec: {
             run: async (file, args, options = {}) => {
                 started.push({ file, args: [...args], options });

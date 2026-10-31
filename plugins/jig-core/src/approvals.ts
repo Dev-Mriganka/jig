@@ -50,6 +50,12 @@ export type AskContext = Pick<ExtensionContext, "ui" | "mode" | "signal">;
 
 export interface Approvals {
     ask(ctx: AskContext, request: AskRequest): Promise<Approval>;
+    /**
+     * Runs `job` when no question is open and holds the queue until it ends, so a question another plugin asks (a
+     * sandbox asking about a host) is never open at the same time as one of ours. A failing job does not stop the ones
+     * behind it.
+     */
+    inTurn<T>(job: () => Promise<T>): Promise<T>;
 }
 
 export interface ApprovalsOptions {
@@ -127,6 +133,7 @@ export function createApprovals(options: ApprovalsOptions = {}): Approvals {
     }
 
     return {
+        inTurn,
         async ask(ctx, request) {
             const queuedAt = now();
             return inTurn<Approval>(async () => {
