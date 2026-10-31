@@ -93,6 +93,8 @@ reads where the catalog says. It was `jig-git`'s `github` kind.
 1. **It starts by itself** after a push and after a pull request is created.
    `jig-git` announces `jig-git:pushed`; when a service of the catalog has that
    `repo` and a `ci` entry, a watch starts on the pushed commit (`ops.watch.auto`).
+   On GitLab the `repo` is the project's whole path, groups and subgroups included,
+   so `platform/payments/orders-api` matches only that project.
    A newer push to the same branch replaces the watch of the older commit.
    Or the agent calls `ci watch`.
 2. **Its finish line is explicit, never "all checks".**

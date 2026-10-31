@@ -21,7 +21,7 @@ export const PUSHED_EVENT = "jig-git:pushed";
 
 /** What jig-git announces after a push has landed and after a pull request was opened. */
 export interface Pushed {
-    /** `owner/name` on GitHub, as origin names it. */
+    /** `owner/name` on GitHub, as origin names it; on GitLab the project's whole path, which may have groups. */
     repo: string;
     branch: string;
     /** The full id of the pushed head. */
@@ -30,7 +30,9 @@ export interface Pushed {
     pr?: number;
 }
 
-const REPO = /^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/;
+/** `owner/name`, or a GitLab project's whole path: up to twenty parts, as GitLab allows groups inside groups. */
+const REPO = /^[A-Za-z0-9_.-]{1,100}(?:\/[A-Za-z0-9_.-]{1,100}){1,19}$/;
+const MAX_REPO_CHARS = 200;
 const BRANCH = /^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$/;
 const SHA = /^[0-9a-f]{40}$/;
 
@@ -38,7 +40,9 @@ const SHA = /^[0-9a-f]{40}$/;
 export function parsePushed(payload: unknown): Pushed | undefined {
     if (typeof payload !== "object" || payload === null) return undefined;
     const { repo, branch, sha, pr } = payload as Record<string, unknown>;
-    if (typeof repo !== "string" || !REPO.test(repo)) return undefined;
+    // A part of `.` or `..` is a step up in a path, not the name of a group or a project.
+    if (typeof repo !== "string" || repo.length > MAX_REPO_CHARS || !REPO.test(repo)) return undefined;
+    if (repo.split("/").some((part) => part === "." || part === "..")) return undefined;
     if (typeof branch !== "string" || !BRANCH.test(branch)) return undefined;
     if (typeof sha !== "string" || !SHA.test(sha)) return undefined;
     if (pr !== undefined && (typeof pr !== "number" || !Number.isSafeInteger(pr) || pr < 1)) return undefined;

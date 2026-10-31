@@ -59,6 +59,25 @@ describe("the listener", () => {
         assert.deepEqual(h.jig.watches, []);
     });
 
+    test("a GitLab project in subgroups is found by its whole path, whatever the case", () => {
+        const raw = withCi(gitlabCi({ project: "platform/payments/orders-api" }));
+        ((raw.services as Record<string, Raw>)["orders-api"] as Raw).repo = "platform/payments/orders-api";
+        h.configure(raw);
+        announce(pushed({ repo: "Platform/Payments/Orders-API", pr: 12 }));
+        assert.equal(h.jig.watches.length, 1);
+        assert.deepEqual(h.jig.watches[0]?.spec, {
+            system: "gitlab",
+            service: "orders-api",
+            ref: "feature/one",
+            sha: SHA,
+            finish: { kind: "pipeline" },
+            since: h.clock.now(),
+        });
+        // The last two parts alone are another project.
+        announce(pushed({ repo: "payments/orders-api" }));
+        assert.equal(h.jig.watches.length, 1, "payments/orders-api is not platform/payments/orders-api");
+    });
+
     test("a service with the repository but no ci entry starts nothing", () => {
         const raw = section();
         (raw.services as Record<string, Raw>).billing = {
@@ -178,6 +197,11 @@ describe("what arrives on the bus is checked", () => {
         ["no repo", { branch: "main", sha: SHA }],
         ["a repo with a space", pushed({ repo: "acme/orders api" })],
         ["a repo without an owner", pushed({ repo: "orders-api" })],
+        ["a repo with an empty part", pushed({ repo: "acme//orders-api" })],
+        ["a repo with a step up in it", pushed({ repo: "acme/../orders-api" })],
+        ["a repo with a part that is a dot", pushed({ repo: "platform/./orders-api" })],
+        ["a repo with twenty-one parts", pushed({ repo: Array.from({ length: 21 }, (_, i) => `g${i}`).join("/") })],
+        ["a repo longer than the catalog allows", pushed({ repo: `acme/${"a".repeat(200)}` })],
         ["a branch that starts with a dash", pushed({ branch: "--force" })],
         ["no branch", { repo: "acme/orders-api", sha: SHA }],
         ["a short sha", pushed({ sha: "abcdef0" })],
@@ -192,6 +216,12 @@ describe("what arrives on the bus is checked", () => {
             assert.equal(parsePushed(payload), undefined);
         });
     }
+
+    test("a repository of several parts is right, and so is a repository whose name starts with a dot", () => {
+        for (const repo of ["platform/payments/orders-api", "a/b/c/d/e/f", "acme/.github"]) {
+            assert.deepEqual(parsePushed(pushed({ repo })), pushed({ repo }), repo);
+        }
+    });
 
     test("a payload that is right is read as it is, with the pull request only when there is one", () => {
         assert.deepEqual(parsePushed(pushed()), pushed());

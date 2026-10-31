@@ -114,7 +114,7 @@ and it ends when the request is merged or closed ([Comment watch](comments-watch
 - **`clone` is GitHub only.** It builds a GitHub URL from `git.cloneHost`.
 - **GitLab under a path** (`https://example.com/gitlab`) and a host with a port are not supported: glab's `--hostname` takes a bare
   host name.
-- **`jig-workflow`'s `pull-request-open` condition** reads `gh pr view`, so it does not see a merge request.
-- **`jig-ops`** matches the event `jig-git:pushed` on `owner/name`; a project in a subgroup is announced with its full path, which
-  `jig-ops` does not match yet ([Events](events.md)).
+- **`jig-workflow` and `jig-ops` follow GitLab too.** The `pull-request-open` and `checks-pass` conditions read the merge request
+  and its pipeline with `glab api`, and `jig-ops` matches the event `jig-git:pushed` on a project's whole path, subgroups included
+  ([Events](events.md)).
 - **Not verified against a GitLab server;** see [Not verified yet](not-verified.md).
