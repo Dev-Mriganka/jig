@@ -24,15 +24,41 @@ import { SandboxManager } from "@anthropic-ai/sandbox-runtime";
 
 /** How long the runtime gets to clean up once Pi has gone, before this process leaves anyway. */
 const SHUTDOWN_GRACE_MS = 3000;
+/** How long Pi gets to decide about a host (it may be asking a person) before the connection is refused. */
+const ASK_TIMEOUT_MS = 10 * 60_000;
 
 let initialized = false;
 let stopping = false;
+/** Connections the proxy waits on Pi to decide, by the number the question was sent with. */
+const questions = new Map();
+let questionCounter = 0;
 /** Wrapped commands that have not finished yet. The runtime's placeholder files are removed only when none is. */
 let inFlight = 0;
 
 /** @param {unknown} message */
 function send(message) {
     if (process.connected) process.send?.(message);
+}
+
+/**
+ * The runtime's question about a host no list decided. The decision is Pi's (its rules, and you in `ask` mode), so the question
+ * goes over the pipe and the connection waits for the answer. Anything but a clear yes is a no: a closed pipe, a slow answer.
+ * @param {{ host: string, port: number | undefined }} target
+ */
+function askPi(target) {
+    return new Promise((resolve) => {
+        if (!process.connected) return resolve({ allow: false, reason: "the sandbox could not ask: Pi is gone" });
+        const askId = ++questionCounter;
+        const timer = setTimeout(() => {
+            questions.delete(askId);
+            resolve({ allow: false, reason: "nobody answered in time" });
+        }, ASK_TIMEOUT_MS);
+        questions.set(askId, (answer) => {
+            clearTimeout(timer);
+            resolve(answer);
+        });
+        send({ event: "ask-host", askId, host: String(target.host), port: Number(target.port) });
+    });
 }
 
 /**
@@ -52,7 +78,7 @@ async function wrap(request) {
             undefined,
             {
                 commandId,
-                commandText: request.command,
+                commandText: typeof request.commandText === "string" ? request.commandText : request.command,
             },
         );
         return { wrapped };
@@ -95,7 +121,20 @@ const handlers = {
     async init(request) {
         if (initialized) await SandboxManager.reset();
         initialized = false;
-        await SandboxManager.initialize(request.config, undefined, false);
+        let callback;
+        if (request.askHosts === true) {
+            // Releases before 0.0.78 read any answer that is not false as a yes, so an object with a reason would allow.
+            if (SandboxManager.askCallbackDenyReason !== true) {
+                throw new Error(
+                    "this sandbox runtime cannot give a reason for refusing a host, so filtered and ask are not safe with it",
+                );
+            }
+            callback = async (target) => {
+                const answer = await askPi(target);
+                return answer.allow === true ? true : { allow: false, reason: String(answer.reason || "refused") };
+            };
+        }
+        await SandboxManager.initialize(request.config, callback, false);
         initialized = true;
         const { warnings } = SandboxManager.checkDependencies();
         return { warnings };
@@ -104,10 +143,22 @@ const handlers = {
     wrap,
     finish,
 
+    /** Pi's answer to a question about a host. */
+    "answer-host"(request) {
+        const resolve = questions.get(request.askId);
+        if (resolve !== undefined) {
+            questions.delete(request.askId);
+            resolve({ allow: request.allow === true, reason: String(request.reason ?? "") });
+        }
+        return {};
+    },
+
     async reset() {
         await SandboxManager.reset();
         initialized = false;
         inFlight = 0;
+        for (const resolve of questions.values()) resolve({ allow: false, reason: "the sandbox was reset" });
+        questions.clear();
         return {};
     },
 };

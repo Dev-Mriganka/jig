@@ -124,8 +124,10 @@ export async function runDoctor(sandbox: Sandbox, options: DoctorOptions): Promi
         environment.output.includes(marker) ? "the variable reached the command" : undefined,
     );
 
-    // A name lookup and a connection to localhost: they work in `open` mode and must not in `off`.
+    // A name lookup and a connection to localhost: they work in `open` mode, and must not in `off`. In `filtered` and `ask`
+    // a command has a network of its own: names resolve only in the proxy and its `localhost` is empty.
     const open = sandbox.mode === "open";
+    const proxied = sandbox.mode === "filtered" || sandbox.mode === "ask";
     const lookup = options.lookupName ?? "example.com";
     const resolved = await sandbox.capture(
         `getent hosts ${lookup} >/dev/null 2>&1 && echo resolved || echo not-resolved`,
@@ -140,8 +142,10 @@ export async function runDoctor(sandbox: Sandbox, options: DoctorOptions): Promi
                 ? "resolved"
                 : "did not resolve; the network or /etc/resolv.conf is not reachable from the sandbox"
             : didResolve
-              ? "resolved, but the network should be off"
-              : "refused, as the network is off",
+              ? "resolved, but the network should be off or filtered"
+              : proxied
+                ? "refused, as names resolve only in the proxy in this mode"
+                : "refused, as the network is off",
     );
 
     const connected = await connectsToLocalhost(sandbox, options.cwd);
@@ -153,9 +157,50 @@ export async function runDoctor(sandbox: Sandbox, options: DoctorOptions): Promi
                 ? "connected"
                 : "the sandbox cannot reach servers on localhost"
             : connected
-              ? "connected, but the network should be off"
-              : "refused, as the network is off",
+              ? "connected, but the command should have a network of its own"
+              : proxied
+                ? "refused, as a command's localhost is its own in this mode"
+                : "refused, as the network is off",
     );
+
+    if (proxied) {
+        // Through the proxy, as a program that honours the proxy settings would go: the callback decides.
+        const metadata = await proxyStatus(sandbox, options.cwd, "169.254.169.254", 80);
+        add(
+            /^HTTP\/1\.[01] 403/.test(metadata),
+            "the proxy refuses a cloud metadata address",
+            /^HTTP\/1\.[01] 403/.test(metadata) ? undefined : metadata || "no answer from the proxy",
+        );
+        const loopback = await proxyStatus(sandbox, options.cwd, "127.0.0.1", 1);
+        add(
+            /^HTTP\/1\.[01] 403/.test(loopback),
+            "the proxy refuses this machine's own address",
+            /^HTTP\/1\.[01] 403/.test(loopback) ? undefined : loopback || "no answer from the proxy",
+        );
+        if (sandbox.mode === "filtered") {
+            // The callback's answer is the point: 403 is its refusal. 200 is a connection; a 5xx is the proxy allowed it and the
+            // host did not answer, which says something about the network and nothing about the sandbox.
+            const through = await proxyStatus(sandbox, options.cwd, lookup, 443);
+            const allowed = /^HTTP\/1\.[01] (200|50\d)/.test(through);
+            add(
+                allowed,
+                `the proxy lets ${lookup} through`,
+                !allowed
+                    ? through || "no answer from the proxy"
+                    : /^HTTP\/1\.[01] 200/.test(through)
+                      ? "connected"
+                      : `allowed, but ${lookup} did not answer (${through})`,
+            );
+        } else {
+            add(true, "a new host", "not tried: in the ask network mode it would ask you");
+        }
+        const problem = sandbox.bridge.problem;
+        add(
+            problem === undefined,
+            "the localhost bridge",
+            problem ?? "ready: ports of background tasks and of network.localhost are carried into each command",
+        );
+    }
 
     // Closed doors: a Unix socket cannot be made, and neither can a user namespace.
     if (platform === "linux") {
@@ -185,6 +230,23 @@ function firstLine(text: string): string {
             .find((line) => line.trim() !== "")
             ?.slice(0, 200) ?? ""
     );
+}
+
+/**
+ * Asks the sandbox's proxy, from inside a command, to open a tunnel to a host, and returns its first answer line (`HTTP/1.1 403
+ * ...`). The proxy's name and password are in the command's environment, where the runtime put them for its own clients.
+ */
+async function proxyStatus(sandbox: Sandbox, cwd: string, host: string, port: number): Promise<string> {
+    const result = await sandbox.capture(
+        [
+            "exec 3<>/dev/tcp/127.0.0.1/3128 2>/dev/null || { echo 'the proxy is not reachable'; exit 0; }",
+            'auth=$(printf %s "$CLOUDSDK_PROXY_USERNAME:$CLOUDSDK_PROXY_PASSWORD" | base64 -w0)',
+            `printf 'CONNECT ${host}:${port} HTTP/1.1\\r\\nHost: ${host}:${port}\\r\\nProxy-Authorization: Basic %s\\r\\n\\r\\n' "$auth" >&3`,
+            'read -t 15 -r line <&3; printf "%s\\n" "$line"',
+        ].join("; "),
+        cwd,
+    );
+    return firstLine(result.output.replace(/\r/g, ""));
 }
 
 /** Starts a server of our own on 127.0.0.1 and has a command in the sandbox connect to it with bash's /dev/tcp. */

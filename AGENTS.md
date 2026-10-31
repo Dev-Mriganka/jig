@@ -2,9 +2,8 @@
 
 Twelve of the fourteen plugins are built: `jig-core`, `jig-git`, `jig-memory`,
 `jig-lens`, `jig-jira`, `jig-logs`, `jig-api`, `jig-ops`, `jig-review` and
-`jig-mongo`, and `jig-theme` is built as well, and `jig-sandbox` is built except
-for background tasks and the `filtered` and `ask` network modes. `jig-workflow`
-and `jig-agents` are design.
+`jig-mongo`, and `jig-theme` is built as well, and `jig-sandbox` is built.
+`jig-workflow` and `jig-agents` are design.
 
 Plugin READMEs are the specifications. Code follows them, and when either
 changes, the other changes in the same commit. Tests read the tool tables of
@@ -41,11 +40,11 @@ and `jig-theme`, so change a table and its test together.
   WebAuthn passkey signature the agent cannot make, or marks "approved in page"
   and waits for a `y` in Pi ([Approvals](docs/approvals.md)). Never add a second
   one, and never let that endpoint approve on a secret or a cookie alone.
-- **`jig-sandbox` tests run the real sandbox.** They need `bwrap`, `socat` and `rg` as
-  programs (`sudo apt install bubblewrap socat ripgrep`; on Ubuntu 24.04 also
+- **`jig-sandbox` tests run the real sandbox.** They need `bwrap`, `socat`, `rg` and
+  `python3` as programs (`sudo apt install bubblewrap socat ripgrep python3`; on Ubuntu 24.04 also
   `sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0`), skip with the reason
   when those are missing, and fail in CI (`CI` is set), where they are installed.
-  `JIG_SANDBOX_TEST_BWRAP`, `_SOCAT` and `_RG` name them when they are elsewhere. A test
+  `JIG_SANDBOX_TEST_BWRAP`, `_SOCAT` and `_RG` name the first three when they are elsewhere. A test
   uses a fake home built at run time, hides the real home's credential paths as well,
   and never reads a file under it or contacts any host but a server of its own.
 - **Checks:** `npm run check` (types, Biome), `npm test` and the review page's

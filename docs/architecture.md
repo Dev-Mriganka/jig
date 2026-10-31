@@ -153,5 +153,6 @@ company plugin (separate, private repository)
 Jig is TypeScript on Node, as Pi is, so it runs on Linux and macOS.
 - **The sandbox is the exception.** `jig-sandbox` uses Anthropic's sandbox
   runtime: bubblewrap on Linux and WSL2, Seatbelt on macOS. The Mac side is written
-  and not yet tested on a Mac. Native Windows is not supported.
+  and not yet tested on a Mac, and its `filtered` and `ask` network modes mean `off`
+  until the bridge between commands is tried there. Native Windows is not supported.
 - **Secrets have a backend per platform** (see Secrets).

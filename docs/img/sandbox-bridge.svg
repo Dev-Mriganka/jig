@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="596" viewBox="0 0 920 596" role="img" aria-label="How a later command reaches a background task's server in the filtered and ask network modes. The command has a network of its own with nothing on localhost. A socat forwarder on the first line of the command listens on the task's port there and asks the sandbox's proxy to connect to 127.0.0.1 on that port. The proxy asks the callback in the broker, which Pi answers: yes only for a port the bridge carries or one listed in network.localhost. The proxy then dials the bridge's listener on this machine, and a python3 helper enters the task's network namespace to reach its server." font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">
+  <rect x="0.5" y="0.5" width="919" height="595" rx="10" fill="#FAFBFA" stroke="#D2D9D3"/>
+  <defs>
+    <marker id="sbxbridge-head-1d3b4d" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#1D3B4D"/></marker>
+    <marker id="sbxbridge-head-5c9cab" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#5C9CAB"/></marker>
+    <marker id="sbxbridge-head-8c979d" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8C979D"/></marker>
+    <marker id="sbxbridge-head-c08326" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#C08326"/></marker>
+  </defs>
+  <rect x="40" y="24" width="280" height="58" rx="6" fill="#1D3B4D"/>
+  <text x="180" y="50" font-size="16" fill="#FFFFFF" font-weight="700" text-anchor="middle">A later command</text>
+  <text x="180" y="69" font-size="12.5" fill="#FFFFFF" text-anchor="middle">its own network: only localhost and two relays</text>
+  <text x="356" y="48" font-size="14.5" fill="#1A1F1D" font-weight="700">curl localhost:3000, or any client</text>
+  <text x="356" y="67" font-size="13" fill="#3A4440">localhost is empty in this command, so the forwarder below answers on port 3000</text>
+  <path d="M180 83 V121" fill="none" stroke="#1D3B4D" stroke-width="2.6" marker-end="url(#sbxbridge-head-1d3b4d)"/>
+  <text x="196" y="106.5" font-size="13" fill="#3A4440">a client connects to 127.0.0.1:3000 in its own network</text>
+  <rect x="40" y="122" width="280" height="58" rx="6" fill="#5C9CAB"/>
+  <text x="180" y="148" font-size="16" fill="#FFFFFF" font-weight="700" text-anchor="middle">socat forwarder on :3000</text>
+  <text x="180" y="167" font-size="12.5" fill="#FFFFFF" text-anchor="middle">the first line of the command</text>
+  <text x="356" y="146" font-size="14.5" fill="#1A1F1D" font-weight="700">started before the command, in its own network</text>
+  <text x="356" y="165" font-size="13" fill="#3A4440">a TCP forwarder, so it runs with the Unix-socket filter already on</text>
+  <path d="M180 181 V219" fill="none" stroke="#5C9CAB" stroke-width="2.6" marker-end="url(#sbxbridge-head-5c9cab)"/>
+  <text x="196" y="204.5" font-size="13" fill="#3A4440">asks the proxy to connect to 127.0.0.1:3000</text>
+  <rect x="40" y="220" width="280" height="58" rx="6" fill="#8C979D"/>
+  <text x="180" y="246" font-size="16" fill="#FFFFFF" font-weight="700" text-anchor="middle">the sandbox's proxy</text>
+  <text x="180" y="265" font-size="12.5" fill="#FFFFFF" text-anchor="middle">the runtime, in the broker</text>
+  <text x="356" y="244" font-size="14.5" fill="#1A1F1D" font-weight="700">the only way out of the command's network</text>
+  <text x="356" y="263" font-size="13" fill="#3A4440">every connection is put to the callback; the runtime allows nothing by itself</text>
+  <path d="M180 279 V317" fill="none" stroke="#8C979D" stroke-width="2.6" marker-end="url(#sbxbridge-head-8c979d)"/>
+  <text x="196" y="302.5" font-size="13" fill="#3A4440">asks the callback, over the broker's pipe</text>
+  <rect x="40" y="318" width="280" height="58" rx="6" fill="#C08326"/>
+  <text x="180" y="344" font-size="16" fill="#FFFFFF" font-weight="700" text-anchor="middle">the callback, answered in Pi</text>
+  <text x="180" y="363" font-size="12.5" fill="#FFFFFF" text-anchor="middle">network/policy.ts</text>
+  <text x="356" y="342" font-size="14.5" fill="#1A1F1D" font-weight="700">yes for a port in network.localhost or one the bridge listens on</text>
+  <text x="356" y="361" font-size="13" fill="#3A4440">never for metadata addresses, other ports of this machine, or a tunnel jig-core opened</text>
+  <path d="M180 377 V415" fill="none" stroke="#C08326" stroke-width="2.6" marker-end="url(#sbxbridge-head-c08326)"/>
+  <text x="196" y="400.5" font-size="13" fill="#3A4440">yes: the proxy dials 127.0.0.1:3000 on this machine</text>
+  <rect x="40" y="416" width="280" height="58" rx="6" fill="#1D3B4D"/>
+  <text x="180" y="442" font-size="16" fill="#FFFFFF" font-weight="700" text-anchor="middle">the bridge's listener</text>
+  <text x="180" y="461" font-size="12.5" fill="#FFFFFF" text-anchor="middle">127.0.0.1:3000 on this machine</text>
+  <text x="356" y="440" font-size="14.5" fill="#1A1F1D" font-weight="700">you reach the task's server here too</text>
+  <text x="356" y="459" font-size="13" fill="#3A4440">it exists only while the task's server listens; if the port is in use it is not made</text>
+  <path d="M180 475 V513" fill="none" stroke="#1D3B4D" stroke-width="2.6" marker-end="url(#sbxbridge-head-1d3b4d)"/>
+  <text x="196" y="498.5" font-size="13" fill="#3A4440">a short python3 helper enters the task's network</text>
+  <rect x="40" y="514" width="280" height="58" rx="6" fill="#5C9CAB"/>
+  <text x="180" y="540" font-size="16" fill="#FFFFFF" font-weight="700" text-anchor="middle">the background task's server</text>
+  <text x="180" y="559" font-size="12.5" fill="#FFFFFF" text-anchor="middle">listening on 127.0.0.1:3000 in the task's network</text>
+  <text x="356" y="538" font-size="14.5" fill="#1A1F1D" font-weight="700">found by reading /proc/&lt;pid&gt;/net/tcp</text>
+  <text x="356" y="557" font-size="13" fill="#3A4440">the helper joins the user namespace that owns the network, then the network</text>
+</svg>

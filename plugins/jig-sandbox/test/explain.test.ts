@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { explainBlocks, explainViolations } from "../src/explain.ts";
+import type { NetworkMode } from "../src/config.ts";
 import { CWD, HOME, linux, rules } from "./support/fixture.ts";
 
 const machine = linux({
@@ -17,7 +18,7 @@ const machine = linux({
     files: { [`${HOME}/.bashrc`]: "", [`${CWD}/.env`]: "", [`${HOME}/.ssh/config`]: "" },
 });
 const set = rules(machine, { wsl: true });
-const explain = (output: string, mode: "open" | "off" = "open") => explainBlocks(output, set, { cwd: CWD, mode });
+const explain = (output: string, mode: NetworkMode = "open") => explainBlocks(output, set, { cwd: CWD, mode });
 
 describe("a write to a locked path", () => {
     test("a shell redirect names the file and says why", () => {
@@ -180,6 +181,48 @@ describe("the network", () => {
         assert.deepEqual(explainViolations([{ line: "  connect  to 169.254.169.254:80  denied " }, { line: "" }]), [
             "[sandbox] network refused: connect to 169.254.169.254:80 denied",
         ]);
+    });
+
+    test("a refusal with the reason the policy gave says it as a sentence, without repeating the host", () => {
+        assert.deepEqual(
+            explainViolations([
+                {
+                    line: "deny network-outbound 169.254.169.254:80 (169.254.169.254:80 is a cloud metadata address, and those are always blocked)",
+                },
+                {
+                    line: "deny network-outbound ::1:8080 ([::1]:8080 is this machine's own address; list its port in sandbox.network.localhost to reach a service on it)",
+                },
+                {
+                    line: "deny network-outbound api.example.com:443 (api.example.com:443 was refused: the user said no. Do not try another way round it)",
+                },
+                { line: "deny network-outbound db.example.com:5432 (user denied)" },
+                { line: "deny network-outbound db.example.com:5432 (user denied)" },
+                { line: "deny network-outbound localhost:3000 (resolved to a loopback address)" },
+            ]),
+            [
+                "[sandbox] cannot reach 169.254.169.254:80: it is a cloud metadata address, and those are always blocked.",
+                "[sandbox] cannot reach ::1:8080: [::1]:8080 is this machine's own address; list its port in sandbox.network.localhost to reach a service on it.",
+                "[sandbox] cannot reach api.example.com:443: it was refused: the user said no. Do not try another way round it.",
+                "[sandbox] cannot reach db.example.com:5432: refused.",
+                "[sandbox] cannot reach localhost:3000: resolved to a loopback address. A port of this machine that is carried into the command is at 127.0.0.1, not at a name.",
+            ],
+        );
+    });
+
+    test("in filtered and ask a name that does not resolve, and a direct connection with no route, get an explanation", () => {
+        const names = "ping: example.com: Temporary failure in name resolution";
+        for (const mode of ["filtered", "ask"] as const) {
+            assert.match(
+                explain(names, mode).lines[0] ?? "",
+                /a name does not resolve here for a program that ignores the proxy settings/,
+            );
+            assert.match(
+                explain("connect: Network is unreachable", mode).lines[0] ?? "",
+                /a direct connection has no route/,
+            );
+        }
+        assert.deepEqual(explain(names, "open").lines, []);
+        assert.doesNotMatch(explain(names, "filtered").lines.join("\n"), /network mode is off/);
     });
 });
 

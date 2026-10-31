@@ -7,6 +7,8 @@ import { createBashToolDefinition, createLocalBashOperations } from "@earendil-w
 import type { BashOperations, ExtensionContext, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import type { Aftermath } from "./aftermath.ts";
+import { backgroundProblem, backgroundProperties, startBackground } from "./background/tools.ts";
+import type { Tasks } from "./background/tasks.ts";
 import { fingerprintOutside, outsideProblem } from "./outside.ts";
 import type { OutsideRun } from "./outside.ts";
 import { createOutputCleaner } from "./output.ts";
@@ -35,6 +37,7 @@ export const SANDBOX_DESCRIPTION = [
     "- A toolchain folder such as ~/.sdkman or ~/.nvm: the user is asked; when a '[sandbox]' line says they allowed it, run the command again.",
     "- A locked file such as ~/.bashrc: the user does it themselves with !.",
     "Only when the sandbox blocks something you need and no Jig tool does it, set outside: true and give a reason (at most 300 characters): the user is asked whether this one command may run outside the sandbox, with their credentials and full network.",
+    "A dev server, a watcher or a build that takes more than a minute: set background: true, with notifyOn patterns for when it is up (ready) and when it failed (error). The command starts as a task in the same sandbox and you are woken when it ends or a pattern matches, so never sleep or poll. bg_output reads its output, bg_list lists tasks and bg_kill stops one. A background task cannot use outside.",
 ].join("\n");
 
 /** What `jig-core` decided about a call, as it announces it on the event bus. */
@@ -64,6 +67,8 @@ export interface BashDeps {
     aftermath: Aftermath;
     /** Decisions by tool call id, kept from jig-core's announcements. */
     decisions: ReadonlyMap<string, Decision>;
+    /** The background tasks. Without them `background` is refused. */
+    tasks?: Tasks;
 }
 
 /** Output of a command, cleaned and with the end of it kept for the explanation. */
@@ -152,13 +157,14 @@ export function sandboxedOperations(deps: BashDeps, ctx: ExtensionContext, shell
     };
 }
 
-/** Pi's own parameters for `bash`, and the two that ask to run outside. */
+/** Pi's own parameters for `bash`, the two that ask to run outside, and the three of a background task. */
 function parametersOf(base: ToolDefinition) {
     const properties = (base.parameters as unknown as { properties: Record<string, never> }).properties;
     return Type.Object({
         ...properties,
         outside: Type.Optional(Type.Boolean({ description: OUTSIDE_PARAMETER })),
         reason: Type.Optional(Type.String({ maxLength: 300, description: REASON_PARAMETER })),
+        ...backgroundProperties(),
     });
 }
 
@@ -229,7 +235,15 @@ export function createBashTool(deps: BashDeps) {
         description: `${base.description}\n\n${SANDBOX_DESCRIPTION}`,
         async execute(
             toolCallId: string,
-            params: { command: string; timeout?: number; outside?: boolean; reason?: string },
+            params: {
+                command: string;
+                timeout?: number;
+                outside?: boolean;
+                reason?: string;
+                background?: boolean;
+                name?: string;
+                notifyOn?: { ready?: string[]; error?: string[] };
+            },
             signal: AbortSignal | undefined,
             onUpdate: Parameters<typeof base.execute>[3],
             ctx: ExtensionContext,
@@ -239,6 +253,23 @@ export function createBashTool(deps: BashDeps) {
                 ...(params.timeout === undefined ? {} : { timeout: params.timeout }),
             };
             const cwd = ctx.cwd || process.cwd();
+            const problem = backgroundProblem(params);
+            if (problem !== undefined) throw new Error(`bash was not run: ${problem}`);
+            if (params.background === true) {
+                if (deps.tasks === undefined) throw new Error("bash was not run: background tasks are not available.");
+                // A task runs only in the sandbox: with it off, the command would run as Pi runs one, and a task outlives the call.
+                if (deps.sandbox.state.kind === "off") {
+                    throw new Error(
+                        "bash was not run: background tasks run only in the sandbox, and the user switched it off for this session (/sandbox on turns it back on). Run the command in the foreground.",
+                    );
+                }
+                try {
+                    return await startBackground(deps.tasks, params, ctx, signal);
+                } catch (error) {
+                    if (error instanceof SandboxRefused) throw new Error(error.message);
+                    throw error;
+                }
+            }
             if (params.outside === true) return runOutside(deps, toolCallId, params, signal, onUpdate, ctx, cwd);
             // The user turned the sandbox off for this session: the command runs as Pi runs it.
             if (deps.sandbox.state.kind === "off") {

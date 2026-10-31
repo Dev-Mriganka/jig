@@ -15,14 +15,22 @@ export interface Asker {
     ask(ctx: ExtensionContext, rule: Rule, refused: string): Promise<string[]>;
 }
 
-export function createAsker(allowed: Allowed, home: () => string): Asker {
-    // One question at a time. A failed question does not stop the ones behind it.
+/** A queue of its own: one job at a time, and a job that fails does not stop the ones behind it. */
+export function serialQueue(): <T>(job: () => Promise<T>) => Promise<T> {
     let tail: Promise<unknown> = Promise.resolve();
-    const inTurn = <T>(job: () => Promise<T>): Promise<T> => {
+    return (job) => {
         const turn = tail.then(job, job);
         tail = turn.catch(() => undefined);
         return turn;
     };
+}
+
+/**
+ * The asker for writes to an ask-first folder. Its questions wait in `inTurn`: jig-core's queue when it is loaded, so they never
+ * open over one of its own or over a question about a host, and a queue of this plugin's own otherwise.
+ */
+export function createAsker(allowed: Allowed, home: () => string, queue?: ReturnType<typeof serialQueue>): Asker {
+    const inTurn = queue ?? serialQueue();
 
     return {
         ask(ctx, rule, refused) {

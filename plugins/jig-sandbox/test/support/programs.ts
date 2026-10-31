@@ -3,6 +3,8 @@
 //
 //   JIG_SANDBOX_TEST_BWRAP, JIG_SANDBOX_TEST_SOCAT, JIG_SANDBOX_TEST_RG   absolute paths to the three programs
 //
+// The tests also use python3 from the PATH (a server and a client of their own, and the helper of the bridge); it is checked here.
+//
 // A test that needs the real sandbox calls `realSandboxReason()`: a string is the reason to skip. In CI (the `CI`
 // variable is set) a missing program is a failure and not a skip, so the escape tests cannot quietly stop running.
 import { execFileSync } from "node:child_process";
@@ -13,6 +15,8 @@ export interface TestPrograms {
     bwrap?: string;
     socat?: string;
     ripgrep?: string;
+    /** The tests start servers and clients with it, and the bridge for background tasks' ports needs it too. */
+    python3?: string;
 }
 
 function onPath(name: string): string | undefined {
@@ -35,9 +39,11 @@ export function testPrograms(): TestPrograms {
     const bwrap = process.env.JIG_SANDBOX_TEST_BWRAP ?? onPath("bwrap");
     const socat = process.env.JIG_SANDBOX_TEST_SOCAT ?? onPath("socat");
     const ripgrep = process.env.JIG_SANDBOX_TEST_RG ?? onPath("rg");
+    const python3 = onPath("python3");
     if (bwrap !== undefined) out.bwrap = bwrap;
     if (socat !== undefined) out.socat = socat;
     if (ripgrep !== undefined) out.ripgrep = ripgrep;
+    if (python3 !== undefined) out.python3 = python3;
     return out;
 }
 
@@ -59,6 +65,7 @@ export function realSandboxReason(): string | undefined {
         programs.bwrap === undefined ? "bwrap (apt install bubblewrap)" : undefined,
         programs.socat === undefined ? "socat (apt install socat)" : undefined,
         programs.ripgrep === undefined ? "rg (apt install ripgrep)" : undefined,
+        programs.python3 === undefined ? "python3 (apt install python3)" : undefined,
     ].filter((name) => name !== undefined);
     if (missing.length > 0) return `missing programs: ${missing.join(", ")}`;
     if (!runs(programs.bwrap as string, ["--unshare-user", "--ro-bind", "/", "/", "true"])) {

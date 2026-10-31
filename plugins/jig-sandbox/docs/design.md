@@ -35,6 +35,12 @@ agent calls bash
             blocks explained: network from the runtime's records, files from the error lines
             an ask-first folder was refused -> Pi asks you -> the rules widen
   -> output cleaned (escape codes), scrubbed (credential values), capped (Pi's limits)
+
+agent calls bash with background: true
+  -> the same rules, then Pi's side starts the wrapped command in a process group of its own
+  -> its output is cleaned, logged under the agent folder, matched against the patterns
+  -> an event (ended, ready, error) becomes one message that wakes the agent
+  -> in filtered and ask, the bridge carries the ports the task listens on
 ```
 
 ### The broker: the runtime never runs inside Pi
@@ -58,6 +64,12 @@ to wrap each command, then spawns the wrapped command itself. The spike showed w
 The broker is started with the Node that runs Pi, from the plugin's own files, and
 its pipe is private to the Pi process. It holds no credentials.
 
+The programs the host runs for the sandbox (bubblewrap, `socat`, ripgrep, and `python3` for the
+bridge) come from `sandbox.programs` when set, and otherwise from `PATH`, but only from a place a
+command in the sandbox cannot write, following links: a copy in a project's `bin` folder could have
+been planted there, and would run outside the sandbox. With only such copies, the program counts
+as not installed.
+
 ### Pinned, and upgraded on purpose
 
 `@anthropic-ai/sandbox-runtime` is pinned to an exact version at least two weeks old;
@@ -75,7 +87,8 @@ it is still `0.0.x`. An upgrade is its own change, with the escape tests run on 
 | `.git/config` writable | `filesystem.allowGitConfig: true`, with the audit below |
 | Unix sockets closed | the runtime's socket filter (seccomp), which blocks making a Unix socket at all. `allowAllUnixSockets` is never set: on WSL it would let a command start Windows programs. The runtime cannot allow one socket by path on Linux, so `docker: true` is not supported: Docker goes through [running a command outside](when-blocked.md#running-one-command-outside) |
 | Network `open` | no `network.allowedDomains` at all: the runtime then leaves the network namespace alone |
-| Network `filtered`, `ask` | `network.allowedDomains` set, the proxy on, and an ask callback (below) |
+| Network `filtered`, `ask` | `allowedDomains: []`, no `strictAllowlist`: the proxy asks the callback, the only thing that allows a host |
+| Ports carried into each command | a `socat` per port on the first line of the command, which asks the proxy for `127.0.0.1:<port>` (below) |
 | Network `off` | `allowedDomains: []` with `strictAllowlist`: the command gets a network namespace with nothing in it |
 | Temporary folder | the runtime's temporary folder variable set to the session's private folder for the broker (its default, `/tmp/claude`, does not exist on most machines); in `open` mode the runtime sets no `TMPDIR` for the command, so the plugin sets it |
 | Every path | `{ path, literal: true }`, absolute, links followed, only when the path exists; a deny for a path outside every writable folder is left out, since it is read-only already |
@@ -101,30 +114,60 @@ address cannot be blocked, and a tunnel `jig-core` opened on `localhost` is reac
 
 ### `filtered` and `ask`: through the proxy
 
-Each command gets a network namespace of its own; every connection goes through the
-runtime's proxy, which asks a callback about each host no list decides. The callback
-is `jig-sandbox`'s:
-- **Always refused:** cloud metadata addresses (`169.254.169.254`, `fd00:ec2::254`,
-  `metadata.google.internal`), and loopback, link-local, private (RFC 1918), carrier
-  (100.64.0.0/10) and this machine's own addresses, unless a port is listed in
-  `network.localhost`. The spike showed that an approved IP address is dialled with no
-  further check, so the callback must refuse these itself.
-- **`deny`:** refused, with the reason in the refusal.
-- **`filtered`:** everything else allowed.
-- **`ask`:** everything else asks you, while the connection waits.
+Each command gets a network namespace of its own with nothing in it but two relays to the
+runtime's proxy. The proxy asks a callback about every connection. The callback runs in the
+broker, which is the runtime's process, so it sends the question over its pipe to Pi, where
+[`network/policy.ts`](../src/network/policy.ts) answers; a failure or a silence is a refusal.
+- **Always refused:** cloud metadata addresses and names (`169.254.169.254`, `fd00:ec2::254`,
+  `metadata.google.internal` and a few more), and loopback, link-local, private (RFC 1918),
+  carrier (100.64.0.0/10) and this machine's own addresses, except a port in
+  `network.localhost` or one a task's server is carried on (below). The spike showed that an
+  approved IP address is dialled with no further check, so the callback does it. An address
+  that wraps another (`::ffff:127.0.0.1`, NAT64, 6to4) is judged by what it wraps.
+- **A name that resolves to such an address** is refused by the runtime's own check, since the
+  callback sees only the name; the line says `resolved to a loopback address`.
+- **Spelled to be read as an address:** `2130706433`, `0x7f000001` and `127.1` are not host
+  names, and are refused, since a program may read them as `127.0.0.1`.
+- **`deny`:** refused, with the entry that matched in the reason.
+- **`filtered`:** every other host is allowed.
+- **`ask`:** a host in `allow` or in your kept answers is allowed; any other asks you, while
+  the connection waits (see [Asking you](#asking-you)).
+
+`allow` and `deny` are read by the callback and not given to the runtime. A host that
+the runtime's own list decides is not checked for a private address, and an entry such as
+`10.0.0.5` in `allow` would have opened one.
+
+A refusal travels as the reason in the proxy's `403` (a client prints it) and as a
+`[sandbox] cannot reach host:port: ...` line after the command's output.
 
 ### `localhost` across commands, in `filtered` and `ask`
 
 Separate namespaces mean a server in one command is not at `localhost` in the next.
-`jig-sandbox` bridges what should be:
-- **Background tasks:** the broker watches each task's listening ports (from its
-  namespace's `/proc/<pid>/net/tcp`) and, for each, opens a Unix socket in the
-  session folder. Every later command starts with a small forwarder that listens on
-  the same port inside its namespace and carries it to that socket. You reach the
-  server too, at the same port on the host.
-- **`network.localhost`:** host ports you list (a local database, say) are bridged into
-  every command the same way.
-- `jig-core`'s tunnel ports are never bridged unless you list them.
+`jig-sandbox` carries two kinds of port across, on Linux and WSL2:
+- **A port a background task listens on.** The bridge reads the task's namespace from
+  `/proc/<pid>/net/tcp` and `tcp6` about once a second and before each command. For each
+  port it opens a listener on this machine's loopback at the same port, so you reach the
+  server there too. A connection to that listener enters the task's namespace and dials the
+  server (a short `python3` helper does the entering, since Node cannot).
+- **A port in `network.localhost`:** a service on this machine, such as a local database.
+- **In each later command,** a `socat` on the first line of the command listens on the same
+  port in the command's own namespace and asks the proxy to connect to `127.0.0.1:<port>`.
+  The callback allows exactly the carried ports on the loopback address, so the proxy
+  reaches the listener. This needs TCP only, so it runs after the command's Unix-socket
+  filter is on.
+- **`jig-core`'s tunnel ports are never carried** unless listed: a port is allowed only
+  while one of the bridge's own listeners is on it. If the machine already uses the port (a
+  tunnel does), the listener cannot start, the task is told so, and the port stays refused.
+- **Why not a Unix socket per port:** the runtime ignores `allowUnixSockets` on Linux (its
+  filter cannot look at a path), and `allowAllUnixSockets` is never set. On macOS the option
+  exists, but `filtered` and `ask` are treated as `off` there until the bridge is tried on a
+  Mac.
+- **Without `python3`** a task's server is not carried, `/sandbox` and the doctor say so,
+  and `network.localhost` ports still work.
+
+![A command's own network holds only a forwarder and the proxy relay; the broker's callback allows a carried port, and the listener on this machine enters the task's network to reach its server](../../../docs/img/sandbox-bridge.svg)
+
+*How a later command reaches a background task's server in `filtered` and `ask` mode.*
 
 ## The audit after each command
 
@@ -163,14 +206,20 @@ also runs for a command that was aborted or timed out.
 
 ## Asking you
 
-- **Writes:** after the command, inside the waiting tool call, as every Jig approval
-  is. The answer widens the rules from the next command; the agent is told to run it
-  again.
-- **Hosts:** in `ask` mode, during the connection, through the same queue as `jig-core`'s
-  approvals, so two questions never overlap.
+Every question goes through `jig-core`'s approval queue (`approvals.inTurn`), so two
+questions never overlap, whether they are about a write, a host or one of `jig-core`'s own.
+Without `jig-core` they wait in a queue of this plugin's own.
+- **Writes:** after the command, inside the waiting tool call, as every Jig approval is. The
+  answer widens the rules from the next command; the agent is told to run it again.
+- **Hosts:** in `ask` mode, during the connection, with four answers. *Once* allows that host
+  and port for 15 seconds, so a command that opens several connections asks once; *This
+  session* until Pi ends; *Always* is kept; *No* refuses with the reason in the refusal.
+  Connections to one host and port that arrive while the question is open share it, and the
+  question closes itself, as a no, after two minutes.
 - **No screen:** the answer is no, and the line says how a person allows it.
-- **Kept answers:** `<agent folder>/jig-sandbox/allowed.json`, which Pi's file tools
-  and the sandbox can only read. `/sandbox allowed` lists them, and `add` and `forget` change them.
+- **Kept answers:** `<agent folder>/jig-sandbox/allowed.json`, which Pi's file tools and the
+  sandbox can only read. `/sandbox allowed` lists folders and hosts, and `add` and `forget`
+  change them.
 
 ## Environment
 
@@ -234,6 +283,13 @@ in a small folder:
 - **Each command:** a median of 60 to 90 ms with a machine that is busy, against 4 to 11 ms
   for a bare `bash -c true`. The rules take 8 to 25 ms of that.
 - **Twenty at once:** about 0.9 s, and none failed.
+- **`filtered` and `ask`** (the same machine, a quiet moment): a command takes a median of
+  78 ms where `open` takes 51 ms, the cost of its own network and the two relays. Each carried
+  port adds about 4 ms to every command (a forwarder starts and the command waits until it
+  listens): 82 ms with one, 90 ms with three. A new connection through a forwarder and the
+  proxy adds about 30 ms; one from this machine to a task's server through the listener and
+  the helper takes about 26 ms; one from a later command to a task's server, through all of
+  it, about 50 ms. A server that keeps its connections open pays this once.
 - **Resolving paths** is what costs on WSL: the Windows part of `PATH` takes seconds to
   resolve cold. Folders under a hidden folder are skipped, and far-away paths are remembered
   for half a minute.
@@ -251,19 +307,35 @@ in a small folder:
   in the same command), `.pi/extensions/x.ts`, a program into a `PATH` folder, Pi's agent
   folder; set `core.fsmonitor` (audited away); connect to a Unix socket; read the Pi
   process's environment through `/proc`; run a Windows program on WSL; create a user
-  namespace. The rules of every test also hide the real home's credential places, and a
-  test never reads a file under it.
+  namespace. In `filtered` and `ask`: reach the cloud metadata address and this machine's
+  loopback and private neighbours through the proxy (also with the address spelled as a
+  number), reach a service on this machine or a tunnel that is not listed, and make a Unix
+  socket with the forwarders running. The rules of every test also hide the real home's
+  credential places, and a test never reads a file under it.
 - **Keeps working, for real** (`keep-working.test.ts`): a Gradle build, `npm install` of a
   local package, `git init/add/commit/branch/config/remote add`, a connection to a server
   on `localhost` in `open` mode and none in `off`, twelve commands at once, and no file
-  left in the project that the command did not write.
+  left in the project that the command did not write. In `filtered` and `ask`
+  (`network-real.test.ts`): a host reached through the proxy, a listed port and a plain TCP
+  exchange through its forwarder, two commands that each start a server on the same port,
+  twelve commands at once, `git`, and a task's server reached by a later command and by the
+  machine. They use a loopback alias as the "public host", so none needs the internet.
+- **The network modes** (`network-*.test.ts`): the address ranges and the odd spellings, the
+  policy's decisions, the four answers and what each remembers, the listener and the
+  forwarders without namespaces, and the broker's question and Pi's answer through the plugin.
+- **Background tasks** (`background*.test.ts`): the patterns that are refused, a burst of
+  events as one message, the limits on error floods, one message in flight, paging and
+  rotation of the log, stopping against a fake process table, the clean-up of a crashed
+  session, and the tools, `/ps` and the footer with real processes. In the real sandbox: a
+  task has the rules of a command, its tree stops (children inside bubblewrap included), its
+  trap runs on the polite stop, and the end of the session leaves nothing running.
 - **The whole path:** the plugin in a fake Pi with the real broker and the real runtime;
   the broker is started and stopped, and Pi's signal handling is untouched.
 - **CI:** Ubuntu 24.04 with bubblewrap, `socat` and ripgrep installed and unprivileged user
   namespaces on runs all of it on every push. In CI a missing program fails the tests;
   on a machine without them they skip with the reason.
 - **Locally,** `JIG_SANDBOX_TEST_BWRAP`, `JIG_SANDBOX_TEST_SOCAT` and `JIG_SANDBOX_TEST_RG`
-  name the programs when they are not on `PATH`.
+  name the programs when they are not on `PATH`. The network tests also need `python3`.
 
 ## Build order
 
@@ -271,8 +343,8 @@ in a small folder:
    doctor, the `jig-core` additions, and the `open` and `off` network modes.
 2. **Built:** the audit, and asking you (writes). Running one command outside is built
    with it.
-3. Background tasks and `/ps`.
-4. `filtered` and `ask`, with the callback and the `localhost` bridge.
+3. **Built:** background tasks and `/ps`.
+4. **Built:** `filtered` and `ask`, with the callback and the `localhost` bridge.
 
 Each step ships with its escape and keep-working tests.
 
@@ -283,8 +355,16 @@ Each step ships with its escape and keep-working tests.
 | `docker: true` opens the Docker socket | The runtime cannot allow one Unix socket by path on Linux, and `allowAllUnixSockets` is never set. `docker` is reserved; the agent runs Docker through `outside` |
 | A spawn hook wraps the command | Pi's hook is synchronous; the tool is Pi's own definition with operations that wrap first |
 | macOS needs `brew install ripgrep` | The runtime uses ripgrep on Linux only; macOS needs nothing |
-| `filtered` and `ask` are modes | Not built: they mean `off`, and `/sandbox` says so |
+| `filtered` and `ask` are modes | Built on Linux and WSL2. On macOS they mean `off` and `/sandbox` says so, since the bridge is untried there |
 | A moved-aside folder could replace a locked file | The kernel refuses to move a folder that holds a mounted path; what can be replaced is a locked link, which the audit puts back |
 | `PATH` folders are locked | Those in your home folder, outside the working folder |
-| The question about a host shares `jig-core`'s queue | The question about a write has a queue of its own; it can overlap a `jig-core` question until the host questions arrive |
-| A server started by a command is reachable by the next one | Commands end with their processes until background tasks exist |
+| The question about a host shares `jig-core`'s queue | Done through a new `jig-core` call, `approvals.inTurn`; the question about a write uses it too, so nothing overlaps |
+| A server started by a command is reachable by the next one | A command ends with its processes. A server that must outlive it is a [background task](background.md) |
+| Task logs are in a private folder of the session | They are under `<agent folder>/jig-sandbox/background`, which the sandbox cannot write: in `/tmp` a command could swap a log for a link to a file Pi can read and it cannot, and `bg_output` would show it |
+| Background tasks start through the same path as `bash` | Pi's side starts them itself, to own the process group and the pipes, and wraps them with the same rules; a task's output is cleaned and its credential values taken out before it is written |
+| A task wakes the agent on text it prints | The patterns are regular expressions, checked first for the constructs that make matching slow |
+| A Unix socket per carried port, through the runtime's option for named sockets | The runtime ignores that option on Linux. A forwarder asks the proxy for `127.0.0.1:<port>` over TCP; the callback allows the carried ports |
+| `network.localhost` opens loopback, link-local, private and the machine's own addresses | It opens loopback and the machine's own addresses at that port. Other private hosts, link-local and carrier addresses stay refused |
+| Entering a task's network from the host | `nsenter` fails: no process is in the user namespace that owns it. A `python3` helper joins that one, then the network |
+| `Once` allows the connection | It allows that host and port for 15 seconds, since a command opens several connections |
+| `allow` and `deny` go to the runtime | They are read by the callback, so a listed address is still checked for a private range |

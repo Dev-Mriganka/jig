@@ -7,14 +7,19 @@ import { userInfo } from "node:os";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createLocalBashOperations, getAgentDir } from "@earendil-works/pi-coding-agent";
+import { createLocalBashOperations, getAgentDir, getShellConfig } from "@earendil-works/pi-coding-agent";
 import type { BashOperations, ExtensionAPI, ExtensionContext, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { jig, withJig } from "../../jig-core/src/client.ts";
 import type { SandboxProvider } from "../../jig-core/src/contract.ts";
 import { createAftermath } from "./aftermath.ts";
 import type { Aftermath } from "./aftermath.ts";
 import { createAllowed } from "./allowed.ts";
-import { createAsker } from "./ask.ts";
+import { createAsker, serialQueue } from "./ask.ts";
+import { backgroundDeclarations } from "./background/declarations.ts";
+import { registerPs } from "./background/ps.ts";
+import { Tasks } from "./background/tasks.ts";
+import type { TasksDeps } from "./background/tasks.ts";
+import { backgroundTools } from "./background/tools.ts";
 import { createBashTool } from "./bash.ts";
 import type { Decision } from "./bash.ts";
 import { startBroker } from "./broker-client.ts";
@@ -31,11 +36,15 @@ import type { SandboxDeps } from "./sandbox.ts";
 import type { ProtectedEntry } from "./rules.ts";
 
 /** The parts a test replaces, so that no test starts a sandbox it did not mean to. */
-export type SandboxOptions = Partial<Omit<SandboxDeps, "createdByAgent">> & {
+export type SandboxOptions = Partial<Omit<SandboxDeps, "createdByAgent" | "network">> & {
+    /** Parts of the network modes a test replaces. */
+    network?: SandboxDeps["network"];
     /** The aftermath of a command; default is the real one. */
     aftermath?: Aftermath;
     /** The name `/sandbox doctor` looks up. */
     lookupName?: string;
+    /** Parts of the background tasks a test replaces: the shell that runs a wrapped command, the timing of wake-ups, the grace period. */
+    background?: Partial<Pick<TasksDeps, "shell" | "timing" | "graceMs" | "segmentBytes" | "port">>;
 };
 
 /** The `sandbox` section as jig-core loaded it. Without jig-core, or without the section, the defaults apply. */
@@ -100,6 +109,17 @@ export function sandbox(options: SandboxOptions = {}): ExtensionFactory {
         const agentDir = options.agentDir ?? (() => getAgentDir());
         const homeOf = options.home ?? (() => userInfo().homedir);
         const allowed = createAllowed(agentDir);
+        // The screen to ask on during a connection: the latest one Pi gave this plugin.
+        let screen: ExtensionContext | undefined;
+        // Questions wait in jig-core's queue when it is loaded, and in one of this plugin's own otherwise.
+        const ownQueue = serialQueue();
+        const inTurn = <T>(job: () => Promise<T>): Promise<T> => {
+            try {
+                return jig().approvals.inTurn(job);
+            } catch {
+                return ownQueue(job);
+            }
+        };
         const settings: () => SandboxSettings = options.settings ?? (() => settingsFrom(sandboxSection()));
         const exec: BashOperations["exec"] = options.exec ?? createLocalBashOperations().exec;
         const core = new Sandbox({
@@ -121,6 +141,19 @@ export function sandbox(options: SandboxOptions = {}): ExtensionFactory {
             exec,
             random: options.random ?? (() => randomBytes(4).toString("hex")),
             now: options.now ?? (() => Date.now()),
+            network: {
+                allowed,
+                screen: () => screen,
+                inTurn,
+                notify: (message) => {
+                    try {
+                        screen?.ui.notify(message, "warning");
+                    } catch {
+                        // A screen that has ended.
+                    }
+                },
+                ...options.network,
+            },
         });
 
         // jig-core announces every decision; the tool reads them, so that what it runs is only what jig-core let through.
@@ -161,6 +194,7 @@ export function sandbox(options: SandboxOptions = {}): ExtensionFactory {
             api.config.registerSection("sandbox", validateSandbox);
             api.sandbox.register(provider);
             api.declareTool(bashDeclaration({ folder: () => sessionFolder, home: homeOf }));
+            for (const declaration of backgroundDeclarations()) api.declareTool(declaration);
         });
 
         const refresh = (ctx: Pick<ExtensionContext, "ui">): void => {
@@ -180,8 +214,31 @@ export function sandbox(options: SandboxOptions = {}): ExtensionFactory {
                 sandbox: core,
                 agentDir,
                 now: options.now ?? (() => Date.now()),
-                asker: createAsker(allowed, homeOf),
+                asker: createAsker(allowed, homeOf, inTurn),
             });
+        const tasks = new Tasks({
+            sandbox: core,
+            aftermath,
+            agentDir,
+            settings: () => settings().background,
+            env,
+            shell:
+                options.background?.shell ??
+                (() => {
+                    const found = getShellConfig();
+                    return { shell: found.shell, args: found.args };
+                }),
+            now: options.now ?? (() => Date.now()),
+            bridge: core.bridge,
+            send: (message, sendOptions) => pi.sendMessage(message, sendOptions),
+            emit: (channel, data) => pi.events.emit(channel, data),
+            ...(options.background?.timing === undefined ? {} : { timing: options.background.timing }),
+            ...(options.background?.graceMs === undefined ? {} : { graceMs: options.background.graceMs }),
+            ...(options.background?.segmentBytes === undefined
+                ? {}
+                : { segmentBytes: options.background.segmentBytes }),
+            ...(options.background?.port === undefined ? {} : { port: options.background.port }),
+        });
         pi.registerTool(
             createBashTool({
                 sandbox: core,
@@ -189,6 +246,7 @@ export function sandbox(options: SandboxOptions = {}): ExtensionFactory {
                 aftermath,
                 decisions,
                 outsideRuns,
+                tasks,
                 now: options.now ?? (() => Date.now()),
                 jig: () => {
                     try {
@@ -199,6 +257,11 @@ export function sandbox(options: SandboxOptions = {}): ExtensionFactory {
                 },
             }) as never,
         );
+        for (const tool of backgroundTools(tasks)) pi.registerTool(tool as never);
+        registerPs(pi, tasks);
+        pi.on("message_start", (event) => {
+            tasks.onMessageStart(event.message as { role?: string; customType?: string });
+        });
         registerSandboxCommand(pi, {
             sandbox: core,
             allowed,
@@ -208,8 +271,15 @@ export function sandbox(options: SandboxOptions = {}): ExtensionFactory {
             ...(options.lookupName === undefined ? {} : { lookupName: options.lookupName }),
         });
 
+        // Every tool call carries the screen as it is now: a question about a host during a connection goes to it.
+        pi.on("tool_call", (_event, ctx) => {
+            screen = ctx;
+            return undefined;
+        });
         pi.on("session_start", (_event, ctx) => {
+            screen = ctx;
             sessionFolder = ctx.cwd;
+            tasks.sessionStart(ctx);
             const started = core.start(ctx.sessionManager.getSessionId(), ctx.cwd);
             refresh(ctx);
             void started.then(() => refresh(ctx));
@@ -217,6 +287,8 @@ export function sandbox(options: SandboxOptions = {}): ExtensionFactory {
         pi.on("session_shutdown", async () => {
             // Stopping the broker is the one thing this plugin does when a session ends. It is safe to run twice.
             unlisten?.();
+            // The tasks first: they are commands in the sandbox, and the broker that wraps them must outlive their stop.
+            await tasks.shutdown();
             await core.stop();
         });
     };

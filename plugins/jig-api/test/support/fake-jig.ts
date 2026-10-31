@@ -173,6 +173,7 @@ export function installFakeJig(): FakeJig {
         },
         protectedPaths: { list: () => [] },
         sandbox: { register: () => undefined },
+        approvals: { inTurn: (job) => job() },
         exec: {
             run: async () => {
                 throw new Error("no programs in tests");

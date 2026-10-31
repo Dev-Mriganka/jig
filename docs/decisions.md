@@ -5,6 +5,7 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 ## Contents
 
 - [2026-10-31: jig-memory cards and recall: the agent writes the prose, keys and keywords find it](#2026-10-31-jig-memory-cards-and-recall-the-agent-writes-the-prose-keys-and-keywords-find-it)
+- [2026-10-31: jig-sandbox, background tasks and the network modes, as built](#2026-10-31-jig-sandbox-background-tasks-and-the-network-modes-as-built)
 - [2026-10-31: jig-sandbox, as built](#2026-10-31-jig-sandbox-as-built)
 - [2026-10-31: jig-sandbox, built on Anthropic's sandbox runtime](#2026-10-31-jig-sandbox-built-on-anthropics-sandbox-runtime)
 - [2026-10-31: gaps a company plugin found in jig-core, closed](#2026-10-31-gaps-a-company-plugin-found-in-jig-core-closed)
@@ -63,6 +64,45 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
   Pi's event bus, so recall uses the activating message and the key. `jig-jira` was
   left alone: a new event there is its own decision.
 
+## 2026-10-31: jig-sandbox, background tasks and the network modes, as built
+
+The last two build steps are built and tested. What building them changed in the design:
+- **Tasks are started by Pi's side,** not through Pi's bash tool, so it owns the process
+  group and the pipes. A task is wrapped with the rules of a foreground command, and its
+  output is cleaned and has credential values taken out before it is written, so the log
+  holds nothing that needs cleaning later.
+- **Logs live in the agent folder,** not in the session's folder under `/tmp`. The sandbox
+  can write `/tmp`, and a command could swap a log for a link to a file Pi can read and the
+  command cannot; `bg_output` would then show it.
+- **Wake-up patterns are regular expressions,** as the design said, checked for the three
+  constructs that make matching slow and for a pattern that matches an empty line. The
+  earlier harness took literal text only. A line is cut to 4 KiB before it is matched.
+- **A task cannot run outside the sandbox.** `jig-core` refuses `background` with
+  `outside` and nobody is asked: a task outlives the call a person could watch. With the
+  sandbox switched off, a task is refused too.
+- **`approvals.inTurn` is the one new `jig-core` call.** It runs a plugin's own question in
+  `jig-core`'s queue, so a question about a host never opens over one of `jig-core`'s. The
+  question about a write uses it too, which retires the separate queue.
+- **Names and addresses are checked by Pi, not by the runtime.** `allow` and `deny` are
+  read by the callback and not given to the runtime, which does not check an address it
+  decides itself. A spelling that a program may read as `127.0.0.1` (`2130706433`,
+  `0x7f000001`, `127.1`) is refused as not being a host name.
+- **A port in `network.localhost` opens loopback and this machine's own addresses at that
+  port,** not link-local, private or carrier addresses: a listed database port must not open
+  a neighbour's. Metadata stays refused whatever is listed.
+- **The runtime has no option for a named Unix socket on Linux,** so the bridge does not
+  use one. A forwarder in each command asks the proxy for `127.0.0.1:<port>` over TCP, and
+  the callback allows exactly the ports a listener of the bridge is on. A tunnel's port is
+  not one, because the machine already uses it.
+- **`nsenter` cannot enter a task's network.** The network namespace belongs to a user
+  namespace that no process is in. A short `python3` helper joins that user namespace (the
+  kernel names it for the network namespace's file) and then the network namespace; the
+  bridge needs `python3` for task ports, and says so when it is missing.
+- **`Once` lasts 15 seconds.** A command opens several connections, and asking for each
+  would be asking about the same thing again.
+- **On macOS `filtered` and `ask` mean `off`.** The bridge is written for Linux's network
+  namespaces and has not been tried on a Mac.
+
 ## 2026-10-31: jig-sandbox, as built
 
 The first two build steps (everything except background tasks and the `filtered` and
@@ -84,7 +124,8 @@ The first two build steps (everything except background tasks and the `filtered`
   locked link that was removed and made again is put back. Moving a locked path's folder
   aside is refused by the kernel, so that case needs no code.
 - **The question about a write has its own queue,** one at a time, and can overlap a
-  `jig-core` question. The host questions of `ask` mode will share `jig-core`'s queue.
+  `jig-core` question. The host questions of `ask` mode will share `jig-core`'s queue
+  (done, with the question about a write, in the entry above).
 - **`outside` is hardened where the design left it open:** a command pattern's `*` does not
   reach across `;`, `&`, `|`, `<`, `>`, a backquote, `$(` or a line break; the dialog shows
   control characters as escapes and refuses a command too long to read (1,000 characters,

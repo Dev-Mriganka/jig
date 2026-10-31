@@ -108,6 +108,11 @@ closed instead of running ungoverned.
   is not active, `canWrite(path)` and, optionally, `whenReady()`. Fields are read
   when they are needed, so they may change. Registering again replaces the
   provider. See [The sandbox](#the-sandbox).
+- **`approvals.inTurn(job)`** runs a plugin's own question in `jig-core`'s queue.
+  Pi has one dialog slot, so questions are asked one at a time; a plugin that asks
+  the user something (a sandbox asking about a host) calls `inTurn` with the
+  question as `job`, and it never opens over one of `jig-core`'s. A job that fails
+  does not stop the ones behind it.
 - **`exec`** has `run` and `git`, which start programs without a shell (see
   [Running programs](running-programs.md)).
 
