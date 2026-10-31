@@ -9,7 +9,7 @@ first time it uses it, where that helps.
 |---|---|
 | **Pi** | The coding agent Jig plugs into ([pi.dev](https://pi.dev)). Its extensions are TypeScript. |
 | **Plugin** | A Pi package of Jig's, such as `jig-core` or `jig-git`, or a private company plugin. |
-| **Company plugin** | A private plugin with one employer's environments, sign-in, tools and backends. |
+| **Company plugin** | A private plugin with one employer's environments, sign-in, tools and backends. See [Writing a company plugin](company-plugin.md). |
 | **Overlay skill** | A company's own rules, added to a generic plugin's skill. The tool stays the same. |
 | **Tool** | Something the model can call: Pi's own `read` or `bash`, or a plugin's `git` or `pr`. |
 | **Action** | One operation of a tool with several, such as `git push` or `pr comment`. |
@@ -18,7 +18,8 @@ first time it uses it, where that helps.
 | **Workspace** | The folder Pi started in, or the repository folder that holds it. |
 | **Adapter** | A small piece of a plugin that speaks one outside system, such as one CI system or one log backend. |
 
-- **A company plugin** is never part of this repository.
+- **A company plugin** is never part of this repository. The one exception is [`examples/jig-acme`](../examples/jig-acme/README.md),
+  a made-up company's plugin that shows how to write one.
 - **Kind** also says whether the action asks you first, such as `external write, asks`.
 - **A section** is checked by its plugin, which starts with defaults when it is wrong.
 - **A workspace** is where `jig-git` finds repositories.

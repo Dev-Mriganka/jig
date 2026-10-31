@@ -1,0 +1,28 @@
+{
+    "name": "jig-acme",
+    "version": "0.1.0",
+    "private": true,
+    "description": "An example company plugin for Jig: the parts a fictional company, Acme Corp, adds to the generic plugins. Copy it, rename it and replace the values.",
+    "type": "module",
+    "license": "MIT",
+    "engines": {
+        "node": ">=22.19.0"
+    },
+    "keywords": [
+        "pi-package"
+    ],
+    "peerDependencies": {
+        "@earendil-works/pi-ai": "*",
+        "@earendil-works/pi-coding-agent": "*",
+        "@earendil-works/pi-tui": "*",
+        "typebox": "*"
+    },
+    "pi": {
+        "extensions": [
+            "./src/index.ts"
+        ],
+        "skills": [
+            "./skills"
+        ]
+    }
+}

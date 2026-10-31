@@ -81,7 +81,9 @@ watch that waits for it are in `jig-ops`, and the two meet in one event,
 ## What a company plugin supplies
 
 Each generic plugin has a company part. It is configuration and knowledge,
-never code that changes the tool:
+never code that changes the tool. [Writing a company plugin](company-plugin.md)
+walks through the seams, and [`jig-acme`](../examples/jig-acme/README.md) is a
+tested example that supplies a part for every plugin that has one:
 - **`jig-core`:** environments, classification rules, extra field names for
   masking, sign-in services, transports, secret commands and protected paths.
 - **`jig-git`:** the GitHub organization, branch names, protected branches and
@@ -106,6 +108,9 @@ never code that changes the tool:
 - **`jig-agents`:** which model each role uses.
 
 ## How company parts plug in
+
+The example behind this picture is [`examples/jig-acme`](../examples/jig-acme/README.md): a made-up company's plugin, with tests
+that load the real plugins.
 
 ![The same generic jira tool set up by two companies, each with its own site, sign-in, ticket key pattern and overlay skill](img/company-plugs-in.svg)
 

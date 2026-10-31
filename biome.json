@@ -32,7 +32,7 @@
     },
     "overrides": [
         {
-            "includes": ["plugins/*/test/**", "test/**"],
+            "includes": ["plugins/*/test/**", "examples/*/test/**", "test/**"],
             "linter": {
                 "rules": {
                     "suspicious": { "noExplicitAny": "off", "noAssignInExpressions": "off" },

@@ -331,7 +331,9 @@ test("the root documents list the plugin", () => {
         /\[`jig-theme`\]\(\.\.\/plugins\/jig-theme\/README\.md\) \| built \|/,
     );
     assert.match(read(path.join(ROOT, "README.md")), /\[`jig-theme`\]\(plugins\/jig-theme\/README\.md\) \| built \|/);
-    assert.match(read(path.join(ROOT, "AGENTS.md")), /`jig-theme` is built/);
+    // AGENTS.md lists the built plugins in its first paragraph; jig-theme must be among them, however it is worded.
+    const agentsIntro = read(path.join(ROOT, "AGENTS.md")).split("\n\n")[1] ?? "";
+    assert.match(agentsIntro, /are built:[^.]*`jig-theme`/);
     // The status line's count follows the plugin table, so it is checked against the table, not a fixed number.
     const root = read(path.join(ROOT, "README.md"));
     const words = [

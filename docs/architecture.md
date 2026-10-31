@@ -140,6 +140,8 @@ company plugin (separate, private repository)
   the company's environments, sign-in service, internal tools and backends
 ```
 
+- **A company plugin is configuration and knowledge,** supplied through `jig-core`'s public contract. [Writing a company
+  plugin](company-plugin.md) says what goes in one, and [`examples/jig-acme`](../examples/jig-acme/README.md) is a tested example.
 - **Plugins talk through `jig-core`,** never to each other's files.
   `jig-core` publishes the shared contracts:
   - how a tool declares what it does;

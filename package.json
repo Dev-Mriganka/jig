@@ -12,7 +12,7 @@
         "pi-package"
     ],
     "scripts": {
-        "test": "node --import ./test/support/host.mjs --test \"plugins/*/test/*.test.ts\"",
+        "test": "node --import ./test/support/host.mjs --test \"plugins/*/test/*.test.ts\" \"examples/*/test/*.test.ts\"",
         "test:it": "node --import ./test/support/host.mjs --test \"plugins/*/test/it/*.test.ts\"",
         "check": "node test/support/link-host.mjs && tsc -p tsconfig.json && biome ci .",
         "format": "biome format --write .",

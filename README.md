@@ -110,7 +110,9 @@ Every plugin needs `jig-core`; otherwise they work on their own.
 
 **Company parts never go into this repository.** A company's environment
 names, sign-in service, internal tools and backends live in a private company
-plugin, so these generic plugins can go with you to any job.
+plugin, so these generic plugins can go with you to any job. To write one, read
+[Writing a company plugin](docs/company-plugin.md); [`examples/jig-acme`](examples/jig-acme/README.md)
+is a complete, tested example for a made-up company.
 
 [Plugins](docs/plugins.md) shows, for every tool, what is generic and what the
 company plugin supplies, and the order of building.
@@ -125,9 +127,12 @@ company plugin supplies, and the order of building.
 4. [Secrets](docs/secrets.md): where passwords and tokens come from, on any
    operating system.
 5. [Plugins](docs/plugins.md): every tool and the plugin it belongs to.
-6. [Decisions](docs/decisions.md): what was decided, what was rejected, and why.
-7. [Glossary](docs/glossary.md): the terms these documents use.
-8. [Writing the docs](docs/writing.md): how these pages are written, if you
+6. [Writing a company plugin](docs/company-plugin.md): what a company adds, the
+   seams in order, how your `jig.json` layers over its defaults, and the tested
+   example in `examples/jig-acme`.
+7. [Decisions](docs/decisions.md): what was decided, what was rejected, and why.
+8. [Glossary](docs/glossary.md): the terms these documents use.
+9. [Writing the docs](docs/writing.md): how these pages are written, if you
    add to them.
 
 ## Relationship to the existing harness
