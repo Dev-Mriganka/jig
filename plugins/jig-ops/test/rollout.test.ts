@@ -246,8 +246,19 @@ describe("the verdict", () => {
         );
         assert.equal(
             sentence(pods(pod("a-0"), pod("a-1", { ready: false, waiting: "ImagePullBackOff", restarts: 0 })), "1.4.2"),
-            "Failing: pod a-1 is ImagePullBackOff (0 restarts). Read why with runtime logs (pod: a-1, previous: true).",
+            "Failing: pod a-1 is ImagePullBackOff (0 restarts). Read why with runtime events.",
         );
+        // A container that has run before has a log of its previous run to read.
+        assert.equal(
+            sentence(pods(pod("a-0"), pod("a-1", { ready: false, waiting: "CrashLoopBackOff", restarts: 4 })), "1.4.2"),
+            "Failing: pod a-1 is CrashLoopBackOff (4 restarts). Read why with runtime logs (pod: a-1, previous: true).",
+        );
+        for (const reason of ["ErrImagePull", "InvalidImageName", "CreateContainerConfigError"]) {
+            assert.match(
+                sentence(pods(pod("a-0"), pod("a-1", { ready: false, waiting: reason, restarts: 0 })), "1.4.2"),
+                new RegExp(`is ${reason} \\(0 restarts\\)\\. Read why with runtime events\\.$`),
+            );
+        }
         assert.equal(sentence([], "1.4.2"), "No pods match app=orders-api in namespace orders-staging.");
         assert.equal(
             sentence([], "1.4.2", "1m00s"),
