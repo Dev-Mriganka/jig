@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { folderOf, ticketRegex, validateMemory } from "../src/config.ts";
+import { folderOf, recallOf, ticketRegex, validateMemory } from "../src/config.ts";
 import { PATTERN } from "./support.ts";
 
 test("a section with no fields, or with its fields set correctly, is valid", () => {
@@ -64,4 +64,37 @@ test("the ticket pattern finds whole keys only: a key must not touch a letter or
 test("without a ticketPattern there is no regular expression, so no message activates a ticket", () => {
     assert.equal(ticketRegex(undefined), undefined);
     assert.equal(ticketRegex({ folder: "/srv/tickets" }), undefined);
+});
+
+test("recall settings: enabled, max from 1 to 10 and minScore above 0 are valid", () => {
+    assert.deepEqual(validateMemory({ recall: {} }), []);
+    assert.deepEqual(validateMemory({ recall: { enabled: false, max: 10, minScore: 0.1 } }), []);
+    assert.deepEqual(validateMemory({ recall: { max: 1, minScore: 40 } }), []);
+});
+
+test("a recall setting that is wrong is an error that names its key", () => {
+    assert.deepEqual(validateMemory({ recall: "yes" }), ["memory.recall: must be an object"]);
+    assert.deepEqual(validateMemory({ recall: [] }), ["memory.recall: must be an object"]);
+    assert.deepEqual(validateMemory({ recall: { maxx: 3 } }), ["memory.recall.maxx: unknown field"]);
+    assert.deepEqual(validateMemory({ recall: { enabled: "no" } }), ["memory.recall.enabled: must be true or false"]);
+    for (const max of [0, 11, 2.5, "3", Number.NaN]) {
+        assert.deepEqual(
+            validateMemory({ recall: { max } }),
+            ["memory.recall.max: must be a whole number from 1 to 10"],
+            String(max),
+        );
+    }
+    for (const minScore of [0, -1, "2", Number.POSITIVE_INFINITY]) {
+        assert.deepEqual(
+            validateMemory({ recall: { minScore } }),
+            ["memory.recall.minScore: must be a number above 0"],
+            String(minScore),
+        );
+    }
+});
+
+test("the recall settings take their defaults field by field", () => {
+    assert.deepEqual(recallOf(undefined), { enabled: true, max: 3, minScore: 2.5 });
+    assert.deepEqual(recallOf({ recall: { max: 5 } }), { enabled: true, max: 5, minScore: 2.5 });
+    assert.deepEqual(recallOf({ recall: { enabled: false, minScore: 4 } }), { enabled: false, max: 3, minScore: 4 });
 });

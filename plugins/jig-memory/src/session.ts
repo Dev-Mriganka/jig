@@ -19,16 +19,20 @@ import {
     verifyCard,
 } from "./close.ts";
 import { loadCards } from "./cards.ts";
-import { folderOf, ticketRegex } from "./config.ts";
-import type { MemorySettings } from "./config.ts";
+import { folderOf, recallOf, ticketRegex } from "./config.ts";
+import type { MemorySettings, RecallSettings } from "./config.ts";
 import { indexCount, isFileTool, saveEvidence } from "./evidence.ts";
+import { hasNoNotes, readMaterial } from "./material.ts";
 import { notesMessage, REMIND_AFTER, reminderText } from "./message.ts";
+import { buildQuery, formatMatches, notesText, recall, recallMessage } from "./recall.ts";
 import { ensureTicket, isSafeKey, mentionedTickets, settleNotes, ticketPaths } from "./store.ts";
 
 /** The session entry that records the active ticket: `{ key }`, or `{ key: null }` after `/ticket off`. */
 export const TICKET_ENTRY = "jig-memory-ticket";
 /** The custom message that carries the notes into the conversation. */
 export const NOTES_MESSAGE = "jig-memory-notes";
+/** The custom message that carries the cards of related tickets. */
+export const RECALL_MESSAGE = "jig-memory-recall";
 
 const ACTIVE = "Active.";
 const COMPACTED = "Still active after compaction; current notes follow.";
@@ -40,6 +44,7 @@ const COMMANDS: ReadonlySet<string> = new Set(["off", "close", "recall"]);
 interface Memory {
     folder: string;
     pattern: RegExp | undefined;
+    recall: Required<RecallSettings>;
 }
 
 /** The ticket the branch recorded last. Undefined when none was, or when the last record is `/ticket off`. */
@@ -66,6 +71,10 @@ export function registerTicketMemory(pi: ExtensionAPI): void {
     const reported = new Set<string>();
     // A close that has asked the agent to fill the card and waits for it to settle.
     let closing: Closing | undefined;
+    // Tickets that recall has run for in this session, so a ticket switched away from and back is not recalled twice, and
+    // the message that made each active, which a recall by hand on the active ticket reads again.
+    const recalled = new Set<string>();
+    const activatedBy = new Map<string, string>();
 
     const note = (ctx: ExtensionContext, text: string, level: "info" | "warning" = "info") => {
         if (ctx.hasUI) ctx.ui.notify(text, level);
@@ -85,9 +94,36 @@ export function registerTicketMemory(pi: ExtensionAPI): void {
         );
     };
 
-    /** Makes `key` the active ticket. A failure is reported, not thrown: the prompt goes on without a ticket. */
-    const activate = (mem: Memory, ctx: ExtensionContext, key: string, why: string) => {
+    /** Recall for a ticket that just became active: the cards of related tickets, as one message when any pass. */
+    const sendRecall = (mem: Memory, ctx: ExtensionContext, key: string, text: string) => {
         try {
+            const matches = recall(
+                loadCards(mem.folder),
+                buildQuery({ ticket: key, text, pattern: mem.pattern }),
+                mem.recall,
+            );
+            if (matches.length === 0) return;
+            pi.sendMessage(
+                {
+                    customType: RECALL_MESSAGE,
+                    content: recallMessage(key, mem.folder, matches),
+                    display: true,
+                    details: { key, tickets: matches.map((match) => match.ticket) },
+                },
+                { triggerTurn: false },
+            );
+        } catch (error) {
+            note(ctx, `Recall for ${key} failed: ${reason(error)}`, "warning");
+        }
+    };
+
+    /**
+     * Makes `key` the active ticket. A failure is reported, not thrown: the prompt goes on without a ticket. `text` is the
+     * message that named it, which recall reads when the ticket has no notes yet.
+     */
+    const activate = (mem: Memory, ctx: ExtensionContext, key: string, why: string, text = "") => {
+        try {
+            const isNew = hasNoNotes(mem.folder, key);
             ensureTicket(mem.folder, key);
             const notes = settleNotes(mem.folder, key, new Date());
             jig().setTicket(key);
@@ -96,7 +132,12 @@ export function registerTicketMemory(pi: ExtensionAPI): void {
             sinceNotes = 0;
             reported.clear();
             pi.appendEntry(TICKET_ENTRY, { key });
+            activatedBy.set(key, text);
             sendNotes(mem, key, ACTIVE, notes);
+            if (isNew && mem.recall.enabled && !recalled.has(key)) {
+                recalled.add(key);
+                sendRecall(mem, ctx, key, text);
+            }
             note(ctx, `Ticket ${key} active (${why}). Folder: ${ticketPaths(mem.folder, key).dir}/`);
         } catch (error) {
             note(ctx, `Could not make ${key} active: ${reason(error)}`, "warning");
@@ -113,6 +154,41 @@ export function registerTicketMemory(pi: ExtensionAPI): void {
         reported.clear();
         pi.appendEntry(TICKET_ENTRY, { key: null });
         note(ctx, message);
+    };
+
+    /** `/ticket recall [text]`: the related tickets for the text, or for the active ticket, shown to the user only. */
+    const recallByHand = (mem: Memory, ctx: ExtensionContext, text: string) => {
+        try {
+            let query = buildQuery({ text, pattern: mem.pattern });
+            if (text === "") {
+                if (active === undefined) {
+                    note(ctx, "No active ticket. Use /ticket recall <text>, or make a ticket active first.");
+                    return;
+                }
+                const material = readMaterial(mem.folder, active);
+                query = buildQuery({
+                    ticket: active,
+                    text: `${activatedBy.get(active) ?? ""}\n${notesText(material.notes)}`,
+                    evidence: material.evidence,
+                    pattern: mem.pattern,
+                });
+            }
+            const cards = loadCards(mem.folder);
+            const searched = Object.values(cards).filter((card) => card.valid).length;
+            if (searched === 0) {
+                note(ctx, "No cards yet: /ticket close writes one for a ticket.");
+                return;
+            }
+            const matches = recall(cards, query, mem.recall);
+            note(
+                ctx,
+                matches.length === 0
+                    ? `No earlier ticket scores ${mem.recall.minScore} or more among ${searched} card${searched === 1 ? "" : "s"}.`
+                    : `Related earlier tickets (${searched} card${searched === 1 ? "" : "s"} searched):\n\n${formatMatches(matches)}`,
+            );
+        } catch (error) {
+            note(ctx, `Recall failed: ${reason(error)}`, "warning");
+        }
     };
 
     /** Drafts the card of `key` and asks the agent to fill it. The check comes when the agent has settled. */
@@ -143,13 +219,15 @@ export function registerTicketMemory(pi: ExtensionAPI): void {
 
     pi.on("session_start", (_event, ctx) => {
         const settings = jig().config.section("memory") as MemorySettings | undefined;
-        const mem: Memory = { folder: folderOf(settings), pattern: ticketRegex(settings) };
+        const mem: Memory = { folder: folderOf(settings), pattern: ticketRegex(settings), recall: recallOf(settings) };
         memory = mem;
         active = restoredTicket(ctx.sessionManager.getBranch());
         notesSeen = "";
         sinceNotes = 0;
         reported.clear();
         closing = undefined;
+        recalled.clear();
+        activatedBy.clear();
         if (active !== undefined) {
             // Only a restored ticket is told: jig-core starts without one, and another extension may have set its own.
             jig().setTicket(active);
@@ -239,7 +317,7 @@ export function registerTicketMemory(pi: ExtensionAPI): void {
             note(ctx, `Several tickets named (${keys.join(", ")}): run /ticket <KEY> to choose one.`);
             return;
         }
-        if (first !== undefined) activate(mem, ctx, first, "named in your message");
+        if (first !== undefined) activate(mem, ctx, first, "named in your message", event.text);
     });
 
     // While a ticket is active, every result is checked against notes.md, and the results of tools other than Pi's file
@@ -278,7 +356,7 @@ export function registerTicketMemory(pi: ExtensionAPI): void {
 
     pi.registerCommand("ticket", {
         description:
-            "Ticket memory: /ticket KEY makes a ticket active, /ticket off clears it, /ticket close writes its card, /ticket alone shows it",
+            "Ticket memory: /ticket KEY makes a ticket active, /ticket off clears it, /ticket close writes its card, /ticket recall finds related tickets, /ticket alone shows it",
         handler: async (args, ctx) => {
             const mem = memory;
             if (mem === undefined) {
@@ -296,6 +374,10 @@ export function registerTicketMemory(pi: ExtensionAPI): void {
                 } else {
                     startClose(mem, ctx, key);
                 }
+                return;
+            }
+            if (word === "recall") {
+                recallByHand(mem, ctx, arg.slice(word.length).trim());
                 return;
             }
             if (arg === "") {
