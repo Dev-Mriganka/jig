@@ -49,7 +49,7 @@ function unquote(value: string): string {
 
 /** The text between the `---` lines at the top of a file, as Pi finds it, or undefined when there is none. */
 export function frontMatterOf(text: string): string | undefined {
-    const normalized = text.replace(/\r\n?/g, "\n").replace(/^﻿/, "");
+    const normalized = text.replace(/\r\n?/g, "\n").replace(/^\uFEFF/, "");
     if (!normalized.startsWith("---")) return undefined;
     const end = normalized.indexOf("\n---", 3);
     return end < 0 ? undefined : normalized.slice(4, end);
@@ -57,7 +57,7 @@ export function frontMatterOf(text: string): string | undefined {
 
 /** The text of a skill without its front matter. */
 export function bodyOf(text: string): string {
-    const normalized = text.replace(/\r\n?/g, "\n").replace(/^﻿/, "");
+    const normalized = text.replace(/\r\n?/g, "\n").replace(/^\uFEFF/, "");
     if (!normalized.startsWith("---")) return normalized.trim();
     const end = normalized.indexOf("\n---", 3);
     return end < 0 ? normalized.trim() : normalized.slice(end + 4).trim();
