@@ -58,6 +58,13 @@ export function bashDeclaration(options: { folder: () => string; home: () => str
         plugin: "jig-sandbox",
         extendsDefaults: true,
         classify(input): CallClass | undefined {
+            // A task outlives the call that started it, so the question about running it outside would be about a command
+            // nobody could watch: it is refused, and nobody is asked.
+            if (input.outside === true && input.background === true) {
+                throw new TypeError(
+                    "a background task cannot run outside the sandbox: run it in the sandbox, or run the command in the foreground with outside: true",
+                );
+            }
             if (input.outside !== true) return undefined;
             const problem = outsideProblem(input);
             // A TypeError says the input is invalid: the call is blocked with this message and nobody is asked.

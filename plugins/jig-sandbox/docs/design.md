@@ -257,6 +257,12 @@ in a small folder:
   local package, `git init/add/commit/branch/config/remote add`, a connection to a server
   on `localhost` in `open` mode and none in `off`, twelve commands at once, and no file
   left in the project that the command did not write.
+- **Background tasks** (`background*.test.ts`): the patterns that are refused, a burst of
+  events as one message, the limits on error floods, one message in flight, paging and
+  rotation of the log, stopping against a fake process table, the clean-up of a crashed
+  session, and the tools, `/ps` and the footer with real processes. In the real sandbox: a
+  task has the rules of a command, its tree stops (children inside bubblewrap included), its
+  trap runs on the polite stop, and the end of the session leaves nothing running.
 - **The whole path:** the plugin in a fake Pi with the real broker and the real runtime;
   the broker is started and stopped, and Pi's signal handling is untouched.
 - **CI:** Ubuntu 24.04 with bubblewrap, `socat` and ripgrep installed and unprivileged user
@@ -271,7 +277,7 @@ in a small folder:
    doctor, the `jig-core` additions, and the `open` and `off` network modes.
 2. **Built:** the audit, and asking you (writes). Running one command outside is built
    with it.
-3. Background tasks and `/ps`.
+3. **Built:** background tasks and `/ps`.
 4. `filtered` and `ask`, with the callback and the `localhost` bridge.
 
 Each step ships with its escape and keep-working tests.
@@ -287,4 +293,7 @@ Each step ships with its escape and keep-working tests.
 | A moved-aside folder could replace a locked file | The kernel refuses to move a folder that holds a mounted path; what can be replaced is a locked link, which the audit puts back |
 | `PATH` folders are locked | Those in your home folder, outside the working folder |
 | The question about a host shares `jig-core`'s queue | The question about a write has a queue of its own; it can overlap a `jig-core` question until the host questions arrive |
-| A server started by a command is reachable by the next one | Commands end with their processes until background tasks exist |
+| A server started by a command is reachable by the next one | A command ends with its processes. A server that must outlive it is a [background task](background.md) |
+| Task logs are in a private folder of the session | They are under `<agent folder>/jig-sandbox/background`, which the sandbox cannot write: in `/tmp` a command could swap a log for a link to a file Pi can read and it cannot, and `bg_output` would show it |
+| Background tasks start through the same path as `bash` | Pi's side starts them itself, to own the process group and the pipes, and wraps them with the same rules; a task's output is cleaned and its credential values taken out before it is written |
+| A task wakes the agent on text it prints | The patterns are regular expressions, checked first for the constructs that make matching slow |

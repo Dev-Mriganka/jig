@@ -35,8 +35,8 @@ In short:
   review page's build and every link in these docs run on GitHub Actions.
 
 Also built: [`jig-sandbox`](plugins/jig-sandbox/README.md), which runs the
-agent's `bash` in an operating-system sandbox. Designs: `jig-workflow` and
-`jig-agents`, and the background tasks and two network modes of `jig-sandbox`.
+agent's `bash` in an operating-system sandbox, with background tasks. Designs:
+`jig-workflow` and `jig-agents`, and the two network modes of `jig-sandbox`.
 
 ## Install
 

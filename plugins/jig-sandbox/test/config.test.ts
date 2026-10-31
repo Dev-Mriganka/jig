@@ -19,7 +19,7 @@ describe("validateSandbox", () => {
                 },
                 env: { keep: ["MY_API_KEY"] },
                 docker: false,
-                background: { maxTasks: 4, maxRuntimeMinutes: 240 },
+                background: { maxTasks: 4, maxRuntimeMinutes: 240, keepFinished: 12, wake: "on" },
                 programs: { bwrap: "/usr/bin/bwrap", socat: "/usr/bin/socat", ripgrep: "/usr/bin/rg" },
             }),
             [],
@@ -70,6 +70,12 @@ describe("validateSandbox", () => {
         assert.deepEqual(validateSandbox({ background: { maxTasks: 0 } }), [
             "sandbox.background.maxTasks: must be a whole number of at least 1",
         ]);
+        assert.deepEqual(validateSandbox({ background: { keepFinished: 0, wake: "sometimes" } }), [
+            "sandbox.background.keepFinished: must be a whole number of at least 1",
+            "sandbox.background.wake: must be on or off",
+        ]);
+        assert.deepEqual(validateSandbox({ background: { wake: "off", keepFinished: 3 } }), []);
+        assert.deepEqual(validateSandbox({ background: { speed: 1 } }), ["sandbox.background.speed: unknown field"]);
         assert.deepEqual(validateSandbox({ programs: { bwrap: "bwrap" } }), [
             "sandbox.programs.bwrap: must be an absolute path",
         ]);
@@ -89,13 +95,13 @@ describe("settingsFrom", () => {
             network: { mode: "off", localhost: [5432, "x", 0] },
             env: { keep: ["MY_API_KEY"] },
             programs: { socat: "/opt/socat", ripgrep: "rg" },
-            background: { maxTasks: 2 },
+            background: { maxTasks: 2, wake: "off" },
         });
         assert.deepEqual(settings.share, []);
         assert.equal(settings.network.mode, "off");
         assert.deepEqual(settings.network.localhost, [5432]);
         assert.deepEqual(settings.env.keep, ["MY_API_KEY"]);
         assert.deepEqual(settings.programs, { socat: "/opt/socat" });
-        assert.deepEqual(settings.background, { maxTasks: 2, maxRuntimeMinutes: 240 });
+        assert.deepEqual(settings.background, { maxTasks: 2, maxRuntimeMinutes: 240, keepFinished: 12, wake: "off" });
     });
 });

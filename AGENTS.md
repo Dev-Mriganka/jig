@@ -3,7 +3,7 @@
 Twelve of the fourteen plugins are built: `jig-core`, `jig-git`, `jig-memory`,
 `jig-lens`, `jig-jira`, `jig-logs`, `jig-api`, `jig-ops`, `jig-review` and
 `jig-mongo`, and `jig-theme` is built as well, and `jig-sandbox` is built except
-for background tasks and the `filtered` and `ask` network modes. `jig-workflow`
+for the `filtered` and `ask` network modes. `jig-workflow`
 and `jig-agents` are design.
 
 Plugin READMEs are the specifications. Code follows them, and when either

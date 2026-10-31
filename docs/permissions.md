@@ -45,6 +45,9 @@ Pi's own tools:
 | `write`, `edit` | local | write | allow, except a protected path (see the floor) |
 | `bash` | local, inside the sandbox | write | allow (the sandbox is the protection, see Architecture) |
 | `bash` with `outside: true` | local, outside the sandbox: action `outside` | write | **ask**; only a rule naming it allows it (see the floor) |
+| `bash` with `background: true` | local, inside the sandbox | write | allow; with `outside: true` it is refused, and nobody is asked |
+| `bg_output`, `bg_list` | local | read | allow |
+| `bg_kill` | local | write | allow |
 | `powershell` | local | write | allow |
 | question tools: `ask_user_question`, `ask_questions` | local | read | allow, so a question never asks first |
 

@@ -192,12 +192,12 @@ function setup(
 }
 
 describe("what the plugin registers", () => {
-    test("the bash tool that replaces Pi's, the /sandbox command, and the two session hooks; it starts nothing", () => {
+    test("the bash tool that replaces Pi's, the three background tools, /sandbox and /ps, and the session hooks; it starts nothing", () => {
         const before = listeners();
         const s = setup();
-        assert.deepEqual([...s.pi.tools.keys()], ["bash"]);
-        assert.deepEqual([...s.pi.commands.keys()], ["sandbox"]);
-        assert.deepEqual([...s.pi.handlers.keys()].sort(), ["session_shutdown", "session_start"]);
+        assert.deepEqual([...s.pi.tools.keys()], ["bash", "bg_output", "bg_list", "bg_kill"]);
+        assert.deepEqual([...s.pi.commands.keys()].sort(), ["ps", "sandbox"]);
+        assert.deepEqual([...s.pi.handlers.keys()].sort(), ["message_start", "session_shutdown", "session_start"]);
         assert.equal(s.brokers.log.launches.length, 0, "no broker until a session starts");
         assert.deepEqual(listeners(), before);
     });
@@ -207,7 +207,15 @@ describe("what the plugin registers", () => {
         assert.ok(tool);
         assert.equal(tool.name, "bash");
         const properties = (tool.parameters as unknown as { properties: object }).properties;
-        assert.deepEqual(Object.keys(properties).sort(), ["command", "outside", "reason", "timeout"]);
+        assert.deepEqual(Object.keys(properties).sort(), [
+            "background",
+            "command",
+            "name",
+            "notifyOn",
+            "outside",
+            "reason",
+            "timeout",
+        ]);
         assert.equal(typeof tool?.renderCall, "function");
         assert.match(tool?.description ?? "", /Execute a bash command/);
         assert.match(tool?.description ?? "", /sandbox/);
