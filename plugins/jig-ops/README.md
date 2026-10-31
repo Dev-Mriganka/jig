@@ -126,6 +126,9 @@ An action or parameter the CI system of the service lacks is refused, naming the
   that `repo` and a `ci` entry (`ops.watch.auto`). The payload is checked.
 - **`jig-ops:artifact-ready`** (published) says a build, tag or release exists for a passed
   watch: `{ repo, pr?, sha, kind, ref, source }`. It was `jig-git:artifact-ready`.
+- **`jig-ops:ci-finished`** (published) says a CI watch ended `passed` or `failed` for a commit:
+  `{ repo, service, system, sha, branch?, pr?, finish, outcome, summary }`. `jig-workflow`'s
+  `checks-pass` listens for it.
 
 ## Company part (in the company plugin)
 

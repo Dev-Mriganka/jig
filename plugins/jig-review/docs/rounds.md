@@ -47,13 +47,15 @@ On approval the plugin emits `jig-review:approved` on `pi.events`:
 
 ```json
 { "reviewId": "2026-10-30T10-00-00Z", "scope": "branch", "ticket": "PROJ-123",
-  "repos": [{ "repo": "orders-api", "head": "…40 hex…" }], "covered": true,
+  "repos": [{ "repo": "orders-api", "head": "…40 hex…", "root": "/work/orders-api" }], "covered": true,
   "files": ["orders-api/Service.java"], "method": "passkey" }
 ```
 
-- **`repos`** lists every reviewed repository and where it stood.
+- **`repos`** lists every reviewed repository and where it stood. `repo` is its path from Pi's folder, which two
+  repositories outside that folder can share; `root` is its own folder, absolute, for a listener that must tell them apart.
+  It is left out when the folders cannot be worked out.
 - **`covered`** says whether the approval vouches for those commits (a branch review whose diff was still the one you saw).
-- **`jig-workflow`'s `review-done`** will listen for it. Anyone can publish on the bus, so a listener checks the payload, and a
+- **`jig-workflow`'s `review-done`** listens for it, and keeps only a `covered` approval of a bound repository. Anyone can publish on the bus, so a listener checks the payload, and a
   gate that must not be forged should read the record, which only this plugin writes.
 
 ## Telling the agent

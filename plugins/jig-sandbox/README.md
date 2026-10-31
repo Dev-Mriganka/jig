@@ -26,7 +26,7 @@ says which rule and why, and offers a way through.
 |---|---|
 | The agent's `bash`, and the background tasks it starts | Your own `!` commands: they are yours |
 | Subagents' `bash`, when it is the registered tool | Jig's tools (`git`, `jira`, `mongo`, ...), through `jig-core`'s rules |
-| | Pi itself and its file tools, which `jig-core`'s protected paths cover |
+| Commands other plugins run with `sandbox.run`, such as `jig-workflow`'s tests | Pi itself and its file tools, which `jig-core`'s protected paths cover |
 
 ## The four kinds of path
 

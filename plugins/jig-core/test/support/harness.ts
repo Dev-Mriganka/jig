@@ -79,6 +79,8 @@ export interface StartOptions {
     openPreview?: (preview: never, header: string) => Promise<string>;
     /** The time and timers the watch engine uses, so a test can move them by hand. Default: the real ones. */
     clock?: FakeClock;
+    /** How long a gate may take, so a test of a slow one need not wait ten seconds. */
+    gateTimeoutMs?: number;
 }
 
 /** Loads jig-core into a fake Pi and starts a session. The state folder must already be set (see `tempState`). */
@@ -93,6 +95,7 @@ export async function start(options: StartOptions = {}): Promise<Harness> {
         createMasker: () => options.masker ?? fakeMasker,
         ...(options.openPreview === undefined ? {} : { openPreview: options.openPreview as never }),
         ...(options.clock === undefined ? {} : { now: options.clock.date, timers: options.clock.timers }),
+        ...(options.gateTimeoutMs === undefined ? {} : { gateTimeoutMs: options.gateTimeoutMs }),
     })(host.pi);
     const api = jig();
     options.plugins?.(api);

@@ -60,7 +60,9 @@ tool_execution_start → tool_call → tool_execution_update → tool_result →
                          or a default (unknown tools count as writes outside)
    3. decide     the rules table → allow / ask / deny
                    your configuration can always make it stricter,
-                   but never lower the floor (see Permissions)
+                   but never lower the floor (see Permissions);
+                   then the gates plugins registered, which can only
+                   make it stricter still
    4. ask        only when the rule says ask: the approval screen,
                    inside this waiting call (see Approvals)
    5. block, or let it run
@@ -131,10 +133,11 @@ jig (this repository, generic)
   jig-api    tool: your saved API requests, run by name
   jig-review tools: the code review in the browser, approved with a passkey
   jig-memory ticket folders, notes, evidence, cards and recall; no tools
+  jig-workflow tool: named workflows, with exit conditions decided from evidence; registers a gate that holds calls
   jig-lens   observability: reads jig-core's records, local dashboard; no tools
   jig-theme  the look: palettes as Pi themes, a footer, the answer colour; no tools
   jig-sandbox the sandbox around the agent's bash, and the bash tool that replaces Pi's
-  jig-workflow, jig-agents   design (see Plugins)
+  jig-agents design (see Plugins)
 
 company plugin (separate, private repository)
   the company's environments, sign-in service, internal tools and backends

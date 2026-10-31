@@ -14,6 +14,8 @@ import { JIG_EVENTS } from "./contract.ts";
 import type { ApprovalKind, Decision, EnvironmentKind, Preview, SandboxProvider, ToolDeclaration } from "./contract.ts";
 import type { DecisionSource } from "./decide.ts";
 import { errorMessage } from "./errors.ts";
+import { createGates } from "./gates.ts";
+import type { Gates } from "./gates.ts";
 import { createMasker, dailyMaskKey } from "./mask/index.ts";
 import type { Masker } from "./mask/index.ts";
 import { stateDir } from "./paths.ts";
@@ -47,6 +49,8 @@ export interface JigCoreOptions {
     now?: () => Date;
     /** The timers the watch engine uses. The default is Node's, none of which keeps the process alive. */
     timers?: Timers;
+    /** How long one gate may take before the call it checks is denied. Default 10 seconds. */
+    gateTimeoutMs?: number;
 }
 
 /** What jig-core remembers about one call, from the moment it is decided until its record is written. */
@@ -65,6 +69,8 @@ export interface CallState {
     /** Set when the call asked. */
     approval?: { kind: ApprovalKind; answer: Answer; waitedMs: number };
     approvedPreview?: Preview;
+    /** The gate that asked or denied this call, when one did. */
+    gate?: string;
     /** The plugin that registered the tool, for records. */
     plugin?: string;
     /** Set when jig-core stopped the call. `line` is for the record and holds no text the user typed. */
@@ -114,6 +120,8 @@ export interface JigState {
     transports: Transports;
     tunnels: Tunnels;
     approvals: Approvals;
+    /** The checks other plugins registered, asked about each call after the rules. */
+    gates: Gates;
     watches: WatchEngine;
     /** Field names that company plugins added to the masker, in the order they came. */
     maskFields: string[];
@@ -207,6 +215,7 @@ export function createState(pi: ExtensionAPI, options: JigCoreOptions = {}): Jig
             openPreview:
                 options.openPreview ?? (async (preview, header) => openInBrowser(writePreviewPage(preview, header))),
         }),
+        gates: createGates(options.gateTimeoutMs === undefined ? {} : { timeoutMs: options.gateTimeoutMs }),
         watches: createWatchEngine({
             now: () => now().getTime(),
             ...(options.timers === undefined ? {} : { timers: options.timers }),

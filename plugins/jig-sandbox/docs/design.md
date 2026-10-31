@@ -245,6 +245,7 @@ Without `jig-core` they wait in a queue of this plugin's own.
 | `jig().sandbox.register(provider)` | The sandbox says it is active, in which mode, why not when it is not, and answers `canWrite(path)` |
 | `exec.run` checks `canWrite` | A program in a folder the sandbox lets bash write is refused, found on `PATH` or by absolute path, so a planted `git` never runs outside |
 | `/jig` and session start | Say whether bash is sandboxed, and in which network mode; a plain warning when there is no sandbox |
+| `sandbox.canRun` and `sandbox.run(command, options)` | Another plugin runs a shell command with the wrapping of `bash`, without the tool: `jig-workflow` runs a repository's tests this way. With the sandbox off, unstarted or refusing, it rejects and nothing runs elsewhere |
 | `bash` action `outside` | Classified as a local write that asks; allowed without asking only by a rule naming `bash`, action `outside` and a command pattern; refused with no screen; recorded |
 | A rule's `command` | A pattern for the call's `command`, whose `*` does not reach across `;`, `&`, `\|`, `<`, `>`, a backquote, `$(` or a line break |
 | A preview's `answers` | The words on the three buttons, so the dialog says `Run once` and not `Allow` |

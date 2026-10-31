@@ -643,3 +643,72 @@ describe("with jig-core", () => {
         await assert.rejects(jig().exec.run(planted, [], { cwd: root }), /a place the sandbox lets bash write/);
     });
 });
+
+describe("running a command for another plugin (jig-core's sandbox.run)", () => {
+    test("the command is wrapped like a bash command, with the rules and the clean environment, and its output comes back", async () => {
+        const s = setup({ core: true, script: (command) => (command === "npm test" ? "3 passing\n" : "") });
+        await s.start();
+        assert.equal(jig().sandbox.canRun, true);
+        const result = await jig().sandbox.run("npm test", { cwd: s.project, timeoutMs: 90_000 });
+        assert.deepEqual(result, { code: 0, output: "3 passing\n", timedOut: false, truncated: false });
+
+        const wrapped = forCommands(s, "wrap").filter((request) => request.fields.commandText === "npm test");
+        assert.equal(wrapped.length, 1, "the broker wrapped it");
+        const ran = s.execs.find((exec) => exec.cwd === s.project);
+        assert.equal(ran?.timeout, 90, "milliseconds became Pi's seconds");
+        assert.ok(!JSON.stringify(ran?.env).includes("token-value"), "no credential in the command's environment");
+    });
+
+    test("a command that ran out of time is a result with timedOut, and one that was cancelled is a rejection", async () => {
+        let mode: "timeout" | "abort" = "timeout";
+        const s = setup({
+            core: true,
+            options: {
+                exec: async (command, _cwd, o) => {
+                    if (command === "echo jig-sandbox-probe") {
+                        o.onData(Buffer.from("jig-sandbox-probe\n"));
+                        return { exitCode: 0 };
+                    }
+                    o.onData(Buffer.from("partial\n"));
+                    throw new Error(mode === "timeout" ? `timeout:${o.timeout}` : "aborted");
+                },
+            },
+        });
+        await s.start();
+        assert.deepEqual(await jig().sandbox.run("slow", { cwd: s.project, timeoutMs: 1500 }), {
+            code: null,
+            output: "partial\n",
+            timedOut: true,
+            truncated: false,
+        });
+        mode = "abort";
+        await assert.rejects(jig().sandbox.run("slow", { cwd: s.project }), /aborted/);
+    });
+
+    test("only the end of a long output is kept, and the result says so", async () => {
+        const s = setup({ core: true, script: () => `${"a".repeat(100)}${"b".repeat(100)}` });
+        await s.start();
+        const result = await jig().sandbox.run("noisy", { cwd: s.project, maxOutputBytes: 100 });
+        assert.equal(result.output, "b".repeat(100));
+        assert.equal(result.truncated, true);
+    });
+
+    test("with the sandbox switched off nothing runs: canRun is false and run rejects", async () => {
+        const s = setup({ core: true });
+        await s.start();
+        await s.command("off");
+        assert.equal(jig().sandbox.canRun, false);
+        const before = s.execs.length;
+        await assert.rejects(jig().sandbox.run("npm test", { cwd: s.project }), /no sandbox can run this command/);
+        assert.equal(s.execs.length, before, "no command was started");
+    });
+
+    test("when the sandbox could not start the command is refused with the reason, never run bare", async () => {
+        const s = setup({ core: true, broker: { failOn: "init" } });
+        await s.start();
+        const before = s.execs.length;
+        assert.equal(jig().sandbox.canRun, false);
+        await assert.rejects(jig().sandbox.run("npm test", { cwd: s.project }), /it could not start/);
+        assert.equal(s.execs.length, before);
+    });
+});

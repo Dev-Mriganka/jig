@@ -269,6 +269,28 @@ function isInside(child: string, parent: string, sep: string): boolean {
     return child === parent || child.startsWith(parent.endsWith(sep) ? parent : parent + sep);
 }
 
+// ---- the paths a file tool acts on ----------------------------------------------------------------------------------
+
+/**
+ * The absolute paths a call to Pi's `write` or `edit` acts on, for a gate: the path as Pi opens it once `~`, `@` and `..`
+ * are resolved, and with every link followed (the same path once when there is no link). Empty for any other tool, and
+ * for a call with no text path. This is the path logic of the checks below, so a gate and the protected paths cannot read
+ * one call in two ways.
+ */
+export function filePathsOf(
+    tool: string,
+    input: Readonly<Record<string, unknown>>,
+    context: { cwd: string; home: string; platform?: NodeJS.Platform },
+): string[] {
+    if (tool !== "write" && tool !== "edit") return [];
+    const given = input.path;
+    if (typeof given !== "string") return [];
+    const target = lexical(given, context.cwd, context.home, context.platform);
+    const forms = new Set([target.folded, followLinks(target.folded, context.platform)]);
+    if (target.unfolded !== target.folded) forms.add(followLinks(target.unfolded, context.platform));
+    return [...forms];
+}
+
 // ---- the check ----------------------------------------------------------------------------------------------------
 
 /** Every form a path can be reached by: as written once folded, and with its links followed. `unfolded` is the same

@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="560" viewBox="0 0 920 560" role="img" aria-label="How jig-workflow works. Workflow files name the stages and the exit conditions of each. Evidence is produced where it can be checked: tests run in the sandbox at the exact HEAD, the plan you approved by its fingerprint, the review and CI events, gh pr view, and scenario results with evidence. Each result is saved in the ticket folder's workflow.json against the commit or the plan it is about. Status and advance read that file and the repositories as they are now and check eight conditions. A gate registered with jig-core asks the same question for each tool call and can only make a decision stricter." font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">
+  <rect x="0.5" y="0.5" width="919" height="559" rx="10" fill="#FAFBFA" stroke="#D2D9D3"/>
+  <defs>
+    <marker id="wfflow-head-1d3b4d-11" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#1D3B4D"/></marker>
+    <marker id="wfflow-head-5c9cab-11" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#5C9CAB"/></marker>
+    <marker id="wfflow-head-8c979d-11" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8C979D"/></marker>
+    <marker id="wfflow-head-c08326-11" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#C08326"/></marker>
+  </defs>
+  <!-- the workflow files -->
+  <rect x="40" y="24" width="280" height="62" rx="6" fill="#1D3B4D"/>
+  <text x="180" y="52" font-size="16" fill="#FFFFFF" font-weight="700" text-anchor="middle">workflow files</text>
+  <text x="180" y="72" font-size="12.5" fill="#FFFFFF" text-anchor="middle">feature.json, bugfix.json, ...</text>
+  <text x="356" y="48" font-size="14.5" fill="#1A1F1D" font-weight="700">yours, or your company plugin's</text>
+  <text x="356" y="67" font-size="13" fill="#3A4440">stages, exit conditions and holds; no code, and a broken file is reported</text>
+  <!-- the evidence -->
+  <rect x="40" y="128" width="280" height="86" rx="6" fill="#FFFFFF" stroke="#1D3B4D" stroke-width="2"/>
+  <text x="180" y="156" font-size="16" fill="#1A1F1D" font-weight="700" text-anchor="middle">evidence</text>
+  <text x="180" y="177" font-size="12.5" fill="#1A1F1D" text-anchor="middle">tests in the sandbox, at the exact HEAD</text>
+  <text x="180" y="194" font-size="12.5" fill="#1A1F1D" text-anchor="middle">the plan you approved, by fingerprint</text>
+  <text x="180" y="211" font-size="12.5" fill="#1A1F1D" text-anchor="middle">review and CI events, gh pr view</text>
+  <text x="356" y="152" font-size="14.5" fill="#1A1F1D" font-weight="700">made where it can be checked</text>
+  <text x="356" y="171" font-size="13" fill="#3A4440">the agent can ask for a test run or a plan approval, never state that one passed</text>
+  <text x="356" y="190" font-size="13" fill="#3A4440">a scenario's pass is the agent's claim, and it must come with evidence</text>
+  <!-- the state -->
+  <rect x="40" y="256" width="280" height="62" rx="6" fill="#5C9CAB"/>
+  <text x="180" y="284" font-size="16" fill="#FFFFFF" font-weight="700" text-anchor="middle">&lt;ticket folder&gt;/workflow.json</text>
+  <text x="180" y="304" font-size="12.5" fill="#FFFFFF" text-anchor="middle">the stage, and each result with its commit</text>
+  <text x="356" y="280" font-size="14.5" fill="#1A1F1D" font-weight="700">owned by jig-workflow</text>
+  <text x="356" y="299" font-size="13" fill="#3A4440">only the plugin writes it: Pi's file tools and the sandbox cannot</text>
+  <text x="356" y="316" font-size="13" fill="#3A4440">a new commit or an edited plan makes the old result stop counting</text>
+  <!-- the conditions -->
+  <rect x="40" y="360" width="280" height="62" rx="6" fill="#C08326"/>
+  <text x="180" y="388" font-size="16" fill="#FFFFFF" font-weight="700" text-anchor="middle">eight conditions</text>
+  <text x="180" y="408" font-size="12.5" fill="#FFFFFF" text-anchor="middle">checked by the plugin, never by a file</text>
+  <text x="356" y="384" font-size="14.5" fill="#1A1F1D" font-weight="700">advance moves one stage</text>
+  <text x="356" y="403" font-size="13" fill="#3A4440">when every exit condition holds; back is always allowed</text>
+  <!-- the gate -->
+  <rect x="40" y="464" width="280" height="62" rx="6" fill="#8C979D"/>
+  <text x="180" y="492" font-size="16" fill="#FFFFFF" font-weight="700" text-anchor="middle">a gate in jig-core</text>
+  <text x="180" y="512" font-size="12.5" fill="#FFFFFF" text-anchor="middle">can only make a decision stricter</text>
+  <text x="356" y="488" font-size="14.5" fill="#1A1F1D" font-weight="700">holds, in the bound repositories</text>
+  <text x="356" y="507" font-size="13" fill="#3A4440">git commit, git push, write and edit are denied until the condition holds</text>
+  <text x="356" y="524" font-size="13" fill="#3A4440">a plan, a stage that needs you and an unsandboxed test run always ask</text>
+  <!-- who does what, between the boxes -->
+  <path d="M180 87 V127" fill="none" stroke="#1D3B4D" stroke-width="2.6" marker-end="url(#wfflow-head-1d3b4d-11)"/>
+  <text x="196" y="112" font-size="13" fill="#3A4440">a stage's exit conditions say which evidence counts</text>
+  <path d="M180 215 V255" fill="none" stroke="#5C9CAB" stroke-width="2.6" marker-end="url(#wfflow-head-5c9cab-11)"/>
+  <text x="196" y="240" font-size="13" fill="#3A4440">each result is saved against the commit or the plan it is about</text>
+  <path d="M180 319 V359" fill="none" stroke="#C08326" stroke-width="2.6" marker-end="url(#wfflow-head-c08326-11)"/>
+  <text x="196" y="344" font-size="13" fill="#3A4440">status and advance read the file and the repositories as they are now</text>
+  <path d="M180 423 V463" fill="none" stroke="#8C979D" stroke-width="2.6" marker-end="url(#wfflow-head-8c979d-11)"/>
+  <text x="196" y="448" font-size="13" fill="#3A4440">a hold asks the same question for each tool call</text>
+</svg>

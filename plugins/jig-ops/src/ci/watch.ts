@@ -12,6 +12,7 @@ import { catalogOf, findCiService, notSetUp } from "../catalog.ts";
 import { SYSTEMS } from "./adapters.ts";
 import type { CiContext } from "./adapter.ts";
 import type { Announce } from "./artifacts.ts";
+import { announceFinished } from "./finished.ts";
 import type { GithubState } from "./github-checks.ts";
 import { describeSpec as describeGithub } from "./github-watch.ts";
 import type { GithubSpec } from "./github-watch.ts";
@@ -79,7 +80,9 @@ async function pollCi(
         );
     }
     const adapter = SYSTEMS[spec.system].create(service, contextFor(signal, announce, options));
-    return adapter.poll(spec, previous);
+    const outcome = await adapter.poll(spec, previous);
+    if (outcome.done !== undefined) announceFinished(announce, service, spec, outcome.done);
+    return outcome;
 }
 
 /** Registers the watch kind with jig-core. `announce` publishes the "artifact ready" event on Pi's event bus. */

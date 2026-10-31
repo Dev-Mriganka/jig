@@ -161,6 +161,9 @@ beforeEach(() => {
 });
 afterEach(() => h.close());
 
+/** What the watch published as "artifact ready": the end of a watch also publishes `jig-ops:ci-finished`, which has its own tests. */
+const artifactEvents = () => h.bus.emitted.filter((entry) => entry.event === ARTIFACT_EVENT);
+
 /** The `ops` section with these artifact rules (none when `rules` is undefined). */
 function rules(list: ArtifactRule[] | undefined): void {
     h.configure({ ...section(), ...(list === undefined ? {} : { artifacts: list }) });
@@ -217,7 +220,7 @@ test("when a watch passes, the artifact rules in git.artifacts are tested and th
     assert.equal(done?.outcome, "passed");
     assert.equal(done?.details, `Ready: image registry/app:1.2-${SHORT}`);
     assert.equal(done?.facts?.artifacts, 1);
-    assert.deepEqual(h.bus.emitted, [
+    assert.deepEqual(artifactEvents(), [
         {
             event: "jig-ops:artifact-ready",
             payload: { repo: SLUG, pr: 42, sha: SHA, kind: "image", ref: `registry/app:1.2-${SHORT}`, source: "log" },
@@ -234,7 +237,7 @@ test("a version of another commit in the log is ignored: no event, no mention", 
     const { done } = await poll(spec);
     assert.equal(done?.outcome, "passed");
     assert.equal(done?.details, undefined);
-    assert.deepEqual(h.bus.emitted, []);
+    assert.deepEqual(artifactEvents(), []);
 });
 
 test("a watch that fails publishes nothing, and without rules nothing is read", async () => {
@@ -242,12 +245,12 @@ test("a watch that fails publishes nothing, and without rules nothing is read", 
     serve([run(9, "build-image", "failure")]);
     api(`repos/${SLUG}/actions/jobs/9/logs`, { stdout: "boom" });
     assert.equal((await poll(spec)).done?.outcome, "failed");
-    assert.deepEqual(h.bus.emitted, []);
+    assert.deepEqual(artifactEvents(), []);
     rules(undefined);
     h.gh.reset();
     serve([run(9, "build-image", "success")]);
     assert.equal((await poll(spec)).done?.outcome, "passed");
-    assert.deepEqual(h.bus.emitted, []);
+    assert.deepEqual(artifactEvents(), []);
 });
 
 test("a rule that cannot be tested does not lose the result: the watch still reports, with a note", async () => {
@@ -278,6 +281,6 @@ test("a comment watch ends the same way: the comment is an artifact when a rule 
         finish: { kind: "comment", pattern: "image: ", since },
     });
     assert.equal(done?.outcome, "passed");
-    assert.equal(h.bus.emitted[0]?.event, "jig-ops:artifact-ready");
-    assert.equal((h.bus.emitted[0]!.payload as ArtifactReady).source, "comment");
+    assert.equal(artifactEvents()[0]?.event, "jig-ops:artifact-ready");
+    assert.equal((artifactEvents()[0]!.payload as ArtifactReady).source, "comment");
 });

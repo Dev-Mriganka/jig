@@ -118,12 +118,14 @@ is refused and you see the new preview.
 |---|---|
 | **Ticket** | A unit of work in an issue tracker, such as `PROJ-123`. |
 | **Ticket folder** | A folder for one ticket, outside every repository: notes, plan, evidence and bound repositories. |
-| **Evidence** | Tool results saved in the ticket folder while the ticket is active, masked like everything else. |
+| **Evidence** | Tool results saved in the ticket folder while the ticket is active, masked like everything else. In a workflow, the result of a test run, a plan approval, a review or a scenario, saved against the commit or plan it is about. |
+| **Bound repository** | A repository listed in a ticket's `ticket.json`: a workflow's holds, tests and reviews apply there. |
+| **Workflow state** | `workflow.json` in the ticket folder: the stage and each result with the commit or plan it is about. Only `jig-workflow` writes it. |
 | **Workflow** | A named, ordered list of stages that you or a company plugin define in a file. |
 | **Stage** | A step of a workflow, such as plan or review, with a goal the agent sees. |
 | **Exit condition** | What must hold before work leaves a stage, from a fixed list such as `plan-approved`. |
 | **Hold** | A tool call a workflow keeps back until a condition holds. It only ever tightens a decision. |
-| **Gate** | A condition that holds a stage or an action until it is met, such as an approved plan. |
+| **Gate** | A check a plugin registers with `jig-core`. It sees each call after the rules and can only make the decision stricter. `jig-workflow` holds calls with one. |
 | **Acceptance scenario** | A numbered check in a ticket's plan. A pass needs evidence. |
 | **Checker agent** | A read-only agent in a fresh context that reviews a change before you do. Planned. |
 | **Card** | A short summary of a closed ticket: problem, cause, fix, repositories, identifiers and error lines. |
@@ -135,7 +137,7 @@ is refused and you see the new preview.
   `jig-memory`.
 - **A workflow** is, for example, `feature` or `bugfix`.
 - **A hold** is, for example, `git push` until the tests pass.
-- **A gate** is, for example, a passing test of the exact commit.
+- **A gate** is, for example, the check that denies `git push` until the tests passed at the exact commit.
 - **Recall** works by shared keys first, then keyword search.
 
 ## Code review

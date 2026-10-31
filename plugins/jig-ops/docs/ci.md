@@ -165,4 +165,13 @@ environment unless your rule allows it, and denies production.
 - **`jig-ops:artifact-ready`** (published): the payload above. It was
   `jig-git:artifact-ready` while `jig-git` ran the watch. The plugin that publishes
   an event owns its name, and `jig-git` publishes it no longer.
+- **`jig-ops:ci-finished`** (published): a CI watch reached its finish line, for a commit:
+  `{ repo, service, system, sha, branch?, pr?, finish, outcome, summary }`. `repo` is the catalog's
+  `repo`, `finish` the watch's finish line (`required` on GitHub, `pipeline` or `jobs` on GitLab,
+  `build` or `stages` on Jenkins, and so on), and `outcome` `passed` or `failed`.
+  - **Why it exists:** a watch's own result is one line for the agent and names no commit.
+    `jig-workflow`'s `checks-pass` needs "the required checks passed at this commit".
+  - **When it is not published:** the service has no `repo`, the watch does not name the commit
+    (a watch of one run by its id, or a Jenkins build started by hand), or it ended otherwise than `passed` or
+    `failed` (timed out, stopped). A listener that fails does not change the watch's result.
 - **`jig:watch-done`**, from `jig-core`'s engine: a watch finished, with its result.

@@ -1,0 +1,43 @@
+{
+    "name": "feature",
+    "description": "A change to a service, from plan to acceptance on staging",
+    "match": { "ticket": "^PROJ-\\d+$" },
+    "branch": "feature/{ticket}",
+    "stages": [
+        {
+            "id": "understand",
+            "goal": "Read the ticket and the code, and write what you learn in the notes",
+            "exit": ["notes-updated"]
+        },
+        {
+            "id": "plan",
+            "goal": "Write plan.md with an approach, the repositories and numbered acceptance scenarios, then submit it",
+            "exit": ["plan-approved"]
+        },
+        {
+            "id": "build",
+            "goal": "Bind the repositories, change the code, commit, and run the tests at the commit",
+            "exit": ["tests-pass-at-head"]
+        },
+        {
+            "id": "review",
+            "goal": "Review the change before anyone else sees it",
+            "exit": ["review-done"]
+        },
+        {
+            "id": "deliver",
+            "goal": "Push, open the pull request, and wait for its checks",
+            "exit": ["pull-request-open", "checks-pass"]
+        },
+        {
+            "id": "accept",
+            "goal": "Run each acceptance scenario on staging and record its result with evidence",
+            "exit": ["scenarios-pass", "you-approve"]
+        },
+        { "id": "done" }
+    ],
+    "holds": [
+        { "until": "plan-approved", "calls": ["git commit", "git push", "write", "edit"] },
+        { "until": "tests-pass-at-head", "calls": ["git push"] }
+    ]
+}

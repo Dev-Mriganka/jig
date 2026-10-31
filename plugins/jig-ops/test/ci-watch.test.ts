@@ -30,6 +30,9 @@ const SINCE = Date.parse("2026-10-30T10:00:00Z");
 
 type Outcome = PollOutcome<PlainState>;
 
+/** What was published as "artifact ready"; the end of a watch also publishes `jig-ops:ci-finished`, tested in ci-finished.test.ts. */
+const artifactEvents = (g: CiWorld) => g.h.bus.emitted.filter((entry) => entry.event === "jig-ops:artifact-ready");
+
 async function poll(g: CiWorld, spec: CiSpec, state?: PlainState): Promise<Outcome> {
     g.h.jig.publish();
     const kind = g.h.jig.kinds.get("ops-ci") as unknown as {
@@ -237,7 +240,7 @@ describe("GitLab: the artifact rules", () => {
         });
         const { done } = await poll(g, glSpec());
         assert.equal(done?.details, `Ready: image registry/app:1.2-${SHA.slice(0, 7)}`);
-        assert.deepEqual(g.h.bus.emitted, [
+        assert.deepEqual(artifactEvents(g), [
             {
                 event: "jig-ops:artifact-ready",
                 payload: {
@@ -422,10 +425,10 @@ describe("Jenkins: the stages that must pass", () => {
         const g = await jenkins(t, world, { ops: { artifacts: [{ kind: "image", check: "build-image" }] } });
         const { done } = await poll(g, { ...stages("build-image"), sha: SHA });
         assert.equal(done?.details, `Ready: image ${SHA.slice(0, 7)}`);
-        assert.equal((g.h.bus.emitted[0]!.payload as { repo: string }).repo, "orders/build");
+        assert.equal((artifactEvents(g)[0]!.payload as { repo: string }).repo, "orders/build");
         const none = await jenkins(t, world, { ops: { artifacts: [{ kind: "image", check: "build-image" }] } });
         await poll(none, stages("build-image"));
-        assert.deepEqual(none.h.bus.emitted, [], "without a commit there is nothing to tie a rule to");
+        assert.deepEqual(artifactEvents(none), [], "without a commit there is nothing to tie a rule to");
     });
 });
 

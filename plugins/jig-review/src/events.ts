@@ -12,8 +12,9 @@ export interface ReviewApprovedEvent {
     scope: ReviewFileScope;
     ticket?: string;
     /** Every reviewed repository and its full HEAD commit when the review was approved. `repo` is the path from Pi's
-     *  folder ("" when Pi's folder is the repository). */
-    repos: Array<{ repo: string; head: string }>;
+     *  folder ("" when Pi's folder is the repository), which is ambiguous for a repository outside Pi's folder; `root`
+     *  is the repository's own folder, absolute, for a listener that must tell repositories apart. */
+    repos: Array<{ repo: string; head: string; root?: string }>;
     /** Whether the approval vouches for those commits: a branch review whose diff was still the one the user saw. For any
      *  other review the commits are only where each repository stood. */
     covered: boolean;

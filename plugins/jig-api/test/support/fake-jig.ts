@@ -172,7 +172,14 @@ export function installFakeJig(): FakeJig {
             },
         },
         protectedPaths: { list: () => [] },
-        sandbox: { register: () => undefined },
+        sandbox: {
+            register: () => undefined,
+            canRun: false,
+            run: async () => {
+                throw new Error("no sandbox in tests");
+            },
+        },
+        gates: { register: () => undefined },
         approvals: { inTurn: (job) => job() },
         exec: {
             run: async () => {

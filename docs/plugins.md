@@ -30,7 +30,7 @@ paths (see [Permissions](permissions.md#the-floor-what-configuration-cannot-chan
 | [`jig-git`](../plugins/jig-git/README.md) | built | `git`, `pr`, `release` | 2 |
 | [`jig-lens`](../plugins/jig-lens/README.md) | built | none: the `/lens` command | 2 |
 | [`jig-sandbox`](../plugins/jig-sandbox/README.md) | built | `bash` (replaces Pi's), `bg_output`, `bg_list`, `bg_kill`; the `/sandbox` and `/ps` commands | 2 |
-| [`jig-workflow`](../plugins/jig-workflow/README.md) | design | `workflow` | 3 |
+| [`jig-workflow`](../plugins/jig-workflow/README.md) | built | `workflow`; the `/workflow` command, and a gate in `jig-core` | 3 |
 | [`jig-memory`](../plugins/jig-memory/README.md) | built | none: ticket folders, cards, recall and the `/ticket` command (`close`, `recall`) | 3 |
 | [`jig-mongo`](../plugins/jig-mongo/README.md) | built | `mongo` | 4 |
 | [`jig-jira`](../plugins/jig-jira/README.md) | built | `jira` | 5 |
@@ -54,8 +54,8 @@ Each plugin's README has the full table of its tool's actions.
 - **`pr`:** `view`, `list`, `comments`, `create`, `edit`, `ready`, `comment`,
   `reply`, `resolve`, `review`, `merge`.
 - **`release`:** `tags`, `releases`, `tag_create`, `tag_push`, `release_create`.
-- **`workflow`** (design): `list`, `status`, `start`, `bind`, `submit-plan`,
-  `test`, `scenario`, `advance`.
+- **`workflow`** (`jig-workflow`): `list`, `status`, `start`, `bind`, `submit-plan`,
+  `test`, `scenario`, `advance`, `back`.
 - **`mongo`:** `databases`, `collections`, `schema`, `stats`, `indexes`,
   `index-stats`, `explain`, `count`, `find`, `distinct`, `sample`, `aggregate`,
   `insert`, `update`, `replace`, `delete`, `bulk`, `create-index`, `drop-index`.
@@ -90,8 +90,9 @@ tested example that supplies a part for every plugin that has one:
   the pull request template.
 - **`jig-lens`:** names for the models in `/lens usage`, through the
   `jig-lens:model-names` event.
-- **`jig-workflow`:** its workflow files, the ticket key patterns they match
-  and its acceptance environments.
+- **`jig-workflow`:** its workflow files in a folder it gives through section
+  defaults, the ticket key patterns they match, its branch naming, and its test
+  commands per repository.
 - **`jig-memory`:** ticket key patterns and the folder's location.
 - **`jig-mongo`:** its connections and routes (for example a tunnel through its
   own jump hosts), its production allow lists and secret references.

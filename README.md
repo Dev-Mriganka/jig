@@ -6,7 +6,7 @@ Jig is a set of plugins for the [Pi](https://pi.dev) coding agent. They decide
 what the agent may do, ask you when it matters, keep secrets out of its reach,
 and record what happened so you can see it later.
 
-**Status:** twelve of the fourteen plugins are built. Each plugin's README is the
+**Status:** thirteen of the fourteen plugins are built. Each plugin's README is the
 specification that its code follows. New to a word? See the [glossary](docs/glossary.md).
 
 ## What works today
@@ -29,6 +29,9 @@ In short:
 - **Seeing and remembering:** `jig-lens` shows cost, failures and the time spent
   waiting for you. `jig-memory` keeps a folder of notes and evidence per ticket, writes a card when
   a ticket closes, and brings related earlier tickets back when a new one starts.
+- **Taking work through stages:** `jig-workflow` runs a ticket through a workflow you define. It records
+  evidence itself (tests run in the sandbox at the exact commit, a plan you approved, a review, a pull
+  request) and holds `git push`, `edit` and `write` until the condition for them holds.
 - **How Pi looks:** `jig-theme` gives six palettes, a one-line footer and your
   own colours.
 - **Checked on every push:** the type check, Biome, over 5,000 tests, the
@@ -39,7 +42,7 @@ In short:
 
 Also built: [`jig-sandbox`](plugins/jig-sandbox/README.md), which runs the
 agent's `bash` in an operating-system sandbox, with background tasks and a network that
-can be filtered or asked about. Designs: `jig-workflow` and `jig-agents`.
+can be filtered or asked about. Design: `jig-agents`.
 
 ## Install
 
@@ -91,7 +94,7 @@ first in the list, because every other plugin needs it:
 | [`jig-sandbox`](plugins/jig-sandbox/README.md) | built | The agent's `bash` in an operating-system sandbox: credentials hidden, start-up files locked, everything else as outside; background tasks; a filtered network |
 | [`jig-git`](plugins/jig-git/README.md) | built | Local git, GitHub pull requests and reviews, tags and releases |
 | [`jig-lens`](plugins/jig-lens/README.md) | built | Cost, tool failures and time spent waiting for you, inside Pi; Grafana optional |
-| [`jig-workflow`](plugins/jig-workflow/README.md) | design | Named workflows you define: stages, exit conditions, holds, test runs |
+| [`jig-workflow`](plugins/jig-workflow/README.md) | built | Named workflows you define: stages, exit conditions checked against evidence, holds, test runs in the sandbox |
 | [`jig-memory`](plugins/jig-memory/README.md) | built | Ticket folders, notes and evidence; a card per closed ticket, and recall of related tickets |
 | [`jig-mongo`](plugins/jig-mongo/README.md) | built | MongoDB: explore, query, aggregate and write, with allow and deny lists |
 | [`jig-jira`](plugins/jig-jira/README.md) | built | Jira issues: read, comment, transition, update, with rendered previews |

@@ -227,3 +227,94 @@ describe("a program the sandbox lets bash write is not one to run", () => {
         await assert.rejects(h.api.exec.run("tool", [], { cwd: work }), ExecError);
     });
 });
+
+describe("running a command in the sandbox for a plugin", () => {
+    const here = { cwd: tmpdir() };
+    const done = { code: 0, output: "ok\n", timedOut: false, truncated: false };
+
+    test("canRun is false with no sandbox, with one that cannot run, and with one that is off", async () => {
+        h = await start();
+        assert.equal(h.api.sandbox.canRun, false);
+        h.api.sandbox.register(provider());
+        assert.equal(h.api.sandbox.canRun, false, "a provider without run is a sandbox for bash only");
+        h.api.sandbox.register(provider({ run: async () => done, active: false }));
+        assert.equal(h.api.sandbox.canRun, false);
+        h.api.sandbox.register(provider({ run: async () => done }));
+        assert.equal(h.api.sandbox.canRun, true);
+    });
+
+    test("a provider that cannot say whether it is active cannot run", async () => {
+        const broken = provider({ run: async () => done });
+        Object.defineProperty(broken, "active", {
+            get() {
+                throw new Error("boom");
+            },
+        });
+        h = await start({ plugins: (api) => api.sandbox.register(broken) });
+        assert.equal(h.api.sandbox.canRun, false);
+    });
+
+    test("run asks the provider, and gives back what it says", async () => {
+        const asked: Array<{ command: string; cwd: string; timeoutMs?: number }> = [];
+        h = await start({
+            plugins: (api) =>
+                api.sandbox.register(
+                    provider({
+                        run: async (command, options) => {
+                            asked.push({
+                                command,
+                                cwd: options.cwd,
+                                ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
+                            });
+                            return done;
+                        },
+                    }),
+                ),
+        });
+        assert.deepEqual(await h.api.sandbox.run("npm test", { ...here, timeoutMs: 5000 }), done);
+        assert.deepEqual(asked, [{ command: "npm test", cwd: here.cwd, timeoutMs: 5000 }]);
+    });
+
+    test("without a sandbox that can run, nothing runs anywhere: the call is refused", async () => {
+        let asked = false;
+        h = await start({
+            plugins: (api) =>
+                api.sandbox.register(
+                    provider({
+                        active: false,
+                        run: async () => {
+                            asked = true;
+                            return done;
+                        },
+                    }),
+                ),
+        });
+        await assert.rejects(h.api.sandbox.run("npm test", here), /no sandbox can run this command/);
+        assert.equal(asked, false, "the provider is not asked when it is off");
+        const bare = await start();
+        await assert.rejects(bare.api.sandbox.run("npm test", here), /no sandbox can run this command/);
+        await bare.shutdown();
+    });
+
+    test("the command, the folder and the time limit are checked before the provider is asked", async () => {
+        let asked = 0;
+        h = await start({
+            plugins: (api) =>
+                api.sandbox.register(
+                    provider({
+                        run: async () => {
+                            asked++;
+                            return done;
+                        },
+                    }),
+                ),
+        });
+        const api = h.api.sandbox;
+        await assert.rejects(api.run("", here), TypeError);
+        await assert.rejects(api.run("a\0b", here), TypeError);
+        await assert.rejects(api.run("true", { cwd: "relative/dir" }), /absolute/);
+        await assert.rejects(api.run("true", { ...here, timeoutMs: 0 }), /timeoutMs/);
+        await assert.rejects(api.run("true", { ...here, timeoutMs: 3 * 60 * 60 * 1000 }), /timeoutMs/);
+        assert.equal(asked, 0);
+    });
+});

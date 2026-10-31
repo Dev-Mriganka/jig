@@ -397,6 +397,28 @@ export interface ProtectedPathInfo {
 /** The network a sandboxed `bash` has. */
 export type SandboxNetworkMode = "open" | "filtered" | "ask" | "off";
 
+/** What a plugin asks for when it runs a command in the sandbox with `sandbox.run`. */
+export interface SandboxRunOptions {
+    /** The folder the command runs in: absolute. */
+    cwd: string;
+    /** From 1 ms to 2 hours. Without it the command may run until `signal` fires. */
+    timeoutMs?: number;
+    signal?: AbortSignal;
+    /** The most output kept: the end of it, when there is more. Default 256 KiB. */
+    maxOutputBytes?: number;
+}
+
+/** How a command run in the sandbox ended. */
+export interface SandboxRunResult {
+    /** The exit code, or null when the command was stopped (a timeout) or could not report one. */
+    code: number | null;
+    /** What the command printed, both streams together, cleaned of terminal control codes and with credentials taken out. */
+    output: string;
+    timedOut: boolean;
+    /** True when `output` is only the end of what the command printed. */
+    truncated: boolean;
+}
+
 /** What a sandbox plugin tells jig-core about the `bash` it runs. Fields are read when they are needed, so they may change. */
 export interface SandboxProvider {
     /** True while `bash` commands run inside the sandbox. False when it is switched off, or could not start. */
@@ -409,6 +431,52 @@ export interface SandboxProvider {
     canWrite(path: string): boolean;
     /** Settles when the sandbox has started, or failed to, so that session start can say which. */
     whenReady?(): Promise<void>;
+    /** Runs a shell command the way the sandbox runs the agent's `bash`: the same rules, environment and audit, without
+     *  the tool around it. Rejects when the sandbox refuses the command or the command is cancelled; a command that
+     *  ran and failed, or timed out, is a result. Optional: a sandbox without it still hides `bash`, and `sandbox.canRun`
+     *  is false. */
+    run?(command: string, options: SandboxRunOptions): Promise<SandboxRunResult>;
+}
+
+/**
+ * A call as a gate sees it, after the rules have decided. Frozen: a gate looks and does not change what runs.
+ */
+export interface GateCall {
+    toolCallId: string;
+    tool: string;
+    action?: string;
+    environment: EnvironmentName;
+    environmentKind: EnvironmentKind;
+    effect: Effect;
+    /** What has been decided so far. A call that is already denied is not shown to gates. */
+    decision: "allow" | "ask";
+    /** The call's input, as the model sent it. */
+    input: Readonly<Record<string, unknown>>;
+    /** Pi's working folder: where a relative path starts. */
+    cwd: string;
+    /** For Pi's `write` and `edit`: the absolute path the call acts on, as written once `~` and `..` are resolved, and
+     *  with every link followed (the same path twice when there is no link). Empty for every other tool. */
+    paths: readonly string[];
+}
+
+/** What a gate may answer: stricter, never looser. */
+export interface GateVerdict {
+    decision: "ask" | "deny";
+    /** One line for the model and the user: why. It names the condition and what fixes it. */
+    reason: string;
+}
+
+/**
+ * A check a plugin registers with `gates.register`. jig-core asks every gate about each call once the rules have decided,
+ * and a gate can only make the decision stricter: an `allow` becomes an `ask` or a `deny`, an `ask` becomes a `deny`.
+ */
+export interface Gate {
+    /** Unique: registering the same name again replaces the gate. */
+    name: string;
+    /** The plugin that registered it, for `/jig`. */
+    plugin: string;
+    /** Answers nothing to leave the decision as it is. Throwing, or taking more than 10 seconds, denies the call. */
+    check(call: GateCall, signal: AbortSignal): GateVerdict | undefined | Promise<GateVerdict | undefined>;
 }
 
 /** jig-core's run-time API, reached through `jig()` in client.ts. */
@@ -556,6 +624,17 @@ export interface JigApi {
         /** Says that `bash` runs in this sandbox. `/jig` and session start report it, and `exec.run` refuses a program in a
          *  place the sandbox can write. Registering again replaces the provider. */
         register(provider: SandboxProvider): void;
+        /** True when a command can be run in the sandbox now: a provider is registered, it is active, and it can `run`. */
+        readonly canRun: boolean;
+        /** Runs a shell command in the sandbox, as `bash` would. Rejects when `canRun` is false, so a plugin never runs a
+         *  command outside the sandbox by asking for the sandbox. */
+        run(command: string, options: SandboxRunOptions): Promise<SandboxRunResult>;
+    };
+
+    /** Checks other plugins add to every call. See `Gate`. */
+    readonly gates: {
+        /** A gate that is not a function or has no name is a `TypeError`. Registering the same name again replaces it. */
+        register(gate: Gate): void;
     };
 
     /** The queue jig-core's questions wait in. Pi has one dialog slot, so questions are asked one at a time. */
@@ -605,7 +684,9 @@ export interface DecisionEvent {
     effect: Effect;
     decision: Decision;
     /** Where the decision came from. */
-    source: "floor" | "rule" | "session" | "tool" | "table" | "unknown";
+    source: "floor" | "rule" | "session" | "tool" | "table" | "unknown" | "gate";
+    /** Set when a gate asked or denied this call: the gate's name. */
+    gate?: string;
     /** Set when the call asked. */
     answer?: "allow" | "allow-session" | "decline";
 }
