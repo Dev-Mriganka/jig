@@ -1,8 +1,8 @@
 # jig-logs: searching logs
 
-**Status: built.** Tested against a fake Elasticsearch, a fake Loki and a fake
-transport on this machine. Not tried against a real backend yet (see
-[Not verified yet](docs/not-verified.md)).
+**Status: built.** Tested against fakes, and in CI against a real Elasticsearch 8,
+OpenSearch 2 and Grafana Loki 3. What is still unproved is in
+[Not verified yet](docs/not-verified.md).
 
 `jig-logs` gives the agent one tool, `logs`, that searches the logs of one
 backend over a time window. It only reads, and `jig-core` governs every call and
@@ -123,7 +123,8 @@ jig-logs/
   src/      the tool and its checks (index, tool, params, config), the search (search, time, query, request, response,
             failure), what the model reads (summary, line, clip), helpers (values), backends/ (the interface, a file each)
   skills/   logs/SKILL.md: how to search (an identifier first, a narrow window, then wider)
-  test/     against fake servers, a fake transport and a fake jig-core; golden requests in test/golden
+  test/     against fake servers, a fake transport and a fake jig-core; golden requests in test/golden;
+            test/it/ against real backends (see the repository's docs/integration-tests.md)
   docs/     the detail pages below
 ```
 

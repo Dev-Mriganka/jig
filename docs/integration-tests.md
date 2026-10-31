@@ -48,10 +48,39 @@ comment. To update one, change the tag and the digest together, then read the ru
 
 ## Running one on your machine
 
-Start the service, set its variables, and run the file:
+Start the service, set the variables that its section below lists, and run the file:
 
 ```bash
-JIG_IT_REQUIRE= npm run test:it
+JIG_IT_LOKI_URL=http://127.0.0.1:3100 JIG_IT_LOKI_LIMITED_URL=http://127.0.0.1:3101 \
+  node --import ./test/support/host.mjs --test plugins/jig-logs/test/it/loki.test.ts
 ```
 
-The sections below, one for each plugin, list the variables and how the workflow starts the service.
+Without Docker, the services run from their own release archives as well: the tests only need the address.
+
+## jig-logs
+
+Three suites, `elasticsearch.test.ts`, `opensearch.test.ts` and `loki.test.ts`. They share `suite.ts`, so the same
+expectations hold for every backend, and they seed their own data (`test/support/dataset.ts`) at known times a few hours back.
+
+| Variable | What it holds |
+|---|---|
+| `JIG_IT_ELASTICSEARCH_URL` | `https://127.0.0.1:9200`: Elasticsearch 8 with security on |
+| `JIG_IT_ELASTICSEARCH_PASSWORD` | The password of its `elastic` user, which the tests use to make their own users |
+| `NODE_EXTRA_CA_CERTS` | The node's certificate authority file, `config/certs/http_ca.crt` in the container |
+| `JIG_IT_OPENSEARCH_URL` | `http://127.0.0.1:9201`: OpenSearch 2 with its security plugin off |
+| `JIG_IT_LOKI_URL` | `http://127.0.0.1:3100`: Loki 3 with tenants on |
+| `JIG_IT_LOKI_LIMITED_URL` | `http://127.0.0.1:3101`: a second Loki with tight limits |
+
+- **Elasticsearch** runs with `ELASTIC_PASSWORD` set, which turns security on with HTTPS. The workflow copies the
+  certificate authority out of the container and sets `NODE_EXTRA_CA_CERTS` for the test step.
+- **OpenSearch** runs with `DISABLE_SECURITY_PLUGIN=true`. It speaks plain HTTP, so the tests reach it through a
+  transport, which is the path a company's gateway takes.
+- **Loki** runs with `-auth.enabled=true`, and the tests send the tenant `jig-it`. Both nodes also get
+  `-ingester.query-store-max-look-back-period=168h -querier.query-ingesters-within=200h`, because Loki otherwise answers
+  only for the last three hours and the tests search windows of days. The limited node adds `-store.max-query-length=20m
+  -validation.max-entries-limit=150`.
+
+## Where to read a failure
+
+The job prints each service's version once it is up. When a step fails, the last step prints the logs of every container,
+each in its own group. A failed test names the backend, and its message shows the text the tool returned.

@@ -39,7 +39,10 @@ export function plan(need: Need, env: Env = process.env): Plan {
     if (requiredServices(env).includes(need.service)) {
         return { kind: "fail", reason: `${what}, but JIG_IT_REQUIRE lists ${need.service}: the service did not start` };
     }
-    return { kind: "skip", reason: `${what}: start ${need.hint} and set it (see docs/integration-tests.md)` };
+    return {
+        kind: "skip",
+        reason: `${what}: start ${need.hint} and set the variables (see docs/integration-tests.md)`,
+    };
 }
 
 /** A variable that must be set. Read it inside `before` or a test, not when the file loads. */

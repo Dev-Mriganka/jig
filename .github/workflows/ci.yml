@@ -61,12 +61,19 @@ jobs:
 
   # The plugins against real services (docs/integration-tests.md). The services start as containers, and each suite
   # finds its service by the address in an environment variable. JIG_IT_REQUIRE lists the services this job starts: a
-  # suite whose service did not come up fails, and does not skip.
+  # suite whose service did not come up fails, and does not skip. The passwords below are throwaway values for
+  # containers that live as long as this job, and none is a secret.
   integration:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
       contents: read
+    env:
+      # Every image has an exact version tag and its digest. To update one, change both together.
+      ES_IMAGE: docker.elastic.co/elasticsearch/elasticsearch:8.19.23@sha256:4d0724bb8d78d7a2330693623e26ca4d621079d062ecc8a30b3e1fc180ec14c1
+      OPENSEARCH_IMAGE: opensearchproject/opensearch:2.19.7@sha256:3bfa1ec74d56928c2e018033d45c460ce2c0ea65a5cedd577de3102326c31b89
+      LOKI_IMAGE: grafana/loki:3.7.9@sha256:0db216b630ae1f348a1584c67f3cead8b4c1fc839169a39501db664744158e28
+      JIG_IT_ELASTICSEARCH_PASSWORD: throwaway-elastic-password
     steps:
       - name: Check out the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -91,8 +98,61 @@ jobs:
           git config --global user.name ci
           git config --global user.email ci@example.com
 
+      # Elasticsearch with security on (HTTPS with a certificate authority of its own, and a password for `elastic`),
+      # OpenSearch with its security plugin off, and two Loki nodes with tenants on: one with the defaults, and one with
+      # tight limits, to show the errors Loki words for them. Loki is told to keep past samples where it can query them,
+      # and not to report usage. The services are started together and waited for in the next step.
+      - name: Start Elasticsearch, OpenSearch and Loki
+        if: ${{ !cancelled() }}
+        run: |
+          docker run -d --name jigit-elasticsearch -p 127.0.0.1:9200:9200 \
+            -e discovery.type=single-node -e xpack.ml.enabled=false -e ES_JAVA_OPTS="-Xms512m -Xmx512m" \
+            -e ELASTIC_PASSWORD="$JIG_IT_ELASTICSEARCH_PASSWORD" "$ES_IMAGE"
+          docker run -d --name jigit-opensearch -p 127.0.0.1:9201:9200 \
+            -e discovery.type=single-node -e DISABLE_SECURITY_PLUGIN=true -e DISABLE_INSTALL_DEMO_CONFIG=true \
+            -e OPENSEARCH_JAVA_OPTS="-Xms512m -Xmx512m" "$OPENSEARCH_IMAGE"
+          loki_flags="-config.file=/etc/loki/local-config.yaml -auth.enabled=true -reporting.enabled=false
+            -ingester.query-store-max-look-back-period=168h -querier.query-ingesters-within=200h"
+          docker run -d --name jigit-loki -p 127.0.0.1:3100:3100 "$LOKI_IMAGE" $loki_flags
+          docker run -d --name jigit-loki-limited -p 127.0.0.1:3101:3100 "$LOKI_IMAGE" $loki_flags \
+            -store.max-query-length=20m -validation.max-entries-limit=150
+
+      - name: Wait for Elasticsearch, OpenSearch and Loki
+        if: ${{ !cancelled() }}
+        run: |
+          retry="--retry 90 --retry-delay 2 --retry-connrefused --retry-all-errors"
+          # Elasticsearch makes its certificate authority when it starts: the tests trust this file.
+          for _ in $(seq 1 90); do
+            docker cp jigit-elasticsearch:/usr/share/elasticsearch/config/certs/http_ca.crt "$RUNNER_TEMP/es-ca.crt" 2>/dev/null && break
+            sleep 2
+          done
+          curl -fsS $retry --cacert "$RUNNER_TEMP/es-ca.crt" -u "elastic:$JIG_IT_ELASTICSEARCH_PASSWORD" \
+            "https://127.0.0.1:9200/_cluster/health?wait_for_status=yellow&timeout=60s" > /dev/null
+          curl -fsS $retry "http://127.0.0.1:9201/_cluster/health?wait_for_status=yellow&timeout=60s" > /dev/null
+          curl -fsS $retry http://127.0.0.1:3100/ready
+          curl -fsS $retry http://127.0.0.1:3101/ready
+          echo "Elasticsearch $(curl -fsS --cacert "$RUNNER_TEMP/es-ca.crt" -u "elastic:$JIG_IT_ELASTICSEARCH_PASSWORD" https://127.0.0.1:9200 | jq -r .version.number)"
+          echo "OpenSearch $(curl -fsS http://127.0.0.1:9201 | jq -r .version.number)"
+          echo "Loki $(curl -fsS -H 'X-Scope-OrgID: jig-it' http://127.0.0.1:3100/loki/api/v1/status/buildinfo | jq -r .version)"
+
       - name: Integration tests
         if: ${{ !cancelled() }}
         env:
-          JIG_IT_REQUIRE: ""
+          JIG_IT_REQUIRE: elasticsearch,opensearch,loki
+          JIG_IT_ELASTICSEARCH_URL: https://127.0.0.1:9200
+          NODE_EXTRA_CA_CERTS: ${{ runner.temp }}/es-ca.crt
+          JIG_IT_OPENSEARCH_URL: http://127.0.0.1:9201
+          JIG_IT_LOKI_URL: http://127.0.0.1:3100
+          JIG_IT_LOKI_LIMITED_URL: http://127.0.0.1:3101
         run: npm run test:it
+
+      # The logs of every container, so a service that failed can be read in the run.
+      - name: Service logs
+        if: ${{ failure() }}
+        run: |
+          docker ps -a
+          for name in $(docker ps -a --format '{{.Names}}'); do
+            echo "::group::docker logs $name"
+            docker logs --tail 300 "$name" 2>&1 || true
+            echo "::endgroup::"
+          done

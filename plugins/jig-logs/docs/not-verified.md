@@ -3,21 +3,48 @@
 What the tests of `jig-logs` do not cover. Back to the
 [jig-logs overview](../README.md).
 
-The tests run against a fake Elasticsearch on 127.0.0.1, a fake Loki on 127.0.0.1
-and a fake transport. Nothing has been tried against a real backend.
+The tests in `test/` run against a fake Elasticsearch on 127.0.0.1, a fake Loki on
+127.0.0.1 and a fake transport. The tests in `test/it/` run the same code against
+real backends, in the `integration` job of CI (see [Integration
+tests](../../../docs/integration-tests.md)); what they prove is listed first.
+
+## Verified in CI
+
+Elasticsearch 8.19, OpenSearch 2.19 and Loki 3.7, each as a container with its version
+printed in the log. `test/it/suite.ts` holds the tests every backend must pass.
+
+| What | Proved by |
+|---|---|
+| Phrase and `query` search; the window and its exclusive end; relative windows | `suite.ts`, all three |
+| Windows cut into hour and day buckets, searched from either end | `suite.ts`, all three |
+| Paging with `size`, `offset` and `order`; `match`, `exclude`, `around`, `chars` | `suite.ts`, all three |
+| A JSON body cut for length, and said to be cut | `suite.ts`, all three |
+| A list `filter` as Elasticsearch `terms` and as a Loki regular expression that matches the whole value | `suite.ts`, `loki.test.ts` |
+| The check for data, with a count on Elasticsearch and without one on Loki | `suite.ts`, all three |
+| A production environment's lines through `jig-core`'s own masker, none withheld | `suite.ts`, all three |
+| The `format` on the time range, a time stored as epoch milliseconds, fields named in the configuration | `elasticTests` in `suite.ts` |
+| `analyze_wildcard`, the 25 second search timeout and the `size: 0` check | `elasticTests` and `suite.ts` |
+| Basic sign-in, an API key and a sign-in service, over HTTPS with a certificate authority of its own | `elasticsearch.test.ts` |
+| A wrong password (401), a user without access (403), a missing index | `elasticsearch.test.ts`, `elasticTests` |
+| The tenant header, and Loki's 401 without it | `loki.test.ts` |
+| Loki's two limits: a window that is too long is halved until it fits or is a gap, and too many lines stop the search | `loki.test.ts` |
+| Phrases with quotes, backslashes, brackets and regular expression characters | `loki.test.ts` |
+| A query Loki rejects, and one the check refuses before it is sent | `suite.ts`, `loki.test.ts` |
+| Requests carried by a transport to a node that speaks plain HTTP | `opensearch.test.ts`, `loki.test.ts` |
+
+## What is still not verified
 
 ## Every backend
 
-- **Each kind of `auth` against a real server,** and TLS with a certificate
-  authority of its own.
-- **Masking of the lines.** A line is cut so that no JSON body or quoted value is
-  left open, because `jig-core` withholds a line it cannot read.
-  - A random test outside this plugin cut about 41 000 lines of nested JSON,
-    escaped JSON and `key="value"` text, and `jig-core`'s masker withheld none of
-    them. Cutting the same messages with a plain slice made it withhold them at
-    once.
-  - The test suite does not run it, because a plugin reaches `jig-core` only
-    through its contract.
+- **A bearer token against a real server.** Elasticsearch's token service needs a
+  licence above the free one, so only Basic, an API key and a sign-in service were
+  run.
+- **Masking of the lines, at scale.** A line is cut so that no JSON body or quoted
+  value is left open, because `jig-core`'s masker withholds a line it cannot read.
+  The integration tests pass the real result of a production search through the real
+  masker, and it withholds nothing. A random test outside this plugin cut about 41 000
+  lines of nested JSON, escaped JSON and `key="value"` text, and the masker withheld
+  none of them; the suite does not run that one.
 - **What `jig-core` does when classifying throws.** An unknown environment, and a
   Loki query that could reach beyond the selector, throw a `TypeError` from the
   declaration.
@@ -31,23 +58,20 @@ and a fake transport. Nothing has been tried against a real backend.
 
 ## Elasticsearch and OpenSearch
 
-- **A real OpenSearch or Elasticsearch.** The request bodies follow the search
-  API and an earlier harness that ran them against OpenSearch, but these parts
-  are new and have never run against a real backend:
-  - the `format` on the time range;
-  - `analyze_wildcard` on a Lucene query;
-  - the 25 second search timeout;
-  - the check for data as a `size: 0` search (the earlier harness used a count);
-  - fields named in the configuration, the `term` filter, and the `terms` filter
-    that a list of values becomes.
+- **Managed services and other versions.** Elasticsearch 8.19 and OpenSearch 2.19 were
+  run. Amazon OpenSearch Service, Elastic Cloud, Elasticsearch 7 and OpenSearch 1 were
+  not, nor were requests signed with AWS credentials.
+- **A reply that reports a timeout or lost shards.** The reply shapes come from the
+  search API; a single node never times out or loses a shard, so the halving for them
+  is tried only against the fake.
 
 ## Loki
 
 The fake Loki was written from Loki's documentation as it stood on 2026-10-30
-(the `latest` pages, a Loki 3 release). No Loki ran. A different version may word
-an error differently or answer a parameter differently.
-
-What the adapter relies on, and the page that says it:
+(the `latest` pages, a Loki 3 release). Loki 3.7 now runs in CI, which settled most of
+what follows; a different version may still word an error differently or answer a
+parameter differently. What is proved is in the table above. What the adapter relies
+on, and the page that says it:
 
 - **`GET /loki/api/v1/query_range`** takes `query`, `limit` (default 100), `start`
   (included), `end` (excluded) and `direction` (`forward` or `backward`, default
@@ -83,28 +107,28 @@ What the adapter relies on, and the page that says it:
   details and an API token. Page:
   [Python client examples](https://grafana.com/docs/loki/latest/reference/python-client-examples).
 
-What was not found in the documentation, so it is assumed:
-- **A search is a GET.** The `query_range` section describes parameters in the
-  address and says nothing of a POST. A very long call puts a few thousand
-  characters in the address, and a gateway that limits the length of one (often
-  to 8 KiB) would refuse it as a 4xx, which the result calls a rejected query.
-- **`limit` is at least 1.** The page gives only its default. The adapter never
-  sends 0, and a bucket that only counts asks for 1.
-- **The escapes of a double-quoted string are Go's.** Only the equivalence above
-  was found. The adapter writes `\\`, `\"` and `\uXXXX` for control characters.
+What the documentation does not say, and CI settled on Loki 3.7:
+- **A search is a GET,** and `limit` may be 1. Both work. A gateway that limits the
+  length of an address (often 8 KiB) would still refuse a very long call as a 4xx,
+  which the result calls a rejected query; no gateway was tried.
+- **The escapes of a double-quoted string are Go's.** A phrase with quotes and
+  backslashes finds its line. `\uXXXX` for control characters is not reached, because
+  a phrase has none.
+- **`limit` counts lines across streams,** and the adapter merges the streams by time.
+  Three services in one environment come back in time order, page after page.
+- **A `=~` label matcher is anchored,** so a list in a `filter` matches whole values.
+- **`match` and `exclude` ignore case** on Loki as they do on Elasticsearch.
+
+What is still assumed:
 - **Comments.** The pages read do not mention `#` comments. The check on a `query`
   reads everything outside a quoted string as code, so a comment cannot hide a `{`
   from it, whether or not Loki has comments.
-- **`limit` counts lines across streams,** and the lines of different streams are
-  merged by time by the adapter, since Loki sorts inside a stream only.
-- **A `=~` label matcher is anchored.** The filter of an environment writes a list as
-  `namespace=~"orders|billing"` and relies on that to match a whole label value, not
-  a part of it. Loki follows Prometheus in this, but the pages read do not say so, and
-  the fake Loki anchors by construction.
 - **A third part of a line,** structured metadata, may follow the time and the
-  line in newer versions. It is not read.
+  line. Loki 3.7 sent two parts; a node that sends metadata was not run.
 - **The wording of errors differs between versions.** They are matched loosely on
-  the phrases of the troubleshooting page, and only on a 400 or a 413.
+  the phrases of the troubleshooting page, and only on a 400 or a 413. The 400s for
+  a window that is too long and for too many lines were seen; the 413, 503 and 504
+  were not.
 - **A window past `max_query_lookback`.** The configuration page says the range is
   trimmed, and the troubleshooting page lists a 400, "this data is no longer
   available". Trimmed, the search finds nothing; as a 400 it reads as a rejected
@@ -115,5 +139,5 @@ What was not found in the documentation, so it is assumed:
   check allows visible ASCII only, up to 300 characters.
 - **Equal times.** Lines of different streams with the same time keep the order
   Loki sent their streams in.
-- **Case.** `match` and `exclude` are sent as `\|=` and `!=`, which are
-  case-sensitive, so the fetch is narrower than the view that shows them.
+- **Grafana Cloud.** Basic authentication with a stack's user and token was not tried;
+  the node in CI has tenants and no sign-in.
