@@ -318,6 +318,55 @@ describe("the broker's life", () => {
         );
     });
 
+    test("network.deny in the open mode refuses nothing, and /sandbox warns that it does not", async () => {
+        const s = setup({ settings: { network: { ...DEFAULT_SETTINGS.network, deny: ["mongo.prod.example.com"] } } });
+        await s.start();
+        const lines = await s.command("");
+        assert.ok(
+            lines.some((line) =>
+                /sandbox\.network\.deny \(mongo\.prod\.example\.com\) does nothing in the open network mode: network\.allow and network\.deny apply in filtered and ask only, so these hosts are NOT refused/.test(
+                    line,
+                ),
+            ),
+            lines.join("\n"),
+        );
+    });
+
+    test("network.deny in filtered and ask is applied, and /sandbox lists it instead of warning", async () => {
+        for (const mode of ["filtered", "ask"] as const) {
+            const s = setup({
+                settings: { network: { ...DEFAULT_SETTINGS.network, mode, deny: ["mongo.prod.example.com"] } },
+            });
+            await s.start();
+            const lines = await s.command("");
+            assert.ok(
+                lines.some((line) => line.includes("hosts refused: mongo.prod.example.com")),
+                mode,
+            );
+            assert.equal(
+                lines.some((line) => line.includes("does nothing in the open network mode")),
+                false,
+                mode,
+            );
+            await s.shutdown();
+        }
+    });
+
+    test("an empty deny list, or allow alone, in the open mode says nothing", async () => {
+        for (const network of [
+            { ...DEFAULT_SETTINGS.network },
+            { ...DEFAULT_SETTINGS.network, allow: ["api.example.com"] },
+        ]) {
+            const s = setup({ settings: { network } });
+            await s.start();
+            assert.equal(
+                (await s.command("")).some((line) => line.includes("does nothing")),
+                false,
+            );
+            await s.shutdown();
+        }
+    });
+
     test("docker: true is accepted and not in effect, and /sandbox says so", async () => {
         const s = setup({ settings: { docker: true } });
         await s.start();

@@ -8,7 +8,7 @@ import type { ExtensionAPI, ExtensionUIContext } from "@earendil-works/pi-coding
 import { createApprovals } from "./approvals.ts";
 import type { Approvals } from "./approvals.ts";
 import type { Classification } from "./classify.ts";
-import { buildPolicy, defaultConfig, emptyAdditions, loadConfigFile } from "./config.ts";
+import { buildPolicy, defaultConfig, effectiveBackends, emptyAdditions, loadConfigFile } from "./config.ts";
 import type { CompanyAdditions, LoadedConfig, Policy, SectionCheck } from "./config.ts";
 import { JIG_EVENTS } from "./contract.ts";
 import type { ApprovalKind, Decision, EnvironmentKind, Preview, SandboxProvider, ToolDeclaration } from "./contract.ts";
@@ -97,6 +97,8 @@ export interface JigState {
     sectionReplace: Map<string, readonly string[]>;
     /** The paths that exclude each other, per plugin section: yours displaces the company's rivals. */
     sectionOneOf: Map<string, readonly (readonly string[])[]>;
+    /** The paths of lists that add up (the company's entries, then yours) instead of being replaced, per plugin section. */
+    sectionUnion: Map<string, readonly string[]>;
     /** Where jig.json is. The extension sets it, because only it knows Pi's agent folder. Empty until then. */
     configPath: () => string;
     /** Pi's agent folder, which holds jig.json and is protected from Pi's file tools. The extension sets it. Empty until
@@ -184,12 +186,14 @@ export function createState(pi: ExtensionAPI, options: JigCoreOptions = {}): Jig
             problems: [],
             sections: new Map(),
             incomplete: new Map(),
+            invalid: new Set(),
         },
         company: emptyAdditions(),
         sectionChecks: new Map(),
         sectionDefaults: new Map(),
         sectionReplace: new Map(),
         sectionOneOf: new Map(),
+        sectionUnion: new Map(),
         configPath: () => "",
         agentDir: () => "",
         configLoaded: false,
@@ -200,7 +204,8 @@ export function createState(pi: ExtensionAPI, options: JigCoreOptions = {}): Jig
         calls: new Map(),
         redactor,
         secrets: createSecrets({
-            backends: () => state.personal.config.secrets.backends,
+            backends: () => effectiveBackends(state.personal.config.secrets, state.company).on,
+            disabled: () => state.personal.config.secrets.disabledBackends,
             // The user's own commands replace a company's of the same name.
             commands: () => ({ ...state.company.secretCommands, ...state.personal.config.secrets.commands }),
             agentDir: () => state.agentDir(),
@@ -302,6 +307,7 @@ export function loadPersonalConfig(state: JigState, file: string = state.configP
         defaults: state.sectionDefaults,
         replace: state.sectionReplace,
         oneOf: state.sectionOneOf,
+        union: state.sectionUnion,
     });
     state.configLoaded = true;
     state.invalidatePolicy();

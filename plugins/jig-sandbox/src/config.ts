@@ -176,6 +176,21 @@ export function validateSandbox(raw: unknown): string[] {
     return errors;
 }
 
+/**
+ * A warning when `network.deny` lists hosts that nothing refuses: the list is read by the proxy that `filtered` and `ask`
+ * route every command through, and `open` has none. Undefined when there is nothing to warn about. `allow` needs no warning:
+ * it only lets hosts through, and `open` lets every host through.
+ */
+export function denyNotApplied(settings: Pick<SandboxSettings, "network">): string | undefined {
+    const { mode, deny } = settings.network;
+    if (mode !== "open" || deny.length === 0) return undefined;
+    const shown = deny.length > 5 ? `${deny.slice(0, 5).join(", ")} and ${deny.length - 5} more` : deny.join(", ");
+    return (
+        `sandbox.network.deny (${shown}) does nothing in the open network mode: network.allow and network.deny apply in ` +
+        "filtered and ask only, so these hosts are NOT refused. Set sandbox.network.mode to filtered or ask to refuse them."
+    );
+}
+
 /** The settings for the section as `config.section("sandbox")` returns it. A missing or wrong field is the default. */
 export function settingsFrom(raw: unknown): SandboxSettings {
     const section = isObject(raw) ? raw : {};

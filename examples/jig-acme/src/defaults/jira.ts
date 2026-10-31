@@ -6,11 +6,13 @@
 // email is theirs, and `auth` replaces the company's whole, so each person writes `{ "email": ..., "token": ... }` in their own
 // jig.json. A company with a sign-in service or a transport writes `{ "signIn": "..." }` or `{ "transport": "..." }` here instead.
 //
-// There is no place for project keys in this section: the plugin reads the project from each call. Acme's keys are in the ticket
-// pattern (memory.ts), the branch rules (git.ts) and the overlay skill (skills/acme-jira).
+// `projects` lists the keys this company works in: a search with no JQL looks in them, and `create` refuses any other project.
+// The same key is in the ticket pattern (memory.ts), the branch rules (git.ts) and the overlay skill (skills/acme-jira). A user who
+// works in more projects writes their own list, which replaces this one.
 export const jiraDefaults = {
     site: "https://acme.atlassian.net",
     auth: { email: "agent@acme.example", token: "pass:acme/jira-token" },
+    projects: ["ACME"],
     // A friendly name for a field the Acme Jira calls by id, and the fields `update` may set (the default list plus that one).
     fields: { "Story Points": "customfield_10016" },
     updateFields: ["summary", "description", "labels", "priority", "assignee", "Story Points"],

@@ -351,6 +351,47 @@ describe("git", () => {
             await assert.rejects(run("gh", ["--version"], { ...options, cwd: repo }), /core\.sshcommand/);
         });
 
+        test("and so does run('glab'), which starts git as well", async () => {
+            const repo = repository();
+            plant(repo, "[core]", "sshCommand", "evil");
+            await assert.rejects(run("glab", ["--version"], { ...options, cwd: repo }), /core\.sshcommand/);
+        });
+
+        test("glab runs in a repository with a normal configuration, with git's and glab's fixed environment", async () => {
+            const folder = path.join(root, `glab-bin${counter++}`);
+            mkdirSync(folder);
+            const fake = path.join(folder, "glab");
+            writeFileSync(fake, `#!${node}\nconsole.log(JSON.stringify(process.env));\n`);
+            chmodSync(fake, 0o755);
+            const repo = repository();
+            plant(repo, '[remote "origin"]', "url", "git@gitlab.example.com:team/project.git");
+            const env = JSON.parse((await run(fake, ["api", "user"], { ...options, cwd: repo })).stdout) as Record<
+                string,
+                string
+            >;
+            for (const [name, value] of Object.entries({
+                GLAB_NO_PROMPT: "1",
+                GLAB_CHECK_UPDATE: "false",
+                GLAB_SEND_TELEMETRY: "false",
+                GLAB_NOTIFY_SKILL_UPDATES: "false",
+                GLAB_SHOW_WHATS_NEW: "false",
+                GLAB_COLOR: "never",
+                GLAB_PAGER: "cat",
+                GLAB_DISPLAY_HYPERLINKS: "false",
+                GIT_TERMINAL_PROMPT: "0",
+                GIT_EDITOR: "true",
+                NO_COLOR: "1",
+            })) {
+                assert.equal(env[name], value, name);
+            }
+            assert.equal(env.GH_PROMPT_DISABLED, undefined, "gh's variables are gh's");
+            assert.equal(
+                Object.keys(env).some((name) => /TOKEN|SECRET|PASSWORD/i.test(name)),
+                false,
+                "no credential is passed on",
+            );
+        });
+
         test("a normal configuration passes", async () => {
             const repo = repository();
             plant(repo, '[remote "origin"]', "url", "git@example.com:team/project.git");

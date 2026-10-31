@@ -73,6 +73,8 @@ export function jigAcme(): ExtensionFactory {
 - **A test environment can ask to be masked** with `mask: true`, as `staging` does because it holds copies of customer data.
 - **These are the names every plugin's settings use:** the keys of `logs.environments`, `mongo.connections` and
   `ops.services.*.environments`.
+- **`/jig` lists them,** grouped by who defined them (built in, a company plugin, your `jig.json`). A plugin reads the same list
+  with `environments.list()`, so a company plugin keeps no list of its own.
 
 ### 2. Section defaults
 
@@ -82,7 +84,7 @@ documents under "Configure".
 
 | Section | What jig-acme gives it |
 |---|---|
-| `jira` | The site, a Cloud login by token reference, the fields `update` may set, a default priority |
+| `jira` | The site, a Cloud login by token reference, the project keys, the fields `update` may set, a default priority |
 | `logs` | An OpenSearch backend behind the sign-in service, an index per environment, a list filter |
 | `mongo` | A connection per environment, a tunnel for two, a production allow list with a reference collection |
 | `api` | The folder of saved requests, and environment names, one of them through the transport |
@@ -108,8 +110,11 @@ Jig never signs in. The tool that owns a login does it, and a company plugin con
 
 - **A secret is a reference,** never the secret. A value pasted where a reference belongs is refused, and the message does not
   repeat it ([`config.ts`](../examples/jig-acme/src/config.ts)).
-- **A company cannot turn a secret backend on.** `secrets.backends` is the user's decision alone, so a company plugin tells each
-  user which one to add. Without it, a request fails with `auth_failed` and says which backend is off.
+- **A company can turn a secret backend on,** with `config.enableSecretBackends(["cmd"])`, so each user need not add the one its
+  sign-in needs. The plugin already runs in Pi with the user's rights, so this gives it nothing new. The user keeps the last word:
+  `secrets.disabledBackends` in `jig.json` turns any backend off, and a request then fails with `auth_failed` and says who turned it
+  off. Without a company plugin only `pass` is on, and `/jig` lists the backends that are on and who enabled them.
+- **Enable only what your own references need.** jig-acme turns on `cmd` and leaves `env`, `file` and the rest to the user.
 - **A sign-in service is asked for every request,** with its method, address, headers and body, because it knows when a token has
   run out. `jig-core` hides what it returns from every result ([`signin.ts`](../examples/jig-acme/src/signin.ts)).
 - **Serve your own hosts only.** The service is handed the whole address of every request. `acme-sso` refuses a host that is not
@@ -126,6 +131,9 @@ that names it (`transport` in its section) holds no credential at all.
 
 - **A transport gets** the system, method, address, headers and a text body, and **returns** a status, headers in lower case and
   a text body. It carries `GET`, `POST`, `PUT`, `PATCH` and `DELETE` only.
+- **It is told the caller's limits:** `maxBytes` (read no more, and one byte past it so `truncated` can be set) and `timeoutMs`.
+  [`transport.ts`](../examples/jig-acme/src/transport.ts) stops reading at the first and drops a stalled gateway at the second.
+- **A header the gateway repeated is returned as a list** (`set-cookie` above all), one entry for each time it was sent.
 - **It fails with a line that names no address.** The address may hold a query, and `jig-core` never repeats it either.
 - **It honours the call's signal,** so a cancelled call stops the request.
 - **Nothing in clear text crosses a network.** The example accepts only a gateway on this machine, because it speaks plain http
@@ -142,7 +150,8 @@ its section (`"via": { "tunnel": "acme-bastion" }` in `mongo`), and `jig-core` o
 - **Start the program with `exec.run`.** It takes an argument list, never a shell, and finds the program only in folders the
   agent cannot write. `ssh -N` does not return, so the call is not awaited: closing the tunnel aborts it with a signal.
 - **Wait until the port accepts connections,** and until a port that was just freed refuses them, or a closing listener is taken
-  for a tunnel that is up.
+  for a tunnel that is up. `jig-core`'s `kit/ports.ts` does both (`freePort`, `waitForPort`, and `socksAnswers` for a `socks`
+  tunnel), and a package of its own keeps a copy of it, as [`src/jig/ports.ts`](../examples/jig-acme/src/jig/ports.ts) does.
 - **Give ssh only what it needs:** the user's agent socket, no configuration file (`-F /dev/null`), and `BatchMode`, so an unknown
   host key is a clear failure and not a question.
 - **Say one line when it fails,** such as "the bastion's host key is not trusted", and never ssh's own words, which can hold
@@ -194,20 +203,24 @@ The user's own `~/.pi/agent/jig.json` is laid over the company's defaults before
 | A list, a string, a number or a flag | Yours replaces the company's |
 | An object in a key the plugin names in `replace` | Yours replaces the company's whole, so the two never make a mix |
 | A key that excludes another (`oneOf`) | The company's value for the other keys is dropped |
+| A list in a key the plugin names in `union` | The company's entries first, then yours, each once |
 
 - **`replace` is for one choice among several.** A Jira `auth` of `{ signIn }` and one of `{ email, token }` are alternatives:
   merged, they would make a login that is neither.
 - **`oneOf` is for two keys that exclude each other,** such as `logs.backend.auth` and `logs.backend.transport`. Setting one
   removes the company's other.
+- **`union` is for a list that you and the company both add to,** such as the folders `workflow` reads workflow files from.
+  Replaced, a folder of yours would take the company's away.
 - **Each plugin names its own keys.** A key is a path from the section's root, with `*` for any one name.
 
-| Section | `replace` | `oneOf` |
-|---|---|---|
-| `jira` | `auth` | none |
-| `logs` | `backend.auth` | `backend.auth`, `backend.transport` |
-| `mongo` | `connections.*.via`, `connections.*.*.via` | none |
-| `api` | `environments.*` | none |
-| `ops` | `services.*.ci.auth`, `services.*.environments.*.deploy` | none |
+| Section | `replace` | `oneOf` | `union` |
+|---|---|---|---|
+| `jira` | `auth` | none | none |
+| `logs` | `backend.auth` | `backend.auth`, `backend.transport` | none |
+| `mongo` | `connections.*.via`, `connections.*.*.via` | none | none |
+| `api` | `environments.*` | none | none |
+| `ops` | `services.*.ci.auth`, `services.*.environments.*.deploy` | none | none |
+| `workflow` | none | none | `folders` |
 
 The other sections merge as plain data. With jig-acme loaded, these are the results the tests check:
 
@@ -230,14 +243,15 @@ A company plugin is configuration, so its tests load the real thing and look at 
 - **Load the real `jig-core` and every plugin you configure** into the fake Pi that `jig-core`'s own tests use, with a `jig.json`
   in a temporary agent folder, then start a session. [`test/support/world.ts`](../examples/jig-acme/test/support/world.ts) does it.
 - **Check that nothing is reported** at start-up or in `/jig`, that each section you gave defaults for is valid, and that `/jig`
-  lists the environments and the company's status.
+  lists the environments (the company's among them) and the company's status.
 - **Check the layering** with small `jig.json` files: one change each, and what the plugin gets back. Cover each `replace` and
   `oneOf` key you rely on.
 - **Run the code against fakes.** A fake server on `127.0.0.1` for a sign-in service and a transport, and a fake `ssh` script first on
   `PATH` for a tunnel, in a temporary folder outside the working folder, which `exec.run` requires.
 - **Check what must not happen:** a request for another host is refused and nothing is sent; a token is not in a reply or a message;
   a program in the working folder is not run.
-- **Keep the copy of `client.ts` identical to `jig-core`'s,** and test that it is.
+- **Keep the copy of `client.ts` identical to `jig-core`'s,** and test that it is. So is the copy of `kit/ports.ts`, if you
+  write a tunnel.
 - **Build a fake credential at run time** from parts. Push protection rejects a commit that holds one, even a fake one
   ([AGENTS.md](../AGENTS.md)).
 
@@ -248,8 +262,9 @@ In a repository of your own, Jig is a neighbour at development time and not a de
   the contract's types from it in `src/jig/types.ts`.
 - **Import the plugins and test helpers** from that link, as `world.ts` does with relative paths here.
 - **Record the Jig commit you built against,** and warn when the checkout is older.
-- **Expect to add stand-ins to the fake Pi.** It lacks a few calls that other plugins make (`registerEntryRenderer`,
-  `appendEntry`), so `world.ts` gives those stand-ins that do nothing.
+- **The fake Pi has what the Jig plugins call.** Besides `jig-core`'s own calls it has `registerEntryRenderer`, `registerMessageRenderer`,
+  `appendEntry`, `sendUserMessage`, `getThinkingLevel` and `sessionManager.getBranch`, and records what a plugin sent through
+  them, so `world.ts` needs no stand-ins. A call it still lacks is added to `plugins/jig-core/test/support/fake-pi.ts`.
 
 ## Keep it private
 

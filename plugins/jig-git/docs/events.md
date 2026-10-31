@@ -29,7 +29,7 @@ knowing who is looking.
   project to name. The same goes for a pull request that was not created.
 - **On GitLab `repo` is the whole path,** which may have groups, as in `platform/payments/orders-api`. `pr` is the number of the
   open merge request, asked of GitLab through `glab`; a lookup that fails leaves it out and never undoes the push. `jig-ops`
-  matches `owner/name` only, so it does not start a CI watch for a project in a subgroup yet.
+  matches the whole path, up to twenty parts, so a project in a subgroup starts a CI watch like any other.
 - **A listener that fails does not undo the push.** The result of the push does not
   depend on who reads the event, and the event carries no secret and no text from
   the model.

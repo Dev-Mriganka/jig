@@ -114,6 +114,7 @@ export function installFakeJig(): FakeJig {
         },
         environments: {
             kindOf: (name: string) => kinds.get(name) ?? "production",
+            list: () => [],
         },
         tunnels: {
             register: () => {},
@@ -156,6 +157,7 @@ export function installFakeJig(): FakeJig {
             addClassifyRules: () => {},
             addProtectedPaths: () => {},
             addSecretCommands: () => {},
+            enableSecretBackends: () => {},
             addMaskFields: () => {},
             addSectionDefaults: () => {},
             registerSection: (name, validate, options) => {

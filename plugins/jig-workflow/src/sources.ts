@@ -3,6 +3,7 @@
 // is checked, and one is used only for a repository that is bound to the ticket. The agent cannot publish on the bus.
 import { realpathSync } from "node:fs";
 import path from "node:path";
+import type { Forge } from "./forge.ts";
 import type { Host } from "./host.ts";
 import type { CiRecord, Observation, ReviewRecord } from "./store.ts";
 
@@ -10,7 +11,8 @@ export const REVIEW_APPROVED_EVENT = "jig-review:approved";
 export const CI_FINISHED_EVENT = "jig-ops:ci-finished";
 
 const COMMIT = /^[0-9a-f]{40}$/;
-const SLUG = /^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/;
+/** `owner/name`, or a GitLab project's whole path, which may have groups: `platform/payments/orders-api`. */
+const SLUG = /^[A-Za-z0-9_.-]{1,100}(?:\/[A-Za-z0-9_.-]{1,100}){1,19}$/;
 
 /** The finish lines of a CI watch that cover the required checks, as the CI adapters name them. */
 const COVERING_FINISH = new Set(["required", "pipeline", "jobs", "build", "stages"]);
@@ -127,8 +129,9 @@ export function parseRollup(rollup: unknown): Rollup {
 const PR_FIELDS = "number,state,isDraft,headRefOid,url,statusCheckRollup";
 
 /**
- * Reads the pull request of the branch that is checked out in a repository, with `gh pr view`, through jig-core's `exec`
- * (so `gh` signs in the way the user set it up). It reads and changes nothing. What cannot be read is in `error`.
+ * Reads the pull request of the branch that is checked out in a repository, through jig-core's `exec` (so `gh` or `glab` signs in
+ * the way the user set it up). On GitHub that is `gh pr view`; on GitLab it is the merge request of the branch and its pipeline,
+ * read with `glab api`. It reads and changes nothing. What cannot be read is in `error`.
  */
 export async function readPullRequest(
     host: Host,
@@ -136,10 +139,14 @@ export async function readPullRequest(
     branch: string,
     head: string,
     signal?: AbortSignal,
+    forge: Forge = { forge: "github" },
 ): Promise<Observation> {
+    if (forge.forge === "gitlab") return readMergeRequest(host, root, branch, head, forge, signal);
     const base = { at: host.now().toISOString(), branch, head };
     try {
-        const result = await host.run("gh", ["pr", "view", "--json", PR_FIELDS], {
+        // With the repository named (origin's host is an alias), gh cannot work the branch out for itself, so it is named too.
+        const where = forge.repo === undefined ? [] : [branch, "-R", forge.repo];
+        const result = await host.run("gh", ["pr", "view", ...where, "--json", PR_FIELDS], {
             cwd: root,
             timeoutMs: 20_000,
             ...(signal === undefined ? {} : { signal }),
@@ -166,6 +173,144 @@ export async function readPullRequest(
         };
     } catch (error) {
         return { ...base, error: firstLine((error as Error).message) || "gh could not be run" };
+    }
+}
+
+// ---- the merge request on GitLab ------------------------------------------------------------------------------------------
+
+/** A draft is a title with a prefix on GitLab, as well as a flag. */
+const DRAFT_PREFIX = /^\s*(?:\[draft\]|\(draft\)|draft:|draft\s+-\s+)\s*/i;
+const JOB_LIMIT = 100;
+
+/** GitLab's state of a merge request as the pull request states of GitHub are written, which the conditions compare. */
+function stateOf(state: unknown): string {
+    switch (state) {
+        case "opened":
+            return "OPEN";
+        case "merged":
+            return "MERGED";
+        case "closed":
+            return "CLOSED";
+        default:
+            return String(state).toUpperCase();
+    }
+}
+
+/**
+ * What a pipeline's jobs come to, counted as the roll-up of GitHub's checks is: a job that may fail does not fail the pipeline, a
+ * job that has not finished (or waits for someone to start it) is pending, and a status nobody knows is not a pass.
+ */
+export function parseJobs(jobs: unknown): Rollup {
+    const counts: Rollup = { pass: 0, fail: 0, pending: 0, total: 0 };
+    if (!Array.isArray(jobs)) return counts;
+    for (const job of jobs) {
+        if (!isObject(job)) continue;
+        counts.total++;
+        switch (job.status) {
+            case "success":
+            case "skipped":
+                counts.pass++;
+                break;
+            case "failed":
+                if (job.allow_failure === true) counts.pass++;
+                else counts.fail++;
+                break;
+            case "created":
+            case "pending":
+            case "running":
+            case "preparing":
+            case "scheduled":
+            case "manual":
+            case "waiting_for_resource":
+            case "waiting_for_callback":
+                counts.pending++;
+                break;
+            default:
+                // Cancelled, or a status nobody knows: not a pass.
+                counts.fail++;
+        }
+    }
+    return counts;
+}
+
+/** A line for a failed `glab api`, with the way to mend a sign-in that is missing. */
+function glabLine(result: { code: number; stderr: string }, hostName: string): string {
+    const said = firstLine(result.stderr) || `glab exited ${result.code}`;
+    return /glab auth login|not logged in|\b401\b|unauthorized|no token|authentication required|invalid token/i.test(
+        result.stderr,
+    )
+        ? `${said} (glab is not signed in for ${hostName}: run glab auth login --hostname ${hostName} yourself)`
+        : said;
+}
+
+async function readMergeRequest(
+    host: Host,
+    root: string,
+    branch: string,
+    head: string,
+    forge: Extract<Forge, { forge: "gitlab" }>,
+    signal?: AbortSignal,
+): Promise<Observation> {
+    const base = { at: host.now().toISOString(), branch, head };
+    const project = `projects/${encodeURIComponent(forge.path)}`;
+    const get = async (endpoint: string): Promise<unknown> => {
+        const result = await host.run("glab", ["api", "--hostname", forge.host, `${project}/${endpoint}`], {
+            cwd: root,
+            timeoutMs: 20_000,
+            ...(signal === undefined ? {} : { signal }),
+        });
+        if (result.code !== 0) throw new Error(glabLine(result, forge.host));
+        try {
+            return JSON.parse(result.stdout);
+        } catch {
+            throw new Error("glab api gave an answer that is not JSON");
+        }
+    };
+    const query = (state: string): string =>
+        `merge_requests?source_branch=${encodeURIComponent(branch)}&state=${state}&per_page=5&order_by=updated_at&sort=desc`;
+    try {
+        // A merge request from a branch of this project, and not from a fork whose branch has the same name.
+        const own = (row: unknown): row is Record<string, unknown> =>
+            isObject(row) &&
+            row.source_branch === branch &&
+            (row.source_project_id === undefined ||
+                row.target_project_id === undefined ||
+                row.source_project_id === row.target_project_id);
+        const listed = async (state: string): Promise<Record<string, unknown> | undefined> => {
+            const rows = await get(query(state));
+            return Array.isArray(rows) ? rows.find(own) : undefined;
+        };
+        // The open one first; else the newest of any state, so a merged or closed request is said to be that.
+        const found = (await listed("opened")) ?? (await listed("all"));
+        if (found === undefined) return base;
+        if (typeof found.iid !== "number" || typeof found.state !== "string") {
+            return { ...base, error: "glab api gave an answer this plugin does not read" };
+        }
+        const sha = typeof found.sha === "string" ? found.sha : "";
+        const title = typeof found.title === "string" ? found.title : "";
+        const pipeline = isObject(found.head_pipeline) ? found.head_pipeline : undefined;
+        let checks: Rollup = { pass: 0, fail: 0, pending: 0, total: 0 };
+        // A pipeline of an older commit says nothing about this head: until one is made for it there are no checks to count.
+        if (
+            pipeline !== undefined &&
+            typeof pipeline.id === "number" &&
+            (pipeline.sha === undefined || pipeline.sha === sha)
+        ) {
+            checks = parseJobs(await get(`pipelines/${pipeline.id}/jobs?per_page=${JOB_LIMIT}`));
+        }
+        return {
+            ...base,
+            pr: {
+                number: found.iid,
+                state: stateOf(found.state),
+                isDraft: found.draft === true || DRAFT_PREFIX.test(title),
+                headRefOid: sha,
+                url: typeof found.web_url === "string" ? found.web_url : "",
+            },
+            checks,
+        };
+    } catch (error) {
+        return { ...base, error: firstLine((error as Error).message) || "glab could not be run" };
     }
 }
 

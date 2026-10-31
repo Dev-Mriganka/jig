@@ -1,4 +1,5 @@
-// The copy of jig-core's client lookup must stay the same as Jig's, or this package and jig-core would stop finding each other.
+// The copy of jig-core's client lookup must stay the same as Jig's, or this package and jig-core would stop finding each other. The
+// copy of its port helpers must stay the same too, so that a fix made there reaches this package.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -16,6 +17,16 @@ function codeOf(file: string): string {
     assert.notEqual(from, -1, `${file} has no import type line`);
     return text.slice(from).replace(/from "\.\/(?:types|contract)\.ts"/, 'from "./contract.ts"');
 }
+
+describe("the port helpers", () => {
+    test("are the same file as jig-core's kit/ports.ts, which a package of its own keeps a copy of", () => {
+        assert.equal(
+            readFileSync(path.join(root, "src/jig/ports.ts"), "utf8"),
+            readFileSync(path.resolve(root, "../../plugins/jig-core/src/kit/ports.ts"), "utf8"),
+            "src/jig/ports.ts differs from jig-core's: copy plugins/jig-core/src/kit/ports.ts again, whole",
+        );
+    });
+});
 
 describe("the client handle", () => {
     test("is the same as jig-core's client.ts, apart from its header and the import of the types", () => {

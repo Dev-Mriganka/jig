@@ -5,6 +5,7 @@ import {
     addCompanyEnvironments,
     addCompanyProtectedPaths,
     addCompanyRules,
+    addCompanySecretBackends,
     addCompanySecretCommands,
     OWN_SECTIONS,
 } from "./config.ts";
@@ -80,6 +81,7 @@ export function buildApi(state: JigState): JigApi {
 
         environments: {
             kindOf: (name) => state.policy().environments.kindOf(name),
+            list: () => state.policy().environments.list(),
         },
 
         tunnels: {
@@ -132,6 +134,10 @@ export function buildApi(state: JigState): JigApi {
             addSecretCommands(commands) {
                 addCompanySecretCommands(state.company, commands);
             },
+            enableSecretBackends(backends) {
+                // Read at each resolve, so there is no policy to rebuild.
+                addCompanySecretBackends(state.company, backends);
+            },
             addMaskFields: (fields) => state.addMaskFields(fields),
             registerSection(name, validate, options) {
                 if (typeof name !== "string" || name === "")
@@ -145,6 +151,15 @@ export function buildApi(state: JigState): JigApi {
                 ) {
                     throw new TypeError(
                         `registerSection(${name}): replace must be a list of paths such as "auth" or "services.*.ci.auth"`,
+                    );
+                }
+                const union = options?.union;
+                if (
+                    union !== undefined &&
+                    (!Array.isArray(union) || union.some((path) => typeof path !== "string" || path === ""))
+                ) {
+                    throw new TypeError(
+                        `registerSection(${name}): union must be a list of paths such as "folders" or "services.*.hosts"`,
                     );
                 }
                 const oneOf = options?.oneOf;
@@ -168,9 +183,11 @@ export function buildApi(state: JigState): JigApi {
                         name,
                         oneOf.map((paths) => [...paths]),
                     );
-                // Registering again replaces what the first call said, the keys that replace included.
+                // Registering again replaces what the first call said, the keys that replace and the lists that add up included.
                 if (replace === undefined || replace.length === 0) state.sectionReplace.delete(name);
                 else state.sectionReplace.set(name, [...replace]);
+                if (union === undefined || union.length === 0) state.sectionUnion.delete(name);
+                else state.sectionUnion.set(name, [...union]);
                 // A section registered after the file was read is checked now, so the order plugins load in does not matter.
                 if (state.configLoaded) loadPersonalConfig(state, state.personal.file);
             },

@@ -40,10 +40,12 @@ gone, so this table cannot drift from the code.
 |---|---|---|
 | `conditions.ts` | The eight exit conditions, each decided from evidence and never from a claim | `action-stages.ts`, `gate.ts`, `runtime.ts` |
 | `plan.ts` | `plan.md`: what it must hold, its fingerprint, its numbered scenarios | `action-plan.ts`, `conditions.ts` |
-| `tests.ts` | Which command tests a repository, running it, and recording the result against the commit | `action-tests.ts` |
+| `tests.ts` | Which command tests a repository, running it, and recording the result against the commit | `action-tests.ts`, `environment.ts`, `outside.ts` |
+| `environment.ts` | The plain environment variables of a test command: what is accepted, how `~` expands | `tests.ts`, `outside.ts`, `action-tests.ts` |
+| `outside.ts` | A test command set to run outside the sandbox: it goes through `bash` with `outside: true`, so you are asked | `action-tests.ts` |
 | `status.ts` | Says where the work is: the stage, each missing condition, the holds | `action-start.ts`, `action-support.ts`, `index.ts` |
 | `definition.ts` | A workflow file, checked: stages, conditions and holds | `load.ts`, `runtime.ts`, `conditions.ts`, `gate.ts`, `status.ts`, `action-start.ts` |
-| `load.ts` | Reads the workflow files from their folders; a bad file is reported and the rest still load | `runtime.ts`, `action-start.ts`, `status.ts` |
+| `load.ts` | Reads the workflow files from their folders; a bad file is reported and the rest still load | `runtime.ts`, `action-start.ts`, `action-support.ts`, `status.ts` |
 | `runtime.ts` | What the plugin keeps while Pi runs: the loaded workflows, the context, the tool results seen | the action files, `gate.ts`, `status.ts`, `commands.ts`, `index.ts` |
 | `config.ts` | The `workflow` section of `jig.json`: folders and test commands | `index.ts`, `runtime.ts`, `tests.ts` |
 
@@ -55,6 +57,7 @@ gone, so this table cannot drift from the code.
 | `ticket.ts` | The active ticket, its folder, and the repositories bound to it | `action-start.ts`, `conditions.ts`, `gate.ts`, `runtime.ts` |
 | `repos.ts` | A repository as the conditions see it: HEAD, branch, clean tree, and which one a call acts in | `conditions.ts`, `gate.ts`, `tests.ts`, `status.ts` |
 | `sources.ts` | Evidence from outside: a checked review event, a CI event, a pull request from `gh` | `conditions.ts`, `listeners.ts`, `index.ts` |
+| `forge.ts` | Which forge a repository is on, from the host of origin and `git.forges`, never from the agent | `repos.ts`, `conditions.ts`, `sources.ts` |
 | `host.ts` | What the plugin needs from outside: `jig-core`'s programs and sandbox, and the clock | `runtime.ts`, `conditions.ts`, the actions |
 | `files.ts` | Replacing a file without ever leaving half of one | `ticket.ts`, `conditions.ts`, `action-support.ts`, `action-start.ts`, `action-plan.ts` |
 

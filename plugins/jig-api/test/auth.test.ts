@@ -273,6 +273,8 @@ describe("a company transport", () => {
                 "X-Trace": "t",
             },
             body: '{"name":"Zed"}',
+            maxBytes: 2 * 1024 * 1024,
+            timeoutMs: 30_000,
         });
         // What the proxy forwarded is what the API saw: only what the proxy adds identifies the session.
         assert.equal(last().headers["x-proxy-session"], "p-77");

@@ -6,6 +6,7 @@ import { randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import path from "node:path";
+import { denyNotApplied } from "./config.ts";
 import { installCommand } from "./programs.ts";
 import type { Sandbox } from "./sandbox.ts";
 
@@ -75,6 +76,9 @@ export async function runDoctor(sandbox: Sandbox, options: DoctorOptions): Promi
     add(problem === undefined, "start", problem ?? "the sandbox broker is running");
     if (problem !== undefined || sandbox.sessionDir === undefined) return lines;
     add(true, "network mode", `${sandbox.mode}${sandbox.modeNote === undefined ? "" : ` (${sandbox.modeNote})`}`);
+    // A setting that does nothing is not a failed check, but the doctor is where a person looks to see whether the sandbox does what they set.
+    const unrefused = denyNotApplied(sandbox.settings());
+    if (unrefused !== undefined) add(true, "network.deny", `WARNING: ${unrefused}`);
 
     const folder = path.join(sandbox.sessionDir, "doctor");
     mkdirSync(folder, { recursive: true });

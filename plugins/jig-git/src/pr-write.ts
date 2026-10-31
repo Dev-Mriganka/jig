@@ -15,7 +15,7 @@ import type { PrDetail } from "./pr-read.ts";
 import type { GitSettings } from "./config.ts";
 import type { Call, Planned } from "./previews.ts";
 import { digest, reviewPreview } from "./previews.ts";
-import { baseBranch, githubRepo, resolveRepo } from "./repo.ts";
+import { baseBranch, GITHUB_COM, githubRepo, resolveRepo } from "./repo.ts";
 import type { Repo } from "./repo.ts";
 import { currentBranch, revParse } from "./run.ts";
 import { lines } from "./text.ts";
@@ -238,7 +238,7 @@ async function watchComments(
     try {
         const remote = await githubRepo(repo, call.settings, call.signal);
         if (!remote) return undefined;
-        const spec = { slug: remote.slug, number };
+        const spec = { slug: remote.slug, number, ...(remote.host === GITHUB_COM ? {} : { host: remote.host }) };
         const { id, already } = startCommentWatch(spec);
         return { id, text: watchingText(spec, id, already) };
     } catch (error) {

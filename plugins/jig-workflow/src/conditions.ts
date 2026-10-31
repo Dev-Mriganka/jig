@@ -11,6 +11,7 @@ import type { Host } from "./host.ts";
 import { fingerprintOf, parsePlan } from "./plan.ts";
 import { inspect, short } from "./repos.ts";
 import type { RepoView } from "./repos.ts";
+import { forgeOf } from "./forge.ts";
 import { readPullRequest } from "./sources.ts";
 import { readText } from "./files.ts";
 import type { Observation, WorkflowState } from "./store.ts";
@@ -96,7 +97,15 @@ export class Evidence {
                                 : "HEAD is detached, so there is no branch to look up",
                     };
                 }
-                const read = await readPullRequest(this.init.host, root, view.branch, view.head, this.init.signal);
+                const forge = forgeOf(view.remote, this.init.host.gitSection());
+                const read = await readPullRequest(
+                    this.init.host,
+                    root,
+                    view.branch,
+                    view.head,
+                    this.init.signal,
+                    forge,
+                );
                 this.observed[root] = read;
                 this.freshlyRead.add(root);
                 return read;

@@ -258,12 +258,25 @@ all. A company plugin supplies that path as a **transport**.
 - **The company plugin registers it** with `transports.register(name,
   transport)`. Registering the same name again replaces it.
 - **A request is sent through it by name,** with `transport: name` in
-  `http.request`. `transports.request(name, { system, method, url, headers, body
-  }, signal)` is the call underneath. Tools build the same HTTP request either
-  way, so only the path changes.
+  `http.request`. `transports.request(name, { system, method, url, headers, body,
+  maxBytes, timeoutMs }, signal)` is the call underneath. Tools build the same
+  HTTP request either way, so only the path changes.
+- **The transport is told the caller's limits:** `maxBytes`, the most reply bytes
+  the caller reads (4 MiB unless its request says otherwise), and `timeoutMs`, how
+  long the whole request may take (30 seconds unless it says otherwise). The
+  `signal` fires when the time is over, so a transport that honours it needs
+  nothing more; the number is for one that sets a limit of its own.
+  - **Stop one byte past `maxBytes`,** not at it, so that a reply of exactly that
+    size and a longer one look different. `jig-core` cuts the reply to
+    `maxBytes` and sets `truncated` when it was longer.
+  - **A caller of `transports.request` that leaves a limit out** gets the defaults.
 - **The answer is checked:** a status from 100 to 599, headers as text (their
   names in lower case) and a text body. Anything else is an error that names
   the transport.
+- **A header sent more than once may be returned as a list,** one entry for each
+  time: `"set-cookie": ["a=1", "b=2"]`. The tool still gets one text, folded with
+  `, ` as a reply from the network is, and a `set-cookie` list becomes the cookies
+  as they are, so a date with a comma in it is never split.
 - **Errors never repeat the request.** Its URL or body may hold data that is
   masked only in the tool's result.
 - **The result is governed like any other:** it goes through the result hook,

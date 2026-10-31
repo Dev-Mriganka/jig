@@ -10,6 +10,7 @@ import type { JigApi } from "../../jig-core/src/contract.ts";
 import { start as startCore } from "../../jig-core/test/support/harness.ts";
 import type { Harness } from "../../jig-core/test/support/harness.ts";
 import { tempState } from "../../jig-core/test/support/state.ts";
+import { bashDeclaration } from "../../jig-sandbox/src/outside.ts";
 import { workflow } from "../src/index.ts";
 import type { RunScript, FakeHost } from "./support.ts";
 import { fakeHost, git, makeRepo, tempFolder } from "./support.ts";
@@ -100,6 +101,17 @@ export interface World {
     asked: Array<{ title: string; options: string[] }>;
     /** What `ctx.executeTool` was asked to run. */
     executed: Array<{ name: string; args: Record<string, unknown> }>;
+    /**
+     * The `bash` tool as the plugin reaches it for a test that runs outside the sandbox: a nested call that goes through the real
+     * jig-core (jig-sandbox's own declaration of `bash`, so the classification and the question are the real ones), and a stand-in
+     * for the tool itself that runs only when jig-core lets the call through.
+     */
+    bash: {
+        /** Every command that ran, with the reason and time limit the call carried and the id of the nested call. */
+        ran: Array<{ id: string; command: string; reason: string; timeout: number | undefined }>;
+        /** What a command does when it runs. Default: it prints nothing and exits 0. */
+        script: ((command: string) => { code: number; output?: string; timedOut?: boolean }) | undefined;
+    };
     activate(ticket: string | undefined): void;
     ticketDir(ticket?: string): string;
     writePlan(text: string, ticket?: string): void;
@@ -137,8 +149,11 @@ export interface WorldOptions {
     trusted?: boolean;
     /** Skip starting the session (the plugin has not seen session_start). */
     noSession?: boolean;
-    /** What a company plugin does while it loads, before the session starts. With it, jig.json has no `workflow` section. */
+    /** What a company plugin does while it loads, before the session starts. With it, jig.json has no `workflow` section,
+     *  unless `userWorkflow` gives the user's own. */
     company?: (api: JigApi, workspace: string) => void;
+    /** With `company`: the `workflow` section the user wrote in jig.json. `$workflows` stands for the world's folder of files. */
+    userWorkflow?: Record<string, unknown>;
 }
 
 /** Hooks that keep the state folder of jig-core private to each test. */
@@ -170,6 +185,7 @@ export async function world(t: TestContext, options: WorldOptions = {}): Promise
     const executed: World["executed"] = [];
     const asked: World["asked"] = [];
     const answers: World["answers"] = [];
+    const bash: World["bash"] = { ran: [], script: undefined };
     const self: Partial<World> = {};
 
     const ctx = {
@@ -186,6 +202,7 @@ export async function world(t: TestContext, options: WorldOptions = {}): Promise
         sessionManager: { getEntries: () => entries, getBranch: () => entries, getSessionId: () => "session-test" },
         isProjectTrusted: () => options.trusted === true,
         executeTool: async (name: string, args: Record<string, unknown>) => {
+            if (name === "bash") throw new Error("the test world runs bash only for a call that has an id: use w.call");
             executed.push({ name, args });
             // What the git tool's `worktree add` does, with the real git.
             const destination = path.join(
@@ -212,7 +229,11 @@ export async function world(t: TestContext, options: WorldOptions = {}): Promise
     const core = await startCore({
         config: {
             memory: { folder: tickets },
-            ...(options.company === undefined ? { workflow: { folders: [workflows], ...(options.config ?? {}) } } : {}),
+            ...(options.company === undefined
+                ? { workflow: { folders: [workflows], ...(options.config ?? {}) } }
+                : options.userWorkflow === undefined
+                  ? {}
+                  : { workflow: JSON.parse(JSON.stringify(options.userWorkflow).replaceAll("$workflows", workflows)) }),
         },
         cwd: workspace,
         ui:
@@ -230,6 +251,7 @@ export async function world(t: TestContext, options: WorldOptions = {}): Promise
         plugins: (api: JigApi) => {
             api.config.registerSection("memory", () => []);
             options.company?.(api, workspace);
+            api.declareTool(bashDeclaration({ folder: () => workspace, home: () => path.join(workspace, "home") }));
             for (const tool of ["git", "deploy"]) {
                 api.declareTool({
                     tool,
@@ -253,6 +275,55 @@ export async function world(t: TestContext, options: WorldOptions = {}): Promise
             .flatMap((part) => (part.type === "text" && part.text !== undefined ? [part.text] : []))
             .join("\n");
     let counter = 0;
+    let nested = 0;
+    type ToolCtx = { executeTool(name: string, args: Record<string, unknown>): Promise<unknown> };
+
+    /** A call to `bash` that the tool makes: decided by jig-core, run (here, scripted) only if it is let through. */
+    async function nestedBash(parent: string, args: Record<string, unknown>) {
+        const id = `${parent}/${++nested}`;
+        const outcome = await core.call({
+            tool: "bash",
+            input: args,
+            id,
+            parent,
+            run: () => {
+                bash.ran.push({
+                    id,
+                    command: String(args.command),
+                    reason: String(args.reason),
+                    timeout: typeof args.timeout === "number" ? args.timeout : undefined,
+                });
+                const done = bash.script?.(String(args.command)) ?? { code: 0 };
+                const output = done.output ?? "";
+                if (done.timedOut === true) {
+                    return {
+                        content: [
+                            {
+                                type: "text" as const,
+                                text: `${output}\n\nCommand timed out after ${args.timeout} seconds`,
+                            },
+                        ],
+                        isError: true,
+                    };
+                }
+                return {
+                    content: [
+                        {
+                            type: "text" as const,
+                            text: done.code === 0 ? output : `${output}\n\nCommand exited with code ${done.code}`,
+                        },
+                    ],
+                    structuredContent: { output, truncated: false, exit_code: done.code, wall_time_seconds: 0.1 },
+                    isError: done.code !== 0,
+                };
+            },
+        });
+        return {
+            toolCall: { id, name: "bash", arguments: args },
+            result: outcome.final,
+            isError: outcome.final.isError === true,
+        };
+    }
 
     const w: World = {
         core,
@@ -271,6 +342,7 @@ export async function world(t: TestContext, options: WorldOptions = {}): Promise
         beforeAnswer: undefined,
         asked,
         executed,
+        bash,
         activate(ticket) {
             entries.push({
                 type: "custom",
@@ -299,8 +371,19 @@ export async function world(t: TestContext, options: WorldOptions = {}): Promise
                 input,
                 id,
                 run: async () => {
+                    // Pi hands a tool a context whose `executeTool` makes calls that are children of this one.
+                    const base = ctx as never as Partial<ToolCtx>;
+                    const callCtx = {
+                        ...ctx,
+                        // A test that takes `executeTool` away from the context gets a call that cannot run other tools.
+                        executeTool:
+                            typeof base.executeTool !== "function"
+                                ? undefined
+                                : (name: string, args: Record<string, unknown>) =>
+                                      name === "bash" ? nestedBash(id, args) : base.executeTool?.(name, args),
+                    };
                     try {
-                        const result = await tool.execute(id, input as never, undefined, undefined, ctx as never);
+                        const result = await tool.execute(id, input as never, undefined, undefined, callCtx as never);
                         return { content: result.content as never, details: result.details };
                     } catch (error) {
                         return { content: [{ type: "text", text: (error as Error).message }], isError: true };

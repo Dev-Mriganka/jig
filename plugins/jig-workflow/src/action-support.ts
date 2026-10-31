@@ -4,6 +4,7 @@ import type { ExtensionToolContext } from "@earendil-works/pi-coding-agent";
 import { InputError } from "../../jig-core/src/kit/values.ts";
 import type { Stage, Workflow } from "./definition.ts";
 import { hash } from "./host.ts";
+import { missingWorkflow } from "./load.ts";
 import type { Runtime, Work } from "./runtime.ts";
 import { suggestion } from "./status.ts";
 import type { WorkflowState } from "./store.ts";
@@ -60,9 +61,7 @@ export function started(rt: Runtime, ticket: string): Started {
     if (work.read.kind === "invalid") throw new InputError(`${work.read.problem}; mend or delete the file`);
     const loaded = rt.definition(work.read.state);
     if (loaded === undefined) {
-        throw new InputError(
-            `the workflow ${work.read.state.workflow} of ${ticket} is not loaded: /workflow reload, or /workflow list for files that failed`,
-        );
+        throw new InputError(missingWorkflow(rt.loaded, work.read.state.workflow, ticket));
     }
     return { work, state: work.read.state, workflow: loaded.workflow };
 }

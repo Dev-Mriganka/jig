@@ -46,7 +46,7 @@ line at session start says which one matches.
 In this order; a later file with the same `name` replaces an earlier one, and `/workflow list` says where
 each one came from.
 
-1. The folders in `workflow.folders` of `jig.json`.
+1. The folders in `workflow.folders`: a company plugin's first, then yours from `jig.json`.
 2. `workflows/` in Pi's agent folder (`~/.pi/agent/workflows/`).
 3. `.pi/workflows/` in Pi's working folder, only when Pi trusts the project
    (`ctx.isProjectTrusted()`).
@@ -87,9 +87,24 @@ jig().config.addSectionDefaults("workflow", {
 });
 ```
 
-Your own `workflow` section is laid over it: an object such as `tests` merges key by key, and a list such
-as `folders` is replaced by yours, so list the company's folder again if you set your own. A company file
-and a personal one with the same name: the personal one wins, because personal folders are read later.
+Your own `workflow` section is laid over it. An object such as `tests` merges key by key, and `folders` adds
+up: the company's folders first, then yours, each once, so a folder of yours never takes the company's away.
+(`jig-core` does this because the plugin registers `folders` as a list that adds up; any other list in a
+section is still replaced by yours.) A company file and a personal one with the same name: the personal one
+wins, because personal folders are read later.
+
+To drop a company workflow you do not want, list its name in `workflow.disabled`:
+
+```json
+{ "workflow": { "disabled": ["investigation"] } }
+```
+
+- **A name, not a file.** Every file with that name is left out, whichever folder it is in, so a workflow of
+  your own with the same name goes too. Rename it if you want to keep it.
+- **`/workflow list` says what was left out** and which file it was, and a name no file has, which is usually a typo.
+- **A ticket already on it** stays where it is. `status` says `workflow.disabled` turns the workflow off, and
+  its holds are not enforced while it is off. Take the name out of the list and start a new session (`jig.json` is
+  read at session start, the workflow files also on `/workflow reload`) to bring them back.
 
 A company decides its ticket key patterns (`match`), its branch naming (`branch`) and which test
 environments count as acceptance environments (in its workflow's goals). This repository holds none of

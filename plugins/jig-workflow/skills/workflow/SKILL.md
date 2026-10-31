@@ -26,7 +26,7 @@ No workflow yet? `workflow start` picks the one whose pattern matches the ticket
 | `you-approve` | `workflow advance` | the user's yes to moving on |
 
 - **The plan** has three headings: `## Approach`, `## Repositories` (a list) and `## Scenarios` (a numbered list, `1.` upward, what the user will see when it works). Edit the plan and it needs approving again.
-- **Tests** run in the sandbox. A result on a tree with uncommitted changes is shown and does not count: commit first, and run again after every new commit. Without a sandbox the call asks the user, naming the commands.
+- **Tests** run in the sandbox. A result on a tree with uncommitted changes is shown and does not count: commit first, and run again after every new commit. Without a sandbox the call asks the user, naming the commands. A repository whose test command is set to run outside the sandbox (it needs credentials the sandbox hides) asks the user about that one command line; you cannot ask for it, and if the user declines, say so and do not retry.
 - **A scenario's pass** needs evidence: a file in the ticket folder (`evidence/accept-1.png`), a tool call of this session, or what you observed in your own words. Say what you saw, not that it passed.
 
 ## When a call is held

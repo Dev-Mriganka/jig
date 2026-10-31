@@ -178,3 +178,34 @@ describe("a default is part of what is approved", () => {
         assert.doesNotMatch(result.preview?.body ?? "", /from your defaults|Defaults not applied/);
     });
 });
+
+describe("jira.projects limits where create may make an issue", () => {
+    const withProjects = (projects: string[]): void =>
+        h.configure({ site: "https://jira.example.test", auth: { token: "pass:jira/token" }, projects });
+
+    test("a project on the list is created in, as before", async () => {
+        withProjects(["OPS", "PROJ"]);
+        assert.match(ok(await h.call(BUG)), /^Created PROJ-100: A bug/);
+    });
+
+    test("a project off the list is refused before anyone is asked or Jira is called, naming the list", async () => {
+        withProjects(["OPS", "WEB"]);
+        const result = await h.call(BUG);
+        assert.equal(result.preview, undefined, "nobody was asked");
+        assert.match(
+            result.blocked ?? "",
+            /jira create: PROJ is not one of your projects \(OPS, WEB\); jira\.projects in jig\.json lists the projects create may use$/,
+        );
+        assert.equal(h.jira.requests.length, 0);
+    });
+
+    test("the key is compared in upper case, as the call is read", async () => {
+        withProjects(["PROJ"]);
+        assert.match(ok(await h.call({ ...BUG, project: "proj" })), /^Created PROJ-100/);
+    });
+
+    test("with no list any project is accepted", async () => {
+        h.configure({ site: "https://jira.example.test", auth: { token: "pass:jira/token" } });
+        assert.match(ok(await h.call(BUG)), /^Created PROJ-100/);
+    });
+});

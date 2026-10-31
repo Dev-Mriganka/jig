@@ -70,6 +70,7 @@ tool then does nothing until the file is fixed (`/jig` lists the problems).
 |---|---|---|
 | `site` | required | The https address of the Jira, such as `https://example.atlassian.net` |
 | `auth` | required | How requests are signed in: exactly one of the four forms below |
+| `projects` | none | Project keys, such as `["PROJ"]`: `search` with no JQL looks in them, and `create` accepts only them |
 | `updateFields` | `summary`, `description`, `labels`, `priority`, `assignee` | The fields `update` may set, by name or id |
 | `fields` | none | Friendly names for field ids, such as `"Story Points": "customfield_10016"` |
 | `createDefaults` | none | Values `create` gives a field when the call does not set it, by field name or id |
@@ -99,6 +100,7 @@ is.
   "jira": {
     "site": "https://example.atlassian.net",
     "auth": { "email": "jane@example.test", "token": "pass:work/jira-token" },
+    "projects": ["PROJ"],
     "fields": { "Story Points": "customfield_10016" },
     "updateFields": ["summary", "description", "labels", "priority", "assignee", "Story Points"],
     "privateNames": ["payroll", "corp.example.net"]
@@ -111,6 +113,8 @@ is.
 - the Jira site;
 - the sign-in: a company sign-in service, a company transport, or an API token
   through a secret reference;
+- the project keys, so that `search` needs no JQL for them and `create` cannot
+  name another project;
 - default fields: friendly names, the fields `update` may set, private names;
 - the environment name, when it is not `external`.
 

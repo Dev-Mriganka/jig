@@ -6,7 +6,7 @@ import { InputError } from "../../jig-core/src/kit/values.ts";
 import { callText } from "./definition.ts";
 import type { Stage, Workflow } from "./definition.ts";
 import { digest } from "./host.ts";
-import { matching } from "./load.ts";
+import { disabledLines, matching } from "./load.ts";
 import type { Runtime, Work } from "./runtime.ts";
 import { activeWorkLines, ticketStatus } from "./status.ts";
 import { archiveState, HISTORY_FOLDER, newState, statePath, whatIsLost, writeState } from "./store.ts";
@@ -34,6 +34,7 @@ export function list(rt: Runtime): ActionResult {
             ...failures.map((failure) => `  ${failure.file}: ${failure.reason}`),
         );
     }
+    lines.push(...disabledLines(rt.loaded));
     return { text: lines.join("\n"), details: { workflows: [...workflows.keys()].sort(), failures: failures.length } };
 }
 

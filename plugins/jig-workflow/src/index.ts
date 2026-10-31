@@ -29,7 +29,8 @@ export function workflow(options: WorkflowOptions = {}): ExtensionFactory {
         const tool = createTool(rt);
         // jig-core may load after this plugin; withJig waits for it.
         withJig((api) => {
-            api.config.registerSection("workflow", validateWorkflow);
+            // A company's workflow folders and yours add up, theirs first; every other list is replaced by yours, as usual.
+            api.config.registerSection("workflow", validateWorkflow, { union: ["folders"] });
             api.declareTool(tool.declaration);
             api.gates.register(createGate(rt));
         });

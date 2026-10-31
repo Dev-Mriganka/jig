@@ -2,12 +2,14 @@
 // commit. Also the plan of what would run, and the question that asks the user to run tests outside the sandbox.
 import path from "node:path";
 import { InputError } from "../../jig-core/src/kit/values.ts";
+import { environmentLines } from "./environment.ts";
 import { digest } from "./host.ts";
+import { outsideRunner } from "./outside.ts";
 import { inspect, short } from "./repos.ts";
 import type { RepoView } from "./repos.ts";
 import type { Runtime } from "./runtime.ts";
 import { updateState } from "./store.ts";
-import { planTests, runTests } from "./tests.ts";
+import { planTests, runTests, testIdentity } from "./tests.ts";
 import type { TestPlan } from "./tests.ts";
 import { started, ticketOf } from "./action-support.ts";
 import type { ActionResult, Call, Params } from "./action-support.ts";
@@ -55,11 +57,7 @@ export async function plannedTests(rt: Runtime, params: Params): Promise<TestsTo
 
 /** The fingerprint of what a test call would run, which the user's yes has to carry when there is no sandbox. */
 export function testFingerprint(ticket: string, plans: readonly TestPlan[], views: readonly RepoView[]): string {
-    return digest(
-        "test",
-        ticket,
-        ...plans.flatMap((plan, index) => [plan.root, plan.command, plan.timeoutSeconds, views[index]?.head]),
-    );
+    return digest("test", ticket, ...plans.flatMap((plan, index) => [...testIdentity(plan), views[index]?.head]));
 }
 
 export async function runTestsAction(rt: Runtime, params: Params, call: Call): Promise<ActionResult> {
@@ -85,8 +83,11 @@ export async function runTestsAction(rt: Runtime, params: Params, call: Call): P
     for (const [index, plan] of plans.entries()) {
         const view = views[index] as RepoView;
         try {
+            // With a sandbox, a command set to run outside goes through the bash tool's own question; without one the call asked above.
+            const outside = sandboxed && plan.outside === true;
             const run = await runTests(rt.host, plan, view, {
-                sandboxed,
+                sandboxed: sandboxed && !outside,
+                ...(outside ? { outside: outsideRunner(call.ctx) } : {}),
                 ...(call.signal === undefined ? {} : { signal: call.signal }),
             });
             updateState(work.paths.dir, (state) => {
@@ -102,7 +103,7 @@ export async function runTestsAction(rt: Runtime, params: Params, call: Call): P
                 : " on a tree with uncommitted changes, which does not count: commit, then run again";
             if (run.result.passed && run.result.clean) passed++;
             lines.push(
-                `${view.name}: ${verdict} at ${short(view.head)}${note} · ${plan.command} · ${sandboxed ? "in the sandbox" : "outside the sandbox, as you approved"} · ${(run.result.durationMs / 1000).toFixed(1)} s`,
+                `${view.name}: ${verdict} at ${short(view.head)}${note} · ${plan.command} · ${run.result.sandboxed ? "in the sandbox" : "outside the sandbox, as you approved"} · ${(run.result.durationMs / 1000).toFixed(1)} s`,
                 ...(run.result.passed && run.result.clean ? [] : [indent(run.tail)]),
             );
         } catch (error) {
@@ -136,6 +137,7 @@ export function testQuestion(ticket: string, plans: readonly TestPlan[]): { summ
             ...plans.flatMap((plan) => [
                 `- ${plan.name}: ${plan.command}`,
                 `    in ${plan.root}, at most ${plan.timeoutSeconds} s (${plan.source ?? "set in jig.json"})`,
+                ...environmentLines(plan.env),
             ]),
             "",
             "A test can run anything. With jig-sandbox active, these would run inside it without asking.",

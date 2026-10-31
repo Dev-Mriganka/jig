@@ -14,7 +14,7 @@ The host of `origin` decides. The model cannot choose it, so a call cannot send 
 |---|---|
 | `github.com`, `ssh.github.com`, `github.com-<alias>` or `git.cloneHost` | GitHub, through `gh` |
 | `gitlab.com` or `altssh.gitlab.com` | GitLab, through `glab`, on `gitlab.com` |
-| A host named in `git.forges` | What the setting says |
+| A host named in `git.forges` | What the setting says, and for an ssh alias the real host `gh` or `glab` is told |
 | No host (a local path, or no origin) | GitHub, as before: `gh` reads the repository's own remotes |
 | Any other host | `pr` and `release` refuse it, with the line that names it |
 
@@ -24,11 +24,45 @@ The host of `origin` decides. The model cannot choose it, so a call cannot send 
 
 - **The refusal for an unknown host** says which host it was and shows the setting that names it, as in `origin of orders-api is on
   git.example.com, which jig-git does not know as GitHub or GitLab; name it in jig.json, such as "git": { "forges": {
-  "git.example.com": "gitlab" } }`.
+  "git.example.com": "gitlab" } }`, and the object form for an alias.
 - **A host set to `"github"`** is accepted as GitHub, which is how a GitHub Enterprise Server host is told apart from the refused
-  ones. `gh` then finds the repository from the remotes, as it did before any host was refused.
+  ones. `gh` is told the repository by `host/owner/name`.
 - **Nested groups** work: `platform/payments/orders-api` is a project path of three parts, and `origin` may use https, ssh or scp
-  form. The host is the one `origin` names, so an ssh alias from `~/.ssh/config` is not a GitLab host: use the real name.
+  form. The host is the one `origin` names; for an ssh alias from `~/.ssh/config`, see below.
+
+## An ssh alias for a real host
+
+A remote may use an alias from `~/.ssh/config`, as with two accounts on one host:
+
+```text
+Host github.com-work
+    HostName github.com
+    IdentityFile ~/.ssh/work_ed25519
+```
+
+and `git remote add origin git@github.com-work:acme/orders-api.git`. git needs the alias, to pick the key, and `gh` needs the real
+host, which it cannot read from an alias. Name the real host in `git.forges`, and git keeps the alias while `gh` and `glab` get the
+real one:
+
+```json
+{
+  "git": {
+    "forges": {
+      "gh-work": { "forge": "github", "host": "github.com" },
+      "gl-work": { "forge": "gitlab", "host": "gitlab.example.com" }
+    }
+  }
+}
+```
+
+- **`github.com-<anything>` and `git.cloneHost`** are already taken for github.com, and need no entry. Any other alias does.
+- **For GitHub** the repository is named to `gh` as `owner/name` on github.com, and as `host/owner/name` on another host, such as a
+  GitHub Enterprise Server. `gh api` calls and the comment watch are told the host (`GH_HOST`) the same way.
+- **For GitLab** `glab api --hostname` gets the real host, and the project path comes from the alias's address.
+- **An alias that is not mapped** is refused with a line that shows the object form, as in `origin of orders-api is on gh-work, which
+  jig-git does not know as GitHub or GitLab; name it in jig.json, such as "git": { "forges": { "gh-work": "gitlab" } }, or, when it is
+  an ssh alias for a real host, "git": { "forges": { "gh-work": { "forge": "github", "host": "github.com" } } }`.
+- **Only you set it.** The setting is in `jig.json`; no parameter of `pr` or `release` can name a host.
 
 ## Sign-in
 
@@ -47,10 +81,10 @@ and a JSON body on standard input. A request says exactly what it does, so a pre
 glab's own commands (`glab mr merge`, `glab mr create`) prompt and choose for themselves, such as turning on auto-merge while a
 pipeline runs, so none of them is used.
 
-- **glab runs in the repository.** It starts git there and reads its configuration. `jig-core` vets a repository for `git` and `gh`;
-  it does not know `glab`, so each glab call is preceded by a harmless git call through `jig-core`, which refuses a repository whose
-  own configuration would run a command.
-- **glab is told not to prompt,** check for updates, send usage data, page or colour its output.
+- **glab runs in the repository.** It starts git there and reads its configuration. `jig-core` vets the repository for `git`,
+  `gh` and `glab` alike, and refuses one whose own configuration would run a command, before glab starts.
+- **glab is told not to prompt,** check for updates, send usage data, page or colour its output. `jig-core` sets that when it
+  starts glab.
 - **A sign-in kept in the keyring** is read over the session bus, whose address is passed on (it is a path, not a secret).
 
 ## What each action does
@@ -114,7 +148,7 @@ and it ends when the request is merged or closed ([Comment watch](comments-watch
 - **`clone` is GitHub only.** It builds a GitHub URL from `git.cloneHost`.
 - **GitLab under a path** (`https://example.com/gitlab`) and a host with a port are not supported: glab's `--hostname` takes a bare
   host name.
-- **`jig-workflow`'s `pull-request-open` condition** reads `gh pr view`, so it does not see a merge request.
-- **`jig-ops`** matches the event `jig-git:pushed` on `owner/name`; a project in a subgroup is announced with its full path, which
-  `jig-ops` does not match yet ([Events](events.md)).
+- **`jig-workflow` and `jig-ops` follow GitLab too.** The `pull-request-open` and `checks-pass` conditions read the merge request
+  and its pipeline with `glab api`, and `jig-ops` matches the event `jig-git:pushed` on a project's whole path, subgroups included
+  ([Events](events.md)).
 - **Not verified against a GitLab server;** see [Not verified yet](not-verified.md).

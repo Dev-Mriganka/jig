@@ -20,8 +20,8 @@ repository, only that repository counts.
 | `plan-approved` | the ticket | the fingerprint you approved, against `plan.md` now |
 | `tests-pass-at-head` | each repository | the last `workflow test` result, against HEAD now |
 | `review-done` | each repository | `jig-review:approved` events, against HEAD now |
-| `pull-request-open` | each repository | `gh pr view` for the checked-out branch |
-| `checks-pass` | each repository | a CI watch result for HEAD, or the checks `gh pr view` shows |
+| `pull-request-open` | each repository | `gh pr view`, or the merge request on GitLab, for the checked-out branch |
+| `checks-pass` | each repository | a CI watch result for HEAD, or the checks `gh` or `glab` show |
 | `scenarios-pass` | the ticket | the scenario results, against the approved plan's scenarios |
 | `you-approve` | the ticket | your answer to the question `advance` asks |
 
@@ -34,7 +34,8 @@ repository, only that repository counts.
   now. Any edit, even a comma, ends it. See [Plan](plan.md).
 - **`tests-pass-at-head`.** Holds when the last result for the repository passed, on a clean tree, at the
   commit HEAD is now. Uncommitted changes after the run do not undo it, because a push sends commits, not
-  the tree; `status` mentions them. See [Tests](tests.md).
+  the tree; `status` mentions them. A run outside the sandbox that you approved counts the same, and `status`
+  says where it ran. See [Tests](tests.md).
 - **`review-done`.** `jig-review` publishes `jig-review:approved` when you approve a review, and the plugin
   saves the ones that **cover** commits (a branch review whose diff was still the one you saw) with each
   repository's folder and HEAD. The condition holds when an event names the repository's folder and its
@@ -42,13 +43,23 @@ repository, only that repository counts.
   is ignored.
 - **`pull-request-open`.** `gh pr view --json ...` in the repository, through `jig-core`'s `exec`, so
   `gh` signs in the way you set it up. It holds for a pull request in state `OPEN` for the checked-out
-  branch, drafts included. A detached HEAD, a missing `gh` or a host that is not GitHub fails with that reason.
+  branch, drafts included. A detached HEAD, a missing `gh` or a host that gh does not know fails with that reason.
+  - **On GitLab** the same condition reads the merge request of the branch with `glab api` (`GET
+    merge_requests?source_branch=...`, the open one first, else the newest of any state), as `jig-git` reads it, and
+    `glab` signs in the way you set it up. A merge request from a fork with the same branch name is not the branch's
+    own. `opened` is `OPEN`, and a draft is a flag or a `Draft:` title.
+  - **Which forge** is decided from the host of `origin` and the `git.forges` setting of `jig-git`, never by the
+    agent: GitHub and `gitlab.com` need nothing, a self-hosted GitLab is named in `git.forges`, and any other host
+    stays on `gh`. An ssh alias for a host is mapped there to the real one ([an ssh alias for a real host](../../jig-git/docs/gitlab.md#an-ssh-alias-for-a-real-host)).
 - **`checks-pass`.** The pull request's head must be HEAD now ("push first" otherwise). Then either:
   1. a `jig-ops` CI watch ended `passed` for that commit (the event `jig-ops:ci-finished`, with a finish
      line that covers the required checks), which is the precise answer; or
   2. every check in the pull request's roll-up passed, none pending and at least one. This counts optional
      checks too, so a slow optional check keeps it false: start a CI watch for the required checks instead.
   A failed watch for a commit does not stop 2 from holding, since a rerun can pass without a new watch.
+  On GitLab the roll-up is the jobs of the merge request's latest pipeline, counted the same way: a job that may fail
+  does not fail the pipeline, an unfinished or manual job is pending, and a pipeline made for an older commit counts
+  for nothing. A CI watch of the project is matched by its whole path, subgroups included.
 - **`scenarios-pass`.** Holds when the plan is approved and each numbered scenario of it has a result of
   `pass` with evidence, recorded for the scenario's current text. See [Plan](plan.md#scenarios).
 - **`you-approve`.** `advance` out of a stage that lists it asks you, in a dialog or on a review screen,

@@ -20,6 +20,9 @@ export interface JiraSettings {
     /** The base address: https, no trailing slash. It may have a path, for a Jira served below one. */
     site: string;
     auth: Auth;
+    /** The project keys this setup works in, upper case. A `search` with no JQL looks in them, and `create` only accepts
+     *  them. Empty when none is set: `search` then needs JQL and `create` takes any project. */
+    projects: readonly string[];
     /** The fields `update` may set, by name or id. */
     updateFields: readonly string[];
     /** Friendly names for field ids, such as `Story Points` for `customfield_10016`. */
@@ -38,6 +41,7 @@ export const DEFAULT_ENVIRONMENT = "external";
 const SECTION_FIELDS: ReadonlySet<string> = new Set([
     "site",
     "auth",
+    "projects",
     "updateFields",
     "fields",
     "createDefaults",
@@ -51,6 +55,9 @@ const AUTH_FIELDS: ReadonlySet<string> = new Set(["email", "token", "signIn", "t
 const SECRET_REFERENCE = /^[a-z][a-z0-9+.-]*:\S+$/;
 const ENVIRONMENT_NAME = /^[A-Za-z][A-Za-z0-9_-]{0,39}$/;
 const MAX_LIST = 100;
+/** A project key as Jira writes it: letters first, then letters, digits and underscores. */
+export const PROJECT_KEY = /^[A-Z][A-Z0-9_]{0,19}$/;
+const MAX_PROJECTS = 50;
 const MAX_DEFAULTS = 30;
 /** What the project and type parameters set, so a default cannot. `summary` is a parameter that `create` requires. */
 const NOT_DEFAULTABLE = new Set(["project", "issuetype", "issue type", "summary"]);
@@ -155,6 +162,26 @@ function checkList(value: unknown, key: string, errors: string[], maxLength: num
     return names;
 }
 
+function checkProjects(value: unknown, errors: string[]): string[] | undefined {
+    if (value === undefined) return undefined;
+    if (!Array.isArray(value) || value.length > MAX_PROJECTS) {
+        errors.push(`jira.projects: must be a list of at most ${MAX_PROJECTS} project keys, such as ["PROJ"]`);
+        return undefined;
+    }
+    const keys: string[] = [];
+    value.forEach((item, index) => {
+        const key = typeof item === "string" ? item.trim().toUpperCase() : "";
+        if (!PROJECT_KEY.test(key)) {
+            errors.push(`jira.projects[${index}]: must be a project key such as PROJ`);
+        } else if (keys.includes(key)) {
+            errors.push(`jira.projects[${index}]: ${key} is listed twice`);
+        } else {
+            keys.push(key);
+        }
+    });
+    return keys;
+}
+
 function checkFields(value: unknown, errors: string[]): Record<string, string> | undefined {
     if (value === undefined) return undefined;
     if (!isObject(value)) {
@@ -228,6 +255,7 @@ export function readJira(raw: unknown): { settings?: JiraSettings; errors: strin
 
     const site = checkSite(raw.site, errors);
     const auth = checkAuth(raw.auth, errors);
+    const projects = checkProjects(raw.projects, errors);
     const fields = checkFields(raw.fields, errors) ?? {};
     const updateFields = checkList(raw.updateFields, "updateFields", errors, 60);
     for (const [index, name] of (updateFields ?? []).entries()) {
@@ -251,6 +279,7 @@ export function readJira(raw: unknown): { settings?: JiraSettings; errors: strin
         settings: {
             site,
             auth,
+            projects: projects ?? [],
             updateFields: updateFields ?? DEFAULT_UPDATE_FIELDS,
             fields,
             createDefaults,

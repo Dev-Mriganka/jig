@@ -6,6 +6,7 @@
 // result hook: redacted, masked where needed and capped, like any other result.
 import type { Transport, TransportRequest, TransportResponse } from "./contract.ts";
 import { errorMessage } from "./errors.ts";
+import { DEFAULT_MAX_BYTES, DEFAULT_TIMEOUT_MS } from "./kit/http.ts";
 import { printable } from "./kit/text.ts";
 
 export interface Transports {
@@ -17,7 +18,8 @@ export interface Transports {
 const MAX_NAMES_SHOWN = 10;
 
 /** The response as a plain copy, checked where another package's mistake would otherwise surface as a confusing
- *  failure deep inside a tool. */
+ *  failure deep inside a tool. Header names are lower-cased; a header given twice under names that differ only in case, or
+ *  as a list, keeps every value as a list. */
 function checkResponse(name: string, value: unknown): TransportResponse {
     const who = `transport "${printable(name)}"`;
     if (typeof value !== "object" || value === null) throw new TypeError(`${who} returned no response`);
@@ -27,18 +29,33 @@ function checkResponse(name: string, value: unknown): TransportResponse {
         throw new TypeError(`${who} returned a response without a valid HTTP status`);
     }
     if (typeof body !== "string") throw new TypeError(`${who} returned a response whose body is not text`);
-    const copy: Record<string, string> = {};
+    const copy: Record<string, string | string[]> = {};
     if (headers !== undefined) {
         if (typeof headers !== "object" || headers === null || Array.isArray(headers)) {
             throw new TypeError(`${who} returned headers that are not an object`);
         }
         for (const [header, headerValue] of Object.entries(headers)) {
-            if (typeof headerValue !== "string")
+            const values: unknown[] = Array.isArray(headerValue) ? headerValue : [headerValue];
+            if (values.some((item) => typeof item !== "string"))
                 throw new TypeError(`${who} returned a header (${printable(header)}) that is not text`);
-            copy[header.toLowerCase()] = headerValue;
+            const lower = header.toLowerCase();
+            const before = copy[lower];
+            if (before === undefined && !Array.isArray(headerValue)) copy[lower] = headerValue as string;
+            else copy[lower] = [...(before === undefined ? [] : [before].flat()), ...(values as string[])];
         }
     }
     return { status, headers: copy, body };
+}
+
+/** The limits a transport is told, when the caller (a plugin that calls `transports.request` itself) gave none. */
+function withLimits(request: TransportRequest): TransportRequest {
+    const usable = (value: unknown): value is number =>
+        typeof value === "number" && Number.isFinite(value) && value >= 1;
+    return {
+        ...request,
+        maxBytes: usable(request.maxBytes) ? Math.floor(request.maxBytes) : DEFAULT_MAX_BYTES,
+        timeoutMs: usable(request.timeoutMs) ? Math.floor(request.timeoutMs) : DEFAULT_TIMEOUT_MS,
+    };
 }
 
 export function createTransports(): Transports {
@@ -62,7 +79,7 @@ export function createTransports(): Transports {
             }
             let response: unknown;
             try {
-                response = await transport.request(request, signal);
+                response = await transport.request(withLimits(request), signal);
             } catch (error) {
                 // The request is not repeated in the message: its URL or body may carry data the model should not
                 // see unmasked, and the tool knows what it asked for.

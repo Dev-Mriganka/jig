@@ -62,8 +62,10 @@ closed instead of running ungoverned.
   [Watches](watches.md)).
 - **`environments`** has `kindOf(name)`: the kind of an environment (`local`,
   `external`, `test` or `production`), built in, configured or added by a
-  company plugin.
-  - A name nobody defined counts as production.
+  company plugin. `list()` gives every defined environment as `{ name, kind,
+  source }`, where `source` is `built-in`, `company` or `personal`; `/jig`
+  shows the same list.
+  - A name nobody defined counts as production, and is not in the list.
   - A tool uses it to refuse an action by kind, such as never in production,
     whatever a company names its environments.
 - **`tunnels`** has `register(name, provider)` and `open(name, { host, port })`.
@@ -87,7 +89,12 @@ closed instead of running ungoverned.
 - **`config`** is what a company plugin adds at start-up, and what a plugin
   keeps for itself.
   - A company adds `addEnvironments`, `addRules`, `addClassifyRules`,
-    `addProtectedPaths`, `addSecretCommands` and `addMaskFields`.
+    `addProtectedPaths`, `addSecretCommands`, `enableSecretBackends` and
+    `addMaskFields`.
+  - **`enableSecretBackends(["cmd", ...])`** turns secret backends on for the
+    references a company's sign-in names. It adds to your `secrets.backends`; your
+    `secrets.disabledBackends` still turns any off. See
+    [Secret references](configuration.md#secret-references).
   - A plugin registers its own section with `registerSection`, and reads it back
     with `section`.
   - A company can give defaults for any plugin's section with
@@ -96,7 +103,9 @@ closed instead of running ungoverned.
     the result, so a user writes only what they change.
   - `registerSection(name, validate, { replace })` names the keys where an
     object of the user's replaces the company's whole, such as `auth`,
-    `backend.auth` or `services.*.ci.auth`.
+    `backend.auth` or `services.*.ci.auth`. `{ union }` names lists that add
+    up instead, such as `folders`: the company's entries first, then the
+    user's, each once.
   - Defaults that are not valid alone, with no section of the user's, leave the
     plugin unconfigured and are shown by `/jig`, not reported as a problem.
 - **`protectedPaths.list()`** gives every protected path with its `kind`
@@ -148,6 +157,18 @@ talks to Pi.
 - **`kit/abort.ts`:** `untilAborted(work, signal)` rejects with the signal's
   reason when it fires, even if `work` ignores its signal. It always observes
   `work`, so a late failure is never an unhandled rejection.
+- **`kit/ports.ts`:** what a tunnel that starts a program needs, using nothing but
+  `127.0.0.1`. A company plugin copies it whole, as it does `client.ts`.
+  - **`freePort()`** gives a port nothing listens on: a listener that was just
+    closed can go on accepting for a few milliseconds, which would look like a
+    tunnel that is up, so the port is handed out once it refuses connections.
+  - **`portAccepts(port)`** and **`socksAnswers(port)`** test a port: the second
+    sends a SOCKS5 greeting and wants version 5 back, so a proxy that has not
+    finished starting is not mistaken for one that has.
+  - **`waitForPort(port, options)`** asks again until the port is ready, the time
+    is over (`PortWaitError`, `timeout`), the call is cancelled (`cancelled`), or
+    the program that should have opened it has failed (what `failed()` returns is
+    thrown). `kind` is `forward` (accepts) or `socks` (answers the greeting).
 - **`kit/oauth.ts`:** the token grants and the in-memory token cache behind
   `auth: { oauth }`. **`kit/http-error.ts`** holds the `HttpError` that
   `kit/http.ts` re-exports.

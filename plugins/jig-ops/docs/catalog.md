@@ -16,7 +16,7 @@ error, and so is a field with a value it cannot use.
 | Field | Meaning |
 |---|---|
 | `services` | A map from a service name to its entry: 1 to 100 services |
-| `repo` | Where the code lives, such as `acme/orders-api`: up to 200 characters, no white space |
+| `repo` | Where the code lives, such as `acme/orders-api`, or a GitLab project's whole path, `platform/payments/orders-api`: up to 200 characters, no white space |
 | `ci` | The CI system and where it is (see [`ci`](#ci) below) |
 | `environments` | A map from an environment name to its entry: 1 to 20 per service |
 

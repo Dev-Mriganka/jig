@@ -23,6 +23,9 @@ the environment variables. Back to the [jig-core overview](../README.md#configur
   [Protected paths](#protected-paths)).
 - **`secrets.backends`:** `pass`, `env`, `keychain`, `op`, `cmd` and `file`.
   Only `pass` is on by default.
+- **`secrets.disabledBackends`:** the same names. A backend listed here is off,
+  whoever turned it on, a company plugin included (see
+  [Secret references](#secret-references)).
 - **`secrets.commands`:** the program, then its arguments, such as
   `{ "gh": ["gh", "auth", "token"] }`. Used only when `cmd` is in
   `secrets.backends`.
@@ -33,11 +36,17 @@ the environment variables. Back to the [jig-core overview](../README.md#configur
 
 - **`/jig`** shows the tools governed, whether `bash` is sandboxed and in which
   network mode (with no sandbox it says plainly that it is not), the plugins
-  loaded, the tools still on the unknown default, and the open watches (and how many are paused or wait
+  loaded, the environments and who defined them, the tools still on the unknown
+  default, and the open watches (and how many are paused or wait
   for their plugin). It also shows the configuration file with the state of each
   plugin section, lines that plugins registered (such as `jig-mongo` saying that
   its index check is off), configuration errors, a failed records write, and
   problems with saved watches.
+  - **A section is `loaded`,** `company defaults incomplete` (waiting for the part
+    only you can give), or `not set`: no company default and nothing in your file.
+  - **`not set or invalid`** means your file has the section and it failed the
+    plugin's check (the problem is listed under it), or the file could not be read
+    at all.
 - **`/jig rules [tool]`** shows the effective decision per tool and action,
   with where each came from: declaration, rule, hint or default.
   - A tool whose schema lists its actions gets a line for each.
@@ -161,9 +170,21 @@ removes one. `/jig rules` lists them all, each with where it came from
 | `cmd:<name>` | a command you declared by name | The trimmed standard output of the command declared as `<name>`. See below |
 | `file:<absolute path>` | a file | The first line of the file, trimmed. A leading `~/` is the home folder. See below |
 
-A reference whose backend is not in `secrets.backends` is an error that says
-so. Every backend has a timeout, 60 seconds by default, which includes the time
-you need to unlock a store. An error never repeats the reference or a value.
+A reference whose backend is not on is an error that says so. Every backend has a
+timeout, 60 seconds by default, which includes the time you need to unlock a store.
+An error never repeats the reference or a value.
+
+**Which backends are on.** The ones in your `secrets.backends` (`pass` alone when you
+list none), plus the ones a company plugin turned on with
+`config.enableSecretBackends`, less the ones in your `secrets.disabledBackends`.
+- **The company only adds.** A company plugin is code that already runs in Pi with
+  your rights, so turning a backend on gives it nothing it lacked. Its `cmd`
+  backend still runs only commands that were declared by name, and `file` still
+  refuses Pi's agent folder.
+- **You have the last word.** A backend in `secrets.disabledBackends` stays off
+  whoever turned it on, and the error says you turned it off.
+- **`/jig` shows it:** `Secret backends on: pass, cmd (cmd enabled by a company
+  plugin); turned off by you: env`.
 
 ### `cmd`: a command that owns the login
 
@@ -182,7 +203,7 @@ turn the backend on:
 ```
 
 - **Off by default,** like every backend but `pass`: `cmd` must be in
-  `secrets.backends`.
+  `secrets.backends`, or a company plugin must have turned it on.
 - **A name, never a command line.** A reference names a declared command. An
   undeclared name is refused (and not repeated in the error), so a model cannot
   slip in a command of its own through a parameter.
@@ -208,7 +229,8 @@ turn the backend on:
 read the first line of a file, for a credential that another tool keeps up to
 date.
 
-- **Off by default:** `file` must be in `secrets.backends`.
+- **Off by default:** `file` must be in `secrets.backends`, or a company plugin must
+  have turned it on.
 - **A regular file,** at most 64 KiB, whose first line is not empty. The path
   must be absolute, or start with `~/`. Permission bits are not checked: files
   on a Windows drive seen from WSL all show 0777.
@@ -244,6 +266,9 @@ such as `git`, `lens` or `memory`.
     `{ oneOf: [["backend.auth", "backend.transport"]] }`. When you set one of
     them, the company's value for the others is dropped. For example, your own
     `backend.auth` removes the company's `backend.transport`.
+  - **A plugin names lists that add up,** with `{ union: ["folders"] }`. The company's
+    entries come first, then yours, each once, so a list of yours does not take the
+    company's away. Any other list of yours still replaces theirs.
   - **A section with no defaults is checked as you wrote it,** as before.
 - **Defaults can lack what only you can give.** With no section of yours, the
   defaults alone are checked. When they are not valid, the plugin is not

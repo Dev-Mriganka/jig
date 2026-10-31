@@ -25,7 +25,8 @@ How `jig-workflow` is built, what it needs from other plugins, and how it is tes
   -> runtime.ts                the ticket's workflow.json is registered with jig-core as a guarded path
 
 the agent works; evidence arrives
-  workflow test       -> tests.ts: command per repository -> jig().sandbox.run (or an approved exec)
+  workflow test       -> tests.ts: command per repository -> jig().sandbox.run (or an approved exec; or, for
+                         a command set to run outside, the bash tool's own question through ctx.executeTool)
                          -> result saved with the commit and whether the tree was clean
   workflow submit-plan-> plan.ts: check; jig-core shows plan.md; approved fingerprint saved
   jig-review:approved -> sources.ts: saved when it covers commits of a bound repository
@@ -56,8 +57,10 @@ any tool call
 |---|---|---|
 | `jig-core` | `gates.register(gate)`: a gate sees each call and can only ask or deny | Holds reach every tool, including Pi's `write` and `edit` |
 | `jig-core` | `sandbox.canRun` and `sandbox.run(command, options)` | Tests run in the sandbox without this plugin knowing how it wraps |
+| `jig-core` | `registerSection(name, validate, { union })`: lists that add up instead of being replaced | A user's `workflow.folders` adds to a company's instead of taking them away |
 | `jig-core` | The decision source `gate` on `jig:decision` and in the records | `/lens` can show how often a hold stopped work |
 | `jig-sandbox` | `run` on its provider: the wrapping of `bash`, without the tool | The same rules, audit and explanations as the agent's shell |
+| `jig-sandbox` | `bash` with `outside: true`, called through `ctx.executeTool` (nothing new in `jig-sandbox`) | A test that needs what the sandbox hides asks the way `bash` does: `jig-core` decides, a rule can name the command, the run is recorded |
 | `jig-review` | `root`, the repository's absolute folder, on each entry of `repos` in `jig-review:approved` | The event named repositories by a path that is ambiguous outside Pi's folder |
 | `jig-ops` | `jig-ops:ci-finished`, published when a CI watch ends | The watch's result names no commit, and `checks-pass` needs one |
 
@@ -72,6 +75,7 @@ Each is small, and each plugin's own documentation describes it.
 | How is a plan approved? | `submit-plan` is a call that always asks, and the preview is the plan | Approval inside the waiting call; the fingerprint ties it to the text |
 | What if a rule allows `submit-plan`? | The gate asks anyway | A rule or a session answer must not stand in for reading the plan |
 | Where do tests run? | In the sandbox; otherwise only after you approve the exact commands | An agent that can run anything on your account for its own checks is the thing the sandbox is for |
+| Can a test run outside it by choice? | Only for a repository whose entry says `outside`, and then through `bash`'s own question | The model cannot choose it, and the plugin invents no second way to ask |
 | What is a test result tied to? | The full HEAD and a clean tree | A pass on files that are not the commit proves nothing about the push |
 | Is a dirty-tree pass kept? | Shown, never counted | It is useful to the agent and not evidence |
 | Who writes `workflow.json`? | Only the plugin; guarded from file tools and the sandbox | An agent that could edit it could mark anything passed |
@@ -82,7 +86,7 @@ Each is small, and each plugin's own documentation describes it.
 | Can a workflow start by itself? | No; the session start line suggests one | Starting writes into the ticket folder |
 | Is `back` free? | Yes, and it erases nothing | Going back to fix a plan must be easy; evidence is checked against what is now |
 | How is review evidence trusted? | An event with full commits, for a bound repository, that covers commits | The agent cannot publish on the bus; the page's passkey is what proves you |
-| `checks-pass` from where? | A CI watch for the commit, else `gh pr view`'s roll-up | The watch knows the required checks; the roll-up needs no setup |
+| `checks-pass` from where? | A CI watch for the commit, else the roll-up from `gh pr view` or, on GitLab, the pipeline's jobs | The watch knows the required checks; the roll-up needs no setup |
 
 ## Where this comes from
 
@@ -118,6 +122,7 @@ and you on an acceptance environment.
 | `bind` asks `jig-git` for a worktree | It runs the `git` tool through `ctx.executeTool`, so `jig-core` governs it as a nested call, and it reads the path from the tool's details |
 | A plan that fails the check is refused | The check runs in the preview, so it is refused before anyone is asked, with every problem listed |
 | `workflow test` asks when there is no sandbox | The gate asks, and the tool checks again when it runs: a sandbox that went away in between is a refusal, never an unasked run |
+| A test outside the sandbox asks by itself | It calls `bash` with `outside: true` through `ctx.executeTool`, with the line `cd <repository> && ...`, because `bash` runs in Pi's folder and has no folder of its own |
 | A hold is scoped by the repository a call acts in | `write` and `edit` by their paths, `git` and `pr` by the repository they name (worked out as `jig-git` does), any other tool for the work as a whole; a repository that cannot be worked out is not held |
 
 ## Tests
@@ -130,7 +135,8 @@ and you on an acceptance environment.
   not elsewhere; the calls that always ask, even with an allow rule and a session answer; the whole path in a
   real `jig-core`, where a gate cannot loosen anything.
 - **Tests:** the command per repository, the build-file defaults, a fake sandbox provider for the sandboxed
-  path, the unsandboxed ask, and one run in the real sandbox. That test needs `bwrap`, `socat`, `rg` and
+  path, the unsandboxed ask, the runs outside through the real `jig-core` (asked, allowed by a rule that names the command,
+  refused with no screen, recorded, counted at HEAD; the `bash` tool is a stand-in), and one run in the real sandbox. That test needs `bwrap`, `socat`, `rg` and
   `python3`, skips with the reason when they are missing, and fails in CI, like `jig-sandbox`'s own.
 - **State:** atomic writes, an invalid file, switching with its archive, the protected path.
 - **The tool and the commands:** every action, with a fake `jig-core` and a fake Pi.

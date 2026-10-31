@@ -9,7 +9,7 @@ export interface PrWatchSpec {
     number: number;
     /** `"gitlab"` for a merge request. Left out for GitHub, so the specs that were saved before GitLab are read as they were. */
     forge?: "gitlab";
-    /** The GitLab host that `glab` talks to. */
+    /** The host `glab` talks to on GitLab. On GitHub: the host `gh` talks to, left out for github.com, so the specs that were saved before it are read as they were. */
     host?: string;
 }
 

@@ -5,7 +5,8 @@
 import type { ExtensionAPI, ExtensionCommandContext, ToolInfo } from "@earendil-works/pi-coding-agent";
 import { classify } from "./classify.ts";
 import type { Classification, ClassSource } from "./classify.ts";
-import { describeProblem } from "./config.ts";
+import { describeProblem, effectiveBackends } from "./config.ts";
+import type { EnvironmentInfo } from "./contract.ts";
 import { decide } from "./decide.ts";
 import { errorMessage } from "./errors.ts";
 import { FILE_TOOLS } from "./protected-paths.ts";
@@ -101,6 +102,8 @@ export function statusLines(state: JigState): string[] {
         `jig-core governs ${tools.length} tools${state.sessionId === undefined ? "" : ` in session ${state.sessionId}`}`,
         sandboxLine(state),
         `Plugins: ${[...plugins].join(", ")}`,
+        environmentsLine(state),
+        secretBackendsLine(state),
         `Tools on the unknown default (they ask until classified): ${unclassified.length === 0 ? "none" : unclassified.join(", ")}`,
         watchesLine(state),
         ...(gates.length === 0
@@ -166,10 +169,50 @@ export function sandboxLine(state: JigState): string {
     }
 }
 
-/** What `/jig` says about one registered section. */
+const ENVIRONMENT_SOURCE: Record<EnvironmentInfo["source"], string> = {
+    "built-in": "built in",
+    company: "a company plugin",
+    personal: "your jig.json",
+};
+
+/**
+ * The environments a call can act in, grouped by who defined them: `Environments: built in: local, external, production;
+ * a company plugin: dev (test), prod (production)`. A built-in name is its own kind, so only the others show one.
+ */
+export function environmentsLine(state: JigState): string {
+    const groups: string[] = [];
+    const all = state.policy().environments.list();
+    for (const source of ["built-in", "company", "personal"] as const) {
+        const names = all
+            .filter((entry) => entry.source === source)
+            .map((entry) => (source === "built-in" ? entry.name : `${entry.name} (${entry.kind})`));
+        if (names.length > 0) groups.push(`${ENVIRONMENT_SOURCE[source]}: ${names.join(", ")}`);
+    }
+    return `Environments (any other name counts as production): ${groups.join("; ")}`;
+}
+
+/**
+ * Which secret backends can resolve a reference, and who turned them on or off: `Secret backends on: pass, cmd (cmd enabled
+ * by a company plugin); turned off by you: env`.
+ */
+export function secretBackendsLine(state: JigState): string {
+    const { on, byCompany, off } = effectiveBackends(state.personal.config.secrets, state.company);
+    const enabled = byCompany.length === 0 ? "" : ` (${byCompany.join(", ")} enabled by a company plugin)`;
+    const disabled = off.length === 0 ? "" : `; turned off by you: ${off.join(", ")}`;
+    return `Secret backends on: ${on.length === 0 ? "none" : on.join(", ")}${enabled}${disabled}`;
+}
+
+/**
+ * What `/jig` says about one registered section: loaded, waiting for the part only you can give, "not set" when nothing
+ * (no company defaults, nothing in the file) set it, and otherwise a section that did not load. A file that could not be
+ * read as a whole says nothing of its sections, so they are not called "not set".
+ */
 function sectionState(state: JigState, name: string): string {
-    if (state.personal.sections.has(name)) return "loaded";
-    return state.personal.incomplete.has(name) ? "company defaults incomplete" : "not set or invalid";
+    const { personal } = state;
+    if (personal.sections.has(name)) return "loaded";
+    if (personal.incomplete.has(name)) return "company defaults incomplete";
+    const unreadable = personal.problems.some((problem) => problem.key === "(file)");
+    return personal.invalid.has(name) || unreadable ? "not set or invalid" : "not set";
 }
 
 /** `Open watches: 3 (1 paused, 1 waiting for its plugin)`: each watch not finished, and why some do not poll. */

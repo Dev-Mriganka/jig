@@ -101,6 +101,7 @@ export function installFakeJig(): FakeJig {
                     : name === "production" || name === "prod"
                       ? "production"
                       : "test",
+            list: () => [],
         },
         tunnels: {
             register: () => {},
@@ -154,6 +155,7 @@ export function installFakeJig(): FakeJig {
             addClassifyRules: () => {},
             addProtectedPaths: () => {},
             addSecretCommands: () => {},
+            enableSecretBackends: () => {},
             addMaskFields: () => {},
             addSectionDefaults: () => {},
             registerSection: (name, validate) => void sections.set(name, validate),

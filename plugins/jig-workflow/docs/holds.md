@@ -71,6 +71,10 @@ that your answer is a fresh one ([Approvals](../../../docs/approvals.md)):
 "Allow for this session" on these allows that one call: the gate asks again next time. With no screen
 (a headless run, a child agent without a dialog) an `ask` is a `deny`, so none of these happens unseen.
 
+A repository whose test entry says `outside` is not in this table. With a sandbox the gate lets `workflow test` through,
+and the question is the `bash` tool's own, asked in a nested call for that repository's command
+([Tests](tests.md#a-command-that-needs-what-the-sandbox-hides)).
+
 ## What a hold does not cover
 
 - **`bash`.** A sandboxed shell can change a file, which is why the sandbox tells the agent to change code

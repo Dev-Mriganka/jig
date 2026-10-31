@@ -54,8 +54,12 @@ describe("loaded after jig-core and every built plugin", () => {
         const lines = await world.jigLines();
         assert.ok(
             lines.includes(
-                "jig-acme: environments dev (test), staging (test), prod (production); sign-in acme-sso; transport acme-gateway; tunnel acme-bastion",
+                "Environments (any other name counts as production): built in: local, external, production; a company plugin: dev (test), staging (test), prod (production)",
             ),
+            lines.join("\n"),
+        );
+        assert.ok(
+            lines.includes("jig-acme: sign-in acme-sso; transport acme-gateway; tunnel acme-bastion"),
             lines.join("\n"),
         );
         assert.ok(lines.some((line) => /acme\.bastion\.user is not set/.test(line)));
@@ -78,6 +82,15 @@ describe("loaded after jig-core and every built plugin", () => {
         assert.equal(world.api.environments.kindOf("qa"), "production", "a name nobody defined counts as production");
     });
 
+    test("environments.list names the company's environments as the company's", async () => {
+        world = await startWorld();
+        const company = world.api.environments.list().filter((entry) => entry.source === "company");
+        assert.deepEqual(
+            company.map((entry) => [entry.name, entry.kind]),
+            Object.entries(ENVIRONMENTS).map(([name, config]) => [name, config.kind]),
+        );
+    });
+
     test("it does not matter whether jig-acme loads before jig-core or after it", async () => {
         const after = await startWorld();
         const linesAfter = await after.jigLines();
@@ -97,6 +110,6 @@ describe("loaded after jig-core and every built plugin", () => {
         // A user may load some Jig plugins only; defaults for a section nobody registered change nothing.
         world = await startWorld({ plugins: false });
         assert.deepEqual(await world.problems(), []);
-        assert.ok((await world.jigLines()).some((line) => line.startsWith("jig-acme: environments")));
+        assert.ok((await world.jigLines()).some((line) => line.startsWith("jig-acme: sign-in")));
     });
 });

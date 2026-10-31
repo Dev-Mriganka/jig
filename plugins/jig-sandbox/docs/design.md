@@ -133,6 +133,10 @@ broker, which is the runtime's process, so it sends the question over its pipe t
 - **`ask`:** a host in `allow` or in your kept answers is allowed; any other asks you, while
   the connection waits (see [Asking you](#asking-you)).
 
+`allow` and `deny` exist only in these two modes. In `open` there is no proxy and nothing reads
+them, so a `deny` list there refuses nothing: `/sandbox` (a note, from the check made when the
+sandbox starts) and `/sandbox doctor` say so. In `off` there is no network to refuse.
+
 `allow` and `deny` are read by the callback and not given to the runtime. A host that
 the runtime's own list decides is not checked for a private address, and an entry such as
 `10.0.0.5` in `allow` would have opened one.

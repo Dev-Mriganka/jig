@@ -6,14 +6,12 @@
 // `forward` (a local port that reaches the one host and port, used as the SSH forward is) or a `socks` proxy (the driver reaches
 // every host of the address through it, so a replica set or a `mongodb+srv` address works).
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { connect, createServer } from "node:net";
 import path from "node:path";
 import type { OpenedTunnel, RunOptions, RunResult } from "../../jig-core/src/contract.ts";
+import { freePort as freeLocalPort, PortWaitError, portAccepts, waitForPort } from "../../jig-core/src/kit/ports.ts";
 import type { HostPort, Route, SshRoute } from "./config.ts";
 import { RouteError } from "./errors.ts";
 import { oneLine } from "./values.ts";
-
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * A running route. `forward`: connect to `127.0.0.1:port` to reach the database. `socks`: `127.0.0.1:port` is a SOCKS5 proxy, and
@@ -45,39 +43,19 @@ export interface RouteDeps {
 }
 
 /**
- * A port nothing listens on. A listener that was just closed can go on accepting connections for a few milliseconds, which would
- * look like a forward that is up, so the port is only handed out once it refuses connections.
+ * A port nothing listens on, once it refuses connections (see jig-core's `kit/ports.ts`: a listener that was just closed can go
+ * on accepting for a few milliseconds, which would look like a forward that is up).
  */
 export async function freePort(): Promise<number> {
-    const port = await new Promise<number>((resolve, reject) => {
-        const server = createServer();
-        server.once("error", () => reject(new RouteError("cannot find a free local port for the SSH forward")));
-        server.listen(0, "127.0.0.1", () => {
-            const address = server.address();
-            const found = typeof address === "object" && address !== null ? address.port : 0;
-            server.close(() =>
-                found > 0
-                    ? resolve(found)
-                    : reject(new RouteError("cannot find a free local port for the SSH forward")),
-            );
-        });
-    });
-    for (let attempt = 0; attempt < 100 && (await probe(port)); attempt++) await sleep(10);
-    return port;
+    try {
+        return await freeLocalPort();
+    } catch {
+        throw new RouteError("cannot find a free local port for the SSH forward");
+    }
 }
 
-export function probe(port: number): Promise<boolean> {
-    return new Promise((resolve) => {
-        const socket = connect({ host: "127.0.0.1", port });
-        const done = (ok: boolean): void => {
-            socket.destroy();
-            resolve(ok);
-        };
-        socket.setTimeout(2000, () => done(false));
-        socket.once("connect", () => done(true));
-        socket.once("error", () => done(false));
-    });
-}
+/** Whether something accepts connections on `127.0.0.1:port`. */
+export const probe = (port: number): Promise<boolean> => portAccepts(port);
 
 /** What ssh said, as one line the user can act on. The text of ssh itself is not repeated: it can hold addresses and paths. */
 export function classifySshFailure(code: number | null, stderr: string): RouteError {
@@ -183,24 +161,28 @@ async function startSsh(
         const stop = (): void => stopper.abort();
         signal?.addEventListener("abort", stop, { once: true });
 
-        const deadline = Date.now() + deps.readyTimeoutMs;
         try {
-            for (;;) {
-                if (cancelled()) throw new RouteError("the call was cancelled while the SSH forward was starting");
-                if (ended !== undefined) {
-                    throw ended instanceof Error
+            await waitForPort(port, {
+                timeoutMs: deps.readyTimeoutMs,
+                pollMs: deps.pollMs,
+                ready: deps.probe,
+                ...(signal === undefined ? {} : { signal }),
+                failed: () => {
+                    if (ended === undefined) return undefined;
+                    return ended instanceof Error
                         ? new RouteError(`the SSH forward could not start: ${ended.message}`)
                         : classifySshFailure(ended.code, ended.stderr);
-                }
-                if (await deps.probe(port)) break;
-                if (Date.now() > deadline)
-                    throw new RouteError(
-                        "the SSH forward did not become ready in time: check the bastion and the network",
-                    );
-                await sleep(deps.pollMs);
-            }
+                },
+            });
         } catch (error) {
             stop();
+            if (error instanceof PortWaitError) {
+                throw new RouteError(
+                    error.reason === "cancelled"
+                        ? "the call was cancelled while the SSH forward was starting"
+                        : "the SSH forward did not become ready in time: check the bastion and the network",
+                );
+            }
             throw error;
         } finally {
             signal?.removeEventListener("abort", stop);

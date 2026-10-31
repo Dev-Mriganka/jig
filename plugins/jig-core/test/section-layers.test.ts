@@ -455,3 +455,93 @@ describe("keys that exclude each other (oneOf)", () => {
         assert.deepEqual(state.sectionOneOf.get("logs"), rivals);
     });
 });
+
+describe("lists that add up (union)", () => {
+    const company = { folders: ["/company/a", "/company/b"], other: ["x"], nested: { hosts: ["h1"] } };
+
+    test("the company's entries come first, then yours, each once", () => {
+        assert.deepEqual(layered(company, { folders: ["/mine", "/company/b", "/mine"] }, [], [], ["folders"]), {
+            folders: ["/company/a", "/company/b", "/mine"],
+            other: ["x"],
+            nested: { hosts: ["h1"] },
+        });
+    });
+
+    test("only the lists the plugin named add up: another list is replaced as ever", () => {
+        const out = layered(company, { folders: ["/mine"], other: ["y"] }, [], [], ["folders"]) as typeof company;
+        assert.deepEqual(out.other, ["y"]);
+        assert.deepEqual(layered(company, { folders: ["/mine"] }), { ...company, folders: ["/mine"] });
+    });
+
+    test("a path can go down into objects, with * for any name", () => {
+        assert.deepEqual(layered(company, { nested: { hosts: ["h2"] } }, [], [], ["nested.hosts"]), {
+            ...company,
+            nested: { hosts: ["h1", "h2"] },
+        });
+        const theirs = { services: { a: { hosts: ["a1"] }, b: { hosts: ["b1"] } } };
+        assert.deepEqual(layered(theirs, { services: { a: { hosts: ["a2"] } } }, [], [], ["services.*.hosts"]), {
+            services: { a: { hosts: ["a1", "a2"] }, b: { hosts: ["b1"] } },
+        });
+    });
+
+    test("entries that are not text add up too, each once by value", () => {
+        assert.deepEqual(layered({ l: [{ a: 1 }, 2] }, { l: [{ a: 1 }, 2, { a: 2 }] }, [], [], ["l"]), {
+            l: [{ a: 1 }, 2, { a: 2 }],
+        });
+    });
+
+    test("with only one side there is nothing to add: it is that side; a value that is not a list replaces", () => {
+        assert.deepEqual(layered(undefined, { folders: ["/mine"] }, [], [], ["folders"]), { folders: ["/mine"] });
+        assert.deepEqual(layered(company, {}, [], [], ["folders"]), company);
+        assert.deepEqual(layered(company, { folders: "/mine" }, [], [], ["folders"]), { ...company, folders: "/mine" });
+        assert.deepEqual(layered({ folders: "/theirs" }, { folders: ["/mine"] }, [], [], ["folders"]), {
+            folders: ["/mine"],
+        });
+    });
+
+    test("neither side is changed", () => {
+        const theirs = { folders: ["/a"] };
+        const mine = { folders: ["/b"] };
+        layered(theirs, mine, [], [], ["folders"]);
+        assert.deepEqual(theirs, { folders: ["/a"] });
+        assert.deepEqual(mine, { folders: ["/b"] });
+    });
+
+    test("registering checks the list, and registering again replaces it", () => {
+        const state = createState(undefined as unknown as ExtensionAPI);
+        const api: JigApi = buildApi(state);
+        const check = () => [];
+        assert.throws(
+            () => api.config.registerSection("logs", check, { union: "folders" as never }),
+            /union must be a list/,
+        );
+        assert.throws(() => api.config.registerSection("logs", check, { union: [""] }), /union must be a list/);
+        api.config.registerSection("logs", check, { union: ["folders"] });
+        assert.deepEqual(state.sectionUnion.get("logs"), ["folders"]);
+        api.config.registerSection("logs", check);
+        assert.equal(state.sectionUnion.has("logs"), false);
+    });
+
+    test("through the loader: the company's list and yours are one list in what the plugin gets", () => {
+        const { api, load, problems } = setup({
+            jira: { site: "https://jira.example.com", hosts: ["mine.example.com"] },
+        });
+        api.config.registerSection("jira", () => [], { union: ["hosts"] });
+        api.config.addSectionDefaults("jira", { ...COMPANY_AUTH, hosts: ["company.example.com"] });
+        load();
+        assert.deepEqual(api.config.section("jira"), {
+            site: "https://jira.example.com",
+            ...COMPANY_AUTH,
+            hosts: ["company.example.com", "mine.example.com"],
+        });
+        assert.deepEqual(problems(), []);
+    });
+
+    test("without the option the same files replace, which is what every plugin had", () => {
+        const { api, load } = setup({ jira: { site: "https://jira.example.com", hosts: ["mine.example.com"] } });
+        api.config.registerSection("jira", () => [], undefined);
+        api.config.addSectionDefaults("jira", { ...COMPANY_AUTH, hosts: ["company.example.com"] });
+        load();
+        assert.deepEqual((api.config.section("jira") as { hosts: string[] }).hosts, ["mine.example.com"]);
+    });
+});

@@ -21,6 +21,7 @@ import { apiGet, graphql } from "./github.ts";
 import { collectGitlab, GITLAB_HOST, GITLAB_PATH } from "./gitlab-watch.ts";
 import { plural } from "./text.ts";
 import { answerOf, fetchJson, remember, Transient } from "./watch-core.ts";
+import type { Getter } from "./watch-core.ts";
 import type { Candidate, Comment, Kind, PrWatchSpec, PrWatchState } from "./watch-core.ts";
 
 export type { PrWatchSpec, PrWatchState } from "./watch-core.ts";
@@ -53,7 +54,7 @@ const noun = (spec: PrWatchSpec): string => (isGitlab(spec) ? "merge request" : 
 export const titleOf = (spec: PrWatchSpec): string =>
     isGitlab(spec)
         ? `comments on merge request ${spec.number} in ${spec.host}/${spec.slug}`
-        : `comments on pull request ${spec.number} in ${spec.slug}`;
+        : `comments on pull request ${spec.number} in ${spec.host === undefined ? "" : `${spec.host}/`}${spec.slug}`;
 
 /** The spec of a saved watch is a file anyone with the account could edit: it is checked before it names a request. */
 function specOf(raw: unknown): PrWatchSpec {
@@ -76,11 +77,12 @@ function specOf(raw: unknown): PrWatchSpec {
         typeof spec?.slug !== "string" ||
         !SLUG.test(spec.slug) ||
         !Number.isInteger(spec.number) ||
-        (spec.number as number) < 1
+        (spec.number as number) < 1 ||
+        (spec.host !== undefined && (typeof spec.host !== "string" || !GITLAB_HOST.test(spec.host)))
     ) {
         throw new Error("this watch does not name a pull request as owner/name and a number");
     }
-    return { slug: spec.slug, number: spec.number as number };
+    return { slug: spec.slug, number: spec.number as number, ...(spec.host === undefined ? {} : { host: spec.host }) };
 }
 
 // ---- what GitHub holds ------------------------------------------------------------------------------------------------
@@ -151,7 +153,11 @@ async function threadsOf(spec: PrWatchSpec, signal: AbortSignal): Promise<Map<nu
     const found = new Map<number, string>();
     try {
         const [owner = "", name = ""] = spec.slug.split("/");
-        const data = await graphql<ThreadData>(THREADS, { owner, name, number: spec.number }, { signal });
+        const data = await graphql<ThreadData>(
+            THREADS,
+            { owner, name, number: spec.number },
+            { signal, host: spec.host },
+        );
         for (const thread of data.repository.pullRequest?.reviewThreads.nodes ?? []) {
             for (const comment of thread.comments.nodes) {
                 if (typeof comment.databaseId === "number") found.set(comment.databaseId, thread.id);
@@ -239,9 +245,14 @@ const newState = (): PrWatchState => ({
 /** The wait after the `n`th failure in a row that goes away by itself: 2, 4, 8, then 10 minutes. */
 export const backoffMs = (n: number): number => Math.min(POLL_MS * 2 ** n, MAX_WAIT_MS);
 
-async function whoAmI(state: PrWatchState, signal: AbortSignal, now: number): Promise<string> {
+async function whoAmI(
+    state: PrWatchState,
+    signal: AbortSignal,
+    now: number,
+    host: string | undefined,
+): Promise<string> {
     if (state.me !== undefined) return state.me;
-    const response = await apiGet("user", { signal });
+    const response = await apiGet("user", { signal, host });
     const login = (answerOf("user", response, now) as { login?: string } | undefined)?.login;
     if (typeof login !== "string" || login === "") throw new Error("GitHub did not say which user gh is signed in as");
     return login;
@@ -255,12 +266,14 @@ async function collectGithub(
     now: number,
     bots: boolean,
 ): Promise<Comment[]> {
-    const me = (await whoAmI(state, signal, now)).toLowerCase();
+    // Every request goes to the host the spec names, when it is not github.com.
+    const get: Getter = (path, options) => apiGet(path, { ...options, host: spec.host });
+    const me = (await whoAmI(state, signal, now, spec.host)).toLowerCase();
     state.me = me;
 
     const base = `repos/${spec.slug}`;
     const pull = `${base}/pulls/${spec.number}`;
-    const head = await fetchJson(apiGet, pull, state, signal, now);
+    const head = await fetchJson(get, pull, state, signal, now);
     if (head.changed) {
         const raw = head.body as { merged?: boolean; state?: string; base?: { ref?: string }; html_url?: string };
         state.pr = {
@@ -281,19 +294,13 @@ async function collectGithub(
         remember(state, kind, candidates, me, bots, found);
     };
 
-    const lines = await fetchJson(
-        apiGet,
-        `${pull}/comments?per_page=100&sort=created&direction=desc`,
-        state,
-        signal,
-        now,
-    );
+    const lines = await fetchJson(get, `${pull}/comments?per_page=100&sort=created&direction=desc`, state, signal, now);
     if (lines.changed) take("review", list(lines.body));
-    const reviews = await fetchJson(apiGet, `${pull}/reviews?per_page=100`, state, signal, now);
+    const reviews = await fetchJson(get, `${pull}/reviews?per_page=100`, state, signal, now);
     if (reviews.changed) take("summary", list(reviews.body));
     const since = state.since === undefined ? "" : `&since=${encodeURIComponent(state.since)}`;
     const talk = await fetchJson(
-        apiGet,
+        get,
         `${base}/issues/${spec.number}/comments?per_page=100${since}`,
         state,
         signal,

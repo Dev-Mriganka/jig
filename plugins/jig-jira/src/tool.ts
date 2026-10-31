@@ -10,7 +10,7 @@ import { settingsOf } from "./config.ts";
 import { createHttp } from "./http.ts";
 import type { Timeouts } from "./http.ts";
 import { ACTIONS, parameters, parseCall } from "./params.ts";
-import type { Call } from "./params.ts";
+import type { Call, ParseOptions } from "./params.ts";
 import { fingerprintOf } from "./plan.ts";
 import { buildPlan } from "./plans.ts";
 import { runRead } from "./reads.ts";
@@ -54,12 +54,17 @@ export function createTool(options: JiraOptions = {}): JiraTool {
         return { settings, session, http };
     }
 
+    /** How a call is read: with the user's project keys, so that a search may leave the JQL out. */
+    function parsing(): ParseOptions {
+        return { projects: settingsOf(jig().config.section("jira"))?.projects ?? [] };
+    }
+
     return {
         classify: (input) => classifyCall(input, settingsOf(jig().config.section("jira"))),
 
         async preview(input, signal) {
             try {
-                const call = parseCall(input);
+                const call = parseCall(input, parsing());
                 if (ACTIONS[call.action].kind === "read") return { summary: describeCall(call) };
                 const plan = await buildPlan(envFor(signal), call, true);
                 return { ...previewOf(plan.shown), fingerprint: fingerprintOf(plan) };
@@ -83,7 +88,7 @@ export function createTool(options: JiraOptions = {}): JiraTool {
             // One call at a time and in order: a comment must be on the issue before the transition that follows it.
             executionMode: "sequential",
             async execute(toolCallId, params, signal) {
-                const call = parseCall(params);
+                const call = parseCall(params, parsing());
                 const env = envFor(signal);
                 if (ACTIONS[call.action].kind === "read") {
                     const text = await runRead(env, call);

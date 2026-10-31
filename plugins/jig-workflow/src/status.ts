@@ -4,7 +4,7 @@ import { evaluate } from "./conditions.ts";
 import type { ConditionResult } from "./conditions.ts";
 import { callText } from "./definition.ts";
 import type { Condition, Workflow } from "./definition.ts";
-import { matching } from "./load.ts";
+import { matching, turnedOff } from "./load.ts";
 import { short } from "./repos.ts";
 import type { Runtime, Work } from "./runtime.ts";
 import type { WorkflowState } from "./store.ts";
@@ -69,8 +69,11 @@ export async function ticketStatus(rt: Runtime, work: Work, options: StatusOptio
     if (loaded === undefined) {
         return {
             text:
-                `${ticket}: the workflow ${state.workflow} is at stage ${state.stage}, and no workflow file of that name is loaded ` +
-                "(run /workflow reload, or see /workflow list for files that failed). Its holds are not enforced until it is found.",
+                `${ticket}: the workflow ${state.workflow} is at stage ${state.stage}, and ` +
+                (turnedOff(rt.loaded, state.workflow)
+                    ? "workflow.disabled in jig.json turns it off. Its holds are not enforced while it is off."
+                    : "no workflow file of that name is loaded (run /workflow reload, or see /workflow list for files that failed). " +
+                      "Its holds are not enforced until it is found."),
             details: { ...none, workflow: state.workflow, stage: state.stage },
         };
     }

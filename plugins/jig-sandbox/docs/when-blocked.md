@@ -23,7 +23,7 @@ gets `[sandbox] no network: the sandbox's network mode is off.`
 | it is a cloud metadata address, and those are always blocked | Metadata services give out credentials; no setting opens them |
 | it is this machine's own address; list its port in `sandbox.network.localhost` | A service on this machine is reachable only for a port you listed |
 | it is a private network address, link-local, or in 100.64.0.0/10 | The machine's neighbours are always blocked |
-| it is on `sandbox.network.deny` (the entry) | You refused the host |
+| it is on `sandbox.network.deny` (the entry) | You refused the host. `deny` applies in `filtered` and `ask` only |
 | it was refused: the user said no | You answered No when asked |
 | it is not allowed, and there is no screen to ask on | `ask` mode with no screen: `/sandbox allowed add <host>` allows it |
 | it is not a valid host name or address | A spelling a program could read as another address, such as `2130706433` |

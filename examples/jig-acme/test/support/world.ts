@@ -78,19 +78,6 @@ function jigPlugins(): ExtensionFactory[] {
 
 const SAVED = ["JIG_STATE_DIR", "PI_CODING_AGENT_DIR"] as const;
 
-/**
- * jig-core's fake Pi has the calls jig-core makes. The other plugins make a few more (jig-lens draws an entry, jig-theme reads the
- * thinking level), and none of them matters to what these tests look at, so a missing one is given a stand-in that does nothing.
- */
-function completed(pi: ExtensionAPI): ExtensionAPI {
-    const stand = pi as unknown as Record<string, unknown>;
-    for (const name of ["registerEntryRenderer", "appendEntry", "sendUserMessage", "registerMessageRenderer"]) {
-        stand[name] ??= () => undefined;
-    }
-    stand.getThinkingLevel ??= () => "off";
-    return pi;
-}
-
 export async function startWorld(options: WorldOptions = {}): Promise<World> {
     const root = mkdtempSync(path.join(tmpdir(), "jig-acme-"));
     const saved = Object.fromEntries(SAVED.map((name) => [name, process.env[name]]));
@@ -105,7 +92,6 @@ export async function startWorld(options: WorldOptions = {}): Promise<World> {
     write(options.personal);
 
     const host = fakePi();
-    completed(host.pi);
     const acme = jigAcme(options.acme);
     const company = options.company !== false;
     if (company && options.acmeFirst === true) acme(host.pi as ExtensionAPI);
@@ -114,8 +100,6 @@ export async function startWorld(options: WorldOptions = {}): Promise<World> {
     if (company && options.acmeFirst !== true) acme(host.pi as ExtensionAPI);
 
     const { ctx, log } = fakeContext({ ui: { select: () => options.answer }, mode: "rpc" });
-    // The same for the session: jig-memory reads the branch of the conversation when a session starts.
-    (ctx.sessionManager as unknown as Record<string, unknown>).getBranch = () => [];
     await host.fire("session_start", { reason: "startup" }, ctx);
 
     async function jigLines(argument = ""): Promise<string[]> {

@@ -74,6 +74,13 @@ function screenNames(screen: Screen): string {
 
 export async function planCreate(env: Env, call: CallOf<"create">, preview: boolean): Promise<Plan> {
     const { settings } = env;
+    // Before anything is asked of Jira: a project outside the user's list is a mistake to correct, not a thing to approve.
+    if (settings.projects.length > 0 && !settings.projects.includes(call.project)) {
+        throw new InputError(
+            `jira create: ${call.project} is not one of your projects (${settings.projects.join(", ")}); ` +
+                "jira.projects in jig.json lists the projects create may use",
+        );
+    }
     const screen = await readScreen(env, call.project, call.type);
     const where = screen === undefined ? call.project : `${screen.type.name} in ${call.project}`;
     const given = new Map<string, Given>();

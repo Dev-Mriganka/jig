@@ -3,6 +3,7 @@
 // parseCall all come from it, so they cannot drift apart.
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
+import { PROJECT_KEY } from "./config.ts";
 import { convertField, MAX_TEXT } from "./fields.ts";
 import { InputError, shortList } from "./values.ts";
 
@@ -72,7 +73,12 @@ function describeActions(): string {
 export const parameters = Type.Object({
     action: StringEnum(ACTION_NAMES, { description: `What to do. Needs: ${describeActions()}` }),
     key: Type.Optional(Type.String({ description: "Issue key, such as PROJ-123" })),
-    jql: Type.Optional(Type.String({ description: "JQL query" })),
+    jql: Type.Optional(
+        Type.String({
+            description:
+                "JQL query. A search may leave it out only when the user has listed projects in jig.json, and then looks in them",
+        }),
+    ),
     page: Type.Optional(Type.String({ description: "Search: the page value the previous result gave" })),
     limit: Type.Optional(
         Type.Integer({
@@ -139,7 +145,6 @@ export type Call =
     | { action: "unlink"; key: string; to: string; linkType: string | undefined };
 
 const ISSUE_KEY = /^[A-Z][A-Z0-9_]*-[1-9][0-9]{0,9}$/;
-const PROJECT_KEY = /^[A-Z][A-Z0-9_]{0,19}$/;
 const COMMENT_ID = /^[0-9]{1,20}$/;
 const MAX_FIELDS = 30;
 
@@ -160,12 +165,22 @@ function present(value: unknown): boolean {
     return value !== undefined && value !== null;
 }
 
+export interface ParseOptions {
+    /** The user's project keys (`jira.projects`). With any, a `search` needs no JQL: it looks in these projects. */
+    projects?: readonly string[];
+}
+
+/** What `search` looks for when the call has no JQL: the newest issues of the user's projects. */
+export function projectsQuery(projects: readonly string[]): string {
+    return `project in (${projects.map((key) => `"${key}"`).join(", ")}) ORDER BY updated DESC`;
+}
+
 /**
  * Checks a call against its action's table and returns it in a typed form. Every problem is an InputError, a
  * `TypeError` that says what to change, with the action's usage line when the shape is wrong, so the model can correct
  * the call at once.
  */
-export function parseCall(input: Readonly<Record<string, unknown>>): Call {
+export function parseCall(input: Readonly<Record<string, unknown>>, options: ParseOptions = {}): Call {
     const action = input.action;
     if (!isAction(action)) {
         // The schema lists every action and Pi checks against it first, so this reaches the model rarely and stays short.
@@ -173,8 +188,11 @@ export function parseCall(input: Readonly<Record<string, unknown>>): Call {
             `jira: action must be one of ${shortList(ACTION_NAMES, ", ", 100)} (got ${shown(action)})`,
         );
     }
-    const { required, optional }: ActionSpec = ACTIONS[action];
-    const known: readonly string[] = ["action", ...required, ...optional];
+    const { required: listed, optional }: ActionSpec = ACTIONS[action];
+    const projects = options.projects ?? [];
+    // A search with no JQL is for the user's projects, so with some listed `jql` is optional.
+    const required: readonly Param[] = action === "search" && projects.length > 0 ? [] : listed;
+    const known: readonly string[] = ["action", ...listed, ...optional];
 
     const extra = Object.keys(input).filter((name) => present(input[name]) && !known.includes(name));
     if (extra.length > 0) throw new InputError(`jira ${action} does not use ${extra.join(", ")}. ${usage(action)}`);
@@ -250,7 +268,7 @@ export function parseCall(input: Readonly<Record<string, unknown>>): Call {
         case "get":
             return { action, key: issueKey(), include: include(), full: flag("full") };
         case "search": {
-            const jql = words("jql", 8000).replace(/\s+/g, " ");
+            const jql = present(input.jql) ? words("jql", 8000).replace(/\s+/g, " ") : projectsQuery(projects);
             const page = present(input.page) ? words("page", 2000) : undefined;
             return { action, jql, limit: limit(), page, include: include() };
         }

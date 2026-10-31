@@ -9,6 +9,8 @@ const REQUEST: TransportRequest = {
     method: "POST",
     url: "https://logs.example.com/app-*/_search",
     body: "{}",
+    maxBytes: 1024,
+    timeoutMs: 5000,
 };
 
 describe("transports", () => {
@@ -27,6 +29,52 @@ describe("transports", () => {
             status: 200,
             headers: { "content-type": "application/json" },
             body: '{"hits":{}}',
+        });
+    });
+
+    test("tell the transport how much of the reply is read and how long to wait, and fill in what a caller left out", async () => {
+        const transports = createTransports();
+        const seen: TransportRequest[] = [];
+        transports.register("company", {
+            request: async (request) => {
+                seen.push(request);
+                return { status: 200, headers: {}, body: "" };
+            },
+        });
+        await transports.request("company", REQUEST);
+        const { maxBytes: _bytes, timeoutMs: _time, ...bare } = REQUEST;
+        await transports.request("company", bare as TransportRequest);
+        await transports.request("company", { ...REQUEST, maxBytes: 0, timeoutMs: Number.NaN });
+        assert.deepEqual(
+            seen.map((request) => [request.maxBytes, request.timeoutMs]),
+            [
+                [1024, 5000],
+                [4 * 1024 * 1024, 30_000],
+                [4 * 1024 * 1024, 30_000],
+            ],
+        );
+    });
+
+    test("may return a repeated header as a list, which is kept as a list", async () => {
+        const transports = createTransports();
+        transports.register("company", {
+            request: async () => ({
+                status: 200,
+                headers: {
+                    "Set-Cookie": ["a=1", "b=2"],
+                    "X-One": ["only"],
+                    Via: "proxy",
+                    "x-Trace": "t-1",
+                    "X-TRACE": "t-2",
+                },
+                body: "",
+            }),
+        });
+        assert.deepEqual((await transports.request("company", REQUEST)).headers, {
+            "set-cookie": ["a=1", "b=2"],
+            "x-one": ["only"],
+            via: "proxy",
+            "x-trace": ["t-1", "t-2"],
         });
     });
 
@@ -60,6 +108,7 @@ describe("transports", () => {
             [{ status: 200, headers: {}, body: 5 }, /body is not text/],
             [{ status: 200, headers: [], body: "" }, /headers that are not an object/],
             [{ status: 200, headers: { a: 1 }, body: "" }, /header \(a\) that is not text/],
+            [{ status: 200, headers: { a: ["x", 2] }, body: "" }, /header \(a\) that is not text/],
         ] as const) {
             transports.register("bad", { request: async () => bad as never });
             await assert.rejects(transports.request("bad", REQUEST), message);

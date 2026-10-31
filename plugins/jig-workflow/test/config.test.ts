@@ -34,6 +34,22 @@ describe("validating the section", () => {
         assert.match(validateWorkflow({ folders: [3] })[0] ?? "", /^workflow.folders\[0\]/);
     });
 
+    test("disabled: a list of workflow names", () => {
+        assert.deepEqual(validateWorkflow({ disabled: [] }), []);
+        assert.deepEqual(validateWorkflow({ disabled: ["feature", "bug-fix", "A1"] }), []);
+        assert.match(validateWorkflow({ disabled: "feature" })[0] ?? "", /^workflow.disabled: must be a list/);
+        for (const bad of ["", "-x", "a b", "a/b", "feature.json", 3, null, "x".repeat(65)]) {
+            assert.match(
+                validateWorkflow({ disabled: ["feature", bad] })[0] ?? "",
+                /^workflow.disabled\[1\]: use a workflow name/,
+            );
+        }
+        assert.match(
+            validateWorkflow({ disabled: Array.from({ length: 101 }, () => "x") })[0] ?? "",
+            /^workflow.disabled: at most 100 names/,
+        );
+    });
+
     test("tests: a command, or an object with a command and a timeout, by key", () => {
         assert.match(validateWorkflow({ tests: [] })[0] ?? "", /^workflow.tests: must be an object/);
         assert.match(validateWorkflow({ tests: { a: "" } })[0] ?? "", /^workflow.tests.a: must be a command/);
@@ -56,6 +72,36 @@ describe("validating the section", () => {
         );
     });
 
+    test("env: plain variables, each problem named by its key", () => {
+        assert.deepEqual(
+            validateWorkflow({
+                tests: { a: { command: "x", env: { JAVA_HOME: "~/.sdkman/candidates/java/17" } }, b: "y" },
+            }),
+            [],
+        );
+        assert.match(
+            validateWorkflow({ tests: { a: { command: "x", env: [] } } })[0] ?? "",
+            /^workflow.tests.a.env: must be/,
+        );
+        assert.deepEqual(validateWorkflow({ tests: { a: { command: "x", env: { NPM_TOKEN: "t" } } } }), [
+            "workflow.tests.a.env.NPM_TOKEN: this name looks like a credential, and credentials belong in a secret reference, not here",
+        ]);
+        assert.deepEqual(validateWorkflow({ tests: { a: { command: "x", env: { java: "17" } } } }).length, 1);
+        assert.deepEqual(validateWorkflow({ tests: { a: { command: "x", env: { A: 1 } } } }), [
+            "workflow.tests.a.env.A: must be text",
+        ]);
+    });
+
+    test("outside: true or false, in the object form", () => {
+        assert.deepEqual(validateWorkflow({ tests: { a: { command: "x", outside: true } } }), []);
+        assert.deepEqual(validateWorkflow({ tests: { a: { command: "x", outside: false } } }), []);
+        for (const bad of ["yes", 1, null, "true"]) {
+            assert.deepEqual(validateWorkflow({ tests: { a: { command: "x", outside: bad } } }), [
+                "workflow.tests.a.outside: must be true or false",
+            ]);
+        }
+    });
+
     test("testTimeoutSeconds: a whole number of seconds from 10 to 7200", () => {
         for (const bad of [9, 7201, 1.5, "900", null]) {
             assert.match(
@@ -71,7 +117,7 @@ describe("validating the section", () => {
 
 describe("the settings", () => {
     test("defaults when there is no section, and when it is not valid", () => {
-        const defaults = { folders: [], tests: [], testTimeoutSeconds: DEFAULT_TEST_TIMEOUT_SECONDS };
+        const defaults = { folders: [], disabled: [], tests: [], testTimeoutSeconds: DEFAULT_TEST_TIMEOUT_SECONDS };
         assert.deepEqual(settingsFrom(undefined), defaults);
         assert.deepEqual(settingsFrom({ folders: "no" }), defaults);
         assert.equal(DEFAULT_TEST_TIMEOUT_SECONDS, 900);
@@ -93,5 +139,54 @@ describe("the settings", () => {
             { key: "c", command: "pytest" },
         ]);
         assert.equal(settings.testTimeoutSeconds, 300);
+    });
+
+    test("disabled: the names, once each, in the order written", () => {
+        assert.deepEqual(settingsFrom({ disabled: ["b", "a", "b"] }).disabled, ["b", "a"]);
+        assert.deepEqual(settingsFrom({}).disabled, []);
+    });
+
+    test("env: ~ is the home folder in a value, and the variables keep their order", () => {
+        const settings = settingsFrom(
+            {
+                tests: {
+                    "orders-api": {
+                        command: "./gradlew test",
+                        env: { JAVA_HOME: "~/.sdkman/candidates/java/17", A: "x" },
+                    },
+                    plain: "make",
+                },
+            },
+            "/home/me",
+        );
+        assert.deepEqual(settings.tests, [
+            {
+                key: "orders-api",
+                command: "./gradlew test",
+                env: { JAVA_HOME: "/home/me/.sdkman/candidates/java/17", A: "x" },
+            },
+            { key: "plain", command: "make" },
+        ]);
+        assert.deepEqual(Object.keys(settings.tests[0]?.env ?? {}), ["JAVA_HOME", "A"]);
+    });
+
+    test("outside is kept when it is true and left out when it is not", () => {
+        const settings = settingsFrom({
+            tests: {
+                a: { command: "x", outside: true },
+                b: { command: "y", outside: false },
+                c: { command: "z" },
+            },
+        });
+        assert.deepEqual(settings.tests, [
+            { key: "a", command: "x", outside: true },
+            { key: "b", command: "y" },
+            { key: "c", command: "z" },
+        ]);
+    });
+
+    test("a section with a refused variable gives the defaults, as any invalid section does", () => {
+        const settings = settingsFrom({ tests: { a: { command: "x", env: { GH_TOKEN: "t" } } } });
+        assert.deepEqual(settings.tests, []);
     });
 });

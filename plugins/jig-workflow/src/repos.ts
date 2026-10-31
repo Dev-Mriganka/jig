@@ -3,6 +3,8 @@
 // Also here: which bound repository a tool call acts in, which is what a hold is scoped by.
 import { existsSync, realpathSync } from "node:fs";
 import path from "node:path";
+import { parseRemoteAddress } from "./forge.ts";
+import type { Remote } from "./forge.ts";
 import type { Host } from "./host.ts";
 
 export interface RepoView {
@@ -12,8 +14,10 @@ export interface RepoView {
     name: string;
     /** The repository name origin's address gives (`orders-api`), when there is an origin. */
     remoteName?: string;
-    /** `owner/name`, lower case, from origin's address. */
+    /** `owner/name`, lower case, from origin's address; the whole path when origin names groups (`group/sub/name` on GitLab). */
     slug?: string;
+    /** The host and the whole path of origin's address, when it has a host. */
+    remote?: Remote;
     /** The full commit HEAD is at. Absent when there is no commit yet. */
     head?: string;
     /** The checked-out branch. Absent when HEAD is detached. */
@@ -59,8 +63,11 @@ export async function inspect(host: Host, root: string, signal?: AbortSignal): P
     if (status.ok) view.clean = status.out === "";
     if (origin.ok) {
         const remote = parseRemote(origin.out);
+        const address = parseRemoteAddress(origin.out);
+        if (address !== undefined) view.remote = address;
         if (remote !== undefined) {
-            view.slug = remote.slug;
+            // A forge that nests groups has a path of more than two parts, and the whole path is the repository's name there.
+            view.slug = address === undefined ? remote.slug : address.path.toLowerCase();
             view.remoteName = remote.name;
         }
     }

@@ -4,7 +4,7 @@
 // `staging`) and the names its tools use for production (such as `prod`). A name nobody defined counts as
 // production, so a typo or a forgotten definition makes the rules stricter, never looser.
 import type { Problem } from "./config.ts";
-import type { EnvironmentConfig, EnvironmentKind, EnvironmentName } from "./contract.ts";
+import type { EnvironmentConfig, EnvironmentInfo, EnvironmentKind, EnvironmentName } from "./contract.ts";
 
 export const BUILT_IN_ENVIRONMENTS: Readonly<Record<string, EnvironmentKind>> = {
     local: "local",
@@ -21,11 +21,16 @@ export interface Environments {
     masks(name: EnvironmentName): boolean;
     /** Every defined name, the built-in ones first. */
     names(): string[];
+    /** Every defined name with its kind and where it came from, the built-in ones first. */
+    list(): EnvironmentInfo[];
 }
 
 /** Environments defined by one source, such as the personal file or a company plugin. */
 export interface EnvironmentLayer {
+    /** For problem messages: the file, or `company`. */
     source: string;
+    /** Whose definitions these are, for the list of environments. */
+    origin: "personal" | "company";
     environments: Readonly<Record<string, EnvironmentConfig>>;
 }
 
@@ -33,6 +38,8 @@ interface Defined {
     kind: "test" | "production";
     mask: boolean;
     source: string;
+    /** Who set the kind: the layer that defined the name, or the one that made it production. */
+    origin: "personal" | "company";
 }
 
 /**
@@ -57,7 +64,7 @@ export function buildEnvironments(layers: readonly EnvironmentLayer[]): {
             const before = defined.get(name);
             if (before === undefined) {
                 const mask = config.kind === "production" || config.mask === true;
-                defined.set(name, { kind: config.kind, mask, source: layer.source });
+                defined.set(name, { kind: config.kind, mask, source: layer.source, origin: layer.origin });
             } else if (before.kind === "production" && config.kind === "test") {
                 problems.push({
                     source: layer.source,
@@ -65,7 +72,7 @@ export function buildEnvironments(layers: readonly EnvironmentLayer[]): {
                     message: `"${name}" is production (set by ${before.source}); configuration cannot lower it to a test environment`,
                 });
             } else if (before.kind === "test" && config.kind === "production") {
-                defined.set(name, { kind: "production", mask: true, source: layer.source });
+                defined.set(name, { kind: "production", mask: true, source: layer.source, origin: layer.origin });
             } else {
                 before.mask = before.mask || config.mask === true;
             }
@@ -84,6 +91,14 @@ export function buildEnvironments(layers: readonly EnvironmentLayer[]): {
             return kind === "test" && defined.get(name)?.mask === true;
         },
         names: () => [...Object.keys(BUILT_IN_ENVIRONMENTS), ...defined.keys()],
+        list: () => [
+            ...Object.entries(BUILT_IN_ENVIRONMENTS).map(([name, kind]) => ({
+                name,
+                kind,
+                source: "built-in" as const,
+            })),
+            ...[...defined].map(([name, entry]) => ({ name, kind: entry.kind, source: entry.origin })),
+        ],
     };
     return { environments, problems };
 }

@@ -26,15 +26,24 @@ export interface Failure {
     reason: string;
 }
 
+/** A name in `workflow.disabled`: the file that was left out, or none when no file defines the name. */
+export interface Disabled {
+    name: string;
+    file?: string;
+}
+
 export interface Loaded {
     workflows: Map<string, LoadedWorkflow>;
     failures: Failure[];
+    /** The names `workflow.disabled` lists, in the order it lists them. */
+    disabled: Disabled[];
 }
 
 /** A workflow file is a few lines of JSON; anything larger is not one. */
 const MAX_FILE_BYTES = 64 * 1024;
 
-export function loadWorkflows(folders: readonly WorkflowFolder[]): Loaded {
+/** Reads the folders in order, then leaves out the workflows named in `disabled`, whichever folder their file is in. */
+export function loadWorkflows(folders: readonly WorkflowFolder[], disabled: readonly string[] = []): Loaded {
     const workflows = new Map<string, LoadedWorkflow>();
     const failures: Failure[] = [];
     for (const folder of folders) {
@@ -54,7 +63,39 @@ export function loadWorkflows(folders: readonly WorkflowFolder[]): Loaded {
             else workflows.set(parsed.name, { workflow: parsed, file, source: folder.source });
         }
     }
-    return { workflows, failures };
+    const left: Disabled[] = disabled.map((name) => {
+        const found = workflows.get(name);
+        workflows.delete(name);
+        return found === undefined ? { name } : { name, file: found.file };
+    });
+    return { workflows, failures, disabled: left };
+}
+
+/** The lines `/workflow list` adds for `workflow.disabled`: what was left out, and a name that no file defines. */
+export function disabledLines(loaded: Loaded): string[] {
+    if (loaded.disabled.length === 0) return [];
+    return [
+        "",
+        "Left out by workflow.disabled in jig.json:",
+        ...loaded.disabled.map((entry) =>
+            entry.file === undefined
+                ? `  ${entry.name}: no workflow file has this name`
+                : `  ${entry.name}: ${entry.file}`,
+        ),
+    ];
+}
+
+/** Whether `workflow.disabled` names this workflow, so that a message can say that and not "not found". */
+export function turnedOff(loaded: Loaded, name: string): boolean {
+    return loaded.disabled.some((entry) => entry.name === name);
+}
+
+/** The refusal for a ticket whose workflow is not available: turned off, or not loaded. */
+export function missingWorkflow(loaded: Loaded, workflow: string, ticket: string): string {
+    const why = turnedOff(loaded, workflow)
+        ? "turned off by workflow.disabled in jig.json"
+        : "not loaded: /workflow reload, or /workflow list for files that failed";
+    return `the workflow ${workflow} of ${ticket} is ${why}`;
 }
 
 function readOne(file: string, stem: string): Workflow | { reason: string } {
