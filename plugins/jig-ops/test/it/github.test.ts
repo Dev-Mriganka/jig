@@ -77,14 +77,23 @@ describeIt(
                 t.skip("no run of this workflow has ended yet");
                 return;
             }
-            // A job of that run, by its id, as `run` lists it.
-            const jobs = ok(await h.ci.call({ action: "run", ...jig, run_id: ids[0] }));
-            const job = /\(job (\d+)\)/.exec(jobs)?.[1];
-            assert.ok(job, jobs);
-            const text = ok(await h.ci.call({ action: "log", ...jig, run_id: ids[0], job, tail: 30 }));
-            assert.match(text, new RegExp(`^Run #${ids[0]}, job .+ \\(\\S+\\): `));
-            assert.ok(text.split("\n").length > 5, "lines of the log follow");
-            assert.ok(text.split("\n").length <= 40, "the tail was honoured");
+            // The newest run that has a job whose log is still there: a run may have skipped its jobs, or lost its logs.
+            let last = "";
+            for (const id of ids) {
+                const jobs = ok(await h.ci.call({ action: "run", ...jig, run_id: id }));
+                const job = /\(job (\d+)\)/.exec(jobs)?.[1];
+                if (job === undefined) continue;
+                const result = await h.ci.call({ action: "log", ...jig, run_id: id, job, tail: 30 });
+                if (result.error !== undefined) {
+                    last = result.error.message;
+                    continue;
+                }
+                assert.match(result.text, new RegExp(`^Run #${id}, job .+ \\(\\S+\\): `));
+                assert.ok(result.text.split("\n").length > 5, "lines of the log follow");
+                assert.ok(result.text.split("\n").length <= 40, "the tail was honoured");
+                return;
+            }
+            assert.fail(`no log could be read from the last ${ids.length} runs: ${last}`);
         });
 
         test("a run that does not exist is one line naming the call and the status", async (t) => {
