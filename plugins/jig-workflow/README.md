@@ -1,6 +1,7 @@
 # jig-workflow: named workflows, with stages, holds and evidence
 
-**Status: design.**
+**Status: built.** Tested with the real `jig-core`, real git repositories, a fake `gh` and, where
+bubblewrap is installed, the real sandbox. `gh pr view` and a CI watch have not been tried against GitHub itself.
 
 `jig-workflow` takes a piece of work, such as a ticket, through a **workflow**: a named, ordered list of
 stages, each with a goal for the agent and the conditions that let the work move on. The conditions are
@@ -134,11 +135,13 @@ trusts the project; a later file with the same name wins. Defaults per build fil
 
 ```text
 jig-workflow/
-  src/        index.ts, definition.ts + load.ts (files), store.ts (workflow.json), ticket.ts + repos.ts,
-              conditions.ts + sources.ts (evidence), plan.ts, tests.ts, gate.ts, tool.ts, commands.ts, status.ts
+  src/        index.ts (the factory), runtime.ts (the session), config.ts, definition.ts + load.ts (workflow files),
+              store.ts (workflow.json), ticket.ts + repos.ts, conditions.ts + sources.ts + listeners.ts (evidence),
+              plan.ts, tests.ts, gate.ts (holds), tool.ts + actions.ts, commands.ts, status.ts, host.ts (jig-core's
+              programs and sandbox, behind one seam)
   skills/     workflow/SKILL.md: how to take work through its workflow
   examples/   feature.json, bugfix.json, investigation.json
-  test/       one file per module, and tests inside a real jig-core
+  test/       one file per module; world.ts runs a whole session through the real jig-core
 ```
 
 ## More detail

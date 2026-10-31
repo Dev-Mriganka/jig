@@ -1,14 +1,14 @@
 # Jig agent guide
 
-Twelve of the fourteen plugins are built: `jig-core`, `jig-git`, `jig-memory`,
+Thirteen of the fourteen plugins are built: `jig-core`, `jig-git`, `jig-memory`,
 `jig-lens`, `jig-jira`, `jig-logs`, `jig-api`, `jig-ops`, `jig-review` and
-`jig-mongo`, and `jig-theme` is built as well, and `jig-sandbox` is built.
-`jig-workflow` and `jig-agents` are design.
+`jig-mongo`, and `jig-theme` is built as well, and `jig-sandbox` is built, and
+`jig-workflow` is built. `jig-agents` is design.
 
 Plugin READMEs are the specifications. Code follows them, and when either
 changes, the other changes in the same commit. Tests read the tool tables of
-`jig-git`, `jig-jira` and `jig-mongo`, and the READMEs and docs of `jig-lens`
-and `jig-theme`, so change a table and its test together.
+`jig-git`, `jig-jira` and `jig-mongo`, and the READMEs and docs of `jig-lens`,
+`jig-theme` and `jig-workflow`, so change a table and its test together.
 
 - **Read first:** [docs/architecture.md](docs/architecture.md) and
   [docs/permissions.md](docs/permissions.md).

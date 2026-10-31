@@ -44,6 +44,8 @@ What each one shows in full is in the
   denied, production results are masked, credentials are hidden from `bash`,
   nothing that needs approval runs without a screen, and Pi's file tools
   refuse protected paths (see [Permissions](../../docs/permissions.md)).
+- **A plugin's gate only tightens.** A gate sees each call after the rules and can make an allow into an
+  ask or a deny, never the reverse; one that fails denies the call ([Plugin contract](docs/plugin-contract.md#gates)).
 - **Unknown tools ask.** A tool that nothing classifies counts as a write
   outside the machine, and asks until a rule or its own hints say otherwise.
 - **Approvals happen only inside the waiting call.** There is no web endpoint

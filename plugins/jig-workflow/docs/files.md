@@ -72,6 +72,9 @@ folder above and change it.
 `feature` ends `deliver` with `pull-request-open` and `checks-pass`, and `accept` with `scenarios-pass`
 and `you-approve`.
 
+All three match `PROJ-` keys, so `start` without a name asks which one. When you copy them, give each a
+pattern of its own, such as `^BUG-\\d+$` for `bugfix`, and `start` picks by the ticket.
+
 ## A company's files
 
 A company plugin ships its own workflows in a folder of its package and tells this plugin where, with

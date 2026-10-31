@@ -38,6 +38,9 @@ const ACTIONS = {
 type ActionName = keyof typeof ACTIONS;
 const NAMES = Object.keys(ACTIONS) as ActionName[];
 
+/** The actions, in the order the README's table lists them. */
+export const ACTION_NAMES: readonly string[] = NAMES;
+
 const parameters = Type.Object(
     {
         action: StringEnum(NAMES, {

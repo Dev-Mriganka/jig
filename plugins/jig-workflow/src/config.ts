@@ -22,7 +22,9 @@ export const DEFAULT_TEST_TIMEOUT_SECONDS = 900;
 export const MIN_TIMEOUT_SECONDS = 10;
 export const MAX_TIMEOUT_SECONDS = 7200;
 
-const FIELDS: ReadonlySet<string> = new Set(["folders", "tests", "testTimeoutSeconds"]);
+/** The fields of the section, in the order the README's table lists them. */
+export const SECTION_FIELDS: readonly string[] = ["folders", "tests", "testTimeoutSeconds"];
+const FIELDS: ReadonlySet<string> = new Set(SECTION_FIELDS);
 const TEST_FIELDS: ReadonlySet<string> = new Set(["command", "timeoutSeconds"]);
 const MAX_COMMAND = 1000;
 

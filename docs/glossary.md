@@ -117,7 +117,9 @@ is refused and you see the new preview.
 |---|---|
 | **Ticket** | A unit of work in an issue tracker, such as `PROJ-123`. |
 | **Ticket folder** | A folder for one ticket, outside every repository: notes, plan, evidence and bound repositories. |
-| **Evidence** | Tool results saved in the ticket folder while the ticket is active, masked like everything else. |
+| **Evidence** | Tool results saved in the ticket folder while the ticket is active, masked like everything else. In a workflow, the result of a test run, a plan approval, a review or a scenario, saved against the commit or plan it is about. |
+| **Bound repository** | A repository listed in a ticket's `ticket.json`: a workflow's holds, tests and reviews apply there. |
+| **Workflow state** | `workflow.json` in the ticket folder: the stage and each result with the commit or plan it is about. Only `jig-workflow` writes it. |
 | **Workflow** | A named, ordered list of stages that you or a company plugin define in a file. |
 | **Stage** | A step of a workflow, such as plan or review, with a goal the agent sees. |
 | **Exit condition** | What must hold before work leaves a stage, from a fixed list such as `plan-approved`. |

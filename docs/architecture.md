@@ -133,10 +133,11 @@ jig (this repository, generic)
   jig-api    tool: your saved API requests, run by name
   jig-review tools: the code review in the browser, approved with a passkey
   jig-memory ticket folders, notes, evidence, cards and recall; no tools
+  jig-workflow tool: named workflows, with exit conditions decided from evidence; registers a gate that holds calls
   jig-lens   observability: reads jig-core's records, local dashboard; no tools
   jig-theme  the look: palettes as Pi themes, a footer, the answer colour; no tools
   jig-sandbox the sandbox around the agent's bash, and the bash tool that replaces Pi's
-  jig-workflow, jig-agents   design (see Plugins)
+  jig-agents design (see Plugins)
 
 company plugin (separate, private repository)
   the company's environments, sign-in service, internal tools and backends

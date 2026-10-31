@@ -28,6 +28,7 @@ Each ticket has a folder outside every repository:
 | `plan.md` | The plan `jig-workflow` asks you to approve |
 | `evidence/` | Tool results captured while the ticket is active, masked like everything else, with an index |
 | `ticket.json` | The repositories bound to the ticket |
+| `workflow.json` | The state of the ticket's workflow, written only by `jig-workflow` |
 | `card.md` | The card, written at close (see [Cards](docs/cards.md)) |
 
 The folder of all tickets also holds `.cards.json`, an index of the cards that

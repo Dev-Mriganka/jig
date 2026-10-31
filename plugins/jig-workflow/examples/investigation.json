@@ -1,7 +1,7 @@
 {
     "name": "investigation",
     "description": "Find out what happened and explain it, without changing code",
-    "match": { "ticket": "^INV-\\d+$" },
+    "match": { "ticket": "^PROJ-\\d+$" },
     "stages": [
         {
             "id": "gather",

@@ -30,8 +30,8 @@ workflow that cannot be found are not enforced, and the status line says that to
 
 ## Who writes it
 
-Only this plugin. It is a guarded path for the ticket the session works on: the plugin registers it with
-`jig-core` (`config.addProtectedPaths`) when the workflow starts or the session finds one. Pi's `write` and
+Only this plugin. It is a guarded path: the plugin registers it with `jig-core` (`config.addProtectedPaths`)
+when the workflow starts, and the first time a session looks at a ticket that has one. Pi's `write` and
 `edit` refuse it, and the sandbox mounts it read-only. The plugin itself writes through a temporary file
 and a rename, so a crash leaves the old state or the new, never half of one.
 

@@ -368,6 +368,42 @@ describe("where workflow files are read from", () => {
     });
 });
 
+describe("a company's files", () => {
+    test("a folder and test commands given through section defaults are used, whatever the order the plugins load in", async (t) => {
+        let folder = "";
+        const w = await world(t, {
+            company: (api, workspace) => {
+                folder = path.join(workspace, "company-workflows");
+                mkdirSync(folder, { recursive: true });
+                writeFileSync(
+                    path.join(folder, "policy.json"),
+                    JSON.stringify({
+                        name: "policy",
+                        match: { ticket: "^PROJ-" },
+                        stages: [{ id: "only", goal: "the company's" }],
+                    }),
+                );
+                // A company plugin may load before or after jig-workflow; the defaults reach it either way.
+                api.config.addSectionDefaults("workflow", { folders: [folder], tests: { "orders-api": "make check" } });
+            },
+        });
+        assert.match((await w.call({ action: "list" })).text, /^policy$/m);
+        assert.match(
+            (await w.call({ action: "list" })).text,
+            new RegExp(`from the configured: ${folder.replace(/[.\\/]/g, "\\$&")}/policy.json`),
+        );
+        // The company's test command is the default for the repository.
+        w.activate("PROJ-1");
+        w.bind(w.orders);
+        await w.call({ action: "start", name: "policy" });
+        await w.call({ action: "test" });
+        assert.deepEqual(
+            w.host.sandboxed.map((run) => run.command),
+            ["make check"],
+        );
+    });
+});
+
 describe("a session that ends", () => {
     test("stops listening to the bus", async (t) => {
         const w = await world(t);

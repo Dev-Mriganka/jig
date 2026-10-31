@@ -1,7 +1,7 @@
 {
     "name": "bugfix",
     "description": "A fix with a test that reproduces the bug first",
-    "match": { "ticket": "^BUG-\\d+$" },
+    "match": { "ticket": "^PROJ-\\d+$" },
     "branch": "fix/{ticket}",
     "stages": [
         {

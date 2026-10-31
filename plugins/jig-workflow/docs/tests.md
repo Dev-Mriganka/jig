@@ -46,8 +46,9 @@ repository and says to set `workflow.tests`.
   the timeout, and says that the commands run as you, with your credentials and the network. The run is
   `/bin/sh -c`, through `jig-core`'s `exec`, which gives it a short environment (no tokens). The result
   is recorded as `sandboxed: false`, and `status` says so.
-- **Never silently outside.** If the sandbox goes away between the question and the run, the tool stops
-  and says so; it does not fall back to the unsandboxed run.
+- **Never silently outside.** If the call was let through because a sandbox was there and it has gone by the
+  time the tool runs, the tool stops and says so; it does not fall back to the unsandboxed run, which would
+  need your yes.
 
 ## What is recorded
 
