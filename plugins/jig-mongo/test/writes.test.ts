@@ -630,6 +630,41 @@ describe("a write the server rejected, or never received", () => {
         assert.equal(h.backend.of("update").length, 1);
     });
 
+    test("a duplicate key in a bulk write (the driver's MongoBulkWriteError) is the server's rejection, not a lost reply", async () => {
+        const duplicate = () => {
+            throw driverError("MongoBulkWriteError", "E11000 duplicate key error collection: orders.orders", {
+                code: 11000,
+            });
+        };
+        h.backend.answers.insert = duplicate;
+        const documents = [{ _id: "a" }, { _id: "b" }];
+        const many = await h.call({ action: "insert", ...target, documents });
+        assert.match(
+            many.error?.message ?? "",
+            /^mongo insert staging orders\.orders: the database rejected the request \(code 11000, a duplicate key\): E11000 duplicate key error collection: orders\.orders\. Part of it may have been carried out\. It was not sent again\. Read once to check/,
+        );
+        assert.doesNotMatch(many.error?.message ?? "", /no answer|outcome is unknown|driver failed/);
+        assert.equal(h.backend.of("insert").length, 1);
+
+        // One document is all or nothing, so nothing is read to check.
+        const one = await h.call({ action: "insert", ...target, documents: [{ _id: "a" }] });
+        assert.match(
+            one.error?.message ?? "",
+            /a duplicate key\): E11000 duplicate key error collection: orders\.orders\. Nothing was changed\.$/,
+        );
+    });
+
+    test("a refused sign-in or a missing right reported as a bulk write error is told as it is for any server error", async () => {
+        h.backend.answers.insert = () => {
+            throw driverError("MongoBulkWriteError", "not authorized", { code: 13, codeName: "Unauthorized" });
+        };
+        const result = await h.call({ action: "insert", ...target, documents: [{ a: 1 }, { a: 2 }] });
+        assert.match(
+            result.error?.message ?? "",
+            /the database user cannot do this in staging \(Unauthorized\): it needs another role\. Nothing was changed\.$/,
+        );
+    });
+
     test("a database that cannot be reached: nothing was sent, whichever step failed", async () => {
         h.close();
         h = setupHarness({
