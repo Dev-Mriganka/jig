@@ -99,7 +99,7 @@ describe("a write is sent once", () => {
     test("production writes are refused in classify through the kind of the environment, before the call is planned", () => {
         const tool = codeOf(fs.readFileSync(path.join(src, "tool.ts"), "utf8"));
         assert.match(tool, /kindOf\(call\.environment\)/);
-        assert.ok(tool.indexOf("production && (") < tool.indexOf("planCall(call, access)"));
+        assert.ok(tool.indexOf("production && (") < tool.indexOf("planCall(call, access,"));
     });
 });
 

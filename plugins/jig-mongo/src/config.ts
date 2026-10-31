@@ -1,7 +1,7 @@
 // The `mongo` section of jig.json: where each environment's database is, how to reach it, and what may be seen there. jig-core
 // checks the section with validateMongo when a session starts, so the rest of the plugin reads settings that are valid.
 // Nothing here touches the network or a secret store.
-import { createAccess, readAllow, readDeny } from "./access.ts";
+import { createAccess, readAllow, readDeny, readReference } from "./access.ts";
 import type { Access, AccessRules } from "./access.ts";
 import { jig } from "../../jig-core/src/client.ts";
 import { InputError, isObject, shortList, shown } from "./values.ts";
@@ -49,6 +49,11 @@ export interface Connection {
     password: string;
     authSource?: string;
     tls?: boolean;
+    /**
+     * Whether a read must use an index (see require-index.ts). Absent: on for production and off for a test environment.
+     * Turning it off for production is the user's choice, and `/jig` says so.
+     */
+    requireIndex?: boolean;
     via: Route;
 }
 
@@ -84,7 +89,15 @@ export function isReference(user: string): boolean {
 }
 
 const SECTION_FIELDS: ReadonlySet<string> = new Set(["connections", "access"]);
-const CONNECTION_FIELDS: ReadonlySet<string> = new Set(["uri", "user", "password", "authSource", "tls", "via"]);
+const CONNECTION_FIELDS: ReadonlySet<string> = new Set([
+    "uri",
+    "user",
+    "password",
+    "authSource",
+    "tls",
+    "requireIndex",
+    "via",
+]);
 const ACCESS_FIELDS: ReadonlySet<string> = new Set(["deny", "allow", "javascript"]);
 /** A cluster name is also a key beside a connection's own fields and an access list's, so it cannot be one of those. */
 export const CLUSTER_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/;
@@ -111,7 +124,7 @@ function checkReference(value: unknown, key: string, errors: string[]): string |
 }
 
 /** Whether jig-core counts the environment as production. A name it cannot answer for counts as production. */
-function isProduction(name: string): boolean {
+export function isProduction(name: string): boolean {
     try {
         return jig().environments.kindOf(name) === "production";
     } catch {
@@ -251,6 +264,11 @@ function checkConnection(
         if (typeof raw.tls === "boolean") tls = raw.tls;
         else errors.push(`${at}.tls: must be true or false`);
     }
+    let requireIndex: boolean | undefined;
+    if (raw.requireIndex !== undefined) {
+        if (typeof raw.requireIndex === "boolean") requireIndex = raw.requireIndex;
+        else errors.push(`${at}.requireIndex: must be true or false`);
+    }
     const via = checkVia(raw.via, uri, `${at}.via`, errors);
     if (
         errors.length > before ||
@@ -269,6 +287,7 @@ function checkConnection(
         via,
         ...(authSource === undefined ? {} : { authSource }),
         ...(tls === undefined ? {} : { tls }),
+        ...(requireIndex === undefined ? {} : { requireIndex }),
     };
 }
 
@@ -321,7 +340,8 @@ function checkAccess(environment: string, raw: unknown, errors: string[], cluste
     }
     if ("allow" in raw) {
         const allow = readAllow(raw.allow, `${at}.allow`, errors);
-        return errors.length > before || allow === undefined ? undefined : { mode: "allow", allow, javascript };
+        if (errors.length > before || allow === undefined) return undefined;
+        return { mode: "allow", allow, reference: readReference(raw.allow), javascript };
     }
     const deny =
         "deny" in raw
@@ -459,6 +479,26 @@ function readClusterAccess(
  * is an `ssh` forward or a company `tunnel`, never both, and merging two would name both.
  */
 export const MONGO_REPLACE: readonly string[] = ["connections.*.via", "connections.*.*.via"];
+
+/**
+ * The lines `/jig` shows for this plugin: the production connections whose index check was turned off. Turning it off is the user's
+ * choice, and a safety check that is off is something to see, so it is said every time.
+ */
+export function statusLines(): string[] {
+    const settings = settingsOf(jig().config.section("mongo"));
+    if (settings === undefined) return [];
+    const off = [...settings.connections.values()]
+        .filter((connection) => connection.requireIndex === false && isProduction(connection.environment))
+        .map((connection) =>
+            connection.cluster === undefined
+                ? connection.environment
+                : `${connection.environment}/${connection.cluster}`,
+        );
+    if (off.length === 0) return [];
+    return [
+        `jig-mongo: the index check is OFF for ${off.join(", ")} (requireIndex: false in your jig.json): reads there may scan whole collections`,
+    ];
+}
 
 /** The error messages for a raw section, for `registerSection`. An empty list means the section is valid. */
 export function validateMongo(raw: unknown): string[] {

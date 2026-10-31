@@ -33,6 +33,8 @@ export interface FakeJig {
     sectionReplace: Map<string, readonly string[] | undefined>;
     approved: Map<string, Preview>;
     facts: Map<string, Facts[]>;
+    /** The lines each plugin asked `/jig` to show. */
+    status: Map<string, () => readonly string[]>;
     /** Secret values by reference, and every reference resolved, in order. */
     secrets: Map<string, string>;
     resolved: string[];
@@ -69,6 +71,7 @@ export function installFakeJig(): FakeJig {
     const values = new Map<string, unknown>();
     const approved = new Map<string, Preview>();
     const facts = new Map<string, Facts[]>();
+    const status = new Map<string, () => readonly string[]>();
     const secrets = new Map<string, string>();
     const resolved: string[] = [];
     const kinds = new Map<string, EnvironmentKind>(defaultKinds());
@@ -202,6 +205,7 @@ export function installFakeJig(): FakeJig {
         },
         protectedPaths: { list: () => [] },
         sandbox: { register: () => undefined },
+        status: { register: (plugin, lines) => void status.set(plugin, lines) },
         exec: {
             run: async (file, args, options = {}) => {
                 started.push({ file, args: [...args], options });
@@ -221,6 +225,7 @@ export function installFakeJig(): FakeJig {
         sectionReplace,
         approved,
         facts,
+        status,
         secrets,
         resolved,
         kinds,

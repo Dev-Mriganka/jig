@@ -17,11 +17,13 @@ A connection named `local` or `external` is refused: a database is a test or pro
 | `password` | A secret reference such as `pass:mongo/staging` |
 | `authSource` | Optional: the database the user signs in to |
 | `tls` | Optional: `true` or `false`. Certificates and host names are always checked |
+| `requireIndex` | Optional: `true` or `false`. Whether reads must use an index; default on for production only |
 | `via` | Optional route: `ssh` or `tunnel` |
 
 - **`uri`:** no user or password in it. Such a string is refused, and the message does not repeat it. Options that carry a credential
   (`password`, `tlsCertificateKeyFilePassword`, `authMechanismProperties`) or weaken TLS (`tlsInsecure`,
   `tlsAllowInvalidCertificates`, `tlsAllowInvalidHostnames`) are refused.
+- **`requireIndex`:** see [Index check](index-check.md). Turning it off for production is shown in `/jig`.
 - **`password`:** resolved when a connection is opened and redacted from every result. A value that is not a reference is refused
   without being repeated.
 - **`user`:** a value that starts with the name of a secret backend and a colon (`pass:`, `env:`, `keychain:`, `op:`, `cmd:`,
@@ -44,7 +46,7 @@ of named connections instead of one connection:
 ```
 
 - **One form or the other,** per environment.
-  - An object with `uri`, `user`, `password`, `authSource`, `tls` or `via` is one connection, as before.
+  - An object with `uri`, `user`, `password`, `authSource`, `tls`, `requireIndex` or `via` is one connection, as before.
   - Any other object is a map of names. A name is 1 to 40 letters, digits, `-` or `_`, and not `deny`, `allow` or `javascript`. An
     environment has at most ten.
 - **The tool takes a `cluster` parameter** where an environment is a map, such as `{environment: "staging", cluster: "orders", ...}`.

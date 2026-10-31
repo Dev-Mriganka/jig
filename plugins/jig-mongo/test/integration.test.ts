@@ -312,7 +312,8 @@ describe("against a real MongoDB", { skip }, () => {
             const section = {
                 connections: {
                     staging: { uri: server.uri, user: server.user, password: "pass:it/db" },
-                    production: { uri: server.uri, user: server.user, password: "pass:it/db" },
+                    // This test is about the allow list, and its queries scan: the index check has a test of its own below.
+                    production: { uri: server.uri, user: server.user, password: "pass:it/db", requireIndex: false },
                 },
                 access: {
                     staging: { deny: ["*.notes"] },
@@ -401,6 +402,66 @@ describe("against a real MongoDB", { skip }, () => {
             );
             const databases = ok(await h.call({ action: "databases", environment: "production" }));
             assert.deepEqual(databases.split("\n").slice(1), [db]);
+        });
+
+        test("production reads must use an index: a scan is refused with the fields an index leads with, an indexed read runs", async () => {
+            const shop = raw.db(db);
+            await shop.collection("parcels").insertMany(
+                Array.from({ length: 60 }, (_, i) => ({
+                    _id: i as never,
+                    status: i % 3 === 0 ? "late" : "ok",
+                    qty: i,
+                })),
+            );
+            await shop.collection("parcels").createIndex({ status: 1, qty: -1 });
+            await shop.collection("regions").insertMany([{ _id: 1 as never, name: "north" }]);
+            h.configure({
+                connections: {
+                    staging: { uri: server.uri, user: server.user, password: "pass:it/db" },
+                    production: { uri: server.uri, user: server.user, password: "pass:it/db" },
+                },
+                access: {
+                    staging: { deny: ["*.notes"] },
+                    production: {
+                        allow: {
+                            [`${db}.parcels`]: ["_id", "status", "qty"],
+                            [`${db}.regions`]: { fields: ["_id", "name"], reference: true },
+                        },
+                    },
+                },
+            });
+            const parcels = { environment: "production", database: db, collection: "parcels" };
+            assert.match(
+                ok(await h.call({ action: "find", ...parcels, filter: { status: "late" } })),
+                /20 documents|20 documents, possibly partial/,
+            );
+            assert.match(
+                ok(await h.call({ action: "count", ...parcels, filter: { status: "late" } })),
+                /20 documents match/,
+            );
+            assert.match(ok(await h.call({ action: "find", ...parcels, filter: { _id: 4 } })), /1 document/);
+            const scan = await h.call({ action: "find", ...parcels, filter: { qty: 5 } });
+            assert.match(
+                scan.error?.message ?? "",
+                /refused, the plan scans the whole collection \(COLLSCAN\).*Filter on a field an index leads with: _id, status\./,
+            );
+            assert.match(
+                (await h.call({ action: "count", ...parcels })).error?.message ?? "",
+                /with no filter it reads every document/,
+            );
+            assert.match(
+                (await h.call({ action: "aggregate", ...parcels, pipeline: [{ $group: { _id: "$qty" } }] })).error
+                    ?.message ?? "",
+                /refused, the plan scans/,
+            );
+            assert.match(
+                (await h.call({ action: "distinct", ...parcels, field: "status" })).error?.message ?? "",
+                /refused, the plan scans/,
+            );
+            // Reference data is read whole.
+            const regions = { environment: "production", database: db, collection: "regions" };
+            assert.match(ok(await h.call({ action: "count", ...regions })), /1 document match/);
+            assert.match(ok(await h.call({ action: "find", ...regions })), /"name":"north"/);
         });
 
         test("an index change and a pipeline that writes: previewed, run, and checked", async () => {

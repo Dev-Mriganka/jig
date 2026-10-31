@@ -544,6 +544,16 @@ export interface JigApi {
         register(provider: SandboxProvider): void;
     };
 
+    /**
+     * Lines for `/jig` that a plugin wants the user to see about its own state, such as a safety check that the user turned
+     * off. Always present in `jig-core`; optional here only so that a test's stand-in for `jig-core` need not have it.
+     */
+    readonly status?: {
+        /** `lines` is asked each time `/jig` runs, and returns nothing when there is nothing to say. Each line is cut to one
+         *  line of 300 characters. Registering the same `plugin` again replaces its lines. */
+        register(plugin: string, lines: () => readonly string[]): void;
+    };
+
     /** Runs programs from an argument list, never a shell. */
     readonly exec: {
         /** Refuses a program whose real path is in a folder the agent's shell can write: the working folder, and with a

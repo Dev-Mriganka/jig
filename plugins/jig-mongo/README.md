@@ -59,6 +59,9 @@ Parameters and results: [Results](docs/results.md).
   before. If that count changes before the write runs, it is refused as "changed since the preview".
 - **Guards on writes:** an `update` or `delete` with an empty filter is refused; `many` above 1000 documents needs a `limit` you
   raise on purpose ([Writes](docs/writes.md)).
+- **Production reads must use an index.** Before a `find`, `count`, `distinct` or `aggregate` runs there, the planner is asked
+  how it would run (nothing is executed), and a plan that scans the collection is refused, naming the fields an index leads
+  with ([Index check](docs/index-check.md)).
 - **Server-side JavaScript is refused** (`$where`, `$function`, `$accumulator`), unless you allow it for a test environment.
 - **A lost reply is never resent.** One read checks what happened.
 - **Production is read-only and masked,** whatever the configuration says: writes and index changes are refused when the call is
@@ -90,6 +93,7 @@ In `~/.pi/agent/jig.json`, under `mongo`. An unknown field is an error, and the 
 | `connections` | Per environment: one connection, or named ones, each with `uri`, `user`, `password` and more |
 | `via` | An SSH forward, or a company tunnel, as a forward or a SOCKS proxy ([Connections](docs/connections.md)) |
 | `access` | Per environment, or per connection where there are several: `deny` or `allow` |
+| `requireIndex` | Per connection: `true` or `false`. Default: on for production, off for a test environment |
 
 - **`uri`** holds no credentials: one that has them is refused. **`password`** is a secret reference. **`user`** is a name, or a
   secret reference such as `pass:mongo/staging-user`.
@@ -102,6 +106,9 @@ In `~/.pi/agent/jig.json`, under `mongo`. An unknown field is an error, and the 
 - **`deny`** is a list of `db.collection`, `db.*`, `*.field` or `db.collection.field`. Production must use `allow`; anything else
   is an error.
 - **`javascript: true`** allows server-side JavaScript in a test environment.
+- **`requireIndex: false`** on a production connection is your decision, never the agent's, and `/jig` shows it. A small
+  collection of an `allow` list can be marked `{ "fields": [...], "reference": true }` and is then read whole
+  ([Index check](docs/index-check.md)).
 Use a read-only database user for production. The floor denies writes anyway, but the user is the second lock.
 
 ## Company part (in the company plugin)
@@ -122,7 +129,8 @@ Use a read-only database user for production. The floor denies writes anyway, bu
 ```text
 jig-mongo/
   src/      the tool (index, tool, params, plan), access lists (access, expr, filter, pipeline), reads, writes (write-check,
-            writes), results (render, explain, bson, ejson), the driver seam (backend, driver), connections (config, session, route)
+            writes), the index check (require-index), results (render, explain, bson, ejson), the driver seam (backend, driver),
+            connections (config, session, route)
   skills/   mongo/SKILL.md: count, then find; explain before blaming the database; preview every write; never production writes
   test/     fakes of jig-core, the database and ssh; one test file per area; an optional one against a real MongoDB
   docs/     the detail pages below
@@ -131,6 +139,7 @@ jig-mongo/
 ## More detail
 
 - [Access](docs/access.md): the lists, the always-denied names, how a pipeline is walked, what is refused and why
+- [Index check](docs/index-check.md): when a read must use an index, how the plan is read, reference collections, `requireIndex`
 - [Writes](docs/writes.md): previews, the count, the cap, "changed since the preview", a lost reply
 - [Connections](docs/connections.md): the configuration, several connections in one environment, the SSH route and its key file, the tunnel (forward or SOCKS), how connections are kept
 - [Results](docs/results.md): Extended JSON in and out, partial results, schema and explain output, the record

@@ -108,6 +108,11 @@ closed instead of running ungoverned.
   is not active, `canWrite(path)` and, optionally, `whenReady()`. Fields are read
   when they are needed, so they may change. Registering again replaces the
   provider. See [The sandbox](#the-sandbox).
+- **`status.register(plugin, lines)`** gives `/jig` lines to show about the
+  plugin's own state, such as a safety check the user turned off. `lines` is
+  asked each time `/jig` runs and may return nothing. Each line is cut to one
+  line of 300 characters; a `lines` that throws shows as `<plugin>: its status
+  could not be read`. Registering the same plugin again replaces it.
 - **`exec`** has `run` and `git`, which start programs without a shell (see
   [Running programs](running-programs.md)).
 

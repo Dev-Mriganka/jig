@@ -28,6 +28,15 @@ Some environments have more than one cluster, such as `orders` and `billing` in 
 
 A slow query is usually a missing index. Run `explain` with the same filter and sort. `COLLSCAN` means the whole collection was read; `IXSCAN(name)` means an index was used. Compare the documents examined with the documents returned: a big gap means the index does not fit the filter. Check `indexes` before you suggest a new one, and say what you found rather than "the database is slow".
 
+## In production a read must use an index
+
+Before a `find`, `count`, `distinct` or `aggregate` runs in production, the tool asks the planner how it would run, and refuses a plan that scans the whole collection. The refusal names the fields an index leads with. Rewrite the query to filter on one of them, or add a `$match` on one at the start of the pipeline. Do not retry the same query.
+
+- `count` with no filter is refused. Use `stats` for the size of a collection, or a filter on an indexed field.
+- To see what documents look like, use `sample`. A `find` with no filter is a scan.
+- `explain` with the default `executionStats` runs the query, so it is refused the same way. Use `verbosity: "queryPlanner"` to see a plan without running it.
+- A small reference collection may be exempt. If a read is refused and you think the collection is small reference data, say so to the user. Do not look for another way in: changing the setting is the user's choice.
+
 ## What you will not see
 
 Fields whose names look like credentials (password, secret, token, apiKey) are never returned and cannot be named, in any environment. The user's lists hide more. In production only the listed fields exist: you get nothing else, and a pipeline that names another field is refused. A refusal names what is allowed. Use that list, and do not try to reach a hidden field by renaming it, `$getField`, `$lookup` or `$replaceRoot`: the same check applies.
@@ -53,6 +62,8 @@ A write, an index change, `$out` and `$merge` are refused in production before a
 The reason names what to change. The common ones:
 
 - `X is not in the allow list` or `X is denied by the access list`: that collection or field is not for you. Use what the message lists.
+- `refused, the plan scans the whole collection` or `... must use an index`: filter on a field the message names.
+- `the index check could not be made`: nothing was read. The database user may not run `explain`, or the route failed. Say so once, and do not retry blindly.
 - `looks like a credential`: a field with that name is always denied. Leave it out.
 - `the filter is empty, so it would change every document`: say which documents.
 - `the filter matches more than 1000 documents`: narrow the filter, or raise `limit` if you mean it.

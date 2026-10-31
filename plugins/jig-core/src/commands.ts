@@ -11,6 +11,7 @@ import { errorMessage } from "./errors.ts";
 import { FILE_TOOLS } from "./protected-paths.ts";
 import type { ProtectedKind, ProtectedSource } from "./protected-paths.ts";
 import { formatDuration, summarize } from "./records.ts";
+import { plainLine } from "./watch/clean.ts";
 import type { JigState } from "./state.ts";
 
 /** A list longer than this is shown in a scrollable selector instead of a notice. */
@@ -106,6 +107,7 @@ export function statusLines(state: JigState): string[] {
         const shown = sections.map((name) => `${name} (${sectionState(state, name)})`);
         lines.push(`Plugin sections in the file: ${shown.join(", ")}`);
     }
+    lines.push(...pluginLines(state));
     // Not an error: a company gave defaults that lack something only you can give, so the plugin waits for it.
     for (const [name, messages] of state.personal.incomplete) {
         lines.push(
@@ -119,6 +121,19 @@ export function statusLines(state: JigState): string[] {
     const watchProblem = state.watches.problem();
     if (watchProblem !== undefined) lines.push(`Watches: ${watchProblem}`);
     return lines;
+}
+
+/** What plugins asked `/jig` to show (`status.register`). A plugin that fails shows that it did, and the others still show. */
+function pluginLines(state: JigState): string[] {
+    const out: string[] = [];
+    for (const [plugin, lines] of state.statusLines) {
+        try {
+            for (const line of lines()) out.push(plainLine(String(line), 300));
+        } catch {
+            out.push(`${plugin}: its status could not be read`);
+        }
+    }
+    return out.filter((line) => line !== "");
 }
 
 /**

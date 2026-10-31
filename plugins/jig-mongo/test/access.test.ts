@@ -2,7 +2,15 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { ObjectId } from "mongodb";
-import { createAccess, fieldPath, projectionFor, readAllow, readDeny, stripCredentials } from "../src/access.ts";
+import {
+    createAccess,
+    fieldPath,
+    projectionFor,
+    readAllow,
+    readDeny,
+    readReference,
+    stripCredentials,
+} from "../src/access.ts";
 import type { Access, AccessRules } from "../src/access.ts";
 import { InputError } from "../src/values.ts";
 
@@ -89,6 +97,55 @@ describe("reading an allow list", () => {
         for (const [raw, pattern] of cases) {
             const errors: string[] = [];
             assert.equal(readAllow(raw, "allow", errors), undefined, JSON.stringify(raw));
+            assert.match(errors.join(" "), pattern);
+        }
+    });
+});
+
+describe("reference data in an allow list", () => {
+    const raw = {
+        "orders.orders": ["_id", "status"],
+        "orders.countries": { fields: ["_id", "name"], reference: true },
+        "orders.regions": { fields: ["_id"], reference: false },
+        "orders.zones": { fields: ["_id"] },
+    };
+
+    test("an entry is a list of fields, or { fields, reference }; the fields are read the same way", () => {
+        const errors: string[] = [];
+        const rules = readAllow(raw, "allow", errors);
+        assert.deepEqual(errors, []);
+        assert.deepEqual(rules?.get("orders.countries"), [["_id"], ["name"]]);
+        assert.deepEqual(rules?.get("orders.orders"), [["_id"], ["status"]]);
+        assert.deepEqual([...readReference(raw)], ["orders.countries"]);
+        assert.deepEqual([...readReference("nothing")], []);
+    });
+
+    test("only the collections marked true are reference data, and a deny list has none", () => {
+        const access = createAccess({
+            mode: "allow",
+            allow: readAllow(raw, "allow", []) as NonNullable<ReturnType<typeof readAllow>>,
+            reference: readReference(raw),
+            javascript: false,
+        });
+        assert.equal(access.isReference("orders", "countries"), true);
+        for (const coll of ["orders", "regions", "zones", "unlisted"])
+            assert.equal(access.isReference("orders", coll), false, coll);
+        assert.equal(deny("billing.cards").isReference("orders", "countries"), false);
+        assert.equal(createAccess({ mode: "allow", allow: new Map(), javascript: false }).isReference("a", "b"), false);
+    });
+
+    test("refuses an object without fields, an unknown key, and a reference that is not true or false", () => {
+        const cases: Array<[unknown, RegExp]> = [
+            [{ "orders.orders": { reference: true } }, /1 to 500 field paths/],
+            [{ "orders.orders": { fields: [], reference: true } }, /1 to 500 field paths/],
+            [{ "orders.orders": { fields: ["_id"], reference: "yes" } }, /reference: must be true or false/],
+            [{ "orders.orders": { fields: ["_id"], small: true } }, /small: unknown field/],
+            [{ "orders.orders": { fields: ["apiKey"], reference: true } }, /always denied/],
+            [{ "orders.orders": "_id" }, /1 to 500 field paths/],
+        ];
+        for (const [value, pattern] of cases) {
+            const errors: string[] = [];
+            assert.equal(readAllow(value, "allow", errors), undefined, JSON.stringify(value));
             assert.match(errors.join(" "), pattern);
         }
     });
