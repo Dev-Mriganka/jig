@@ -50,10 +50,24 @@ export interface Harness {
     cleanup(): void;
 }
 
-export function setupHarness(): Harness {
-    const sb = sandbox();
+/** What a real harness has in place of the fake gh: asking for it is a mistake in the test. */
+const NO_FAKE_GH = new Proxy(
+    {},
+    {
+        get() {
+            throw new Error("this harness runs the real gh, so it has no fake one");
+        },
+    },
+);
+
+/**
+ * `real`: the programs are the git and gh on PATH, and `github.com` is the real one (the tests in `it/`). The sandbox still
+ * holds HOME, the git configuration and the workspace, so nothing touches the user's own.
+ */
+export function setupHarness(real = false): Harness {
+    const sb = sandbox(real ? { github: "real" } : {});
     const jig = installFakeJig();
-    const gh = installFakeGh(sb);
+    const gh = real ? (NO_FAKE_GH as FakeGh) : installFakeGh(sb);
     const tools = new Map<string, ToolDefinition>();
     const announced: Announced[] = [];
     const pi = {

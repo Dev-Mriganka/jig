@@ -136,6 +136,21 @@ adapter) and `health.test.ts` (health by address). The last needs only `openssl`
   `kube-controller-manager` and `kube-scheduler` with a node object and a small program that marks scheduled pods ready. Pods then never
   start, so `logs`, `exec` and the kubelet's events cannot be read there.
 
+## jig-git
+
+One file, `github.test.ts`, with two suites. They only read, and nothing is pushed, created or commented.
+
+| Variable | What it holds |
+|---|---|
+| `JIG_IT_GITHUB` | Any value: this machine may reach github.com |
+| `GH_TOKEN` | A token `gh` signs in with. Without it, `gh` uses its own login |
+
+- **Git over https** clones `actions/hello-world-docker-action` with plain git, because the plugin's `clone` goes over ssh and a run has no
+  key GitHub knows. The plugin then fetches, logs and reads that clone, and reads its tags. Its own `clone` is tried with an ssh that has no
+  key, and must fail in one line and leave nothing behind.
+- **Pull requests and releases** are read through `gh` for `cli/cli`, with a repository that holds nothing but an `origin`, and for the
+  small repository. A run gets this by the token of `permissions`; on your machine `gh`'s own login does the same.
+
 ## Where to read a failure
 
 The job prints each service's version once it is up. When a step fails, the last step prints the logs of every container,

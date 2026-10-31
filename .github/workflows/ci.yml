@@ -233,7 +233,7 @@ jobs:
       - name: Integration tests
         if: ${{ !cancelled() }}
         env:
-          JIG_IT_REQUIRE: elasticsearch,opensearch,loki,mongodb,mongodb-ssh,mongodb-socks,kubernetes,github-actions
+          JIG_IT_REQUIRE: elasticsearch,opensearch,loki,mongodb,mongodb-ssh,mongodb-socks,kubernetes,github-actions,github,github-gh
           JIG_IT_ELASTICSEARCH_URL: https://127.0.0.1:9200
           NODE_EXTRA_CA_CERTS: ${{ runner.temp }}/es-ca.crt
           JIG_IT_OPENSEARCH_URL: http://127.0.0.1:9201
@@ -254,6 +254,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           JIG_IT_GITHUB_REPOSITORY: ${{ github.repository }}
           JIG_IT_GITHUB_RUN_ID: ${{ github.run_id }}
+          JIG_IT_GITHUB: "1"
         run: npm run test:it
 
       # The logs of every container, so a service that failed can be read in the run.
