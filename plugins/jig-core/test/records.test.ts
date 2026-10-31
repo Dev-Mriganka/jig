@@ -7,6 +7,8 @@ import {
     callRecord,
     cleanFacts,
     cleanupRecords,
+    conditionOf,
+    conditionProblem,
     formatDuration,
     oneLine,
     recordsFile,
@@ -52,7 +54,11 @@ const FULL: CallInput = {
 
 describe("a call record", () => {
     test("has every field", () => {
-        const record = callRecord(FULL, NOW, { JIG_PARENT_SESSION: "parent-9", JIG_AGENT_ROLE: "reviewer" });
+        const record = callRecord(FULL, NOW, {
+            JIG_PARENT_SESSION: "parent-9",
+            JIG_AGENT_ROLE: "reviewer",
+            JIG_CONDITION: "baseline",
+        });
         assert.deepEqual(Object.keys(record), [
             "id",
             "kind",
@@ -60,6 +66,7 @@ describe("a call record", () => {
             "session",
             "parentSession",
             "agentRole",
+            "condition",
             "ticket",
             "tool",
             "action",
@@ -87,6 +94,7 @@ describe("a call record", () => {
         assert.equal(record.session, "session-1");
         assert.equal(record.parentSession, "parent-9");
         assert.equal(record.agentRole, "reviewer");
+        assert.equal(record.condition, "baseline");
         assert.equal(record.ticket, "TICKET-42");
         assert.equal(record.waitedMs, 4322, "whole milliseconds");
         assert.equal(record.durationMs, 87);
@@ -214,6 +222,33 @@ describe("a turn record", () => {
             [record.model, record.input, record.output, record.cacheRead, record.cacheWrite, record.cost],
             ["claude-test-1", 1200, 300, 5000, 700, 0.0421],
         );
+    });
+});
+
+describe("the condition tag", () => {
+    const TURN = { session: "s", model: "m", input: 1, output: 1, cacheRead: 0, cacheWrite: 0, cost: 0 };
+
+    test("is on call and turn lines when JIG_CONDITION is set and valid", () => {
+        const env = { JIG_CONDITION: "with-tool.x_1" };
+        assert.equal(callRecord(FULL, NOW, env).condition, "with-tool.x_1");
+        assert.equal(turnRecord(TURN, NOW, env).condition, "with-tool.x_1");
+        assert.equal(callRecord(FULL, NOW, { JIG_CONDITION: "a".repeat(32) }).condition, "a".repeat(32));
+    });
+
+    test("is left out when it is not set, blank or not valid", () => {
+        for (const value of [undefined, "", " ", "has space", "a".repeat(33), "tool/x", "caf\u00e9", "x\n", "a:b"]) {
+            const env = { JIG_CONDITION: value };
+            assert.equal("condition" in callRecord(FULL, NOW, env), false, JSON.stringify(value));
+            assert.equal("condition" in turnRecord(TURN, NOW, env), false, JSON.stringify(value));
+            assert.equal(conditionOf(env), undefined);
+        }
+    });
+
+    test("is a problem only when it is set and does not fit", () => {
+        assert.equal(conditionProblem({}), undefined);
+        assert.equal(conditionProblem({ JIG_CONDITION: "" }), undefined);
+        assert.equal(conditionProblem({ JIG_CONDITION: "baseline" }), undefined);
+        assert.match(conditionProblem({ JIG_CONDITION: "no good" }) ?? "", /^JIG_CONDITION must be 1 to 32/);
     });
 });
 

@@ -141,6 +141,8 @@ const KEPT_NAMES: ReadonlySet<string> = new Set([
     "LANG",
     "TMPDIR",
     "JIG_STATE_DIR",
+    // jig-core's records tag every line with it, and a child's lines belong to the same condition as its parent's.
+    "JIG_CONDITION",
     "HTTP_PROXY",
     "HTTPS_PROXY",
     "NO_PROXY",

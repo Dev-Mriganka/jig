@@ -42,6 +42,8 @@ interface Line {
     session: string;
     parentSession?: string;
     agentRole: string;
+    /** The way of working this session belongs to, from `$JIG_CONDITION`. Left out when it is not set or not valid. */
+    condition?: string;
     ticket?: string;
 }
 
@@ -93,10 +95,27 @@ export interface Who {
 export type CallInput = Who & Omit<CallRecord, keyof Line | "kind">;
 export type TurnInput = Who & Omit<TurnRecord, keyof Line | "kind">;
 
-/** The fields every line has. The parent session and the role come from the environment: a child agent is started
- *  with `JIG_PARENT_SESSION` and `JIG_AGENT_ROLE` set. */
+/** What `$JIG_CONDITION` may hold: 1 to 32 characters that are safe in a dashboard label and a file name. */
+const CONDITION = /^[A-Za-z0-9._-]{1,32}$/;
+
+/** The condition tag from the environment, or undefined when it is not set or not valid. */
+export function conditionOf(env: NodeJS.ProcessEnv): string | undefined {
+    const value = env.JIG_CONDITION;
+    return value !== undefined && CONDITION.test(value) ? value : undefined;
+}
+
+/** What is wrong with `$JIG_CONDITION`, or undefined when it is not set, or set and valid. A blank one is not set. */
+export function conditionProblem(env: NodeJS.ProcessEnv): string | undefined {
+    const value = env.JIG_CONDITION;
+    if (value === undefined || value === "" || CONDITION.test(value)) return undefined;
+    return "JIG_CONDITION must be 1 to 32 characters of letters, digits, dots, underscores and hyphens, so records carry no condition";
+}
+
+/** The fields every line has. The parent session, the role and the condition come from the environment: a child agent
+ *  is started with `JIG_PARENT_SESSION` and `JIG_AGENT_ROLE` set, and passes `JIG_CONDITION` on. */
 function header(kind: "call" | "turn", who: Who, now: Date, env: NodeJS.ProcessEnv): Line {
     const parent = env.JIG_PARENT_SESSION;
+    const condition = conditionOf(env);
     return {
         id: randomUUID(),
         kind,
@@ -104,6 +123,7 @@ function header(kind: "call" | "turn", who: Who, now: Date, env: NodeJS.ProcessE
         session: who.session,
         ...(parent === undefined || parent === "" ? {} : { parentSession: parent }),
         agentRole: env.JIG_AGENT_ROLE !== undefined && env.JIG_AGENT_ROLE !== "" ? env.JIG_AGENT_ROLE : "main",
+        ...(condition === undefined ? {} : { condition }),
         ...(who.ticket === undefined ? {} : { ticket: who.ticket }),
     };
 }

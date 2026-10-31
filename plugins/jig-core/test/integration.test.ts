@@ -498,6 +498,25 @@ describe("records", () => {
         assert.equal("ticket" in (w.callRecords()[1] ?? {}), false);
     });
 
+    test("carry the condition from JIG_CONDITION on every call and turn line", async () => {
+        const w = await begin({ config: CONFIG, ui: ALLOW, env: { JIG_CONDITION: "with-tool.x_1" } });
+        await w.call("fake_tool", { env: "local" });
+        const lines = w.records();
+        assert.ok(lines.some((line) => line.kind === "call"));
+        assert.ok(lines.some((line) => line.kind === "turn"));
+        assert.ok(lines.every((line) => line.condition === "with-tool.x_1"));
+        assert.deepEqual(w.ui?.notifications.filter(isProblemNotice), []);
+    });
+
+    test("leave a JIG_CONDITION that does not fit out, and name it when the session starts", async () => {
+        const w = await begin({ config: CONFIG, ui: ALLOW, env: { JIG_CONDITION: "bad value!" } });
+        await w.call("fake_tool", { env: "local" });
+        assert.ok(w.records().length > 0);
+        assert.ok(w.records().every((line) => !("condition" in line)));
+        const [notice] = w.ui?.notifications.filter(isProblemNotice) ?? [];
+        assert.match(notice?.message ?? "", /JIG_CONDITION must be 1 to 32 characters/);
+    });
+
     test("go to a private file named for the UTC day", async () => {
         const w = await begin({ config: CONFIG });
         await w.call("fake_tool", { env: "local" });

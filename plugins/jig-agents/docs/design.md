@@ -76,7 +76,7 @@ builds the command line for every shipped role and fails if any of them can appe
   sandbox makes the working folder writable and a wider one would widen the child. A role
   that writes works in a worktree instead (see [Lifecycle](#lifecycle)).
 - **Environment.** A list of names: `PATH`, `HOME`, `USER`, `LOGNAME`, `SHELL`, `TERM`, `TZ`,
-  `LANG`, `TMPDIR`, `LC_*`, `XDG_*`, `PI_*`, `JIG_STATE_DIR`, proxy and certificate
+  `LANG`, `TMPDIR`, `LC_*`, `XDG_*`, `PI_*`, `JIG_STATE_DIR`, `JIG_CONDITION`, proxy and certificate
   variables, and the names in `agents.env`. Any other name is left behind, a key, token or
   password included. Pi's own login in the agent folder needs no variable; a model provider
   that does, such as `AWS_PROFILE`, is named in `agents.env`.

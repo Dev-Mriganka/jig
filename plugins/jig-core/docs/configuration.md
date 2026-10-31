@@ -293,6 +293,7 @@ such as `git`, `lens` or `memory`.
 | `JIG_STATE_DIR` | The state folder (see below) |
 | `JIG_AGENT_ROLE` | The role of this agent, such as `reviewer`. Default: `main`. Written to every record |
 | `JIG_PARENT_SESSION` | The session that started this one. Written to every record of a child agent |
+| `JIG_CONDITION` | A label for the way of working, 1 to 32 characters of `A-Za-z0-9._-`. Written to every record |
 | `PI_CODING_AGENT_DIR` | Pi's own setting for its agent folder, and so for where `jig.json` is |
 | `BROWSER` | The program that opens a rendered preview (see below) |
 
@@ -300,5 +301,7 @@ such as `git`, `lens` or `memory`.
   empty or relative `XDG_STATE_HOME` is ignored. Folders are private (0700) and
   files too (0600).
 - **`JIG_AGENT_ROLE`:** a child agent is started with it set.
+- **`JIG_CONDITION`:** a value that does not fit is left out of the records and shown as a configuration problem when
+  the session starts. A child agent gets the parent's value.
 - **`BROWSER`:** a name, optionally with arguments, and `%s` for the address.
   The default is `xdg-open`, or `open` on macOS.

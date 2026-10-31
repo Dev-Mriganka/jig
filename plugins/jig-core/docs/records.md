@@ -34,7 +34,7 @@ kind plus one masked and redacted line of at most 200 characters.
 | Field | Lines | Meaning |
 |---|---|---|
 | `id`, `kind`, `time` | all | A unique id, `call` or `turn`, and the time in ISO 8601, UTC |
-| `session`, `parentSession`, `agentRole`, `ticket` | all | The Pi session id; the parent session; the agent role; the ticket |
+| `session`, `parentSession`, `agentRole`, `condition`, `ticket` | all | The Pi session id; the parent session; the agent role; the condition tag; the ticket |
 | `tool`, `action`, `plugin` | call | What was called. `plugin` is the one that declared the tool, else where Pi says the tool came from |
 | `environment`, `environmentKind`, `effect` | call | Where it acted (the tool's own name for it and the kind behind it), and `read` or `write` |
 | `decision`, `decisionSource` | call | `allow`, `ask` or `deny`, and its source (see below) |
@@ -50,6 +50,10 @@ it has no environment, effect or decision, and its error kind is `not-run`.
 - **`session`, `parentSession`, `agentRole`:** the parent session is
   `$JIG_PARENT_SESSION` when set, and the role is `$JIG_AGENT_ROLE` (default
   `main`). The ticket is the one set with `setTicket`.
+- **`condition`** is `$JIG_CONDITION` when it is 1 to 32 characters of `A-Z`, `a-z`,
+  `0-9`, `.`, `_` and `-`: a label for the way of working, such as `baseline` or `with-tool-x`,
+  so that `/lens compare` can set two ways side by side. A value that does not fit is left
+  out of the records and named in the start-up problems; a child agent passes it on.
 - **`decisionSource`** is `table`, `rule`, `tool`, `session`, `unknown`,
   `floor` or `gate` (a plugin's gate asked or denied; the record says only
   that a gate held the call).

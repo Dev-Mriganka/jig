@@ -112,6 +112,7 @@ describe("the environment", () => {
                 TZ: "UTC",
                 PI_CODING_AGENT_DIR: "/agent",
                 JIG_STATE_DIR: "/state",
+                JIG_CONDITION: "with-tool-x",
                 HTTPS_PROXY: "http://proxy",
                 SSL_CERT_FILE: "/ca.pem",
                 GITHUB_TOKEN: "t",
@@ -134,6 +135,7 @@ describe("the environment", () => {
             "TZ",
             "PI_CODING_AGENT_DIR",
             "JIG_STATE_DIR",
+            "JIG_CONDITION",
             "HTTPS_PROXY",
             "SSL_CERT_FILE",
             "MODEL_API_KEY",
@@ -142,6 +144,7 @@ describe("the environment", () => {
         }
         for (const name of ["GITHUB_TOKEN", "AWS_SECRET_ACCESS_KEY", "ANTHROPIC_API_KEY", "DB_PASSWORD"])
             assert.ok(!(name in env), name);
+        assert.equal(env.JIG_CONDITION, "with-tool-x", "the condition tag reaches the child unchanged");
     });
 
     test("tells the child who it is, for jig-core's records, jig-theme and jig-review, and its own parent check", () => {
