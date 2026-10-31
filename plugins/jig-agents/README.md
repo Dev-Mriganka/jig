@@ -13,6 +13,10 @@ cost, and its report reaches the parent without polling.
 For example, the agent starts a `scout` with the task "find where `orders-api` rounds
 order totals" and carries on. When the scout finishes, its report arrives as a message.
 
+![The agent starts a child through jig-agents, which runs a separate Pi in RPC mode with the same plugins, sends it the task, counts its limits, brings its questions to your screen and your answers back, and delivers its report as a message](../../docs/img/agents-rpc.svg)
+
+*How a child runs. The child is a full Pi with the same plugins, so Jig's rules govern it; its questions come to you through the parent, and its report comes back without polling.*
+
 ## The decision
 
 Jig builds this plugin itself, small, on Pi's own RPC mode, and adopts no package. Of the

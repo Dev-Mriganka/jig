@@ -174,8 +174,8 @@ is refused and you see the new preview.
 
 | Term | Meaning |
 |---|---|
-| **Subagent** | A child agent: a full Pi session that another session starts in its own terminal pane. |
-| **Agent file** | A file that sets a subagent's role, tools and model, such as a planner or a reviewer. |
+| **Subagent** | A child agent: a separate Pi process, in RPC mode, with the same plugins as the session that starts it, so Jig's rules govern it. |
+| **Agent file** | A file that sets a role: its description, tools and prompt, such as a scout, a reviewer or a worker. Its model comes from configuration. |
 
 ## The look
 
