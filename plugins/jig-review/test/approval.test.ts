@@ -173,7 +173,11 @@ test("an approval is announced on the event bus, with the commits and the files"
     assert.equal(event.covered, true);
     assert.deepEqual(
         event.repos,
-        REPOSITORIES.map((repo) => ({ repo, head: git(path.join(session!.root, repo), "rev-parse", "HEAD").trim() })),
+        REPOSITORIES.map((repo) => ({
+            repo,
+            head: git(path.join(session!.root, repo), "rev-parse", "HEAD").trim(),
+            root: path.join(session!.root, repo),
+        })),
     );
     assert.deepEqual(
         event.files,
@@ -190,6 +194,17 @@ test("the event says when the approval vouches for no commit, and still names wh
     assert.equal(event.covered, false);
     assert.equal(event.repos.length, 2);
     assert.ok(!("ticket" in event));
+});
+
+test("every repository in the event has its own folder, for a listener that must tell repositories apart", async () => {
+    session = await openReview("");
+    await approveInPi(session);
+    const event = session.host.events.find((entry) => entry.channel === REVIEW_EVENTS.approved)!
+        .data as ReviewApprovedEvent;
+    assert.deepEqual(
+        event.repos.map((repo) => repo.root).sort(),
+        REPOSITORIES.map((repo) => path.join(session!.root, repo)).sort(),
+    );
 });
 
 test("a clean repository next to the reviewed ones is not named in the event", async () => {

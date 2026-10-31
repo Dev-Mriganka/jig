@@ -195,11 +195,16 @@ export class ReviewCoordinator {
             (
                 await this.workspace.getHeads({ folder: approved.folder, ticket: approved.ticket }).catch(() => [])
             ).filter((head) => head.repo === "" || files.some((file) => file.startsWith(`${head.repo}/`)));
+        const roots = this.rootsOf({ folder: approved.folder, ticket: approved.ticket });
         const event: ReviewApprovedEvent = {
             reviewId: approved.id,
             scope: approved.fileScope,
             ...(approved.ticket ? { ticket: approved.ticket } : {}),
-            repos: repos.map((head) => ({ repo: head.repo, head: head.sha })),
+            repos: repos.map((head) => ({
+                repo: head.repo,
+                head: head.sha,
+                ...(roots.has(head.repo) ? { root: roots.get(head.repo) as string } : {}),
+            })),
             covered: approvedHeads !== undefined && approvedHeads.length > 0,
             files,
             method,
@@ -216,6 +221,15 @@ export class ReviewCoordinator {
             this.pi.sendUserMessage(buildApprovalPrompt(approved, approvedHeads, approval), { deliverAs: "followUp" });
         }
         this.server?.publish("review-updated");
+    }
+
+    /** The folders of the repositories a target covers; none when they cannot be worked out (the event then has no `root`). */
+    private rootsOf(target: { folder?: string; ticket?: string }): Map<string, string> {
+        try {
+            return this.workspace.rootsOf(target);
+        } catch {
+            return new Map();
+        }
     }
 
     // ---- events -----------------------------------------------------------------------------------------------------

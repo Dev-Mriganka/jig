@@ -75,8 +75,8 @@ fingerprint and asks you to confirm it before it is stored.
 On approval the plugin:
 - records it in the review store, with how and when, and the full commit of each repository when the
   approved diff is still the current one (a branch review; anything else vouches for no commit);
-- emits `jig-review:approved` on `pi.events`, for `jig-workflow`'s later `review-done` condition:
-  `{ reviewId, scope, ticket?, repos: [{ repo, head }], covered, files, method }`;
+- emits `jig-review:approved` on `pi.events`, for `jig-workflow`'s `review-done` condition:
+  `{ reviewId, scope, ticket?, repos: [{ repo, head, root }], covered, files, method }`;
 - tells the agent how it was approved, when the agent asked for the review.
 
 ## Rules

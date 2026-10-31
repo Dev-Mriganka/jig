@@ -167,6 +167,11 @@ export class WorkspaceReviewSource {
         return heads.join(", ") || "none";
     }
 
+    /** The folder of every repository the target covers, by its path from Pi's folder ("" for the folder itself). */
+    public rootsOf(target: Target = {}): Map<string, string> {
+        return new Map(this.sources(target).map((repo) => [repo.prefix, repo.root]));
+    }
+
     /** Full HEAD commit of every repository the target covers, with its path from Pi's folder ("" for the folder itself). */
     public async getHeads(target: Target = {}): Promise<Array<{ repo: string; sha: string }>> {
         const heads: Array<{ repo: string; sha: string }> = [];

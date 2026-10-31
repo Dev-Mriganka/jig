@@ -3,7 +3,13 @@
 // `gh` or a sandbox is a fake.
 import { createHash } from "node:crypto";
 import { jig } from "../../jig-core/src/client.ts";
-import type { RunOptions, RunResult, SandboxRunOptions, SandboxRunResult } from "../../jig-core/src/contract.ts";
+import type {
+    Preview,
+    RunOptions,
+    RunResult,
+    SandboxRunOptions,
+    SandboxRunResult,
+} from "../../jig-core/src/contract.ts";
 
 export interface Host {
     /** `git` in a repository, through jig-core: hooks off, a repository that would run a command refused. */
@@ -15,6 +21,8 @@ export interface Host {
         canRun(): boolean;
         run(command: string, options: SandboxRunOptions): Promise<SandboxRunResult>;
     };
+    /** The preview the user approved for this tool call, or undefined when the call did not ask. */
+    approvedPreview(toolCallId: string): Preview | undefined;
     now(): Date;
 }
 
@@ -33,6 +41,13 @@ export function coreHost(): Host {
                 }
             },
             run: (command, options) => jig().sandbox.run(command, options),
+        },
+        approvedPreview: (toolCallId) => {
+            try {
+                return jig().approvedPreview(toolCallId);
+            } catch {
+                return undefined;
+            }
         },
         now: () => new Date(),
     };
