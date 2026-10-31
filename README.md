@@ -97,7 +97,7 @@ first in the list, because every other plugin needs it:
 | [`jig-ops`](plugins/jig-ops/README.md) | built | CI, deploy and runtime from one service catalog; watches CI until it ends |
 | [`jig-review`](plugins/jig-review/README.md) | built | Code review in the browser, answered round by round, approved with a passkey |
 | [`jig-theme`](plugins/jig-theme/README.md) | built | Six palettes as Pi themes, your own, a one-line footer, the answer colour |
-| [`jig-agents`](plugins/jig-agents/README.md) | design | Subagents in terminal panes |
+| [`jig-agents`](plugins/jig-agents/README.md) | design | Child agents that Jig's rules still govern: their questions come to your screen, with limits on turns, time and cost |
 
 Every plugin needs `jig-core`; otherwise they work on their own.
 

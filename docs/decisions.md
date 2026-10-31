@@ -4,6 +4,7 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 
 ## Contents
 
+- [2026-10-31: jig-agents is built by us, on Pi's RPC mode](#2026-10-31-jig-agents-is-built-by-us-on-pis-rpc-mode)
 - [2026-10-31: jig-memory cards and recall: the agent writes the prose, keys and keywords find it](#2026-10-31-jig-memory-cards-and-recall-the-agent-writes-the-prose-keys-and-keywords-find-it)
 - [2026-10-31: jig-sandbox, background tasks and the network modes, as built](#2026-10-31-jig-sandbox-background-tasks-and-the-network-modes-as-built)
 - [2026-10-31: jig-sandbox, as built](#2026-10-31-jig-sandbox-as-built)
@@ -33,6 +34,54 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 - [2026-10-30: jig-git's tools, and a watch that knows when it is done](#2026-10-30-jig-gits-tools-and-a-watch-that-knows-when-it-is-done)
 - [2026-10-30: built clean, beside the existing harness](#2026-10-30-built-clean-beside-the-existing-harness)
 - [Earlier decisions that still hold (2026-10-29)](#earlier-decisions-that-still-hold-2026-10-29)
+
+## 2026-10-31: jig-agents is built by us, on Pi's RPC mode
+
+- **No package is adopted.** About 250 names were found, 146 sorted by name and weekly
+  downloads, about 20 read by README and 8 in the code that launches a child. None
+  keeps every child under `jig-core` and `jig-sandbox`, sends a child's question to the
+  parent's screen through `jig-core`'s own dialogs, and limits turns, time and cost. The
+  most used, `pi-subagents` (326,000 a week), does not govern its foreground children,
+  has no turn limit, and is 10.7 MB. The two small ones that run a separate Pi in RPC
+  mode, `@deathbeam/pi-delegate` and `@ferris1225/pi-subagents`, deny a child's
+  questions and have no limits ([Options](../plugins/jig-agents/docs/options.md)).
+- **A thin plugin around one does not help.** A child's dialogs are answered inside the
+  package's launch code, limits that stop a running child need an event stream the
+  package owns, and in several the list of extensions is set by an agent file or a call.
+  `pi-subagents` has a hook that forces plugins in, which fixes only the last.
+- **A child is `pi --mode rpc`, started by the plugin.** It is the same program with the
+  same plugins and `jig.json`, so every rule that governs the parent governs the child.
+  The command line is built from fixed parts and never holds `--no-extensions`, `-e` or
+  `--extension`. At start the plugin checks that the child lists `jig-core`'s commands,
+  and stops it if not. The estimate is about 1,000 lines and no dependency.
+- **A child's questions go to your screen, and every failure is a no.** In RPC mode Pi
+  turns the child's dialog into a request with a random id; the parent shows it under a
+  header it writes, queued, and answers on the pipe only it holds. No screen, no answer in
+  time, too many questions, or a request it cannot read: the question is cancelled, which
+  the child's `jig-core` counts as a decline. It is the "approving from another session"
+  that [Approvals](approvals.md) lists as later, with no file and no web endpoint, and
+  the floor is still decided in the child.
+- **The parent enforces the limits.** Turns come from the child's events, minutes from a
+  timer that does not count time spent waiting for you, and cost from `get_session_stats`.
+  At a limit the child is told to write its report, then aborted, then ended. The earlier
+  harness asked in a prompt and checked time only at a turn end, and a long tool call
+  overran it.
+- **A result is a watch.** `jig-core`'s engine already sends one follow-up message that
+  starts a turn, combined, spaced and cleaned, so the parent never polls. The engine's
+  outcome words are CI-shaped (`passed` for a clean finish); a `finished` word is a later,
+  small change.
+- **Models and limits are configuration, not agent files.** A public agent file never
+  names a company's model, and a company plugin sets models through `jig-core`'s section
+  defaults. Agent files are read only from the plugin, the company plugin and the user's
+  agent folder, never from the project, which the model can write.
+- **Terminal panes are dropped.** That gives up a live view of a child, children that
+  survive a `/reload`, and interactive roles such as the earlier planner. It buys no
+  tmux, no orphans (a child ends with its parent session), and a screen that only the
+  parent owns, which is what makes forwarding questions safe.
+- **Nothing has been run.** The first thing built is a test with a real Pi child and a
+  scripted model: a question reaches a fake screen and the answer returns, a child
+  without `jig-core` is stopped, each limit stops a looping child, and the child's own
+  `bash` cannot answer for it.
 
 ## 2026-10-31: jig-memory cards and recall: the agent writes the prose, keys and keywords find it
 
