@@ -1,7 +1,7 @@
 // The ticket folder on disk: <folder>/<KEY>/ holds notes.md (what is known, kept by the agent), plan.md (the plan that
-// jig-workflow asks you to approve), evidence/ (the saved results and index.md), history/ (the older lines of ## Now) and
-// ticket.json (the repositories bound to the ticket). Folders are 0700 and files 0600, because the notes and the
-// evidence hold what the tools returned.
+// jig-workflow asks you to approve), evidence/ (the saved results and index.md), history/ (the older lines of ## Now),
+// ticket.json (the repositories bound to the ticket) and, after a close, card.md. Folders are 0700 and files 0600,
+// because the notes and the evidence hold what the tools returned.
 import { randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -18,6 +18,8 @@ export interface TicketPaths {
     notes: string;
     plan: string;
     ticket: string;
+    /** card.md: made at close, not at activation. */
+    card: string;
     evidence: string;
     index: string;
     history: string;
@@ -35,6 +37,7 @@ export function ticketPaths(folder: string, key: string): TicketPaths {
         notes: path.join(dir, "notes.md"),
         plan: path.join(dir, "plan.md"),
         ticket: path.join(dir, "ticket.json"),
+        card: path.join(dir, "card.md"),
         evidence,
         index: path.join(evidence, "index.md"),
         history: path.join(dir, "history"),

@@ -161,6 +161,11 @@ export class FakePi {
         });
     }
 
+    /** The agent has settled after a run. */
+    settle(aborted = false): unknown[] {
+        return this.fire("agent_settled", { aborted });
+    }
+
     compact(): unknown[] {
         return this.fire("session_compact", { reason: "threshold", willRetry: false, fromExtension: false });
     }

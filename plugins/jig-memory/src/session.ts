@@ -5,8 +5,19 @@
 // The active ticket is saved with appendEntry and read back from the branch on session_start. The notes reach the
 // agent as messages, when a ticket becomes active and after each compaction, which may have folded the earlier
 // message away. They never go into the system prompt: a changed prompt rewrites the provider's cached prefix.
+import { existsSync } from "node:fs";
 import type { ExtensionAPI, ExtensionContext, SessionEntry } from "@earendil-works/pi-coding-agent";
 import { jig } from "../../jig-core/src/client.ts";
+import {
+    CARD_FIX,
+    CARD_REQUEST,
+    type Closing,
+    correctionText,
+    draftClose,
+    NothingToClose,
+    requestText,
+    verifyCard,
+} from "./close.ts";
 import { folderOf, ticketRegex } from "./config.ts";
 import type { MemorySettings } from "./config.ts";
 import { indexCount, isFileTool, saveEvidence } from "./evidence.ts";
@@ -21,6 +32,9 @@ export const NOTES_MESSAGE = "jig-memory-notes";
 const ACTIVE = "Active.";
 const COMPACTED = "Still active after compaction; current notes follow.";
 const NO_TICKET = "No active ticket. Run /ticket KEY, or name a ticket in your message.";
+const USAGE = "Use /ticket KEY, /ticket off, or /ticket alone to show the active ticket.";
+// The words after /ticket that are commands. A ticket key with one of these names cannot be set with /ticket.
+const COMMANDS: ReadonlySet<string> = new Set(["off", "close", "recall"]);
 
 interface Memory {
     folder: string;
@@ -49,6 +63,8 @@ export function registerTicketMemory(pi: ExtensionAPI): void {
     let sinceNotes = 0;
     // Hints already shown while another ticket is active, so naming it in every message says so once.
     const reported = new Set<string>();
+    // A close that has asked the agent to fill the card and waits for it to settle.
+    let closing: Closing | undefined;
 
     const note = (ctx: ExtensionContext, text: string, level: "info" | "warning" = "info") => {
         if (ctx.hasUI) ctx.ui.notify(text, level);
@@ -86,7 +102,7 @@ export function registerTicketMemory(pi: ExtensionAPI): void {
         }
     };
 
-    const deactivate = (ctx: ExtensionContext) => {
+    const deactivate = (ctx: ExtensionContext, message = "No active ticket.") => {
         if (active === undefined) {
             note(ctx, NO_TICKET);
             return;
@@ -95,7 +111,33 @@ export function registerTicketMemory(pi: ExtensionAPI): void {
         active = undefined;
         reported.clear();
         pi.appendEntry(TICKET_ENTRY, { key: null });
-        note(ctx, "No active ticket.");
+        note(ctx, message);
+    };
+
+    /** Drafts the card of `key` and asks the agent to fill it. The check comes when the agent has settled. */
+    const startClose = (mem: Memory, ctx: ExtensionContext, key: string) => {
+        if (!existsSync(ticketPaths(mem.folder, key).dir)) {
+            note(ctx, `No folder for ${key} in ${mem.folder}: run /ticket ${key} first.`, "warning");
+            return;
+        }
+        try {
+            closing = draftClose(mem.folder, key, mem.pattern, new Date());
+        } catch (error) {
+            note(
+                ctx,
+                error instanceof NothingToClose
+                    ? error.message
+                    : `Could not draft the card for ${key}: ${reason(error)}`,
+                "warning",
+            );
+            return;
+        }
+        // A follow-up waits for a run that is going, and an idle agent starts at once.
+        pi.sendMessage(
+            { customType: CARD_REQUEST, content: requestText(mem.folder, key), display: true, details: { key } },
+            { triggerTurn: true, deliverAs: "followUp" },
+        );
+        note(ctx, `Card for ${key} drafted in ${ticketPaths(mem.folder, key).card}; the agent is asked to fill it.`);
     };
 
     pi.on("session_start", (_event, ctx) => {
@@ -106,6 +148,7 @@ export function registerTicketMemory(pi: ExtensionAPI): void {
         notesSeen = "";
         sinceNotes = 0;
         reported.clear();
+        closing = undefined;
         if (active !== undefined) {
             // Only a restored ticket is told: jig-core starts without one, and another extension may have set its own.
             jig().setTicket(active);
@@ -121,6 +164,51 @@ export function registerTicketMemory(pi: ExtensionAPI): void {
         // The compaction may have folded the activation message away, and the notes may have changed since it.
         notesSeen = settleNotes(memory.folder, key, new Date());
         sendNotes(memory, key, COMPACTED, notesSeen);
+    });
+
+    // The agent has finished, follow-ups included: read the card it was asked for. A card that does not pass gets one
+    // correction message, then a warning, so a model that cannot count characters never makes a loop.
+    pi.on("agent_settled", (event, ctx) => {
+        const pending = closing;
+        const mem = memory;
+        if (pending === undefined || mem === undefined) return;
+        const key = pending.key;
+        let verdict: { ok: boolean; problems: string[] };
+        try {
+            verdict = verifyCard(mem.folder, pending);
+        } catch (error) {
+            closing = undefined;
+            note(ctx, `Could not check the card for ${key}: ${reason(error)}`, "warning");
+            return;
+        }
+        if (verdict.ok) {
+            closing = undefined;
+            const file = ticketPaths(mem.folder, key).card;
+            if (active === key) deactivate(ctx, `Ticket ${key} closed. Card: ${file}`);
+            else note(ctx, `Card for ${key} written: ${file}`);
+            return;
+        }
+        const list = verdict.problems.join(" ");
+        if (event.aborted || pending.corrected) {
+            closing = undefined;
+            note(
+                ctx,
+                `The card for ${key} is not complete: ${list} Fix ${ticketPaths(mem.folder, key).card} by hand, or run /ticket close ${key} again.`,
+                "warning",
+            );
+            return;
+        }
+        pending.corrected = true;
+        pi.sendMessage(
+            {
+                customType: CARD_FIX,
+                content: correctionText(mem.folder, key, verdict.problems),
+                display: true,
+                details: { key },
+            },
+            { triggerTurn: true, deliverAs: "followUp" },
+        );
+        note(ctx, `The card for ${key} needs changes; the agent is asked once more. ${list}`);
     });
 
     pi.on("input", (event, ctx) => {
@@ -182,7 +270,8 @@ export function registerTicketMemory(pi: ExtensionAPI): void {
     });
 
     pi.registerCommand("ticket", {
-        description: "Ticket memory: /ticket KEY makes a ticket active, /ticket off clears it, /ticket alone shows it",
+        description:
+            "Ticket memory: /ticket KEY makes a ticket active, /ticket off clears it, /ticket close writes its card, /ticket alone shows it",
         handler: async (args, ctx) => {
             const mem = memory;
             if (mem === undefined) {
@@ -190,6 +279,18 @@ export function registerTicketMemory(pi: ExtensionAPI): void {
                 return;
             }
             const arg = args.trim();
+            const [word = "", ...rest] = arg.split(/\s+/);
+            if (word === "close") {
+                const key = rest[0] ?? active;
+                if (key === undefined) {
+                    note(ctx, "No active ticket. Run /ticket close KEY.");
+                } else if (rest.length > 1 || !isSafeKey(key)) {
+                    note(ctx, "Use /ticket close, or /ticket close KEY.", "warning");
+                } else {
+                    startClose(mem, ctx, key);
+                }
+                return;
+            }
             if (arg === "") {
                 if (active === undefined) {
                     note(ctx, NO_TICKET);
@@ -206,8 +307,8 @@ export function registerTicketMemory(pi: ExtensionAPI): void {
                 deactivate(ctx);
                 return;
             }
-            if (!isSafeKey(arg)) {
-                note(ctx, "Use /ticket KEY, /ticket off, or /ticket alone to show the active ticket.", "warning");
+            if (!isSafeKey(arg) || COMMANDS.has(arg)) {
+                note(ctx, USAGE, "warning");
                 return;
             }
             if (arg === active) {
