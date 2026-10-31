@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, test } from "node:test";
-import { loadWorkflows, matching } from "../src/load.ts";
+import { disabledLines, loadWorkflows, matching, missingWorkflow, turnedOff } from "../src/load.ts";
 
 let root: string;
 beforeEach(() => {
@@ -103,5 +103,72 @@ describe("picking a workflow by ticket", () => {
         assert.deepEqual(matching(loaded, "PROJ-123"), ["feature", "wide"]);
         assert.deepEqual(matching(loaded, "BUG-7"), ["bugfix", "wide"]);
         assert.deepEqual(matching(loaded, "OTHER"), []);
+    });
+});
+
+describe("workflows that are turned off", () => {
+    const folders = () => [
+        {
+            dir: folder("company", { "feature.json": workflow("feature"), "policy.json": workflow("policy") }),
+            source: "configured" as const,
+        },
+        {
+            dir: folder("mine", {
+                "feature.json": workflow("feature", { description: "mine" }),
+                "extra.json": workflow("extra"),
+            }),
+            source: "agent folder" as const,
+        },
+    ];
+
+    test("a name in the list is left out whichever folder its file is in, every file of that name", () => {
+        const loaded = loadWorkflows(folders(), ["feature"]);
+        assert.deepEqual([...loaded.workflows.keys()].sort(), ["extra", "policy"]);
+        assert.deepEqual(loaded.disabled, [{ name: "feature", file: path.join(root, "mine", "feature.json") }]);
+    });
+
+    test("nothing is turned off by default", () => {
+        const loaded = loadWorkflows(folders());
+        assert.deepEqual([...loaded.workflows.keys()].sort(), ["extra", "feature", "policy"]);
+        assert.deepEqual(loaded.disabled, []);
+        assert.deepEqual(disabledLines(loaded), []);
+    });
+
+    test("a name that no file has is kept in the list, so that the list can say so", () => {
+        const loaded = loadWorkflows(folders(), ["policy", "polcy"]);
+        assert.deepEqual([...loaded.workflows.keys()].sort(), ["extra", "feature"]);
+        assert.deepEqual(
+            loaded.disabled.map((entry) => entry.name),
+            ["policy", "polcy"],
+        );
+        assert.equal(loaded.disabled[1]?.file, undefined);
+        assert.deepEqual(disabledLines(loaded), [
+            "",
+            "Left out by workflow.disabled in jig.json:",
+            `  policy: ${path.join(root, "company", "policy.json")}`,
+            "  polcy: no workflow file has this name",
+        ]);
+    });
+
+    test("a workflow that is picked by ticket is not offered when it is off", () => {
+        const dir = folder("m", {
+            "a.json": workflow("a", { match: { ticket: "^P-" } }),
+            "b.json": workflow("b", { match: { ticket: "^P-" } }),
+        });
+        assert.deepEqual(matching(loadWorkflows([{ dir, source: "configured" }], ["a"]), "P-1"), ["b"]);
+    });
+
+    test("the refusal for a ticket on it says it is turned off, and for a missing one that it is not loaded", () => {
+        const loaded = loadWorkflows(folders(), ["feature"]);
+        assert.equal(turnedOff(loaded, "feature"), true);
+        assert.equal(turnedOff(loaded, "ghost"), false);
+        assert.equal(
+            missingWorkflow(loaded, "feature", "PROJ-1"),
+            "the workflow feature of PROJ-1 is turned off by workflow.disabled in jig.json",
+        );
+        assert.equal(
+            missingWorkflow(loaded, "ghost", "PROJ-1"),
+            "the workflow ghost of PROJ-1 is not loaded: /workflow reload, or /workflow list for files that failed",
+        );
     });
 });

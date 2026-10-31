@@ -624,15 +624,24 @@ export interface JigApi {
          *  with `*` for any one name: `auth`, `backend.auth`, `services.*.ci.auth`.
          *
          *  `oneOf` lists keys in one object that exclude each other, such as `["backend.auth", "backend.transport"]`:
-         *  when the user's section sets one of them, the company's value for the others is dropped. */
+         *  when the user's section sets one of them, the company's value for the others is dropped.
+         *
+         *  `union` names lists that add up instead of being replaced, such as the folders a company and the user both
+         *  read from: the result is the company's entries first, then the user's, each once. A key is a path, as for
+         *  `replace`. */
         registerSection(
             name: string,
             validate: (raw: unknown) => readonly string[],
-            options?: { replace?: readonly string[]; oneOf?: readonly (readonly string[])[] },
+            options?: {
+                replace?: readonly string[];
+                oneOf?: readonly (readonly string[])[];
+                union?: readonly string[];
+            },
         ): void;
         /** A company plugin's defaults for a plugin's section, such as its log backend or its service catalog. Your own
          *  section in jig.json is laid over them: objects merge key by key, any other value of yours replaces theirs,
-         *  and a key the plugin named in `registerSection`'s `replace` is replaced whole. The result is checked by the
+         *  a key the plugin named in `registerSection`'s `replace` is replaced whole, and a list it named in `union`
+         *  has theirs first and then yours. The result is checked by the
          *  plugin's own validation. With no section of your own, the defaults alone are checked: when they are not
          *  valid (a field only the user can give is missing), the plugin is not configured, no problem is reported,
          *  and `/jig` says the company defaults are incomplete. */

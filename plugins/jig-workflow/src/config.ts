@@ -18,6 +18,8 @@ export interface TestRule {
 export interface WorkflowSettings {
     /** Absolute folders. */
     folders: string[];
+    /** Names of workflows to leave out, whichever folder they are in. */
+    disabled: string[];
     /** In the order they are written: the first that matches a repository is used. */
     tests: TestRule[];
     testTimeoutSeconds: number;
@@ -28,10 +30,13 @@ export const MIN_TIMEOUT_SECONDS = 10;
 export const MAX_TIMEOUT_SECONDS = 7200;
 
 /** The fields of the section, in the order the README's table lists them. */
-export const SECTION_FIELDS: readonly string[] = ["folders", "tests", "testTimeoutSeconds"];
+export const SECTION_FIELDS: readonly string[] = ["folders", "disabled", "tests", "testTimeoutSeconds"];
 const FIELDS: ReadonlySet<string> = new Set(SECTION_FIELDS);
 const TEST_FIELDS: ReadonlySet<string> = new Set(["command", "timeoutSeconds", "env", "outside"]);
 const MAX_COMMAND = 1000;
+const MAX_DISABLED = 100;
+/** A workflow's name, as a file is named (see definition.ts). */
+const WORKFLOW_NAME = /^[A-Za-z0-9][A-Za-z0-9-]{0,63}$/;
 
 function isObject(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -62,7 +67,7 @@ export function validateWorkflow(raw: unknown): string[] {
     const errors = Object.keys(raw)
         .filter((name) => !FIELDS.has(name))
         .map((name) => `workflow.${name}: unknown field`);
-    const { folders, tests, testTimeoutSeconds } = raw;
+    const { folders, disabled, tests, testTimeoutSeconds } = raw;
     if (folders !== undefined) {
         if (!Array.isArray(folders)) {
             errors.push("workflow.folders: must be a list of folders");
@@ -70,6 +75,19 @@ export function validateWorkflow(raw: unknown): string[] {
             folders.forEach((folder, index) => {
                 if (typeof folder !== "string" || (!path.isAbsolute(folder) && !folder.startsWith("~/"))) {
                     errors.push(`workflow.folders[${index}]: use an absolute path, or one that starts with ~/`);
+                }
+            });
+        }
+    }
+    if (disabled !== undefined) {
+        if (!Array.isArray(disabled)) {
+            errors.push("workflow.disabled: must be a list of workflow names");
+        } else if (disabled.length > MAX_DISABLED) {
+            errors.push(`workflow.disabled: at most ${MAX_DISABLED} names`);
+        } else {
+            disabled.forEach((name, index) => {
+                if (typeof name !== "string" || !WORKFLOW_NAME.test(name)) {
+                    errors.push(`workflow.disabled[${index}]: use a workflow name: letters, digits and -`);
                 }
             });
         }
@@ -113,13 +131,19 @@ export function validateWorkflow(raw: unknown): string[] {
 
 /** The section with defaults filled in. An absent or invalid section gives the defaults. */
 export function settingsFrom(section: unknown, home: string = os.homedir()): WorkflowSettings {
-    const settings: WorkflowSettings = { folders: [], tests: [], testTimeoutSeconds: DEFAULT_TEST_TIMEOUT_SECONDS };
+    const settings: WorkflowSettings = {
+        folders: [],
+        disabled: [],
+        tests: [],
+        testTimeoutSeconds: DEFAULT_TEST_TIMEOUT_SECONDS,
+    };
     if (!isObject(section) || validateWorkflow(section).length > 0) return settings;
     if (Array.isArray(section.folders)) {
         settings.folders = (section.folders as string[]).map((folder) =>
             folder.startsWith("~/") ? path.join(home, folder.slice(2)) : folder,
         );
     }
+    if (Array.isArray(section.disabled)) settings.disabled = [...new Set(section.disabled as string[])];
     if (isObject(section.tests)) {
         for (const [key, value] of Object.entries(section.tests)) {
             if (typeof value === "string") settings.tests.push({ key, command: value });

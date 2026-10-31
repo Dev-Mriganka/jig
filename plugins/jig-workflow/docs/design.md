@@ -57,6 +57,7 @@ any tool call
 |---|---|---|
 | `jig-core` | `gates.register(gate)`: a gate sees each call and can only ask or deny | Holds reach every tool, including Pi's `write` and `edit` |
 | `jig-core` | `sandbox.canRun` and `sandbox.run(command, options)` | Tests run in the sandbox without this plugin knowing how it wraps |
+| `jig-core` | `registerSection(name, validate, { union })`: lists that add up instead of being replaced | A user's `workflow.folders` adds to a company's instead of taking them away |
 | `jig-core` | The decision source `gate` on `jig:decision` and in the records | `/lens` can show how often a hold stopped work |
 | `jig-sandbox` | `run` on its provider: the wrapping of `bash`, without the tool | The same rules, audit and explanations as the agent's shell |
 | `jig-sandbox` | `bash` with `outside: true`, called through `ctx.executeTool` (nothing new in `jig-sandbox`) | A test that needs what the sandbox hides asks the way `bash` does: `jig-core` decides, a rule can name the command, the run is recorded |

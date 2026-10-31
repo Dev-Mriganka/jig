@@ -149,8 +149,11 @@ export interface WorldOptions {
     trusted?: boolean;
     /** Skip starting the session (the plugin has not seen session_start). */
     noSession?: boolean;
-    /** What a company plugin does while it loads, before the session starts. With it, jig.json has no `workflow` section. */
+    /** What a company plugin does while it loads, before the session starts. With it, jig.json has no `workflow` section,
+     *  unless `userWorkflow` gives the user's own. */
     company?: (api: JigApi, workspace: string) => void;
+    /** With `company`: the `workflow` section the user wrote in jig.json. `$workflows` stands for the world's folder of files. */
+    userWorkflow?: Record<string, unknown>;
 }
 
 /** Hooks that keep the state folder of jig-core private to each test. */
@@ -226,7 +229,11 @@ export async function world(t: TestContext, options: WorldOptions = {}): Promise
     const core = await startCore({
         config: {
             memory: { folder: tickets },
-            ...(options.company === undefined ? { workflow: { folders: [workflows], ...(options.config ?? {}) } } : {}),
+            ...(options.company === undefined
+                ? { workflow: { folders: [workflows], ...(options.config ?? {}) } }
+                : options.userWorkflow === undefined
+                  ? {}
+                  : { workflow: JSON.parse(JSON.stringify(options.userWorkflow).replaceAll("$workflows", workflows)) }),
         },
         cwd: workspace,
         ui:

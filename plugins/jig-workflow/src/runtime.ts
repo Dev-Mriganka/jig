@@ -33,7 +33,7 @@ export class Runtime {
     readonly host: Host;
     /** The latest context Pi gave us. Its session manager is live, so the active ticket is read from it each time. */
     ctx: ExtensionContext | undefined;
-    loaded: Loaded = { workflows: new Map(), failures: [] };
+    loaded: Loaded = { workflows: new Map(), failures: [], disabled: [] };
     settings: WorkflowSettings = settingsFrom(undefined);
     private readonly seen = new Map<string, { tool: string; error: boolean }>();
     private readonly guarded = new Set<string>();
@@ -77,7 +77,7 @@ export class Runtime {
         ];
         const project = this.projectFolder();
         if (project !== undefined) folders.push({ dir: project, source: "project" });
-        this.loaded = loadWorkflows(folders);
+        this.loaded = loadWorkflows(folders, this.settings.disabled);
         // The folders a workflow is read from are not for the agent to write: an agent that could edit the file that holds it
         // back could lift its own holds. The agent folder is guarded by jig-core already.
         this.guard([...this.settings.folders, path.join(this.cwd, ".pi", "workflows")]);

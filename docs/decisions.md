@@ -4,6 +4,7 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 
 ## Contents
 
+- [2026-10-31: jig-workflow: test variables, tests outside the sandbox, and folders that add up](#2026-10-31-jig-workflow-test-variables-tests-outside-the-sandbox-and-folders-that-add-up)
 - [2026-10-31: small gaps the example company plugin and later builds found, closed](#2026-10-31-small-gaps-the-example-company-plugin-and-later-builds-found-closed)
 - [2026-10-31: jig-agents, as built](#2026-10-31-jig-agents-as-built)
 - [2026-10-31: jig-git talks to GitLab through glab api, and the repository decides the forge](#2026-10-31-jig-git-talks-to-gitlab-through-glab-api-and-the-repository-decides-the-forge)
@@ -40,6 +41,39 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 - [2026-10-30: jig-git's tools, and a watch that knows when it is done](#2026-10-30-jig-gits-tools-and-a-watch-that-knows-when-it-is-done)
 - [2026-10-30: built clean, beside the existing harness](#2026-10-30-built-clean-beside-the-existing-harness)
 - [Earlier decisions that still hold (2026-10-29)](#earlier-decisions-that-still-hold-2026-10-29)
+
+## 2026-10-31: jig-workflow: test variables, tests outside the sandbox, and folders that add up
+
+A company configuring `jig-workflow` found three gaps. Each is a commit of its own, with tests and docs. Nothing is specific to a company.
+
+**Variables for one repository's tests**
+- **`env` in a `workflow.tests` entry** sets plain variables, such as `JAVA_HOME` to pick a JDK. Which JDK a repository needs is a fact
+  about the repository, so it belongs in the entry next to the command.
+- **A command line sets them in the sandbox.** `sandbox.run` takes a command and nothing else, so the line is `export A=b && command`,
+  with every value quoted. A run without a sandbox passes them as the shell's environment. Rejected: an `env` option on `sandbox.run`,
+  which changes `jig-core` and `jig-sandbox` for what one line of shell does.
+- **A name that looks like a credential is refused,** by the patterns `jig-sandbox` takes out of a command's environment. The list is
+  copied, because a plugin does not import another's modules, and a test compares the two. A token does not belong in a plain file.
+- **`~` is the home folder** at the start of a value and after a `:`. Nothing else is expanded, so `$HOME` stays text.
+
+**Tests that need what the sandbox hides**
+- **`outside: true` is configuration only.** The `workflow` tool has no such parameter, so the model cannot choose it.
+- **It runs through `bash`'s own way to run outside.** The plugin calls `bash` with `outside: true` and a fixed reason through
+  `ctx.executeTool`, as `bind` calls `git`. So `jig-core` asks in the waiting call, a rule that names the command can allow it, no
+  screen means no, and `jig-sandbox` records the run. Rejected: a dialog of the plugin's own, which no rule could name and `/sandbox`
+  would not list; an API that asks for a plugin, which is a second door for approvals; and a parameter for the model.
+- **The line starts with `cd`,** because `bash` runs in Pi's folder and has no folder parameter.
+- **A refusal is that repository's result,** and the others go on. A run that passed counts like a sandboxed one at the same HEAD, and
+  `status` says where it ran. Without a sandbox that can run commands, nothing changes: the call asks once for every command.
+- **The question shows the command, not the build files,** and the agent can edit those. The docs say to look at what changed first.
+- **Not verified:** the tests use the real `jig-core` and `jig-sandbox`'s own declaration of `bash` with a stand-in for the tool. A real Pi
+  with the real sandbox has not been tried, and the README says so.
+
+**A company's folders and yours add up**
+- **`registerSection` gets `union`,** the lists that add up: the company's entries first, then yours, each once. Only `jig-core` sees both
+  layers, so the plugin cannot do it alone. Every other list still replaces, because some must: a user's `git.protected` is the whole list.
+- **`workflow.disabled` drops a workflow by name,** whichever folder its file is in, so a user can leave out a company workflow. `/workflow
+  list` says what was left out and names a name no file has. A ticket already on it is told, and its holds are not enforced while it is off.
 
 ## 2026-10-31: small gaps the example company plugin and later builds found, closed
 

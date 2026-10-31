@@ -34,6 +34,22 @@ describe("validating the section", () => {
         assert.match(validateWorkflow({ folders: [3] })[0] ?? "", /^workflow.folders\[0\]/);
     });
 
+    test("disabled: a list of workflow names", () => {
+        assert.deepEqual(validateWorkflow({ disabled: [] }), []);
+        assert.deepEqual(validateWorkflow({ disabled: ["feature", "bug-fix", "A1"] }), []);
+        assert.match(validateWorkflow({ disabled: "feature" })[0] ?? "", /^workflow.disabled: must be a list/);
+        for (const bad of ["", "-x", "a b", "a/b", "feature.json", 3, null, "x".repeat(65)]) {
+            assert.match(
+                validateWorkflow({ disabled: ["feature", bad] })[0] ?? "",
+                /^workflow.disabled\[1\]: use a workflow name/,
+            );
+        }
+        assert.match(
+            validateWorkflow({ disabled: Array.from({ length: 101 }, () => "x") })[0] ?? "",
+            /^workflow.disabled: at most 100 names/,
+        );
+    });
+
     test("tests: a command, or an object with a command and a timeout, by key", () => {
         assert.match(validateWorkflow({ tests: [] })[0] ?? "", /^workflow.tests: must be an object/);
         assert.match(validateWorkflow({ tests: { a: "" } })[0] ?? "", /^workflow.tests.a: must be a command/);
@@ -101,7 +117,7 @@ describe("validating the section", () => {
 
 describe("the settings", () => {
     test("defaults when there is no section, and when it is not valid", () => {
-        const defaults = { folders: [], tests: [], testTimeoutSeconds: DEFAULT_TEST_TIMEOUT_SECONDS };
+        const defaults = { folders: [], disabled: [], tests: [], testTimeoutSeconds: DEFAULT_TEST_TIMEOUT_SECONDS };
         assert.deepEqual(settingsFrom(undefined), defaults);
         assert.deepEqual(settingsFrom({ folders: "no" }), defaults);
         assert.equal(DEFAULT_TEST_TIMEOUT_SECONDS, 900);
@@ -123,6 +139,11 @@ describe("the settings", () => {
             { key: "c", command: "pytest" },
         ]);
         assert.equal(settings.testTimeoutSeconds, 300);
+    });
+
+    test("disabled: the names, once each, in the order written", () => {
+        assert.deepEqual(settingsFrom({ disabled: ["b", "a", "b"] }).disabled, ["b", "a"]);
+        assert.deepEqual(settingsFrom({}).disabled, []);
     });
 
     test("env: ~ is the home folder in a value, and the variables keep their order", () => {

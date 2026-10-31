@@ -10,7 +10,7 @@ import { callText } from "./definition.ts";
 import type { Stage, Workflow } from "./definition.ts";
 import { environmentLines } from "./environment.ts";
 import { digest, hash } from "./host.ts";
-import { matching } from "./load.ts";
+import { disabledLines, matching, missingWorkflow } from "./load.ts";
 import { outsideRunner } from "./outside.ts";
 import { fingerprintOf, MAX_PLAN_CHARS, parsePlan, repositoryWarnings } from "./plan.ts";
 import { inspect, short } from "./repos.ts";
@@ -85,9 +85,7 @@ export function started(rt: Runtime, ticket: string): Started {
     if (work.read.kind === "invalid") throw new InputError(`${work.read.problem}; mend or delete the file`);
     const loaded = rt.definition(work.read.state);
     if (loaded === undefined) {
-        throw new InputError(
-            `the workflow ${work.read.state.workflow} of ${ticket} is not loaded: /workflow reload, or /workflow list for files that failed`,
-        );
+        throw new InputError(missingWorkflow(rt.loaded, work.read.state.workflow, ticket));
     }
     return { work, state: work.read.state, workflow: loaded.workflow };
 }
@@ -143,6 +141,7 @@ export function list(rt: Runtime): ActionResult {
             ...failures.map((failure) => `  ${failure.file}: ${failure.reason}`),
         );
     }
+    lines.push(...disabledLines(rt.loaded));
     return { text: lines.join("\n"), details: { workflows: [...workflows.keys()].sort(), failures: failures.length } };
 }
 

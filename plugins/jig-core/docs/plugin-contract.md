@@ -103,7 +103,9 @@ closed instead of running ungoverned.
     the result, so a user writes only what they change.
   - `registerSection(name, validate, { replace })` names the keys where an
     object of the user's replaces the company's whole, such as `auth`,
-    `backend.auth` or `services.*.ci.auth`.
+    `backend.auth` or `services.*.ci.auth`. `{ union }` names lists that add
+    up instead, such as `folders`: the company's entries first, then the
+    user's, each once.
   - Defaults that are not valid alone, with no section of the user's, leave the
     plugin unconfigured and are shown by `/jig`, not reported as a problem.
 - **`protectedPaths.list()`** gives every protected path with its `kind`
