@@ -63,6 +63,14 @@ export function buildApi(state: JigState): JigApi {
             state.declarations.set(declaration.tool, declaration);
         },
 
+        tools: {
+            declared: () =>
+                [...state.declarations.values()].map((declaration) => ({
+                    tool: declaration.tool,
+                    plugin: declaration.plugin,
+                })),
+        },
+
         approvedPreview: (toolCallId) => state.calls.get(toolCallId)?.approvedPreview,
 
         addFacts(toolCallId: string, facts: Facts) {

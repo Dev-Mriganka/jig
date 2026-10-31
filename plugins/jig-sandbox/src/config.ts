@@ -1,6 +1,7 @@
 // The `sandbox` section of jig.json. jig-core checks it with validateSandbox when it loads, so the rest of the plugin
 // reads a section that is valid, or absent. Every field is optional.
 import path from "node:path";
+import { readRolePolicy } from "../../jig-core/src/kit/role-policy.ts";
 
 export type NetworkMode = "open" | "filtered" | "ask" | "off";
 
@@ -30,6 +31,11 @@ export interface SandboxSettings {
     };
     /** Where the programs the runtime needs are, when they are not on `PATH`. Absolute paths. */
     programs: { bwrap?: string; socat?: string; ripgrep?: string };
+    /**
+     * True in a child agent whose role may not write: its home folder and working folder are locked. Never read from `jig.json` (a
+     * field of the section cannot set it) and never switched off by it: it comes from the environment the child was started in.
+     */
+    readOnly: boolean;
 }
 
 export const DEFAULT_SETTINGS: SandboxSettings = {
@@ -41,6 +47,7 @@ export const DEFAULT_SETTINGS: SandboxSettings = {
     docker: false,
     background: { maxTasks: 4, maxRuntimeMinutes: 240, keepFinished: 12, wake: "on" },
     programs: {},
+    readOnly: false,
 };
 
 const MODES: readonly NetworkMode[] = ["open", "filtered", "ask", "off"];
@@ -233,5 +240,15 @@ export function settingsFrom(raw: unknown): SandboxSettings {
             ...(socat === undefined ? {} : { socat }),
             ...(ripgrep === undefined ? {} : { ripgrep }),
         },
+        readOnly: false,
     };
+}
+
+/**
+ * Whether this process is a child agent whose role may not write, from the policy its parent put in the environment. A policy that is
+ * there and cannot be read counts as read-only: the sandbox locks more, never less, when it is not sure.
+ */
+export function readOnlyRole(env: Readonly<Record<string, string | undefined>>): boolean {
+    const reading = readRolePolicy(env);
+    return reading.kind === "unreadable" || (reading.kind === "policy" && !reading.policy.writes);
 }

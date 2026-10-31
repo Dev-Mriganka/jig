@@ -71,20 +71,22 @@ export function modelFor(
     pi: ExtensionAPI,
     settings: AgentsSettings,
     agentDir: string,
-    role: string,
+    role: Pick<Role, "name" | "thinking">,
 ): ModelChoice | undefined {
-    const choice = chooseModel(settings, role, parentModel(ctx, pi), readEnabledModels(agentDir));
+    const choice = chooseModel(settings, role.name, parentModel(ctx, pi), readEnabledModels(agentDir), role.thinking);
     if (choice?.source === "role") {
         const [provider = "", ...rest] = choice.model.split("/");
         const known = ctx.modelRegistry?.find?.(provider, rest.join("/"));
         if (typeof ctx.modelRegistry?.find === "function" && known === undefined) {
-            throw new StartError(`Pi does not know the model ${choice.model} that agents.roles.${role}.model names`);
+            throw new StartError(
+                `Pi does not know the model ${choice.model} that agents.roles.${role.name}.model names`,
+            );
         }
     }
     return choice;
 }
 
-/** The commands a child must list before it gets its task: jig-core's, and jig-sandbox's when the parent has it. */
+/** The commands a child must list before it gets its task: jig-core's and jig-agents', and jig-sandbox's when the parent has it. */
 export function requiredCommands(pi: ExtensionAPI): string[] {
     let have: string[] = [];
     try {
@@ -92,7 +94,8 @@ export function requiredCommands(pi: ExtensionAPI): string[] {
     } catch {
         // The list is a check, and a parent that cannot give it checks jig-core's command alone.
     }
-    return have.includes("sandbox") ? ["jig", "sandbox"] : ["jig"];
+    // `/agents` too: this plugin is what registers the role's gate in the child, so a child without it would run unnarrowed.
+    return have.includes("sandbox") ? ["jig", "agents", "sandbox"] : ["jig", "agents"];
 }
 
 /** The first message a child gets: its task, how its report is used, and its limits. */

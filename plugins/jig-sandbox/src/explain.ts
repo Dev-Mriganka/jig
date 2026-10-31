@@ -6,7 +6,7 @@
 // Network refusals are the runtime's own records and come from the broker (see `explainViolations`).
 import path from "node:path";
 import { inside } from "./pathing.ts";
-import { ruleFor, showPath, writableRootFor } from "./rules.ts";
+import { ROLE_SOURCE, ruleFor, showPath, writableRootFor } from "./rules.ts";
 import type { Rule, RuleSet } from "./rules.ts";
 import type { NetworkMode } from "./config.ts";
 
@@ -41,6 +41,9 @@ const ABSOLUTE = new RegExp(
 /** `bash: .bashrc: Read-only file system`, `cp: /a/b: Permission denied`: the path sits between two colons. */
 const BETWEEN_COLONS = /^[^:]+: (.+?): [A-Z]/;
 
+/** A path that begins the line, with a slash or a dot in it so that `Error` is not taken for a file: `./a.txt: Read-only file system`. */
+const LEADING_PATH = /^(\.{0,2}\/\S*|[\w@+-]+\.[\w.@+-]+): [A-Z]/;
+
 /** A shell names itself and the line of the script before the error: `/usr/bin/bash: line 1: /a/b: Read-only file system`. */
 const SHELL_PREFIX = /^\S+: line \d+: /;
 
@@ -65,6 +68,9 @@ function pathsIn(rawLine: string, cwd: string, home: string): string[] {
     for (const match of line.matchAll(ABSOLUTE)) add(match[1] as string);
     const colons = BETWEEN_COLONS.exec(line);
     if (colons !== null) add(colons[1] as string);
+    // A shell redirect to a relative path leaves the path first, once the shell's own prefix is gone: `./a.txt: Read-only file system`.
+    const leading = LEADING_PATH.exec(line);
+    if (leading !== null) add(leading[1] as string);
     return found;
 }
 
@@ -154,8 +160,12 @@ export function explainBlocks(output: string, set: RuleSet, options: ExplainOpti
         );
     }
     if (lines.length === 0 && generalWrite) {
+        // For an agent whose role may not write, the usual line would be untrue: it says the working folder is writable.
+        const readOnly = set.rules.some((rule) => rule.source === ROLE_SOURCE);
         lines.push(
-            "[sandbox] a write was refused (read-only file system). Bash may write your home folder, the working folder and /tmp; /sandbox shows every rule.",
+            readOnly
+                ? "[sandbox] a write was refused (read-only file system): this agent's role may not write. Only /tmp is writable, for scratch files."
+                : "[sandbox] a write was refused (read-only file system). Bash may write your home folder, the working folder and /tmp; /sandbox shows every rule.",
         );
     }
     const shown = lines.slice(0, MAX_LINES);

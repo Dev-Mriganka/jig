@@ -83,6 +83,27 @@ describe("the factory", () => {
         withdrawJig(api);
     });
 
+    test("tools.declared() lists each declared tool with the plugin that declared it, as a copy", () => {
+        const host = fakePi();
+        jigCore()(host.pi);
+        const api = jig();
+        const read = { environment: "local", effect: "read" as const };
+        api.declareTool({ tool: "git", plugin: "jig-git", classify: () => read });
+        api.declareTool({ tool: "pr", plugin: "jig-git", classify: () => read });
+        api.declareTool({ tool: "logs", plugin: "jig-logs", classify: () => read });
+        api.declareTool({ tool: "logs", plugin: "jig-logs2", classify: () => read });
+        const declared = api.tools?.declared() ?? [];
+        // jig-core declares its own `watch` tool; a tool declared again belongs to the plugin that declared it last.
+        assert.deepEqual(
+            declared.map((entry) => `${entry.plugin}:${entry.tool}`),
+            ["jig-core:watch", "jig-git:git", "jig-git:pr", "jig-logs2:logs"],
+        );
+        // A copy: changing an entry of it changes nothing.
+        Object.assign(declared[1] as object, { plugin: "changed" });
+        assert.equal(api.tools?.declared()[1]?.plugin, "jig-git");
+        withdrawJig(api);
+    });
+
     test("a plugin that was waiting for jig-core gets the API as soon as it is published", () => {
         let version: number | undefined;
         withJig((api) => {

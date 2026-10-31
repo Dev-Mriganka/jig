@@ -17,6 +17,10 @@ on Linux. No model was called.
   time. Whether a real model does is not known.
 - **That a report puts the answer first.** The shipped roles ask for it; the message shows only the first
   10 lines.
+- **That preloading a skill makes a model use it,** and that a scout with fewer skills does better. The
+  tests show that the text is in the child's instructions and that the other skills are not listed; they
+  cannot show what a model does with either. The same holds for `thinking`: the flag reaches Pi, which clamps it
+  to the model, but a scripted model has no thinking to change.
 - **Cost against a real price.** The cost limit is tested with the fake child's numbers. Pi's faux
   provider reports a cost of zero, so the real Pi runs show "cost unknown". A priced model counting
   against `maxCost` through `get_session_stats` is read from Pi's documents and not run.
@@ -29,6 +33,12 @@ on Linux. No model was called.
   where `ptrace_scope` is 0, is not tried: the real-Pi tests load `jig-core` and `jig-agents` only.
 - **`jig-sandbox` in a child.** The check that a child lists `/sandbox` when the parent does is tested with
   a stand-in command. A child that loads the real sandbox, and the cost of its broker once per child, is not.
+  A read-only `bash` is tried in a real Pi child that loads `jig-sandbox` and runs a real command, which reads, writes
+  `/tmp` and fails to write its working folder. What is not tried is the cost of a broker for every child, or a
+  scout running `rg` and `git log` on a large repository.
+- **Skills as a plugin lists them.** The parent learns a child's possible skills from `pi.getCommands()` and reads
+  `metadata` from their files, because Pi gives an extension nothing else. This is tested on Pi 1.4; a later Pi
+  that lists skills differently would show a role every skill or none.
 - **A real terminal.** Questions are shown through a fake screen that closes a question when its signal
   fires, as Pi's does. How Pi's terminal interface draws a title of 31 lines, and how a user feels
   about answering three children's questions in a row, is not seen.
@@ -51,8 +61,9 @@ on Linux. No model was called.
   whose model has no price.
 - **Holds do not reach a child.** A child's session has no active ticket, so `jig-workflow`'s holds do not
   apply inside it. A workflow file can hold `subagent start` itself, such as until the plan is approved.
-- **`git` in a read-only role.** `scout` and `reviewer` list `git`, whose commit and branch actions are local
-  writes that the rules allow. The plugin cannot ask `jig-core` which tools write, so only `bash`, `write`,
-  `edit` and their kin are refused for a role that does not write.
+- **A tool that classifies a write as a read.** A read-only role's gate trusts `jig-core`'s classification of each
+  call, as everything in Jig does. A tool that declares an action a read when it writes is not caught by `writes:
+  false`; `actions` is the second line, because it names the allowed actions. `scout` and `reviewer` list the
+  read actions of `git` and no other, and a test checks them against `jig-git`'s own table.
 
 Back to the [jig-agents overview](../README.md).

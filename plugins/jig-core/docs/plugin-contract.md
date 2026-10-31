@@ -36,6 +36,9 @@ closed instead of running ungoverned.
   - An optional `preview` feeds the review screen.
   - It also says whether the tool masks its own results.
   - Declaring a tool again replaces the declaration.
+- **`tools.declared()`** lists the declared tools as `{ tool, plugin }`, a copy, so a plugin can tell which
+  plugin a tool belongs to. `jig-agents` uses it to show a role only the skills of the plugins whose tools
+  the role has. It is optional in the type, so that a test's stand-in for `jig-core` need not have it.
 - **`approvedPreview(toolCallId)`** gives the preview you approved for this
   call, or nothing when the call did not ask. A tool compares it with what it
   would do now, and refuses with "changed since the preview" when they differ.
@@ -143,6 +146,14 @@ talks to Pi.
 - **`kit/values.ts`:** `isObject(value)`, and `InputError`: a `TypeError` named
   `InputError`, which `jig-core` reads as "invalid input" when a tool's classify
   or preview throws it.
+- **`kit/role-policy.ts`:** what a role gives its child agent to obey, as one environment variable,
+  `JIG_ROLE_POLICY`: `writeRolePolicy(policy)` and `readRolePolicy(env)`. The policy holds the role's name,
+  whether it `writes`, the only `actions` some tools may run, and the actions that must `ask`.
+  - **Three readers, one parser.** `jig-agents` writes it when it starts a child. In the child, `jig-agents`
+    enforces it with a gate and `jig-sandbox` locks the folders when the role does not write
+    ([jig-agents design](../../jig-agents/docs/design.md#a-role-only-narrows-and-the-child-enforces-it)).
+  - **Unreadable is not absent.** A variable that is set and cannot be read as a policy gives
+    `{ kind: "unreadable", problem }`, and every reader refuses; only a variable that is not set is `absent`.
 - **`kit/text.ts`:** `printable(text)` makes a name or header from outside safe
   in a message (control characters become `?`, cut at 60 characters).
   `stringOf(value)` is `String(value)`, or a stand-in when the value's own
@@ -189,7 +200,8 @@ its login in.
 
 A gate is a check that a plugin registers with `gates.register({ name, plugin, check })`. `jig-core` asks every
 gate about each call once the rules have decided ([What asks](approval-screens.md)), so a plugin can hold a
-call without any tool reading its files. `jig-workflow` holds `git push` until the tests pass this way.
+call without any tool reading its files. `jig-workflow` holds `git push` until the tests pass this way, and `jig-agents`
+registers one in every child agent, `role-policy`, which refuses what the child's role does not allow.
 
 `check(call, signal)` gets a frozen `GateCall`:
 

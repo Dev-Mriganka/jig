@@ -39,13 +39,13 @@ so this table cannot drift from the code.
 | `sandbox-messages.ts` | The words of a refusal, an error and a hint, as plain functions | `sandbox.ts` |
 | `broker-client.ts` | Pi's side of the broker: starts it, sends requests over its pipe, stops it | `index.ts`, `sandbox-types.ts`, `sandbox.ts` |
 | `programs.ts` | Finds bubblewrap, socat and ripgrep, or says what to install | `doctor.ts`, `network/wiring.ts` and 2 more |
-| `config.ts` | The `sandbox` section of `jig.json` | `background/tasks-deps.ts`, `background/tasks.ts` and 9 more |
+| `config.ts` | The `sandbox` section of `jig.json`, and whether a child's role may not write (`readOnlyRole`) | `background/tasks-deps.ts`, `background/tasks.ts` and 9 more |
 
 ### The rules
 
 | File | What it does | Called by |
 |---|---|---|
-| `rules.ts` | The rules as data: which paths are hidden, locked or ask-first, and what the runtime is told | `ask.ts`, `audit.ts` and 5 more |
+| `rules.ts` | The rules as data: which paths are hidden, locked or ask-first (a read-only agent's home and working folders are locked), and what the runtime is told | `ask.ts`, `audit.ts` and 5 more |
 | `lists.ts` | The exact lists of hidden, locked and ask-first paths, with the reason for each group | `gitconfig.ts`, `rules.ts` |
 | `repos.ts` | The repositories the sandbox watches: hooks locked, configuration audited | `audit.ts`, `rules.ts` |
 | `files.ts` | The file system as the rules look at it, so a test can give them a machine that does not exist | `audit.ts`, `index.ts` and 6 more |

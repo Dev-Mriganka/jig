@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, test } from "node:test";
 import { jigCore } from "../../jig-core/src/index.ts";
 import { withdrawJig } from "../../jig-core/src/client.ts";
 import { jig } from "../../jig-core/src/client.ts";
+import { ROLE_POLICY_VARIABLE, writeRolePolicy } from "../../jig-core/src/kit/role-policy.ts";
 import { DEFAULT_SETTINGS } from "../src/config.ts";
 import type { SandboxSettings } from "../src/config.ts";
 import { sandbox } from "../src/index.ts";
@@ -618,6 +619,40 @@ describe("/sandbox", () => {
         const s = setup();
         await s.start();
         assert.match((await s.command("frobnicate")).join(" "), /Usage: \/sandbox/);
+    });
+
+    test("a child whose role may not write has its home and working folders locked, and /sandbox says so", async () => {
+        const policy = writeRolePolicy({ role: "scout", writes: false, actions: {}, ask: {} });
+        const s = setup({ env: { [ROLE_POLICY_VARIABLE]: policy } });
+        await s.start();
+        const text = (await s.command("")).join("\n");
+        assert.match(text, /this agent's role may not write: its home folder and working folder are locked/);
+        assert.match(text, /~ {3}\(the role of this agent \(read-only\)\) {3}this agent's role may not write/);
+        assert.match(text, /~\/work\/orders {3}\(the role of this agent \(read-only\)\)/);
+    });
+
+    test("a policy that cannot be read locks them too, and a role that may write locks nothing", async () => {
+        const broken = setup({ env: { [ROLE_POLICY_VARIABLE]: "{not json" } });
+        await broken.start();
+        assert.match((await broken.command("")).join("\n"), /role may not write/);
+        const writer = setup({
+            env: { [ROLE_POLICY_VARIABLE]: writeRolePolicy({ role: "worker", writes: true, actions: {}, ask: {} }) },
+        });
+        await writer.start();
+        assert.doesNotMatch((await writer.command("")).join("\n"), /role may not write/);
+    });
+
+    test("the section of jig.json is added to the lock and cannot take it away", async () => {
+        const policy = writeRolePolicy({ role: "scout", writes: false, actions: {}, ask: {} });
+        mkdirSync(path.join(root, "home", "notes"), { recursive: true });
+        const s = setup({
+            env: { [ROLE_POLICY_VARIABLE]: policy },
+            settings: { lock: ["~/notes"], share: [path.join(root, "home", "notes")] },
+        });
+        await s.start();
+        const text = (await s.command("")).join("\n");
+        assert.match(text, /~\/notes {3}\(your sandbox section \(lock\)\)/);
+        assert.match(text, /role may not write/);
     });
 
     test("allowed lists nothing at first; add, list and forget work, and the answer is kept in the agent folder", async () => {

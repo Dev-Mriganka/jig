@@ -5,6 +5,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, test } from "node:test";
+import { readRolePolicy, ROLE_POLICY_VARIABLE, writeRolePolicy } from "../../jig-core/src/kit/role-policy.ts";
 import { settingsFrom } from "../src/config.ts";
 import { thisPi } from "../src/host.ts";
 import {
@@ -60,6 +61,57 @@ describe("the command line", () => {
             promptFile: "f",
         });
         assert.deepEqual(flags.slice(4, 8), ["--model", "p/m", "--thinking", "high"]);
+    });
+
+    test("starts with no skills but the ones given: --no-skills, then one --skill for each, before the prompt", () => {
+        const flags = flagsFor({
+            role: role(),
+            model: undefined,
+            sessionId: "s",
+            promptFile: "f",
+            skillFiles: ["/pkg/plugins/jig-git/skills/git/SKILL.md", "/home/me/skills/house/SKILL.md"],
+        });
+        assert.deepEqual(flags.slice(flags.indexOf("--no-skills")), [
+            "--no-skills",
+            "--skill",
+            "/pkg/plugins/jig-git/skills/git/SKILL.md",
+            "--skill",
+            "/home/me/skills/house/SKILL.md",
+            "--append-system-prompt",
+            "f",
+            "--no-approve",
+        ]);
+    });
+
+    test("a role that sees no skill gets --no-skills and nothing after it; left out, Pi finds skills as it always does", () => {
+        const none = flagsFor({ role: role(), model: undefined, sessionId: "s", promptFile: "f", skillFiles: [] });
+        assert.ok(none.includes("--no-skills"));
+        assert.ok(!none.includes("--skill"));
+        const left = flagsFor({ role: role(), model: undefined, sessionId: "s", promptFile: "f" });
+        assert.ok(!left.includes("--no-skills"));
+    });
+
+    test("context none is --no-context-files, and the default passes nothing", () => {
+        const spec = { role: role(), model: undefined, sessionId: "s", promptFile: "f" };
+        assert.ok(flagsFor({ ...spec, context: "none" }).includes("--no-context-files"));
+        assert.ok(!flagsFor({ ...spec, context: "project" }).includes("--no-context-files"));
+        assert.ok(!flagsFor(spec).includes("--no-context-files"));
+    });
+
+    test("the thinking level goes after the model, or alone when there is no model to carry it", () => {
+        const spec = { role: role(), sessionId: "s", promptFile: "f" };
+        assert.deepEqual(flagsFor({ ...spec, model: undefined, thinking: "high" }).slice(4, 6), ["--thinking", "high"]);
+        const withModel = flagsFor({
+            ...spec,
+            model: { model: "p/m", thinking: "low", source: "role" },
+            thinking: "high",
+        });
+        assert.deepEqual(
+            withModel.slice(4, 8),
+            ["--model", "p/m", "--thinking", "low"],
+            "the model's own level is the final one",
+        );
+        assert.ok(!flagsFor({ ...spec, model: { model: "p/m", source: "role" } }).includes("--thinking"));
     });
 
     test("a role without a tools list (one that writes) leaves Pi's usual tools, minus the excluded ones", () => {
@@ -156,6 +208,26 @@ describe("the environment", () => {
         assert.equal(env.JIG_AGENT_ROLE, "scout");
         assert.equal(env.PI_SKIP_VERSION_CHECK, "1");
     });
+
+    test("carries the role's policy in JIG_ROLE_POLICY, and never the parent's own", () => {
+        const policy = writeRolePolicy({ role: "scout", writes: false, actions: { git: ["status"] }, ask: {} });
+        const env = childEnvironment(
+            { [ROLE_POLICY_VARIABLE]: "the parent's own", PATH: "/bin" },
+            [ROLE_POLICY_VARIABLE],
+            {
+                ...who,
+                policy,
+            },
+        );
+        assert.equal(env[ROLE_POLICY_VARIABLE], policy);
+        assert.deepEqual(readRolePolicy(env), {
+            kind: "policy",
+            policy: { role: "scout", writes: false, actions: { git: ["status"] }, ask: {} },
+        });
+        // Not even a name that agents.env lists lets the parent's value through when there is nothing to set.
+        const bare = childEnvironment({ [ROLE_POLICY_VARIABLE]: "the parent's own" }, [ROLE_POLICY_VARIABLE], who);
+        assert.equal(ROLE_POLICY_VARIABLE in bare, false);
+    });
 });
 
 describe("the model", () => {
@@ -177,6 +249,26 @@ describe("the model", () => {
             source: "parent",
         });
         assert.equal(chooseModel(settings({}), "scout", undefined, undefined), undefined);
+    });
+
+    test("the thinking level, strongest first: the role's setting, the configured model's :level, the file's, the parent's", () => {
+        const choose = (roleSettings: Record<string, unknown>, fileThinking?: string, withParent = true) =>
+            chooseModel(
+                settings({ scout: roleSettings }),
+                "scout",
+                withParent ? parent : undefined,
+                undefined,
+                fileThinking,
+            )?.thinking;
+        // A configured model.
+        assert.equal(choose({ model: "a/b:low", thinking: "high" }, "minimal"), "high");
+        assert.equal(choose({ model: "a/b:low" }, "minimal"), "low");
+        assert.equal(choose({ model: "a/b" }, "minimal"), "minimal");
+        assert.equal(choose({ model: "a/b" }), undefined, "Pi's own level for that model");
+        // The parent's model, which carries the parent's level unless the role says another.
+        assert.equal(choose({ thinking: "high" }, "minimal"), "high");
+        assert.equal(choose({}, "minimal"), "minimal");
+        assert.equal(choose({}), "medium");
     });
 
     test("a model outside enabledModels is refused with the allowed patterns; an empty list allows nothing", () => {

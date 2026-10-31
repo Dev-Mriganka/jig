@@ -4,6 +4,7 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 
 ## Contents
 
+- [2026-11-01: a role only narrows, and the child enforces it](#2026-11-01-a-role-only-narrows-and-the-child-enforces-it)
 - [2026-10-31: every dependency is on its latest stable release, pinned, and kept there by Dependabot](#2026-10-31-every-dependency-is-on-its-latest-stable-release-pinned-and-kept-there-by-dependabot)
 - [2026-10-31: CI runs the latest and the previous line of every service, and MongoDB starts by a setting](#2026-10-31-ci-runs-the-latest-and-the-previous-line-of-every-service-and-mongodb-starts-by-a-setting)
 - [2026-10-31: big files are split by job, big plugins have a code map, and growth is a warning](#2026-10-31-big-files-are-split-by-job-big-plugins-have-a-code-map-and-growth-is-a-warning)
@@ -44,6 +45,38 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 - [2026-10-30: jig-git's tools, and a watch that knows when it is done](#2026-10-30-jig-gits-tools-and-a-watch-that-knows-when-it-is-done)
 - [2026-10-30: built clean, beside the existing harness](#2026-10-30-built-clean-beside-the-existing-harness)
 - [Earlier decisions that still hold (2026-10-29)](#earlier-decisions-that-still-hold-2026-10-29)
+
+## 2026-11-01: a role only narrows, and the child enforces it
+
+- **What was wrong.** A role narrowed by tool name only, and `writes: false` only checked the tool list. The shipped
+  scout and reviewer therefore had the whole `git` tool, push included, and no `bash`, so they could not even run `rg`.
+- **The rule, from Codex.** A role may customise its child or reduce what it can do, never widen it, and the **child**
+  enforces it: not the parent, and not the prompt. The others compared (Claude Code, `pi-subagents`) let a file name whole
+  tools and leave the rest to a permission layer; Jig has that layer in every child already, so it uses it
+  ([Specialisation compared](../plugins/jig-agents/docs/options.md#specialisation-compared-2026-11-01)).
+- **One environment variable carries it.** The parent writes the role's `writes`, `actions` and `ask` into `JIG_ROLE_POLICY`
+  when it starts the child. In the child, `jig-agents` reads it once and registers a `jig-core` gate: writes are refused for
+  `writes: false`, a tool named in `actions` runs only those actions, and an action in `ask` asks. A gate can only make a
+  decision stricter, so the child's rules and the floor still apply. The model cannot give a running Pi another environment.
+- **A policy that cannot be read fails closed,** through the path the start-up check already had: the child refuses every call
+  and throws when its session starts, which the parent reads as a plugin that failed to load. `jig-core`'s kit holds the one
+  parser that `jig-agents` and `jig-sandbox` both use, and `jig().tools.declared()` is the one small addition to the contract.
+- **A read-only role may have `bash`, in a sandbox.** `jig-core` calls every `bash` a write. For a role that does not write,
+  `jig-sandbox` locks the child's home folder and working folder, and the gate lets only a plain `bash` through while the
+  sandbox is active. Where there is no sandbox the role is refused, so `scout` and `reviewer` need `jig-sandbox`.
+- **The build caches are locked with the home folder,** because the runtime lays a read-only mount over the writable ones.
+  That costs a read-only role the ability to build, and closes the route by which an agent changes a cache that a later
+  build outside the sandbox uses. A role that must build is a writing role.
+- **Configuration can narrow and never widen.** `writes` and `tools` are not settings. `actions` keeps the actions that both the
+  file and configuration list, `ask` adds up (a company's and yours too), and the fields that only choose what a child reads replace
+  the file's: `skills`, `preload`, `context`, `thinking`.
+- **What a child reads follows its tools.** Without a `skills` line, a skill that belongs to a plugin is seen only by a role that
+  has one of the plugin's tools. A company's skill says which tool it extends with `metadata: jig-tool:`, a field the Agent Skills
+  format keeps for authors and Pi's parser accepts. `preload` puts a skill's whole text in the instructions, `context: none`
+  leaves out AGENTS.md and CLAUDE.md, and `thinking` sets the level.
+- **Left out:** a `memory` field, until a rule exists for what a child may remember and who may write it; `fetch` in the
+  shipped read-only roles, because it changes the repository's remote refs; and a narrowing of the worker's `git`, since a push asks
+  by default.
 
 ## 2026-10-31: every dependency is on its latest stable release, pinned, and kept there by Dependabot
 

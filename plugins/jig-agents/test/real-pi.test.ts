@@ -19,12 +19,16 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, test } from "node:test";
 import type { TestContext } from "node:test";
-import { thisPi } from "../src/host.ts";
-import type { PiCommand } from "../src/host.ts";
+import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
+import { withJig } from "../../jig-core/src/client.ts";
+import { ROLE_POLICY_VARIABLE, writeRolePolicy } from "../../jig-core/src/kit/role-policy.ts";
+import { realHost, thisPi } from "../src/host.ts";
+import type { Host, PiCommand } from "../src/host.ts";
 import { childEnvironment, flagsFor } from "../src/launch.ts";
 import { loadRoles, shippedFolder } from "../src/roles.ts";
 import { RpcChannel } from "../src/rpc.ts";
 import { realTimers } from "../src/host.ts";
+import { skipUnlessRealSandbox } from "../../jig-sandbox/test/support/programs.ts";
 import { startWorld, until } from "./world.ts";
 import type { ScreenScript, World } from "./world.ts";
 
@@ -68,7 +72,16 @@ afterEach(async () => {
 });
 
 /** A temporary agent folder for the child: the packages Jig loads, the scripted model, and the user's jig.json. */
-function folders(options: { jig?: boolean; config?: unknown; steps?: unknown[] } = {}): Folders {
+function folders(
+    options: {
+        jig?: boolean;
+        /** Also load jig-sandbox in the child, so that its `bash` runs in the real sandbox. */
+        sandbox?: boolean;
+        config?: unknown;
+        steps?: unknown[];
+        roles?: Record<string, string>;
+    } = {},
+): Folders {
     const root = realpathSync(mkdtempSync(path.join(tmpdir(), "jig-agents-real-")));
     roots.push(root);
     const agent = path.join(root, "agent");
@@ -84,7 +97,11 @@ function folders(options: { jig?: boolean; config?: unknown; steps?: unknown[] }
                 ? [
                       {
                           source: REPO,
-                          extensions: ["plugins/jig-core/src/index.ts", "plugins/jig-agents/src/index.ts"],
+                          extensions: [
+                              "plugins/jig-core/src/index.ts",
+                              "plugins/jig-agents/src/index.ts",
+                              ...(options.sandbox === true ? ["plugins/jig-sandbox/src/index.ts"] : []),
+                          ],
                           skills: [],
                           prompts: [],
                           themes: [],
@@ -94,33 +111,57 @@ function folders(options: { jig?: boolean; config?: unknown; steps?: unknown[] }
         }),
     );
     writeFileSync(path.join(agent, "jig.json"), JSON.stringify(options.config ?? {}));
-    // A role with the two test tools: the shipped roles list only the tools a real role needs.
+    // Roles with the test tools: the shipped roles list only the tools a real role needs, and the real child has no jig-sandbox, so none of
+    // these lists bash.
     mkdirSync(path.join(agent, "agents"));
-    writeFileSync(
-        path.join(agent, "agents", "tester.md"),
-        "---\ndescription: Uses the two tools of the test\ntools: read, ask_tool, echo_tool\nwrites: false\n---\nYou use the tools you are told to.\n",
-    );
+    const roles: Record<string, string> = {
+        tester: "---\ndescription: Uses the tools of the test\ntools: read, ask_tool, echo_tool, write_tool\nwrites: false\n---\nYou use the tools you are told to.\n",
+        ...options.roles,
+    };
+    for (const [name, text] of Object.entries(roles)) writeFileSync(path.join(agent, "agents", `${name}.md`), text);
     const script = path.join(root, "model-script.json");
     writeFileSync(script, JSON.stringify({ steps: options.steps ?? [{ text: "hello" }] }));
     return { root, agent, home, script };
 }
 
+/**
+ * Says which plugin two tools belong to, as the child's scripted model does for `echo_tool`, so that a skill of `jig-test` follows the
+ * role that has `echo_tool` and a skill of `jig-other` follows `other_tool`, which no test role has.
+ */
+const toolsAreDeclared: ExtensionFactory = () => {
+    const read = { environment: "local", effect: "read" as const };
+    withJig((api) => {
+        api.declareTool({ tool: "echo_tool", plugin: "jig-test", classify: () => read });
+        api.declareTool({ tool: "other_tool", plugin: "jig-other", classify: () => read });
+    });
+};
+
 async function realWorld(
     f: Folders,
-    over: { ui?: ScreenScript; config?: Record<string, unknown> } = {},
+    over: {
+        ui?: ScreenScript;
+        config?: Record<string, unknown>;
+        skills?: string[];
+        host?: Partial<Host>;
+        /** Commands the parent has. The real child loads jig-core and jig-agents only, unless the folders say jig-sandbox too. */
+        commands?: string[];
+    } = {},
 ): Promise<World> {
     const pi = (found as { pi: PiCommand }).pi;
     return startWorld({
         ...(over.ui === undefined ? {} : { ui: over.ui }),
+        ...(over.skills === undefined ? {} : { skills: over.skills }),
         config: over.config ?? {},
         repo: false,
+        commands: over.commands ?? [],
+        extensions: [toolsAreDeclared],
         env: {
             PI_CODING_AGENT_DIR: f.agent,
             PI_FAKE_MODEL_SCRIPT: f.script,
             PI_OFFLINE: "1",
             HOME: f.home,
         },
-        host: { piCommand: () => pi },
+        host: { piCommand: () => pi, ...over.host },
     });
 }
 
@@ -151,6 +192,9 @@ describe("the stock Pi as a child", { skip }, () => {
             model: { model: "faux/faux-1", thinking: "off", source: "role" },
             sessionId: "agent-real01",
             promptFile: path.join(f.root, "prompt.md"),
+            // Pi takes the flags the plugin adds for what a child reads: no skills, and no AGENTS.md or CLAUDE.md.
+            skillFiles: [],
+            context: "none",
         });
         writeFileSync(path.join(f.root, "prompt.md"), "You are a scout.");
         const env = childEnvironment(
@@ -163,7 +207,14 @@ describe("the stock Pi as a child", { skip }, () => {
                 AWS_PROFILE: "must-not-pass",
             },
             [],
-            { id: "real01", name: "tester-1", role: "scout", parentSession: "parent-1", parentPid: process.pid },
+            {
+                id: "real01",
+                name: "tester-1",
+                role: "scout",
+                parentSession: "parent-1",
+                parentPid: process.pid,
+                policy: writeRolePolicy({ role: "scout", writes: false, actions: { git: ["status"] }, ask: {} }),
+            },
         );
         assert.equal(env.AWS_PROFILE, undefined);
         const cwd = path.join(f.root, "work");
@@ -350,7 +401,7 @@ describe("a real child run by the plugin, with the scripted model", { skip }, ()
         assert.equal(refused.isError, true);
         assert.match(
             refused.text,
-            /does not list the \/jig command, so it did not load the same plugins as this session/,
+            /does not list the \/jig, \/agents commands, so it did not load the same plugins as this session/,
         );
         assert.equal(w.rt.children.size, 0);
     });
@@ -386,7 +437,7 @@ describe("a real child run by the plugin, with the scripted model", { skip }, ()
     test("the child's records name its role and its parent's session", { timeout: 90_000 }, async () => {
         const f = folders({ steps: [{ tool: "echo_tool", args: {} }, { text: "done" }] });
         w = await realWorld(f);
-        await w.tool({ action: "start", role: "reviewer", task: "x" });
+        await w.tool({ action: "start", role: "tester", task: "x" });
         await w.deliver();
         const dir = path.join(w.stateDir, "records");
         const lines = readdirSync(dir).flatMap((name) =>
@@ -395,9 +446,374 @@ describe("a real child run by the plugin, with the scripted model", { skip }, ()
                 .filter((line) => line !== "")
                 .map((line) => JSON.parse(line) as Record<string, any>),
         );
-        const childCalls = lines.filter((record) => record.kind === "call" && record.agentRole === "reviewer");
+        const childCalls = lines.filter((record) => record.kind === "call" && record.agentRole === "tester");
         assert.ok(childCalls.length >= 1, "a call record written by the child");
         assert.ok(childCalls.every((record) => record.parentSession === w?.session.sessionManager.getSessionId()));
         assert.ok(childCalls.some((record) => record.tool === "echo_tool"));
+    });
+});
+
+/** A real Pi started by hand with the flags and policy a parent would give it, for a test of what the child itself does. */
+async function spawnChild(
+    t: TestContext,
+    f: Folders,
+    options: { policy: string; flags: string[]; script: unknown[] },
+): Promise<{ run(): Promise<string>; stderr(): string }> {
+    writeFileSync(f.script, JSON.stringify({ steps: options.script }));
+    const cwd = path.join(f.root, "work");
+    mkdirSync(cwd, { recursive: true });
+    const pi = (found as { pi: PiCommand }).pi;
+    const env = childEnvironment(
+        {
+            PATH: process.env.PATH,
+            HOME: f.home,
+            PI_CODING_AGENT_DIR: f.agent,
+            PI_FAKE_MODEL_SCRIPT: f.script,
+            PI_OFFLINE: "1",
+        },
+        [],
+        {
+            id: "hand01",
+            name: "hand-1",
+            role: "hand",
+            parentSession: "parent-1",
+            parentPid: process.pid,
+            policy: options.policy,
+        },
+    );
+    const proc = spawn(
+        pi.file,
+        [...pi.args, "--mode", "rpc", "--no-approve", "--model", "faux/faux-1", ...options.flags],
+        {
+            cwd,
+            env,
+            stdio: ["pipe", "pipe", "pipe"],
+            detached: true,
+        },
+    );
+    t.after(() => {
+        try {
+            process.kill(-(proc.pid as number), "SIGKILL");
+        } catch {
+            // Ended already.
+        }
+    });
+    let stderr = "";
+    proc.stderr.on("data", (chunk: Buffer) => {
+        stderr += chunk.toString();
+    });
+    let settled: (() => void) | undefined;
+    const channel = new RpcChannel(
+        proc.stdout,
+        proc.stdin,
+        {
+            event: (event) => {
+                if (event.type === "agent_settled") settled?.();
+            },
+            ui: () => undefined,
+            unreadable: () => undefined,
+            closed: () => undefined,
+        },
+        { timers: realTimers },
+    );
+    return {
+        stderr: () => stderr,
+        async run() {
+            const done = new Promise<void>((resolve) => {
+                settled = resolve;
+            });
+            await channel.request({ type: "prompt", message: "go" });
+            await Promise.race([
+                done,
+                new Promise((_resolve, reject) =>
+                    setTimeout(() => reject(new Error(`no answer. stderr: ${stderr.slice(-300)}`)), 40_000),
+                ),
+            ]);
+            const last = (await channel.request({ type: "get_last_assistant_text" })) as { text?: string };
+            return last.text ?? "";
+        },
+    };
+}
+
+describe("a real child enforces the narrowing its role gave it", { skip }, () => {
+    const roles = {
+        actioner:
+            "---\ndescription: Looks, does not peek\ntools: read, act_tool\nactions: act_tool look\nwrites: false\n---\nYou look.\n",
+        asker: "---\ndescription: Looks, after asking\ntools: read, act_tool\nask: act_tool look\nwrites: false\n---\nYou look.\n",
+    };
+
+    test("a role that may not write: the child's own gate refuses a write and names the role, and a read runs", {
+        timeout: 90_000,
+    }, async () => {
+        const f = folders({ steps: [{ tool: "write_tool", args: {} }, { textFromLastToolResult: "Report: " }] });
+        w = await realWorld(f);
+        await w.tool({ action: "start", role: "tester", task: "write" });
+        const refused = await w.deliver();
+        assert.match(
+            refused.content,
+            /Report: .*Blocked by jig-core: the role "tester" may not write, and write_tool writes/,
+        );
+        assert.equal(w.ui.selects.length, 0, "nobody was asked: the role decided");
+
+        writeFileSync(
+            f.script,
+            JSON.stringify({ steps: [{ tool: "echo_tool", args: {} }, { textFromLastToolResult: "Report: " }] }),
+        );
+        await w.tool({ action: "start", role: "tester", task: "read" });
+        assert.match((await w.deliver(2)).content, /Report: echo/);
+    });
+
+    test("actions: an action the role does not list is refused, whatever the tool's own rules say", {
+        timeout: 90_000,
+    }, async () => {
+        const f = folders({
+            roles,
+            steps: [{ tool: "act_tool", args: { action: "peek" } }, { textFromLastToolResult: "Report: " }],
+        });
+        w = await realWorld(f);
+        await w.tool({ action: "start", role: "actioner", task: "peek" });
+        assert.match(
+            (await w.deliver()).content,
+            /Report: .*the role "actioner" may run only act_tool look; act_tool peek is not one of them/,
+        );
+
+        writeFileSync(
+            f.script,
+            JSON.stringify({
+                steps: [{ tool: "act_tool", args: { action: "look" } }, { textFromLastToolResult: "Report: " }],
+            }),
+        );
+        await w.tool({ action: "start", role: "actioner", task: "look" });
+        assert.match((await w.deliver(2)).content, /Report: act_tool look ran/);
+    });
+
+    test("ask: an action the rules allow asks anyway, in the parent's dialog, with the role in the question", {
+        timeout: 90_000,
+    }, async () => {
+        const f = folders({
+            roles,
+            steps: [
+                { tool: "act_tool", args: { action: "peek" } },
+                { tool: "act_tool", args: { action: "look" } },
+                { textFromLastToolResult: "Report: " },
+            ],
+        });
+        w = await realWorld(f, { ui: { select: () => "Allow" } });
+        await w.tool({ action: "start", role: "asker", task: "look" });
+        assert.match((await w.deliver()).content, /Report: act_tool look ran/);
+        assert.equal(w.ui.selects.length, 1, "peek ran without a question; look asked");
+        assert.match(
+            JSON.stringify(w.ui.selects[0]),
+            /Asked by role-policy: the role \\"asker\\" asks before act_tool look/,
+        );
+    });
+
+    test("a policy the child cannot read is refused at start, as a plugin that failed to load is, and the task is never sent", {
+        timeout: 90_000,
+    }, async () => {
+        const f = folders();
+        const real = realHost();
+        w = await realWorld(f, {
+            host: {
+                spawn: (file, args, options) =>
+                    real.spawn(file, args, {
+                        ...options,
+                        env: { ...options.env, [ROLE_POLICY_VARIABLE]: "{not a policy" },
+                    }),
+            },
+        });
+        const refused = await w.tool({ action: "start", role: "tester", task: "secret task" });
+        assert.equal(refused.isError, true);
+        assert.match(
+            refused.text,
+            /a plugin failed to load in the child: .*JIG_ROLE_POLICY cannot be read \(the policy is not JSON\); every call is refused until the agent is started again/,
+        );
+        assert.equal(w.rt.children.size, 0);
+    });
+
+    test("bash in a read-only role, in a child with no sandbox: the child refuses it", {
+        timeout: 90_000,
+    }, async (t: TestContext) => {
+        const f = folders();
+        const child = await spawnChild(t, f, {
+            policy: writeRolePolicy({ role: "reader", writes: false, actions: {}, ask: {} }),
+            flags: ["--tools", "read,bash"],
+            script: [{ tool: "bash", args: { command: "echo hi" } }, { textFromLastToolResult: "Report: " }],
+        });
+        const report = await child.run();
+        assert.match(
+            report,
+            /Report: .*Blocked by jig-core: the role "reader" may not write, and its bash is read-only only inside jig-sandbox, which is not active in this agent/,
+        );
+        assert.doesNotMatch(report, /\bhi\b/);
+    });
+
+    test("a child whose policy says it may write runs bash as before", { timeout: 90_000 }, async (t: TestContext) => {
+        const f = folders();
+        // `bash` is a local write that jig-core's rules allow; a writing role is not narrowed. The command is harmless.
+        const child = await spawnChild(t, f, {
+            policy: writeRolePolicy({ role: "doer", writes: true, actions: {}, ask: {} }),
+            flags: ["--tools", "read,bash"],
+            script: [{ tool: "bash", args: { command: "echo only-a-test" } }, { textFromLastToolResult: "Report: " }],
+        });
+        assert.match(await child.run(), /Report: .*only-a-test/);
+    });
+});
+
+/** The real sandbox needs bubblewrap and its friends; without them the test that uses it says why it is skipped. */
+const sandboxSkip = skip === false ? skipUnlessRealSandbox() : skip;
+
+describe("a real child with the real sandbox runs a read-only bash", { skip: sandboxSkip }, () => {
+    const roles = {
+        sleuth: "---\ndescription: Reads with a shell\ntools: read, bash\nwrites: false\n---\nYou look around.\n",
+    };
+
+    test("it reads, writes /tmp, and cannot write its working folder, which the sandbox says and the gate allowed", {
+        timeout: 120_000,
+    }, async () => {
+        const command =
+            'd=$(mktemp -d /tmp/jig-sleuth-XXXXXX); echo scratch > "$d/f"; cat "$d/f"; rm -r "$d"; ' +
+            'ls; echo nope > ./made-by-the-sleuth.txt; echo "exit: $?"';
+        const f = folders({
+            sandbox: true,
+            roles,
+            steps: [{ tool: "bash", args: { command } }, { textFromLastToolResult: "Report: " }],
+        });
+        w = await realWorld(f, { commands: ["sandbox"] });
+        writeFileSync(path.join(w.cwd, "kept.txt"), "kept\n");
+        const started = await w.tool({ action: "start", role: "sleuth", task: "look" });
+        assert.equal(started.isError, false, started.text);
+        const report = (await w.deliver()).content;
+        assert.match(report, /scratch/, "/tmp is writable");
+        assert.match(report, /kept\.txt/, "the working folder is readable");
+        assert.match(report, /exit: [1-9]/, "the write failed");
+        assert.match(report, /\[sandbox\] cannot write .*made-by-the-sleuth\.txt: this agent's role may not write/);
+        assert.equal(existsSync(path.join(w.cwd, "made-by-the-sleuth.txt")), false);
+        assert.equal(readFileSync(path.join(w.cwd, "kept.txt"), "utf8"), "kept\n");
+    });
+
+    test("bash with outside: true is refused by the gate before anyone is asked", { timeout: 120_000 }, async () => {
+        const args = {
+            command: "echo escaped > /tmp/jig-outside-test",
+            outside: true,
+            reason: "the sandbox is in the way",
+        };
+        const f = folders({
+            sandbox: true,
+            roles,
+            steps: [{ tool: "bash", args }, { textFromLastToolResult: "Report: " }],
+        });
+        w = await realWorld(f, { commands: ["sandbox"], ui: { select: () => "Allow" } });
+        await w.tool({ action: "start", role: "sleuth", task: "go outside" });
+        assert.match((await w.deliver()).content, /Report: .*the role "sleuth" may not write, and bash outside writes/);
+        assert.equal(w.ui.selects.length, 0);
+        assert.equal(existsSync("/tmp/jig-outside-test"), false);
+    });
+});
+
+describe("a real child reads only what its role gave it", { skip }, () => {
+    /** Three skills the parent has, and two more that belong to plugins, one of which declares a tool the role has. */
+    function parentSkills(root: string): string[] {
+        const make = (where: string, name: string, body = `${name} body\n`): string => {
+            const dir = path.join(root, "skills", where, name);
+            mkdirSync(dir, { recursive: true });
+            const file = path.join(dir, "SKILL.md");
+            writeFileSync(file, `---\nname: ${name}\ndescription: About ${name}. Use it when asked.\n---\n${body}`);
+            return file;
+        };
+        return [
+            make("mine", "alpha-skill"),
+            make("mine", "beta-skill", "BETA-BODY-MARKER\n"),
+            make("mine", "gamma-skill"),
+            make("plugins/jig-test/skills", "delta-skill"),
+            make("plugins/jig-other/skills", "eps-skill"),
+        ];
+    }
+    const inspect = [
+        "AGENTS-MARKER-LINE",
+        "BETA-BODY-MARKER",
+        "alpha-skill",
+        "beta-skill",
+        "gamma-skill",
+        "delta-skill",
+        "eps-skill",
+    ];
+    const reader = (more: string): Record<string, string> => ({
+        reader: `---\ndescription: Reads with chosen skills\ntools: read, echo_tool\nwrites: false\n${more}\n---\nYou read.\n`,
+    });
+
+    /** Starts the role in a real child and returns which markers its model was given, by marker. */
+    async function seen(
+        role: string,
+        files: Record<string, string>,
+        config?: Record<string, unknown>,
+    ): Promise<Record<string, boolean>> {
+        const f = folders({ roles: files, steps: [{ inspect }] });
+        w = await realWorld(f, { skills: parentSkills(f.root), ...(config === undefined ? {} : { config }) });
+        writeFileSync(path.join(w.cwd, "AGENTS.md"), "# Notes\n\nAGENTS-MARKER-LINE\n");
+        const started = await w.tool({ action: "start", role, task: "look" });
+        assert.equal(started.isError, false, started.text);
+        const text = (await w.deliver()).content;
+        const found = /prompt has: (.*)/.exec(text)?.[1] ?? "";
+        const result = Object.fromEntries(found.split("; ").map((pair) => pair.split("=") as [string, string]));
+        assert.deepEqual(Object.keys(result), inspect, text);
+        return Object.fromEntries(Object.entries(result).map(([marker, answer]) => [marker, answer === "yes"]));
+    }
+
+    test("by default the skills follow the tools: the role's own plugin, and what nobody owns, but not another plugin's", {
+        timeout: 90_000,
+    }, async () => {
+        const result = await seen("reader", reader(""));
+        // The task says the markers nowhere, so a yes is the system prompt: the skills Pi listed, and the project's instructions.
+        assert.deepEqual(
+            [
+                result["alpha-skill"],
+                result["beta-skill"],
+                result["gamma-skill"],
+                result["delta-skill"],
+                result["eps-skill"],
+            ],
+            [true, true, true, true, false],
+        );
+        assert.equal(result["AGENTS-MARKER-LINE"], true, "project instructions are read by default");
+        assert.equal(result["BETA-BODY-MARKER"], false, "a skill is listed, not loaded");
+    });
+
+    test("a list of skills is exactly those; a preloaded one is in the instructions whole; context none leaves AGENTS.md out", {
+        timeout: 90_000,
+    }, async () => {
+        const result = await seen(
+            "reader",
+            reader("skills: alpha-skill, beta-skill\npreload: beta-skill\ncontext: none"),
+        );
+        assert.deepEqual(
+            [
+                result["alpha-skill"],
+                result["beta-skill"],
+                result["gamma-skill"],
+                result["delta-skill"],
+                result["eps-skill"],
+            ],
+            [true, true, false, false, false],
+        );
+        assert.equal(result["BETA-BODY-MARKER"], true, "the preloaded skill's text is in the child's instructions");
+        assert.equal(result["AGENTS-MARKER-LINE"], false, "context none: AGENTS.md is not read");
+    });
+
+    test("configuration replaces the file's skills, preload and context", { timeout: 90_000 }, async () => {
+        const result = await seen("reader", reader("skills: alpha-skill\ncontext: none"), {
+            agents: { roles: { reader: { skills: ["gamma-skill"], context: "project" } } },
+        });
+        assert.deepEqual(
+            [result["alpha-skill"], result["gamma-skill"], result["BETA-BODY-MARKER"], result["AGENTS-MARKER-LINE"]],
+            [false, true, false, true],
+        );
+    });
+
+    test("none lists no skill at all", { timeout: 90_000 }, async () => {
+        const result = await seen("reader", reader("skills: none"));
+        for (const name of ["alpha-skill", "beta-skill", "gamma-skill", "delta-skill", "eps-skill"]) {
+            assert.equal(result[name], false, name);
+        }
     });
 });

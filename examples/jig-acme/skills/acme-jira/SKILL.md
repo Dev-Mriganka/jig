@@ -1,6 +1,8 @@
 ---
 name: acme-jira
 description: "Acme's Jira rules on top of the jira skill: the ACME project and its issue keys, priorities, story points, and how a pull request is linked. Use whenever the user names an ACME-123 style key, or asks to create, update, move or comment on an Acme Jira issue."
+metadata:
+  jig-tool: jira
 ---
 
 # Jira at Acme

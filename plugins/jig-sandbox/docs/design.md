@@ -91,6 +91,7 @@ Versions taken, newest first:
 | Hidden | `filesystem.denyRead`, as literal absolute paths, with symbolic links resolved first; computed from your real home folder (the password database's), not `$HOME`, because `ssh` and Java use that one |
 | Writable by default | `filesystem.allowWrite`: your home folder, the working folder (also when outside home), `/tmp`, the session's private temporary folder, `share` |
 | Locked | `filesystem.denyWrite`, which wins over `allowWrite` |
+| Locked for a read-only agent | the home folder and the working folder join `denyWrite`; both stay in `allowWrite`, which the deny wins over |
 | Ask first | `filesystem.denyWrite` until you approve, then left out of it |
 | `/mnt/wsl/resolv.conf`; `share` under a hidden path | `filesystem.allowRead` (and `allowWrite` for `share`), always on the real file, never on a link to it: an allowed link binds its target's content at the link's place |
 | `.git/config` writable | `filesystem.allowGitConfig: true`, with the audit below |
@@ -111,6 +112,28 @@ Runtime limits that shape the rules:
 - **Name resolution in `filtered` mode** happens in the proxy, on the host: HTTP
   clients work, while `dig`, `getent` and programs that ignore proxy settings find no
   names. `open` mode has plain DNS.
+
+## A child agent that may not write
+
+[jig-agents](../../jig-agents/docs/design.md#read-only-bash) lets a role with `writes: false` have `bash` when the child has this
+sandbox. This is the sandbox's half: it makes that `bash` read-only.
+
+- **The seam is the rules, not the runtime.** `SandboxSettings` has a `readOnly` flag that the section of `jig.json` cannot
+  set. `index.ts` sets it when the environment holds a policy (`JIG_ROLE_POLICY`, read by jig-core's kit) whose role does
+  not write, and `computeRules` then adds two locked rules, for the home folder and for the working folder of each command.
+- **Nothing downstream changed.** The runtime's `denyWrite`, `canWrite`, the audit, the explanations and `/sandbox` already
+  know locked rules.
+- **It only adds.** The flag is laid over the settings after they are read, so no field of `jig.json` removes it.
+  `share` is ignored in a read-only agent, because a shared folder is writable and a role's lock is the floor.
+- **A policy that is there and unreadable counts as read-only.** The sandbox locks more, never less, when it is not sure.
+- **The caches are locked, not carved out.** The runtime emits `denyWrite` last, so it covers a writable mount inside it:
+  a lock on the home folder makes `~/.npm`, `~/.gradle/caches` and `~/.m2/repository` read-only as well.
+- **That is a loss and a gain.** A role that wants to build cannot. The one risk this sandbox leaves for a writing agent, a
+  changed file in a cache that a later build outside uses, is closed for an agent that may not write. A role that must build
+  is a writing role.
+- **The gate is the other half.** The sandbox cannot tell a read from a write in a shell string. `jig-agents` lets a
+  read-only role call `bash` only while the sandbox is active, and refuses `bash` with `outside: true`, which runs
+  outside it.
 
 ## Network
 
@@ -326,6 +349,10 @@ in a small folder:
   number), reach a service on this machine or a tunnel that is not listed, and make a Unix
   socket with the forwarders running. The rules of every test also hide the real home's
   credential places, and a test never reads a file under it.
+- **A role that may not write, for real** (`readonly.test.ts`): nine ways to write into the working folder and the home
+  folder fail (a redirect, `touch`, `mkdir`, a copy, a link, an append, a rename, a delete, `tee`) and change nothing, the
+  build caches cannot be written, `/tmp` can, the refusal names the lock and asks nobody, and the same writes work in a world
+  without the lock. The rules and the plugin's use of the environment have their own tests (`rules.test.ts`, `plugin.test.ts`).
 - **Keeps working, for real** (`keep-working.test.ts`): a Gradle build, `npm install` of a
   local package, `git init/add/commit/branch/config/remote add`, a connection to a server
   on `localhost` in `open` mode and none in `off`, twelve commands at once, and no file

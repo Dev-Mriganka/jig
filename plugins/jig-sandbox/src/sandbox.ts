@@ -143,6 +143,11 @@ export class Sandbox {
         }
         const unrefused = denyNotApplied(settings);
         if (unrefused !== undefined) this.notes.push(unrefused);
+        if (settings.readOnly) {
+            this.notes.push(
+                "this agent's role may not write: its home folder and working folder are locked, so a command reads them and writes only /tmp and the session's scratch folder.",
+            );
+        }
         if ((settings.network.mode === "filtered" || settings.network.mode === "ask") && deps.platform !== "linux") {
             // Fail closed: a mode that is asked for and not available never means a more open one. The bridge between
             // commands is written for Linux's network namespaces, and the Mac side has not been tried.

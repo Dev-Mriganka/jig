@@ -1,32 +1,12 @@
 // The `/agents` command: the children of this session and any problem, the roles, the end of a child's transcript, and `say` and `stop`
 // typed by you. `say` and `stop` are the `message` and `stop` actions of the tool.
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import { oneLine, stripControl } from "./clean.ts";
-import { limitsFor } from "./config.ts";
+import { oneLine } from "./clean.ts";
 import { StartError } from "./launch.ts";
+import { roleReport } from "./role-report.ts";
 import type { Runtime } from "./runtime.ts";
 
 const USAGE = "Use /agents, /agents roles, /agents show <id>, /agents say <id> <text>, or /agents stop <id>.";
-
-/** The roles, with where each came from and the problems of the files that were skipped. */
-export function roleReport(rt: Runtime): string {
-    const lines: string[] = [];
-    for (const role of rt.roles.roles.values()) {
-        const settings = rt.settings.roles[role.name];
-        const limits = limitsFor(rt.settings, role.name);
-        const tools = role.tools === undefined ? "the usual tools" : role.tools.join(", ");
-        lines.push(
-            `${role.name}${role.writes ? " (writes)" : " (read-only)"}: ${stripControl(role.description)}`,
-            `  tools: ${tools}; model: ${settings?.model ?? "the parent's"}; limits: ${limits.maxTurns} turns, ${limits.maxMinutes} min, $${limits.maxCost}; file: ${role.file}`,
-        );
-    }
-    for (const name of Object.keys(rt.settings.roles)) {
-        if (!rt.roles.roles.has(name))
-            lines.push(`warning: agents.roles.${name} is set in jig.json, but no agent file defines the role ${name}`);
-    }
-    for (const problem of rt.roles.problems) lines.push(`skipped ${problem.file}: ${stripControl(problem.problem)}`);
-    return lines.length === 0 ? "No roles." : lines.join("\n");
-}
 
 export function registerCommands(pi: ExtensionAPI, rt: Runtime): void {
     pi.registerCommand("agents", {

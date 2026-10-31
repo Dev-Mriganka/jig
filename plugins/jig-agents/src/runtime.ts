@@ -21,6 +21,8 @@ import type { LoadedRoles, Role } from "./roles.ts";
 import { agentDir, agentsRoot, listChildren, removeOld, runDirOf, stateDir, writeText } from "./store.ts";
 import { ChildWatches, WATCH_KIND } from "./watch.ts";
 import type { WatchSpec } from "./watch.ts";
+import { planRole } from "./role-plan.ts";
+import type { RolePlan } from "./role-plan.ts";
 import { generateId, modelFor, nameFor, requiredCommands, resolveCwd, taskPrompt } from "./start-plan.ts";
 import { addWorktree, removeWorktree } from "./worktree.ts";
 import type { Worktree } from "./worktree.ts";
@@ -275,7 +277,10 @@ export class Runtime {
         );
         this.checkCounts();
         const cwd = resolveCwd(ctx, input.cwd);
-        const model = modelFor(ctx, this.pi, this.settings, agentDir(this.host.env()), role.name);
+        const model = modelFor(ctx, this.pi, this.settings, agentDir(this.host.env()), role);
+        // Worked out before a worktree or a process exists: a role that cannot run here is refused with the reason.
+        const requireCommands = requiredCommands(this.pi);
+        const plan = planRole(this.pi, role, this.settings.roles[role.name], requireCommands);
         signal?.throwIfAborted();
 
         // Everything above is checked without waiting, so two starts at once cannot both take the same name or the last place.
@@ -294,7 +299,7 @@ export class Runtime {
             model,
             generation: 1,
             startedAt: new Date(this.host.now()).toISOString(),
-            requireCommands: requiredCommands(this.pi),
+            requireCommands,
         };
         const child = new Child(spec, this.childContext());
         this.children.set(id, child);
@@ -319,8 +324,8 @@ export class Runtime {
                 child.spec = { ...child.spec, cwd: tree.path, branch: tree.branch, worktree: tree.path };
             }
             signal?.throwIfAborted();
-            const promptFile = writeText(dir, "system-prompt.md", `${role.prompt}\n`);
-            await this.run(child, role, model, promptFile, taskPrompt(role, name, task, child.spec));
+            const promptFile = writeText(dir, "system-prompt.md", `${plan.prompt}\n`);
+            await this.run(child, role, model, plan, promptFile, taskPrompt(role, name, task, child.spec));
             signal?.throwIfAborted();
             const watchId = this.watches.start(child, this.watchSpec(child.id));
             return { child, model: child.snapshot().model, watchId };
@@ -340,17 +345,27 @@ export class Runtime {
         child: Child,
         role: Role,
         model: ModelChoice | undefined,
+        plan: RolePlan,
         promptFile: string,
         prompt: string,
     ): Promise<void> {
         const spec = child.spec;
-        const flags = flagsFor({ role, model, sessionId: `agent-${spec.id}`, promptFile });
+        const flags = flagsFor({
+            role,
+            model,
+            sessionId: `agent-${spec.id}`,
+            promptFile,
+            skillFiles: plan.skills.visible.map((skill) => skill.file),
+            context: plan.effective.context,
+            ...(plan.effective.thinking === undefined ? {} : { thinking: plan.effective.thinking }),
+        });
         const env = childEnvironment(this.host.env(), this.settings.env, {
             id: spec.id,
             name: spec.name,
             role: spec.role,
             parentSession: this.session,
             parentPid: this.host.pid,
+            policy: plan.policy,
         });
         await child.launch(this.host.piCommand(), flags, env, prompt);
     }
@@ -404,7 +419,10 @@ export class Runtime {
         } catch {
             throw new StartError(`${child.name} worked in ${child.spec.cwd}, which is gone, so it cannot be resumed`);
         }
-        const model = modelFor(ctx, this.pi, this.settings, agentDir(this.host.env()), role.name);
+        const model = modelFor(ctx, this.pi, this.settings, agentDir(this.host.env()), role);
+        // A resumed child gets the policy of the role as it is now: a file or a setting that was narrowed since applies to it too.
+        const requireCommands = requiredCommands(this.pi);
+        const plan = planRole(this.pi, role, this.settings.roles[role.name], requireCommands);
         const spec: ChildSpec = {
             ...child.spec,
             writes: role.writes,
@@ -413,18 +431,19 @@ export class Runtime {
             model,
             generation: child.spec.generation + 1,
             startedAt: new Date(this.host.now()).toISOString(),
-            requireCommands: requiredCommands(this.pi),
+            requireCommands,
         };
         signal?.throwIfAborted();
         this.watches.stop(child);
         child.reset(spec);
         this.started++;
         try {
-            const promptFile = writeText(spec.dir, "system-prompt.md", `${role.prompt}\n`);
+            const promptFile = writeText(spec.dir, "system-prompt.md", `${plan.prompt}\n`);
             await this.run(
                 child,
                 role,
                 model,
+                plan,
                 promptFile,
                 `Message from your parent agent:\n\n${body}\n\nYour last message is your report again; the limits start afresh.`,
             );

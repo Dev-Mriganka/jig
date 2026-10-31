@@ -8,6 +8,7 @@ import { registerCommands } from "./commands.ts";
 import { validateAgents } from "./config.ts";
 import { realHost } from "./host.ts";
 import type { Host } from "./host.ts";
+import { installRoleGate } from "./role-gate.ts";
 import { loadRoles, shippedFolder } from "./roles.ts";
 import { Runtime } from "./runtime.ts";
 import { createTool, describeTool } from "./tool.ts";
@@ -23,15 +24,25 @@ export interface AgentsOptions {
 /** The extension, with parts a test can replace. Pi loads the default export below. */
 export function agents(options: AgentsOptions = {}): ExtensionFactory {
     return (pi: ExtensionAPI) => {
-        const rt = new Runtime(pi, options.host ?? realHost());
+        const host = options.host ?? realHost();
+        const rt = new Runtime(pi, host);
         options.onRuntime?.(rt);
+        // A child enforces the narrowing its role gave it: a gate for the policy in its environment. A policy that cannot be read refuses
+        // every call, and is reported when the session starts, which the parent's start-up check reads as a plugin that failed to load.
+        const policyProblem = installRoleGate(host.env());
+        if (policyProblem !== undefined) {
+            pi.on("session_start", () => {
+                throw new Error(policyProblem);
+            });
+        }
         // The tool's description lists the roles. It starts with the ones that ship, and is registered again at session start when
         // the user's or a company's files change the list.
         let described = describeTool(loadRoles([shippedFolder()]).roles.values());
         const tool = createTool(rt, described);
         // jig-core may load after this plugin; withJig waits for it.
         withJig((api) => {
-            api.config.registerSection("agents", validateAgents);
+            // What a role's `ask` adds up: a company's and yours both apply. Everything else in a role is replaced by the later layer.
+            api.config.registerSection("agents", validateAgents, { union: ["roles.*.ask.*"] });
             api.declareTool(tool.declaration);
             api.watches.registerKind(watchKind(rt));
             api.status?.register("jig-agents", () => rt.statusLines());

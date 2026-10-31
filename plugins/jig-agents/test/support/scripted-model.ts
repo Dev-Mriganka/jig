@@ -16,22 +16,61 @@ interface Step {
     text?: string;
     textFromLastToolResult?: string;
     loop?: { tool: string; args?: JsonObject };
+    /** Says which of these texts the model was given anywhere in what it reads, such as a skill's name or a line of AGENTS.md. */
+    inspect?: string[];
 }
 
 const parameters = Type.Object({ note: Type.Optional(Type.String()) });
+const actionParameters = Type.Object({
+    action: Type.Unsafe<string>({ type: "string", enum: ["look", "peek", "poke"] }),
+});
 
 export default function (pi: ExtensionAPI): void {
     withJig((api) => {
+        // A read that jig-core asks about, so a role that may not write can still be asked: its question is what the tests follow.
         api.declareTool({
             tool: "ask_tool",
             plugin: "jig-test",
-            classify: () => ({ environment: "local", effect: "write", atLeast: "ask" }),
+            classify: () => ({ environment: "local", effect: "read", atLeast: "ask" }),
         });
         api.declareTool({
             tool: "echo_tool",
             plugin: "jig-test",
             classify: () => ({ environment: "local", effect: "read" }),
         });
+        api.declareTool({
+            tool: "write_tool",
+            plugin: "jig-test",
+            classify: () => ({ environment: "local", effect: "write" }),
+        });
+        // `look` and `peek` read, `poke` writes: a tool with actions, for the narrowing of a role.
+        api.declareTool({
+            tool: "act_tool",
+            plugin: "jig-test",
+            classify: (input) => ({
+                action: String(input.action),
+                environment: "local",
+                effect: input.action === "poke" ? "write" : "read",
+            }),
+        });
+    });
+    pi.registerTool({
+        name: "write_tool",
+        label: "Write tool",
+        description: "A tool that writes, as far as jig-core is told.",
+        parameters,
+        async execute() {
+            return { content: [{ type: "text", text: "write_tool ran" }], details: {} };
+        },
+    });
+    pi.registerTool({
+        name: "act_tool",
+        label: "Act tool",
+        description: "A tool with the actions look, peek and poke.",
+        parameters: actionParameters,
+        async execute(_id, params) {
+            return { content: [{ type: "text", text: `act_tool ${params.action} ran` }], details: {} };
+        },
     });
     pi.registerTool({
         name: "ask_tool",
@@ -83,6 +122,13 @@ export default function (pi: ExtensionAPI): void {
             if (step.textFromLastToolResult !== undefined) {
                 return fauxAssistantMessage(
                     `${step.textFromLastToolResult}${lastToolResult(context.messages as never)}`,
+                );
+            }
+            if (step.inspect !== undefined) {
+                // What the child was given to read: the system prompt and the first message are part of the transcript.
+                const seen = JSON.stringify(context.messages);
+                return fauxAssistantMessage(
+                    `prompt has: ${step.inspect.map((marker) => `${marker}=${seen.includes(marker) ? "yes" : "no"}`).join("; ")}`,
                 );
             }
             return fauxAssistantMessage(step.text ?? "done");

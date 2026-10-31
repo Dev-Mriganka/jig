@@ -150,8 +150,16 @@ export interface WorldOptions {
     /** Replace parts of the host (a test of the process table, say). */
     host?: Partial<Host>;
     mode?: "rpc" | "tui";
-    /** Commands the parent session has besides jig-core's and `/agents`, such as `sandbox`. */
+    /**
+     * Commands the parent session has besides jig-core's and `/agents`. The default is `sandbox`, a stand-in for jig-sandbox's command,
+     * because the shipped scout and reviewer have `bash`, which a read-only role may have only where there is a sandbox; the fake child
+     * lists it too. Pass `[]` for a parent without one.
+     */
     commands?: string[];
+    /** More extensions for the parent session: tools to call, for a test of what the session lets through. */
+    extensions?: ExtensionFactory[];
+    /** Skill files (`SKILL.md`) the parent session has, as Pi lists them. */
+    skills?: string[];
     /** Runs once the folders exist and before the session starts: prepare files the plugin will find. */
     prepare?: (paths: { root: string; stateDir: string; agentDir: string; cwd: string }) => void | Promise<void>;
 }
@@ -283,7 +291,7 @@ export async function startWorld(options: WorldOptions = {}): Promise<World> {
         extensionFactories: [
             jigCore({ createMasker: () => fakeMasker, now: clock.date, timers: clock.timers }),
             factory,
-            ...(options.commands ?? []).map(
+            ...(options.commands ?? ["sandbox"]).map(
                 (name): ExtensionFactory =>
                     (pi) =>
                         pi.registerCommand(name, {
@@ -291,9 +299,12 @@ export async function startWorld(options: WorldOptions = {}): Promise<World> {
                             handler: async () => undefined,
                         }),
             ),
+            ...(options.extensions ?? []),
         ],
         noExtensions: false,
+        // Nothing is discovered; the skills a test names are explicit paths, which load all the same.
         noSkills: true,
+        ...(options.skills === undefined ? {} : { additionalSkillPaths: options.skills }),
         noPromptTemplates: true,
         noThemes: true,
         noContextFiles: true,

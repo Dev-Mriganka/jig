@@ -180,8 +180,9 @@ is refused and you see the new preview.
 | Term | Meaning |
 |---|---|
 | **Subagent** | A child agent: a separate Pi process, in RPC mode, with the same plugins as the session that starts it, so Jig's rules govern it. |
-| **Agent file** | A file that sets a role: its description, tools and prompt, such as a scout, a reviewer or a worker. Its model comes from configuration. |
+| **Agent file** | A file that sets a role: its description, tools, the actions of a tool, whether it writes, the skills it reads, and its prompt. Its model comes from configuration. |
 | **Role** | What a subagent is for: `scout` explores, `reviewer` reviews, `worker` changes code in a worktree of its own. A role is an agent file, and `/agents roles` lists them. |
+| **Narrowing** | What a role does to its child: it can take away tools, actions and writing, and never add them. The child enforces it with a gate, from a policy in its environment. |
 
 ## The look
 

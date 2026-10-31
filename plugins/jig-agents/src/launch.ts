@@ -2,6 +2,7 @@
 // configuration. Nothing in an agent file, a tool call or the project reaches the command line as a flag.
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { ROLE_POLICY_VARIABLE } from "../../jig-core/src/kit/role-policy.ts";
 import { parseModel, THINKING_LEVELS } from "./config.ts";
 import type { AgentsSettings } from "./config.ts";
 import type { Role } from "./roles.ts";
@@ -72,14 +73,19 @@ export function patternAllows(pattern: string, provider: string, id: string): bo
 /**
  * The model a child runs: the role's from configuration, checked against `enabledModels`; else the parent's own. A model outside the
  * allowed list refuses the start and names the patterns.
+ *
+ * The thinking level, strongest first: `agents.roles.<role>.thinking`, the `:thinking` on the configured model, the agent file's
+ * `thinking` (`fileThinking`), and last the parent's own level when the child runs the parent's model.
  */
 export function chooseModel(
     settings: AgentsSettings,
     role: string,
     parent: ParentModel | undefined,
     enabled: readonly string[] | undefined,
+    fileThinking?: string,
 ): ModelChoice | undefined {
-    const configured = settings.roles[role]?.model;
+    const own = settings.roles[role];
+    const configured = own?.model;
     if (configured !== undefined) {
         const parsed = parseModel(configured);
         if (parsed === undefined) throw new StartError(`agents.roles.${role}.model "${configured}" is not provider/id`);
@@ -89,16 +95,14 @@ export function chooseModel(
                     ` (${enabled.length === 0 ? "the list is empty" : `allowed: ${enabled.join(", ")}`}). Add it there, or change the role's model.`,
             );
         }
-        return {
-            model: parsed.model,
-            ...(parsed.thinking === undefined ? {} : { thinking: parsed.thinking }),
-            source: "role",
-        };
+        const thinking = own?.thinking ?? parsed.thinking ?? fileThinking;
+        return { model: parsed.model, ...(thinking === undefined ? {} : { thinking }), source: "role" };
     }
     if (parent === undefined) return undefined;
+    const thinking = own?.thinking ?? fileThinking ?? parent.thinking;
     return {
         model: `${parent.provider}/${parent.id}`,
-        ...(parent.thinking === undefined ? {} : { thinking: parent.thinking }),
+        ...(thinking === undefined ? {} : { thinking }),
         source: "parent",
     };
 }
@@ -108,22 +112,35 @@ export interface FlagSpec {
     model: ModelChoice | undefined;
     /** The child's session id, `agent-<id>`. */
     sessionId: string;
-    /** The file that holds the role's prompt. */
+    /** The file that holds the role's prompt, with the skills it preloads. */
     promptFile: string;
+    /**
+     * The skill files the child sees. When given, the child starts with `--no-skills` and one `--skill` for each, so it sees these and no
+     * other; left out, Pi finds skills as it always does.
+     */
+    skillFiles?: readonly string[];
+    /** `none`: the child does not read the project's AGENTS.md or CLAUDE.md. */
+    context?: "project" | "none";
+    /** The thinking level when there is no model to carry it. */
+    thinking?: string;
 }
 
 /** The flags after Pi's own program and entry file. */
 export function flagsFor(spec: FlagSpec): string[] {
     const flags = ["--mode", "rpc", "--session-id", spec.sessionId];
-    if (spec.model !== undefined) {
-        flags.push("--model", spec.model.model);
-        if (spec.model.thinking !== undefined) flags.push("--thinking", spec.model.thinking);
-    }
+    if (spec.model !== undefined) flags.push("--model", spec.model.model);
+    const thinking = spec.model?.thinking ?? spec.thinking;
+    if (thinking !== undefined) flags.push("--thinking", thinking);
     const tools = spec.role.tools;
     if (tools !== undefined) flags.push("--tools", tools.join(","));
     // No children of children; no MCP tools unless the role names one, which `--tools` then narrows to.
     const namesMcp = tools?.some((tool) => tool.startsWith("mcp__")) === true;
     flags.push("--exclude-tools", namesMcp ? "subagent" : "subagent,mcp__*");
+    if (spec.skillFiles !== undefined) {
+        flags.push("--no-skills");
+        for (const file of spec.skillFiles) flags.push("--skill", file);
+    }
+    if (spec.context === "none") flags.push("--no-context-files");
     flags.push("--append-system-prompt", spec.promptFile);
     // A `.pi/` folder the model wrote in the project does not load in the child.
     flags.push("--no-approve");
@@ -165,6 +182,8 @@ export interface ChildIdentity {
     role: string;
     parentSession: string;
     parentPid: number;
+    /** The role's policy, as `writeRolePolicy` writes it. The child enforces it; see role-gate.ts. */
+    policy?: string;
 }
 
 /**
@@ -179,7 +198,8 @@ export function childEnvironment(
     const extra = new Set(extraNames);
     const env: Record<string, string> = {};
     for (const [name, value] of Object.entries(parent)) {
-        if (value === undefined) continue;
+        // The parent's own policy, if it has one, is not the child's: only the one built for this role is set, below.
+        if (value === undefined || name === ROLE_POLICY_VARIABLE) continue;
         if (KEPT_NAMES.has(name) || extra.has(name) || KEPT_PREFIXES.some((prefix) => name.startsWith(prefix))) {
             env[name] = value;
         }
@@ -190,6 +210,8 @@ export function childEnvironment(
     env.PI_SUBAGENT_PARENT_PID = String(who.parentPid);
     env.JIG_PARENT_SESSION = who.parentSession;
     env.JIG_AGENT_ROLE = who.role;
+    // Set after the loop, so nothing in the parent's environment can stand in for it: the parent's own value is never copied.
+    if (who.policy !== undefined) env[ROLE_POLICY_VARIABLE] = who.policy;
     // A child has no use for a version check, and ten children should not each make one.
     env.PI_SKIP_VERSION_CHECK = "1";
     return env;
