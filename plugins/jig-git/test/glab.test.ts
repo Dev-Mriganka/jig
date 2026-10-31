@@ -200,6 +200,11 @@ test("the status glab reports, and the line a failure keeps", () => {
     assert.equal(statusOf(failed("something else")), undefined);
     assert.match(glabFailure("glab api", { ...failed(""), timedOut: true }).message, /^glab api failed: timed out$/);
     assert.match(glabFailure("glab api", failed("")).message, /^glab api failed: exit 1$/);
+    assert.equal(
+        glabFailure("glab api", failed("dial tcp 10.0.0.1:4010: connection refused")).message,
+        "glab api failed: dial tcp 10.0.0.1:4010: connection refused",
+        "a port that holds the digits 401 is not a sign-in problem",
+    );
 });
 
 test("a read with headers gives the status, the headers in lower case and the body; a 304 is an answer, not an error", async () => {

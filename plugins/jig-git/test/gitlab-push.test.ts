@@ -95,3 +95,19 @@ test("a listener that throws does not undo the push or lose its result", async (
         setAnnouncer((event, payload) => void h.announced.push({ event, payload }));
     }
 });
+
+test("the protected-branch rule is the same on GitLab: the default branch and git.protected are never pushed to, and nothing is announced", async () => {
+    const r = makeRepo(h.sb, `push${++counter}`, "acme", "gitlab.com");
+    const onMain = await h.call("git", { action: "push", repo: r.name, branch: "main" });
+    assert.equal(
+        onMain.error?.message,
+        "refusing to push protected branch main; push a feature branch and open a pull request",
+    );
+    h.jig.setSection("git", { protected: ["main", "release/*"] });
+    git(r.dir, "switch", "-q", "-c", "release/1.0", "--no-track", "origin/main");
+    commitFile(r.dir, "f.ts", "1\n", "A release fix");
+    const onRelease = await h.call("git", { action: "push", repo: r.name });
+    assert.match(onRelease.error?.message ?? "", /^refusing to push protected branch release\/1\.0/);
+    assert.deepEqual(pushedEvents(), []);
+    assert.equal(h.glab.calls().length, 0);
+});

@@ -142,6 +142,16 @@ test("create: an open merge request for the branch is returned and nothing is cr
     assert.equal(h.jig.started.length, 0, "and it is not watched: pr watch does that");
 });
 
+test("create: a merge request from a fork with the same branch name does not count as the branch's own, so a new one is made", async () => {
+    const p = project();
+    h.glab.on("api", { json: [mr({ iid: 9, source_project_id: 99, target_project_id: 7 }, p.path)] }, [
+        "merge_requests?source_branch=",
+    ]);
+    h.glab.on("api", { json: mr({ iid: 77 }, p.path) }, ["=POST"]);
+    ok(await h.call("pr", { action: "create", repo: p.r.name, title: "T", body: BODY }));
+    assert.equal(writes().length, 1);
+});
+
 test("create: a branch that is not pushed at its tip is refused before any write; so are a commit pushed after the preview and a head equal to the base", async () => {
     const p = project(false);
     h.glab.on("api", { json: [] });

@@ -104,6 +104,22 @@ test("view: a branch with only a merged merge request shows that one; a branch w
     );
 });
 
+test("view: a merge request from a fork whose branch has the same name is not the branch's own", async () => {
+    const p = project();
+    serveMr(p);
+    const fork = mr({ iid: 9, source_project_id: 99, target_project_id: 7 }, p.path);
+    const own = mr({ iid: 42, source_project_id: 7, target_project_id: 7 }, p.path);
+    h.glab.on("api", { json: [fork, own] }, ["merge_requests?source_branch=feature%2Fone&state=opened"]);
+    assert.match(ok(await h.call("pr", { action: "view", repo: p.r.name })), /^MR !42 /);
+    h.glab.reset();
+    serveMr(p);
+    h.glab.on("api", { json: [fork] }, ["merge_requests?source_branch="]);
+    assert.match(
+        (await h.call("pr", { action: "view", repo: p.r.name })).error?.message ?? "",
+        /^no merge request for feature\/one in /,
+    );
+});
+
 test("view: a draft, a conflict, auto-merge and a merge request without a pipeline are told", async () => {
     const p = project();
     serveMr(p, {

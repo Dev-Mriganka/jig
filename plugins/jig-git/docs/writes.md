@@ -37,6 +37,7 @@ run is the `ci` tool's, with its own check.)
 
 On GitLab the one read is the open merge requests of the branch for a create, the merge
 request for an edit, a ready or a merge, the newest notes for a comment or a review, and
-the discussion for a reply or a resolve. A review is also read after it is sent, because
-GitLab answers it with no body: if the review is not there, the tool says so and does not
-send it again.
+the discussion for a reply or a resolve.
+
+A review is also read after it is sent, because GitLab answers it with no body: if the
+review is not there, the tool says so and does not send it again.

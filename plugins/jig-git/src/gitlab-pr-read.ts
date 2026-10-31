@@ -50,6 +50,9 @@ export interface Mr {
     head_pipeline?: { id: number; status: string; web_url?: string } | null;
     /** Whether the request is set to merge when its pipeline succeeds. */
     merge_when_pipeline_succeeds?: boolean;
+    /** The project the source branch is in, and the one the request is made to: different for a fork. */
+    source_project_id?: number;
+    target_project_id?: number;
 }
 
 export interface GlJob {
@@ -81,6 +84,12 @@ export function getMr(gl: Gl, iid: number): Promise<Mr> {
     return get<Mr>(gl, "glab api (merge request)", `merge_requests/${iid}`);
 }
 
+/** A merge request from a branch of this project, not from a fork whose branch happens to have the same name. */
+const fromThisProject = (mr: Pick<Mr, "source_project_id" | "target_project_id">): boolean =>
+    mr.source_project_id === undefined ||
+    mr.target_project_id === undefined ||
+    mr.source_project_id === mr.target_project_id;
+
 /** The first open merge request whose source branch is `branch`, if there is one. */
 export async function openMrFor(gl: Gl, branch: string): Promise<Mr | undefined> {
     const rows = await get<Mr[]>(
@@ -94,7 +103,7 @@ export async function openMrFor(gl: Gl, branch: string): Promise<Mr | undefined>
             sort: "desc",
         }),
     );
-    return rows.find((row) => row.source_branch === branch);
+    return rows.find((row) => row.source_branch === branch && fromThisProject(row));
 }
 
 /** The merge request a call means: its number, a source branch, or the branch that is checked out. */
@@ -117,7 +126,7 @@ export async function mrNumber(gl: Gl, params: { number?: number; branch?: strin
             sort: "desc",
         }),
     );
-    const found = any.find((row) => row.source_branch === branch);
+    const found = any.find((row) => row.source_branch === branch && fromThisProject(row));
     if (!found)
         throw new Error(`no merge request for ${branch} in ${gl.repo.name}: pass number, or open one with pr create`);
     return found.iid;

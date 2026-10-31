@@ -83,7 +83,7 @@ export async function glab(args: readonly string[], options: GlabOptions = {}): 
 // ---- errors -------------------------------------------------------------------------------------------------------
 
 const SIGN_IN =
-    /glab auth login|not logged in|401|unauthorized|bad credentials|no token|authentication required|invalid token/i;
+    /glab auth login|not logged in|\b401\b|unauthorized|bad credentials|no token|authentication required|invalid token/i;
 
 /** The HTTP status glab reports on standard error, as in `glab: 404 Not Found (HTTP 404)`; undefined when it reports none. */
 export function statusOf(result: RunResult): number | undefined {

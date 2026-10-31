@@ -1,4 +1,4 @@
-// jig-git: git and GitHub for the agent. Three tools, `git`, `pr` and `release`. The tools only say what each call does;
+// jig-git: git, GitHub and GitLab for the agent. Three tools, `git`, `pr` and `release`. The tools only say what each call does;
 // jig-core decides whether it runs, and asks the user. CI (checks, runs, logs and watches) is the `ci` tool of jig-ops: after a
 // push or a new pull request this plugin announces `jig-git:pushed` on Pi's event bus, and jig-ops acts on it.
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
