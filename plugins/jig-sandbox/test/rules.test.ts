@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { canWritePath, computeRules, ruleFor, runtimeFilesystem, secretFilesIn } from "../src/rules.ts";
-import type { RuleKind, RuleSet } from "../src/rules.ts";
+import type { RuleKind, RulesInput, RuleSet } from "../src/rules.ts";
 import { fakeMachine } from "./support/fake-files.ts";
 import type { FakeMachine, MachineSpec } from "./support/fake-files.ts";
 
@@ -690,5 +690,83 @@ describe("asking the rules", () => {
         for (const place of ["/usr/bin/tool", "/etc/hosts", "/opt/x", `${SESSION}/broker/anything`]) {
             assert.equal(canWritePath(set, place), false, place);
         }
+    });
+});
+
+describe("a child agent whose role may not write", () => {
+    const readOnly = (files = linux(), over: Partial<RulesInput["settings"]> = {}) =>
+        rules(files, { settings: { share: [], hide: [], lock: [], readOnly: true, ...over } });
+
+    test("the home folder and the working folder are locked, with the role as the source", () => {
+        const set = readOnly();
+        for (const place of [HOME, CWD]) {
+            const rule = set.rules.find((entry) => entry.path === place);
+            assert.equal(rule?.kind, "locked", place);
+            assert.equal(rule?.source, "the role of this agent (read-only)");
+            assert.match(rule?.reason ?? "", /role may not write/);
+        }
+    });
+
+    test("nothing is writable but /tmp and the session's scratch folder, the build caches in the home folder included", () => {
+        const set = readOnly(linux({ dirs: [`${HOME}/.npm`, `${HOME}/.gradle/caches`, `${HOME}/.m2/repository`] }));
+        for (const place of [
+            `${CWD}/a.txt`,
+            `${HOME}/notes.txt`,
+            `${HOME}/.npm/_cacache/x`,
+            `${HOME}/.gradle/caches/x`,
+            `${HOME}/.m2/repository/x`,
+        ]) {
+            assert.equal(canWritePath(set, place), false, place);
+        }
+        for (const place of ["/tmp/x", `${SESSION}/tmp/y`]) assert.equal(canWritePath(set, place), true, place);
+    });
+
+    test("the runtime is told to deny writing to both folders", () => {
+        const denied = runtimeFilesystem(readOnly()).denyWrite.map((entry) => entry.path);
+        assert.ok(denied.includes(HOME));
+        assert.ok(denied.includes(CWD));
+    });
+
+    test("a refusal says what to do instead", () => {
+        const rule = ruleFor(readOnly(), `${CWD}/src/a.ts`);
+        assert.equal(rule?.kind, "locked");
+        assert.match(rule?.way ?? "", /Report the change you would make/);
+    });
+
+    test("a folder the user shares stays read-only, and the reason is said", () => {
+        const files = linux({ dirs: ["/srv/work"] });
+        const set = readOnly(files, { share: ["/srv/work"] });
+        assert.equal(canWritePath(set, "/srv/work/a.txt"), false);
+        assert.ok(
+            set.problems.some((problem) =>
+                /share \/srv\/work: ignored, because this agent's role may not write/.test(problem),
+            ),
+        );
+        // The same share works for an agent that may write.
+        const writer = rules(files, { settings: { share: ["/srv/work"], hide: [], lock: [] } });
+        assert.equal(canWritePath(writer, "/srv/work/a.txt"), true);
+    });
+
+    test("an ask-first folder in the home folder is answered by the lock, so nobody is asked to widen it", () => {
+        const set = readOnly(linux({ dirs: [`${HOME}/.sdkman`] }));
+        assert.equal(ruleFor(set, `${HOME}/.sdkman/bin/sdk`)?.kind, "locked");
+        assert.equal(canWritePath(set, `${HOME}/.sdkman/bin/sdk`), false);
+    });
+
+    test("the user's own hide still applies, and the credentials stay hidden", () => {
+        const set = readOnly(linux({ dirs: [`${HOME}/.ssh`, `${HOME}/private-notes`] }), {
+            hide: ["~/private-notes"],
+        });
+        assert.equal(ruleFor(set, `${HOME}/.ssh/id_test`)?.kind, "hidden");
+        assert.equal(ruleFor(set, `${HOME}/private-notes/a`)?.kind, "hidden");
+    });
+
+    test("without the flag nothing changes", () => {
+        const set = rules(linux(), { settings: { share: [], hide: [], lock: [], readOnly: false } });
+        assert.equal(canWritePath(set, `${CWD}/a.txt`), true);
+        assert.equal(
+            set.rules.some((rule) => rule.source.includes("role")),
+            false,
+        );
     });
 });

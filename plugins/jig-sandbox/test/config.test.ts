@@ -1,7 +1,8 @@
 // The `sandbox` section of jig.json: what is accepted, and what each mistake says.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { DEFAULT_SETTINGS, denyNotApplied, settingsFrom, validateSandbox } from "../src/config.ts";
+import { ROLE_POLICY_VARIABLE, writeRolePolicy } from "../../jig-core/src/kit/role-policy.ts";
+import { DEFAULT_SETTINGS, denyNotApplied, readOnlyRole, settingsFrom, validateSandbox } from "../src/config.ts";
 
 describe("validateSandbox", () => {
     test("an empty section and a full one are valid", () => {
@@ -103,6 +104,27 @@ describe("settingsFrom", () => {
         assert.deepEqual(settings.env.keep, ["MY_API_KEY"]);
         assert.deepEqual(settings.programs, { socat: "/opt/socat" });
         assert.deepEqual(settings.background, { maxTasks: 2, maxRuntimeMinutes: 240, keepFinished: 12, wake: "off" });
+    });
+});
+
+describe("readOnlyRole", () => {
+    const policy = (writes: boolean): string => writeRolePolicy({ role: "scout", writes, actions: {}, ask: {} });
+
+    test("is true for a child whose role may not write, false for one that may, and false when there is no policy", () => {
+        assert.equal(readOnlyRole({ [ROLE_POLICY_VARIABLE]: policy(false) }), true);
+        assert.equal(readOnlyRole({ [ROLE_POLICY_VARIABLE]: policy(true) }), false);
+        assert.equal(readOnlyRole({}), false);
+    });
+
+    test("is true when the policy is there and cannot be read: the sandbox locks more when it is not sure", () => {
+        for (const text of ["", "{not json", "[]", '{"v":9}']) {
+            assert.equal(readOnlyRole({ [ROLE_POLICY_VARIABLE]: text }), true, text);
+        }
+    });
+
+    test("is never set by the section of jig.json: the field is not one the section accepts or reads", () => {
+        assert.deepEqual(validateSandbox({ readOnly: true }), ["sandbox.readOnly: unknown field"]);
+        assert.equal(settingsFrom({ readOnly: true }).readOnly, false);
     });
 });
 

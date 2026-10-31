@@ -94,6 +94,12 @@ out of it.
   `.idea/runConfigurations`
 - Python start-up hooks: `*.pth` files in your user site-packages
 
+**A read-only agent** (a child whose role has `writes: false`, see
+[jig-agents](../../jig-agents/README.md#read-only-bash))
+- the home folder and the working folder, and with them everything inside, the build caches included.
+  `/tmp` and the session's scratch folder stay writable. Nothing in your section opens them again: `share` is
+  ignored, and an ask-first folder in the home folder is answered by this lock, so nobody is asked.
+
 ## Ask first: writable once you say yes
 
 Toolchain managers put programs on your `PATH`, so a write there can run outside the
@@ -110,7 +116,7 @@ asks where it now is. A manager that is not installed has nothing to ask about.
 
 ## Writable: everything else
 
-Your home folder, the project and its siblings, `/tmp`, and every cache a build uses:
+Except for a [read-only agent](#locked-readable-never-written), your home folder, the project and its siblings, `/tmp`, and every cache a build uses:
 `~/.gradle/caches`, `~/.gradle/wrapper`, `~/.m2/repository`, `~/.npm`, `~/.cache`,
 `~/.local/share/pnpm`, `~/go/pkg/mod`. Builds run as they do outside.
 

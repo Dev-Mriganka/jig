@@ -78,6 +78,12 @@ export const GROUPS = {
     build: { reason: "your builds run it, also outside the sandbox", way: BY_HAND, floor: false },
     python: { reason: "Python runs it at start-up, also outside the sandbox", way: BY_HAND, floor: false },
     "yours-locked": { reason: "you locked it in jig.json", way: "", floor: false },
+    // Not a list: the rules lock the home folder and the working folder for an agent whose role may not write.
+    readonly: {
+        reason: "this agent's role may not write",
+        way: "Report the change you would make instead of making it. /tmp is writable for scratch files.",
+        floor: true,
+    },
 
     toolchain: {
         reason: "programs installed there are on your PATH and run outside the sandbox later",

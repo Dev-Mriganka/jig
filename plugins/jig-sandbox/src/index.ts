@@ -24,7 +24,7 @@ import { createBashTool, sandboxedOperations } from "./bash.ts";
 import type { BashDeps, Decision } from "./bash.ts";
 import { startBroker } from "./broker-client.ts";
 import { registerSandboxCommand } from "./commands.ts";
-import { settingsFrom, validateSandbox } from "./config.ts";
+import { readOnlyRole, settingsFrom, validateSandbox } from "./config.ts";
 import { bashDeclaration } from "./outside.ts";
 import type { OutsideRun } from "./outside.ts";
 import type { SandboxSettings } from "./config.ts";
@@ -123,7 +123,11 @@ export function sandbox(options: SandboxOptions = {}): ExtensionFactory {
                 return ownQueue(job);
             }
         };
-        const settings: () => SandboxSettings = options.settings ?? (() => settingsFrom(sandboxSection()));
+        // A child agent whose role may not write is locked by the policy in its environment. The section of jig.json can add to what
+        // is locked and cannot take this away: it is laid over the settings after they are read.
+        const readOnly = readOnlyRole(env);
+        const configured: () => SandboxSettings = options.settings ?? (() => settingsFrom(sandboxSection()));
+        const settings: () => SandboxSettings = () => (readOnly ? { ...configured(), readOnly } : configured());
         const exec: BashOperations["exec"] = options.exec ?? createLocalBashOperations().exec;
         const core = new Sandbox({
             brokerScript: options.brokerScript ?? fileURLToPath(new URL("../broker/broker.mjs", import.meta.url)),

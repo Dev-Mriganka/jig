@@ -83,7 +83,13 @@ export interface RulesInput {
     runtimePaths: readonly string[];
     protectedPaths: readonly ProtectedEntry[];
     /** The user's additions and sharing, from the `sandbox` section. */
-    settings: { share: readonly string[]; hide: readonly string[]; lock: readonly string[] };
+    settings: {
+        share: readonly string[];
+        hide: readonly string[];
+        lock: readonly string[];
+        /** A child agent whose role may not write: the home folder and the working folder are locked, and nothing is shared. */
+        readOnly?: boolean;
+    };
     /** Ask-first folders the user allowed, absolute. */
     approved: readonly string[];
     /** Secret files the agent made in this session: they are its own, not hidden. */
@@ -158,6 +164,9 @@ function makeRule(candidate: Candidate, real: string, home: string): Rule {
         floor: candidate.kind === "locked" ? true : group.floor,
     };
 }
+
+/** Where the rules for a child agent that may not write come from, as `/sandbox` says it. */
+const ROLE_SOURCE = "the role of this agent (read-only)";
 
 const CORE_SOURCE: Record<ProtectedEntry["source"], string> = {
     default: "jig-core protected paths",
@@ -279,6 +288,12 @@ export function computeRules(input: RulesInput): RuleSet {
         const absolute = expand(text, home);
         if (absolute !== undefined) add("locked", absolute, "yours-locked", "your sandbox section (lock)");
     }
+    // A child agent whose role may not write reads its home folder and its working folder and writes neither. The lock on the home
+    // folder covers the build caches in it too: the runtime lays a read-only mount over a folder after the writable ones.
+    if (input.settings.readOnly === true) {
+        add("locked", home, "readonly", ROLE_SOURCE);
+        add("locked", cwd, "readonly", ROLE_SOURCE);
+    }
 
     // Ask first: the toolchain managers, where they are by default and where their own variable moved them.
     for (const item of ASK_FIRST) add("ask-first", inHome(item.path), item.group, BUILT_IN);
@@ -385,6 +400,10 @@ export function computeRules(input: RulesInput): RuleSet {
     // `share`: a folder that is writable although a rule hides it. It cannot open a credential, and it cannot unlock a
     // path: those rules are the floor.
     for (const text of input.settings.share) {
+        if (input.settings.readOnly === true) {
+            problems.push(`share ${text}: ignored, because this agent's role may not write`);
+            continue;
+        }
         const absolute = expand(text, home);
         const real = absolute === undefined ? undefined : files.real(absolute);
         if (real === undefined) {
