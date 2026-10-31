@@ -1,7 +1,7 @@
 // The `sandbox` section of jig.json: what is accepted, and what each mistake says.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { DEFAULT_SETTINGS, settingsFrom, validateSandbox } from "../src/config.ts";
+import { DEFAULT_SETTINGS, denyNotApplied, settingsFrom, validateSandbox } from "../src/config.ts";
 
 describe("validateSandbox", () => {
     test("an empty section and a full one are valid", () => {
@@ -103,5 +103,35 @@ describe("settingsFrom", () => {
         assert.deepEqual(settings.env.keep, ["MY_API_KEY"]);
         assert.deepEqual(settings.programs, { socat: "/opt/socat" });
         assert.deepEqual(settings.background, { maxTasks: 2, maxRuntimeMinutes: 240, keepFinished: 12, wake: "off" });
+    });
+});
+
+describe("denyNotApplied", () => {
+    const network = (mode: "open" | "filtered" | "ask" | "off", deny: string[]) => ({
+        network: { ...DEFAULT_SETTINGS.network, mode, deny },
+    });
+
+    test("warns when hosts are denied in the open mode, naming them", () => {
+        const warning = denyNotApplied(network("open", ["a.example.com", "*.b.example.com:443"]));
+        assert.match(
+            warning ?? "",
+            /^sandbox\.network\.deny \(a\.example\.com, \*\.b\.example\.com:443\) does nothing in the open network mode/,
+        );
+        assert.match(warning ?? "", /apply in filtered and ask only, so these hosts are NOT refused/);
+        assert.match(warning ?? "", /Set sandbox\.network\.mode to filtered or ask/);
+    });
+
+    test("shortens a long list", () => {
+        const hosts = Array.from({ length: 8 }, (_, i) => `h${i}.example.com`);
+        assert.match(
+            denyNotApplied(network("open", hosts)) ?? "",
+            /\(h0\.example\.com, .*h4\.example\.com and 3 more\)/,
+        );
+    });
+
+    test("says nothing when the list is empty, or the mode is one that applies it (or has no network at all)", () => {
+        assert.equal(denyNotApplied(network("open", [])), undefined);
+        for (const mode of ["filtered", "ask", "off"] as const)
+            assert.equal(denyNotApplied(network(mode, ["a.example.com"])), undefined, mode);
     });
 });

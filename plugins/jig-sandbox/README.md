@@ -83,6 +83,12 @@ always blocked.`
 - **macOS:** `filtered` and `ask` are tested on Linux and WSL2, and mean `off` on a Mac;
   `/sandbox` says so.
 
+**`network.allow` and `network.deny` apply in `filtered` and `ask` only.** They are read by the
+proxy those two modes route commands through. `allow` matters in `ask` alone (`filtered`
+already lets every public host through), and **`deny` does nothing in `open`**, the default,
+or in `off`: a host you list there is not refused. `/sandbox` and `/sandbox doctor` warn when
+`deny` is set in `open`; set `network.mode` to `filtered` or `ask` to apply it.
+
 In every mode, `ssh` has no keys (they are hidden), so git over SSH goes through Jig's
 `git` tool, and Unix sockets are closed, the Docker socket included: through Docker a
 command could run anything as root. For Docker, the agent asks to
@@ -121,8 +127,8 @@ In `~/.pi/agent/jig.json`, under `sandbox`. Every field is optional.
 | `share` | none | Folders writable although a rule hides them, such as a Windows work folder under `/mnt` |
 | `hide`, `lock` | none | More hidden or locked paths |
 | `network.mode` | `open` | `open`, `filtered`, `ask` or `off` |
-| `network.allow` | none | Hosts `ask` lets through without asking: `api.example.com`, `*.example.com:443` |
-| `network.deny` | none | Hosts always refused in `filtered` and `ask`, in the same form |
+| `network.allow` | none | Hosts `ask` lets through without asking: `api.example.com`, `*.example.com:443`. Used in `ask` only |
+| `network.deny` | none | Hosts always refused in `filtered` and `ask`, in the same form. Not applied in `open`, and `/sandbox` warns |
 | `network.localhost` | none | Ports on this machine that commands may reach in `filtered` and `ask` |
 | `env.keep` | none | Variables passed in although their names look like credentials |
 | `programs` | found on `PATH` | Absolute paths of `bwrap`, `socat` and `ripgrep` when they are elsewhere |
@@ -140,7 +146,9 @@ install, the sandbox is part of the system. Native Windows is not supported yet.
 ## Company part (in the company plugin)
 
 Hosts to deny (production databases) and to allow in `ask` mode, and more hidden or
-locked paths, through `jig-core`'s section defaults and protected paths.
+locked paths, through `jig-core`'s section defaults and protected paths. A deny list does
+nothing in the default `open` mode, so a company that wants it applied also defaults
+`network.mode` to `filtered` or `ask`; otherwise `/sandbox` warns each user.
 
 ## Later
 
