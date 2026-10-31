@@ -7,6 +7,7 @@ import { validateGitSection } from "./config.ts";
 import { setAnnouncer } from "./events.ts";
 import { gitTool } from "./git.ts";
 import { prTool } from "./pr.ts";
+import { registerCommentWatch } from "./pr-watch.ts";
 import { releaseTool } from "./release.ts";
 import { setWorkingDirectory } from "./repo.ts";
 import type { JigTool } from "./tool.ts";
@@ -22,5 +23,7 @@ export default function (pi: ExtensionAPI) {
     withJig((api) => {
         for (const tool of tools) api.declareTool(tool.declaration);
         api.config.registerSection("git", validateGitSection);
+        // The comments of a pull request are watched in the background, and the agent is told in one message per poll.
+        registerCommentWatch(api);
     });
 }

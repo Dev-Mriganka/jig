@@ -2,20 +2,22 @@
 //
 // One message can carry several results (see `outbox.ts`), so the text is a block per watch, with a blank line between
 // blocks. The text is built from a watch's title and its cleaned result; nothing in here has seen a secret.
-import type { WatchResult } from "../contract.ts";
+import type { WatchResult, WatchUpdate } from "../contract.ts";
 
 /** Pi's custom message type for these messages, so a UI or another plugin can pick them out. */
 export const WATCH_MESSAGE_TYPE = "jig-watch";
 
 /** One thing to tell the agent about one watch. Every text in it is already cleaned. */
 export interface Notice {
-    event: "finished" | "paused";
+    event: "finished" | "paused" | "update";
     id: string;
     kind: string;
     plugin: string;
     title: string;
     /** For a finished watch. */
     result?: WatchResult;
+    /** For news from a watch that goes on. Already cleaned. */
+    update?: WatchUpdate;
     /** The watch was finished by the first poll after Pi was closed and opened again. */
     afterRestart?: boolean;
     /** For a paused watch: how many polls in a row failed, and the last failure on one line. */
@@ -66,6 +68,24 @@ function pausedBlock(notice: Notice): string {
     ].join("\n");
 }
 
+/**
+ * News from a watch that goes on. Nothing else keeps these lines (the saved result is the end of the watch), so all of the
+ * details are shown, not the first few: they are at most 40 lines, and the last says how many were cut.
+ */
+function updateBlock(notice: Notice, update: WatchUpdate): string {
+    const lines = [`The watch "${notice.title}" has news, and goes on.`];
+    if (update.summary !== "") lines.push(update.summary);
+    const details = update.details === undefined ? [] : update.details.split("\n");
+    if (details.length > 0) lines.push("Details:", ...details.map((line) => `  ${line}`));
+    const links = update.links ?? [];
+    if (links.length > 0) {
+        lines.push("Links:", ...links.slice(0, SHOWN_LINKS).map((link) => `  ${link}`));
+        if (links.length > SHOWN_LINKS) lines.push(`  [${links.length - SHOWN_LINKS} more links not shown]`);
+    }
+    lines.push(`To stop watching, use the watch tool (id ${notice.id}).`);
+    return lines.join("\n");
+}
+
 function finishedBlock(notice: Notice, result: WatchResult): string {
     const first = `The watch "${notice.title}" ${OUTCOME_PHRASE[result.outcome]}.`;
     // After a colon the sentence starts with a lower case letter.
@@ -90,7 +110,8 @@ function finishedBlock(notice: Notice, result: WatchResult): string {
 /** One message for these notices, in the order they came. */
 export function composeMessage(notices: readonly Notice[]): WatchMessage {
     const blocks = notices.map((notice) => {
-        const { result } = notice;
+        const { result, update } = notice;
+        if (notice.event === "update" && update !== undefined) return updateBlock(notice, update);
         if (notice.event === "finished" && result !== undefined) return finishedBlock(notice, result);
         return pausedBlock(notice);
     });

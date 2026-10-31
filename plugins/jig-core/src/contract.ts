@@ -125,12 +125,26 @@ export interface WatchResult {
     facts?: Facts;
 }
 
+/** News for the agent while a watch goes on, such as new comments on a pull request. */
+export interface WatchUpdate {
+    /** One line for the agent and the user. */
+    summary: string;
+    /** More lines, up to 40, such as the text of the news. jig-core masks and redacts them. */
+    details?: string;
+    links?: readonly string[];
+}
+
 /** One poll of a watch. */
 export interface PollOutcome<State> {
     /** Saved with the watch, so polling resumes where it stopped after Pi restarts. */
     state: State;
     /** Set when the finish line is reached. */
     done?: WatchResult;
+    /**
+     * Tells the agent now, in a message of its own, and the watch goes on. Send it with the state that remembers what it
+     * says, so the next poll does not say it again. A poll that is also `done` sends its update first, in the same message.
+     */
+    update?: WatchUpdate;
     /** The next poll sooner or later than the kind's interval, such as GitHub's `X-Poll-Interval`. */
     nextPollMs?: number;
 }

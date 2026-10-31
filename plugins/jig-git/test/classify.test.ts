@@ -54,6 +54,7 @@ const EXPECTED: Record<string, Row[]> = {
         ["resolve", "external", "write"],
         ["review", "external", "write", { approval: "review" }],
         ["merge", "external", "write"],
+        ["watch", "local", "write"],
     ],
     release: [
         ["tags", "local", "read"],

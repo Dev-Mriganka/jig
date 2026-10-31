@@ -451,6 +451,130 @@ describe("finishing", () => {
     });
 });
 
+describe("news while a watch goes on", () => {
+    const news = (summary: string, extra: Record<string, unknown> = {}) => ({ summary, ...extra });
+
+    test("an update is sent to the agent as a message of its own, and the watch goes on to poll again", async () => {
+        const { r, polls, id } = started((n) =>
+            n === 1
+                ? {
+                      state: n,
+                      update: news("2 new comments", {
+                          details: "alice: fix this\nbob: and this",
+                          links: ["https://example.com/pull/42#c1"],
+                      }),
+                  }
+                : { state: n },
+        );
+        await r.clock.advance(FIRST_POLL_MS);
+        assert.equal(r.sent.length, 0, "the message waits 1 s, for others that arrive with it");
+        await r.clock.advance(SECOND);
+        assert.equal(r.sent.length, 1);
+        assert.equal(
+            r.sent[0]?.content,
+            [
+                'The watch "checks of pull request 42" has news, and goes on.',
+                "2 new comments",
+                "Details:",
+                "  alice: fix this",
+                "  bob: and this",
+                "Links:",
+                "  https://example.com/pull/42#c1",
+                `To stop watching, use the watch tool (id ${id}).`,
+            ].join("\n"),
+        );
+        assert.deepEqual(r.sent[0]?.details.watches, [
+            { id, kind: "k", plugin: "jig-test", title: "checks of pull request 42", event: "update" },
+        ]);
+        await r.clock.advance(30 * SECOND);
+        assert.equal(polls.length, 2, "the watch polled again");
+        assert.equal(savedFile(state.dir, id).status, "open");
+        assert.equal(r.events.length, 0, "nothing ended, so no event");
+        assert.equal(r.sent.length, 1);
+    });
+
+    test("every line of the details is shown, up to the 40 the cleaning keeps, and the cut is said", async () => {
+        const details = Array.from({ length: 60 }, (_, i) => `line ${i + 1}`).join("\n");
+        const { r } = started(() => ({ state: 1, update: news("many", { details }) }));
+        await r.clock.advance(FIRST_POLL_MS + SECOND);
+        const lines = (r.sent[0]?.content ?? "").split("\n");
+        assert.ok(lines.includes("  line 39"));
+        assert.ok(!lines.includes("  line 40"));
+        assert.ok(lines.includes("  [21 more lines cut]"));
+    });
+
+    test("is cleaned like a result: redacted, then masked, and escape codes and control characters are gone", async () => {
+        const r = rig({
+            protect: {
+                redact: (text) => text.replaceAll("SECRET", "[redacted]"),
+                mask: (text) => text.replaceAll("PERSONAL", "[masked]"),
+            },
+        });
+        r.engine.registerKind(
+            scripted(r.clock, "k", () => ({
+                state: 1,
+                update: news("SECRET\u001b[31m and PERSONAL", { details: "line PERSONAL\u0007 SECRET" }),
+            })).kind,
+        );
+        r.begin("session-news");
+        r.engine.start({ kind: "k", spec: {}, title: "t" });
+        await r.clock.advance(FIRST_POLL_MS + SECOND);
+        const text = r.sent[0]?.content ?? "";
+        assert.match(text, /\n\[redacted\] and \[masked\]\n/);
+        assert.match(text, /\n {2}line \[masked\] \[redacted\]\n/);
+        assert.ok(!text.includes("SECRET") && !text.includes("PERSONAL") && !text.includes("\u001b"));
+    });
+
+    test("a poll that is also the end tells the news first and the ending after it, in one message", async () => {
+        const { r, id } = started(() => ({
+            state: 1,
+            update: news("1 new comment", { details: "alice: last words" }),
+            done: { outcome: "passed", summary: "pull request 42 was merged" },
+        }));
+        await r.clock.advance(FIRST_POLL_MS + SECOND);
+        assert.equal(r.sent.length, 1);
+        const text = r.sent[0]?.content ?? "";
+        assert.ok(text.indexOf("alice: last words") < text.indexOf("pull request 42 was merged"));
+        assert.deepEqual(
+            r.sent[0]?.details.watches.map((watch) => watch.event),
+            ["update", "finished"],
+        );
+        assert.equal(savedFile(state.dir, id).status, "done");
+        assert.ok(!("update" in (savedFile(state.dir, id).result ?? {})), "the news is not part of the saved result");
+    });
+
+    test("updates of several polls are spaced like any messages: at least 10 seconds apart", async () => {
+        const { r } = started((n) => ({ state: n, update: news(`news ${n}`) }), { intervalMs: 5_000 });
+        await r.clock.advance(FIRST_POLL_MS + 30 * SECOND);
+        assert.ok(r.sent.length >= 2);
+        for (let i = 1; i < r.sent.length; i++) assert.ok((r.sent[i]?.at ?? 0) - (r.sent[i - 1]?.at ?? 0) >= 10_000);
+    });
+
+    test("an update that is not a summary with optional details and links is a failed poll", async () => {
+        for (const bad of [
+            "news",
+            { details: "no summary" },
+            { summary: 5 },
+            { summary: "s", details: 5 },
+            { summary: "s", links: "x" },
+        ]) {
+            const { r, id } = started(() => ({ state: 1, update: bad as never }));
+            await r.clock.advance(FIRST_POLL_MS + SECOND);
+            assert.equal(r.sent.length, 0, JSON.stringify(bad));
+            assert.equal(savedFile(state.dir, id).failures, 1, JSON.stringify(bad));
+        }
+    });
+
+    test("the state of the poll that sent the news is saved with it, so the next poll does not say it again", async () => {
+        const { r, id } = started((n) =>
+            n === 1 ? { state: { seen: [1] }, update: news("first") } : { state: { seen: [1, 2] } },
+        );
+        await r.clock.advance(FIRST_POLL_MS + 30 * SECOND);
+        assert.deepEqual(savedFile(state.dir, id).state, { seen: [1, 2] });
+        assert.equal(r.sent.length, 1);
+    });
+});
+
 describe("the deadline", () => {
     test("is 60 minutes by default: the last poll is made at that moment, and a watch still not done ends as timed out", async () => {
         const { r, polls, from, id } = started((n) => ({ state: n }));
