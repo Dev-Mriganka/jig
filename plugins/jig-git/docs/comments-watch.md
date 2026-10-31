@@ -78,8 +78,9 @@ A watch belongs to the Pi session that started it. When Pi closes, the watch is 
 The same watch, on a merge request. It is started and ended the same way, tells one message per poll, never repeats a note, skips
 your own and a bot's, and says the comments are information to weigh. What differs is where the comments come from.
 
-- **Three requests a minute,** through `glab api -i`: the merge request, its discussions, and (once) the user `glab` is signed in as.
-  The discussions are read page by page, up to 5 pages of 100; a longer merge request says so in the first message.
+- **Two requests a minute or a few more,** through `glab api -i`: the merge request, and its discussions page by page (up to 5 pages
+  of 100 threads; the rest of a longer merge request is not read, and `pr comments` says so). The user `glab` is signed in as is
+  asked for once.
 - **One kind of comment, two shapes.** A note on a line of the diff is told with its file and line; any other note is told without.
   Each carries its thread, `<number>:<id>`, which `pr reply` takes. System notes (a label added, a push) are not comments.
 - **No cursor.** GitLab has no `updated_after` for discussions, so the ids already told are remembered, and a reply in an old thread

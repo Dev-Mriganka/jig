@@ -2,10 +2,14 @@
 // there; the actions, their names and their parameters are the same.
 import { forgeOf } from "./forge.ts";
 import type { GitlabHome, Home } from "./forge.ts";
-import { planComments, planList, planView } from "./gitlab-pr-read.ts";
+import { getMr, openMrFor, planComments, planList, planView } from "./gitlab-pr-read.ts";
+import type { Gl } from "./gitlab-pr-read.ts";
+import { checkBranch, checkNumber } from "./names.ts";
+import { startCommentWatch, watchingText } from "./pr-watch.ts";
 import type { Call, Planned } from "./previews.ts";
 import { resolveRepo } from "./repo.ts";
 import type { Repo } from "./repo.ts";
+import { currentBranch } from "./run.ts";
 
 /** Whether a thread id has the shape of a GitLab one: the merge request, a colon, and the discussion. */
 export const looksLikeGitlabThread = (value: unknown): boolean =>
@@ -27,6 +31,49 @@ export async function homeOf(params: Readonly<Record<string, unknown>>, call: Ca
     return forgeOf(repo, call.settings, call.signal);
 }
 
+/**
+ * `pr watch` on a merge request: starts the watch on its comments (see pr-watch.ts). It reads GitLab to find the merge request and
+ * changes nothing there, so it is a local write that does not ask.
+ */
+async function planWatch(
+    params: { repo?: string; number?: number; branch?: string },
+    call: Call,
+    home: GitlabHome,
+): Promise<Planned> {
+    const gl: Gl = { home, repo: await resolveRepo(params.repo, call.signal), call };
+    let number: number;
+    if (params.number !== undefined) {
+        number = checkNumber(params.number);
+        const state = (await getMr(gl, number)).state;
+        if (state !== "opened") {
+            throw new Error(`merge request ${number} in ${home.path} is ${state}, so there is nothing to watch`);
+        }
+    } else {
+        const branch =
+            params.branch === undefined ? await currentBranch(gl.repo.root, call.signal) : checkBranch(params.branch);
+        if (!branch) throw new Error(`HEAD is detached in ${gl.repo.name}; pass number or branch`);
+        const open = await openMrFor(gl, branch);
+        if (open === undefined) {
+            throw new Error(
+                `no open merge request for ${branch} in ${gl.repo.name}: pass number, or open one with pr create`,
+            );
+        }
+        number = open.iid;
+    }
+    return {
+        preview: { summary: `watch merge request ${number} in ${home.path} for new comments, in the background` },
+        run: async () => {
+            const spec = { slug: home.path, number, forge: "gitlab" as const, host: home.host };
+            const { id, already } = startCommentWatch(spec);
+            return {
+                text: watchingText(spec, id, already),
+                facts: { pr: number, watch: already ? "existing" : "started" },
+                details: { id, number, slug: home.path, already },
+            };
+        },
+    };
+}
+
 export function planGitlabPr(
     params: Readonly<Record<string, unknown>>,
     call: Call,
@@ -40,6 +87,8 @@ export function planGitlabPr(
             return planList(p, call, home);
         case "comments":
             return planComments(p, call, home);
+        case "watch":
+            return planWatch(p, call, home);
         default:
             throw new Error(`pr ${String(params.action)} on GitLab is not built yet`);
     }
