@@ -171,6 +171,8 @@ export function installFakeJig(): FakeJig {
                     : undefined;
             },
         },
+        protectedPaths: { list: () => [] },
+        sandbox: { register: () => undefined },
         exec: {
             run: async () => {
                 throw new Error("no programs in tests");

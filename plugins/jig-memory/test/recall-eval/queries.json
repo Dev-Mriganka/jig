@@ -1,0 +1,212 @@
+[
+    {
+        "id": "q01",
+        "ticket": "PROJ-301",
+        "kind": "name",
+        "text": "PROJ-301: Cancel order returns 500 for guest checkout orders. The log shows a NullPointerException in OrderMapper.toDto.",
+        "expect": ["PROJ-101"]
+    },
+    {
+        "id": "q02",
+        "ticket": "PROJ-302",
+        "kind": "name",
+        "text": "PROJ-302: Some customers were charged twice. The payment provider timed out and PaymentWorker sent the ChargeRequest again.",
+        "expect": ["PROJ-102"]
+    },
+    {
+        "id": "q03",
+        "ticket": "PROJ-303",
+        "kind": "error",
+        "text": "PROJ-303: The nightly report job stops for our largest accounts.\njava.lang.OutOfMemoryError: Java heap space\n    at java.base/java.util.Arrays.copyOf(Arrays.java:3512)",
+        "expect": ["PROJ-103"]
+    },
+    {
+        "id": "q04",
+        "ticket": "PROJ-304",
+        "kind": "words",
+        "text": "PROJ-304: Integration tests fail at random on CI with connection refused to the test database. A rerun usually passes.",
+        "expect": ["PROJ-104"]
+    },
+    {
+        "id": "q05",
+        "ticket": "PROJ-305",
+        "kind": "name",
+        "text": "PROJ-305: Stock reservation fails with 504 under load. I think the InventoryClient read timeout is too low.",
+        "expect": ["PROJ-105"]
+    },
+    {
+        "id": "q06",
+        "ticket": "PROJ-306",
+        "kind": "words",
+        "text": "PROJ-306: The daily totals are wrong for customers in Sydney. Orders placed in the morning there are counted for the previous day, so the day boundary must be using the wrong time zone.",
+        "expect": ["PROJ-106"]
+    },
+    {
+        "id": "q07",
+        "ticket": "PROJ-307",
+        "kind": "words",
+        "text": "PROJ-307: The migration that adds an index to the invoices table locks the table and fails with a lock timeout on the staging copy of production.",
+        "expect": ["PROJ-107"]
+    },
+    {
+        "id": "q08",
+        "ticket": "PROJ-308",
+        "kind": "name",
+        "text": "PROJ-308: Prices on invoices have three decimals, like 12.500, since the dependency update. Probably the PriceMapper and BigDecimal.",
+        "expect": ["PROJ-108"]
+    },
+    {
+        "id": "q09",
+        "ticket": "PROJ-309",
+        "kind": "name",
+        "text": "PROJ-309: Mobile users are logged out for no reason. The app gets 401 from /auth/refresh with 'Token expired' for a token that was issued seconds ago.",
+        "expect": ["PROJ-109"]
+    },
+    {
+        "id": "q10",
+        "ticket": "PROJ-310",
+        "kind": "words",
+        "text": "PROJ-310: Invoice messages end up in the dead-letter queue. The consumer logs no error, and I suspect it acknowledges them before it has processed them.",
+        "expect": ["PROJ-110"]
+    },
+    {
+        "id": "q11",
+        "ticket": "PROJ-311",
+        "kind": "paraphrase",
+        "text": "PROJ-311: After an editor changes a product's price, customers still see the old price on the product page for several minutes.",
+        "expect": ["PROJ-111"]
+    },
+    {
+        "id": "q12",
+        "ticket": "PROJ-312",
+        "kind": "paraphrase",
+        "text": "PROJ-312: New customers get two identical welcome emails.",
+        "expect": ["PROJ-112"]
+    },
+    {
+        "id": "q13",
+        "ticket": "PROJ-313",
+        "kind": "words",
+        "text": "PROJ-313: When I search orders sorted by creation date, some orders are missing on page 2 and others show up twice.",
+        "expect": ["PROJ-113"]
+    },
+    {
+        "id": "q14",
+        "ticket": "PROJ-314",
+        "kind": "name",
+        "text": "PROJ-314: Importing a 40 MB CSV file fails with 413 Request Entity Too Large on /imports, although the docs say 100 MB is fine.",
+        "expect": ["PROJ-114"]
+    },
+    {
+        "id": "q15",
+        "ticket": "PROJ-315",
+        "kind": "error",
+        "text": "PROJ-315: The orders pods restart in a loop after the config change.\nIllegalStateException: Missing required property ORDERS_DB_URL",
+        "expect": ["PROJ-115"]
+    },
+    {
+        "id": "q16",
+        "ticket": "PROJ-316",
+        "kind": "words",
+        "text": "PROJ-316: Log lines from background tasks have no correlation id, so we cannot follow a request through them.",
+        "expect": ["PROJ-116"]
+    },
+    {
+        "id": "q17",
+        "ticket": "PROJ-317",
+        "kind": "words",
+        "text": "PROJ-317: Customer email addresses show up in clear text in the error log, in the stack trace of failed requests.",
+        "expect": ["PROJ-117"]
+    },
+    {
+        "id": "q18",
+        "ticket": "PROJ-318",
+        "kind": "paraphrase",
+        "text": "PROJ-318: Orders in Japanese yen show a total a hundred times too high on the invoice.",
+        "expect": ["PROJ-118"]
+    },
+    {
+        "id": "q19",
+        "ticket": "PROJ-319",
+        "kind": "words",
+        "text": "PROJ-319: The invoice scheduler ran twice at midnight, once on each instance, and every invoice exists twice.",
+        "expect": ["PROJ-119"]
+    },
+    {
+        "id": "q20",
+        "ticket": "PROJ-320",
+        "kind": "name",
+        "text": "PROJ-320: The order list takes 12 seconds for customers with many orders. The slow query log points to OrderRepository.",
+        "expect": ["PROJ-120"]
+    },
+    {
+        "id": "q21",
+        "ticket": "PROJ-321",
+        "kind": "name",
+        "text": "PROJ-321: CouponExpiryTest fails only between 23:00 and 01:00 UTC.",
+        "expect": ["PROJ-121"]
+    },
+    {
+        "id": "q22",
+        "ticket": "PROJ-322",
+        "kind": "words",
+        "text": "PROJ-322: The date picker shows the previous day for users on Safari.",
+        "expect": ["PROJ-122"]
+    },
+    {
+        "id": "q23",
+        "ticket": "PROJ-323",
+        "kind": "name",
+        "text": "PROJ-323: Creating a shipment throws a NullPointerException in ShipmentMapper when the address has no second line.",
+        "expect": ["PROJ-123"]
+    },
+    {
+        "id": "q24",
+        "ticket": "PROJ-324",
+        "kind": "error",
+        "text": "PROJ-324: Requests hang and then fail.\nSQLTransientConnectionException: HikariPool-1 - Connection is not available, request timed out after 30000ms.",
+        "expect": ["PROJ-124"]
+    },
+    {
+        "id": "q25",
+        "ticket": "PROJ-325",
+        "kind": "words",
+        "text": "PROJ-325: Webhook deliveries to a deleted endpoint keep being retried every hour. The endpoint answers 410 Gone.",
+        "expect": ["PROJ-125"]
+    },
+    {
+        "id": "q26",
+        "ticket": "PROJ-326",
+        "kind": "key",
+        "text": "PROJ-326: Follow-up of PROJ-102: refunds are issued twice as well.",
+        "expect": ["PROJ-102"]
+    },
+    {
+        "id": "q27",
+        "ticket": "PROJ-327",
+        "kind": "two cards",
+        "text": "PROJ-327: Both the inventory calls and the database calls time out during the Monday peak.",
+        "expect": ["PROJ-105", "PROJ-124"]
+    },
+    {
+        "id": "q28",
+        "ticket": "PROJ-328",
+        "kind": "none",
+        "text": "PROJ-328: Update the copyright year in the footer and change the link colour to the new brand blue.",
+        "expect": []
+    },
+    {
+        "id": "q29",
+        "ticket": "PROJ-329",
+        "kind": "none",
+        "text": "PROJ-329: Add a dark mode toggle to the settings screen and remember the choice.",
+        "expect": []
+    },
+    {
+        "id": "q30",
+        "ticket": "PROJ-330",
+        "kind": "none",
+        "text": "PROJ-330: Upgrade the Gradle wrapper to the latest release and update the build documentation.",
+        "expect": []
+    }
+]

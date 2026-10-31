@@ -71,7 +71,10 @@ is refused and you see the new preview.
 | **Transport** | Company plugin code that carries a tool's requests to one of its systems. |
 | **Signed-in request** | A request `jig-core` sends for a plugin, adding the credential, so the plugin never sees it. |
 | **Spill file** | Where the full result goes when the text shown to the model is cut. |
-| **Sandbox** | Bubblewrap around the agent's shell and file tools. It hides credentials. Linux only. |
+| **Sandbox** | The operating-system box `jig-sandbox` runs the agent's `bash` in (bubblewrap on Linux and WSL2, Seatbelt on macOS). It hides credentials and keeps the agent from planting what runs later outside. |
+| **Broker** | The small process, one per session, in which the sandbox runtime runs, so its placeholder files and signal handlers stay out of Pi and the project. |
+| **Locked path** | A path the sandbox lets `bash` read and never write, because something outside the sandbox runs it later: `~/.bashrc`, `PATH` folders, git hooks, Pi's settings. |
+| **Ask-first path** | A toolchain folder such as `~/.sdkman` that `bash` can write once you say yes, for the session or always. |
 
 - **Masking** never touches identifiers. A company plugin can name more fields
   that hold personal data (see [Masking](../plugins/jig-core/docs/masking.md)).
@@ -120,8 +123,9 @@ is refused and you see the new preview.
 | **Gate** | A condition that holds a stage or an action until it is met, such as an approved plan. |
 | **Acceptance scenario** | A numbered check in a ticket's plan. A pass needs evidence. |
 | **Checker agent** | A read-only agent in a fresh context that reviews a change before you do. Planned. |
-| **Card** | A short summary of a closed ticket: problem, cause, fix, repositories, identifiers. Planned. |
-| **Recall** | Finding earlier tickets related to a new one, and handing the agent their cards. Planned. |
+| **Card** | A short summary of a closed ticket: problem, cause, fix, repositories, identifiers and error lines. |
+| **Recall** | Finding earlier tickets related to a new one, and handing the agent their cards. |
+| **Recall test** | Invented cards and queries that measure how many right cards recall returns, and how many wrong ones. |
 | **Memory keeper** | Planned: writes a ticket's card at close and proposes facts. You approve every one. |
 
 - **A ticket** is taken through a workflow by `jig-workflow` and remembered by

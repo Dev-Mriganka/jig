@@ -14,7 +14,7 @@ parts live in a private company plugin kept at the company.
 |---|---|---|
 | `read`, `ls`, `find`, `grep` | Pi | `jig-core` default: local read, allowed |
 | `write`, `edit` | Pi | `jig-core` default: local write, allowed |
-| `bash` | Pi | Runs in the sandbox; allowed, with optional command rules |
+| `bash` | Pi | `jig-sandbox` runs it in the sandbox; allowed, with optional command rules. Run outside the sandbox, it asks |
 | `ask_user_question` | `@juicesharp/rpiv-ask-user-question` | Allowed, so a question never asks first |
 | Tools from any other package | That package | Classified from the tool's hints or your rules; unknown tools ask |
 
@@ -29,8 +29,9 @@ paths (see [Permissions](permissions.md#the-floor-what-configuration-cannot-chan
 | [`jig-core`](../plugins/jig-core/README.md) | built | `watch`; the tool manager and the `/jig` commands | 1 |
 | [`jig-git`](../plugins/jig-git/README.md) | built | `git`, `pr`, `release` | 2 |
 | [`jig-lens`](../plugins/jig-lens/README.md) | built | none: the `/lens` command | 2 |
+| [`jig-sandbox`](../plugins/jig-sandbox/README.md) | built, in part | `bash` (replaces Pi's); the `/sandbox` command | 2 |
 | [`jig-workflow`](../plugins/jig-workflow/README.md) | design | `workflow` | 3 |
-| [`jig-memory`](../plugins/jig-memory/README.md) | built | none: ticket folders and the `/ticket` command | 3 |
+| [`jig-memory`](../plugins/jig-memory/README.md) | built | none: ticket folders, cards, recall and the `/ticket` command (`close`, `recall`) | 3 |
 | [`jig-mongo`](../plugins/jig-mongo/README.md) | built | `mongo` | 4 |
 | [`jig-jira`](../plugins/jig-jira/README.md) | built | `jira` | 5 |
 | [`jig-logs`](../plugins/jig-logs/README.md) | built | `logs` | 6 |

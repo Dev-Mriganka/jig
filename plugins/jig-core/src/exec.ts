@@ -12,6 +12,12 @@ import type { Readable, Writable } from "node:stream";
 import type { RunOptions, RunResult } from "./contract.ts";
 import { gitConfigRefusal } from "./git-config-guard.ts";
 
+/** Asks the sandbox (when there is one) whether the agent's shell can write a place. Passed in by jig-core's API. */
+export interface ExecGuard {
+    /** True when a command in the sandbox can write this real path. */
+    writable(real: string): boolean;
+}
+
 /** A call that could not run, or whose outcome is not a normal exit: the program is missing, it was aborted, or the
  *  repository's own configuration was refused. A program that ran and failed is a `RunResult` with its exit code. */
 export class ExecError extends Error {}
@@ -113,17 +119,20 @@ function realPath(folder: string): string {
     }
 }
 
-function isInside(folder: string, parents: readonly string[]): boolean {
+function isInside(folder: string, parents: readonly string[], guard?: ExecGuard): boolean {
     const real = realPath(folder);
-    return parents.some((parent) => real === parent || real.startsWith(parent + path.sep));
+    return (
+        parents.some((parent) => real === parent || real.startsWith(parent + path.sep)) ||
+        guard?.writable(real) === true
+    );
 }
 
 /** PATH without relative entries and without folders the agent can write to. A `git` or `ssh` planted in such a
  *  folder would otherwise run the next time git starts one. */
-function safePath(value: string | undefined, writable: readonly string[]): string {
+function safePath(value: string | undefined, writable: readonly string[], guard?: ExecGuard): string {
     return (value ?? "")
         .split(path.delimiter)
-        .filter((entry) => path.isAbsolute(entry) && !isInside(entry, writable))
+        .filter((entry) => path.isAbsolute(entry) && !isInside(entry, writable, guard))
         .join(path.delimiter);
 }
 
@@ -131,13 +140,14 @@ function childEnv(
     options: RunOptions,
     extraNames: readonly string[],
     fixed: Readonly<Record<string, string>>,
+    guard?: ExecGuard,
 ): NodeJS.ProcessEnv {
     const env: NodeJS.ProcessEnv = {};
     for (const name of [...BASE_ENV, ...extraNames]) {
         const value = process.env[name];
         if (value !== undefined) env[name] = value;
     }
-    env.PATH = safePath(env.PATH, writableFolders(options.cwd));
+    env.PATH = safePath(env.PATH, writableFolders(options.cwd), guard);
     // The caller's own variables come last: a Jig tool passing credentials is trusted code, and the agent's shell
     // cannot reach this process's environment.
     return { ...env, ...fixed, ...options.env };
@@ -156,9 +166,18 @@ function isExecutableFile(file: string): boolean {
 }
 
 /** An absolute path to run for `file`: a name is looked up in the safe part of PATH, an absolute path is kept. Throws
- *  `ExecError` when the program is missing or only in a folder the agent can write to. */
-export function resolveProgram(file: string, cwd: string | undefined): string {
-    if (path.isAbsolute(file)) return file;
+ *  `ExecError` when the program is missing or only in a folder the agent can write to. With a sandbox registered, a
+ *  folder counts as one the agent can write when the sandbox lets `bash` write there, and an absolute path is checked
+ *  too: a program that bash can replace is not one to run with your credentials. */
+export function resolveProgram(file: string, cwd: string | undefined, guard?: ExecGuard): string {
+    if (path.isAbsolute(file)) {
+        if (guard?.writable(realPath(file)) === true) {
+            throw new ExecError(
+                `${file} is in a place the sandbox lets bash write, so a program there could have been planted`,
+            );
+        }
+        return file;
+    }
     if (file.includes("/") || file.includes("\\"))
         throw new ExecError(`give a program name or an absolute path, not ${file}`);
     const writable = writableFolders(cwd);
@@ -167,7 +186,8 @@ export function resolveProgram(file: string, cwd: string | undefined): string {
     for (const entry of wanted) {
         const candidate = path.join(entry, file);
         if (!isExecutableFile(candidate)) continue;
-        if (!isInside(entry, writable)) return candidate;
+        // The program itself may be a link into a writable place, so its own real path is looked at as well.
+        if (!isInside(entry, writable, guard) && guard?.writable(realPath(candidate)) !== true) return candidate;
         rejected ??= entry;
     }
     if (rejected !== undefined) {
@@ -254,9 +274,10 @@ async function spawnProgram(
     args: readonly string[],
     options: RunOptions,
     env: NodeJS.ProcessEnv,
+    guard?: ExecGuard,
 ): Promise<RunResult> {
     const what = label(file, args);
-    const program = resolveProgram(file, options.cwd);
+    const program = resolveProgram(file, options.cwd, guard);
     if (options.signal?.aborted) throw new ExecError(`${what} was aborted`);
     const limit = options.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
     const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -351,29 +372,57 @@ async function spawnProgram(
 
 /**
  * Runs a program from an argument list, never a shell. The environment is a short allow-list plus `options.env`.
- * `git` and `gh` go through the same checks as `git()`, because both start git.
+ * `git` and `gh` go through the same checks as `git()`, because both start git. `guard` is the sandbox, when there is one.
  */
-export async function run(file: string, args: readonly string[], options: RunOptions = {}): Promise<RunResult> {
+export async function run(
+    file: string,
+    args: readonly string[],
+    options: RunOptions = {},
+    guard?: ExecGuard,
+): Promise<RunResult> {
     const name = path.basename(file);
-    if (name === "git") return runGit(file, options.cwd ?? process.cwd(), args, options);
+    if (name === "git") return runGit(file, options.cwd ?? process.cwd(), args, options, guard);
     if (name === "gh") {
-        refuseUnsafeRepository(options.cwd ?? process.cwd(), args);
-        return spawnProgram(file, args, options, childEnv(options, GIT_ENV, { ...GIT_FIXED_ENV, ...GH_FIXED_ENV }));
+        refuseUnsafeRepository(options.cwd ?? process.cwd(), args, guard);
+        return spawnProgram(
+            file,
+            args,
+            options,
+            childEnv(options, GIT_ENV, { ...GIT_FIXED_ENV, ...GH_FIXED_ENV }, guard),
+            guard,
+        );
     }
-    return spawnProgram(file, args, options, childEnv(options, [], {}));
+    return spawnProgram(file, args, options, childEnv(options, [], {}, guard), guard);
 }
 
 /** Runs git in `repo` with hooks, `core.fsmonitor` and prompts off. Refuses when the repository's own configuration
  *  would make git run a command. */
-export function git(repo: string, args: readonly string[], options: RunOptions = {}): Promise<RunResult> {
-    return runGit("git", repo, args, options);
+export function git(
+    repo: string,
+    args: readonly string[],
+    options: RunOptions = {},
+    guard?: ExecGuard,
+): Promise<RunResult> {
+    return runGit("git", repo, args, options, guard);
 }
 
 /** `program` is "git", or the absolute path of a git the caller chose. */
-async function runGit(program: string, repo: string, args: readonly string[], options: RunOptions): Promise<RunResult> {
+async function runGit(
+    program: string,
+    repo: string,
+    args: readonly string[],
+    options: RunOptions,
+    guard?: ExecGuard,
+): Promise<RunResult> {
     const withRepo: RunOptions = { ...options, cwd: repo };
-    refuseUnsafeRepository(repo, args);
-    return spawnProgram(program, [...GIT_FIXED_FLAGS, ...args], withRepo, childEnv(withRepo, GIT_ENV, GIT_FIXED_ENV));
+    refuseUnsafeRepository(repo, args, guard);
+    return spawnProgram(
+        program,
+        [...GIT_FIXED_FLAGS, ...args],
+        withRepo,
+        childEnv(withRepo, GIT_ENV, GIT_FIXED_ENV, guard),
+        guard,
+    );
 }
 
 // ---- the repository's own configuration ----------------------------------------------------------------------------------
@@ -384,9 +433,9 @@ async function runGit(program: string, repo: string, args: readonly string[], op
  * in a repository, its local configuration is read and a key that runs a program or redirects a remote refuses the
  * call. `git clone` makes a new repository and reads no configuration of the folder around it, so it is not checked.
  */
-function refuseUnsafeRepository(repo: string, args: readonly string[]): void {
+function refuseUnsafeRepository(repo: string, args: readonly string[], guard?: ExecGuard): void {
     if (gitSubcommand(args) === "clone") return;
-    const refusal = gitConfigRefusal(repo, listLocalConfig);
+    const refusal = gitConfigRefusal(repo, (cwd) => listLocalConfig(cwd, guard));
     if (refusal !== undefined) throw new ExecError(refusal);
 }
 
@@ -395,14 +444,14 @@ const CONFIG_LIST_BYTES = 4 * 1024 * 1024;
 
 /** The output of `git config --list` for the repository at `cwd`, or undefined when that cannot be read (not a
  *  repository, or git is missing): the real call then fails for the same reason. */
-function listLocalConfig(cwd: string): string | undefined {
+function listLocalConfig(cwd: string, guard?: ExecGuard): string | undefined {
     try {
         return execFileSync(
-            resolveProgram("git", cwd),
+            resolveProgram("git", cwd, guard),
             [...GIT_FIXED_FLAGS, "config", "--list", "--null", "--show-origin", "--show-scope"],
             {
                 cwd,
-                env: childEnv({ cwd }, GIT_ENV, GIT_FIXED_ENV),
+                env: childEnv({ cwd }, GIT_ENV, GIT_FIXED_ENV, guard),
                 encoding: "utf8",
                 timeout: CONFIG_LIST_MS,
                 killSignal: "SIGKILL",

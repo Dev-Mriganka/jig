@@ -106,14 +106,14 @@ What closes those gaps:
   until a rule or the tool's own hints say otherwise.
 - **`bash` runs in a sandbox** that hides credentials. Without credentials, a
   shell command cannot do much harm outside the machine. The sandbox is the
-  protection; command rules for `bash` are a convenience on top. While Jig is
-  tried beside the existing harness, it borrows that harness's sandbox (see
-  Decisions).
+  protection; command rules for `bash` are a convenience on top. `jig-sandbox`
+  is that sandbox, and `/jig` says plainly when it is not installed. One command
+  can run outside it, if you approve that exact command (see Permissions).
 - **Pi's file tools refuse protected paths.** `read`, `write`, `edit`, `grep`,
   `find` and `ls` cannot read credential files (`~/.ssh`, `gh`'s token file,
   Pi's `auth.json`) or write Pi's agent folder, where `jig.json` and Jig's state
-  live. This is a floor rule. Until the sandbox runs, `bash` can still reach
-  those paths (see Permissions).
+  live. This is a floor rule. `jig-sandbox` hides the same paths from `bash`;
+  without it, `bash` can still reach them (see Permissions).
 - **Remote actions go through tools,** not through `bash`. Jig's tools hold the
   credentials, so the tool manager sees, decides and records every remote
   action.
@@ -130,9 +130,10 @@ jig (this repository, generic)
   jig-logs   tool: log search (Elasticsearch, OpenSearch, Loki)
   jig-api    tool: your saved API requests, run by name
   jig-review tools: the code review in the browser, approved with a passkey
-  jig-memory ticket folders, notes and evidence; no tools
+  jig-memory ticket folders, notes, evidence, cards and recall; no tools
   jig-lens   observability: reads jig-core's records, local dashboard; no tools
   jig-theme  the look: palettes as Pi themes, a footer, the answer colour; no tools
+  jig-sandbox the sandbox around the agent's bash, and the bash tool that replaces Pi's
   jig-workflow, jig-agents   design (see Plugins)
 
 company plugin (separate, private repository)
@@ -150,6 +151,7 @@ company plugin (separate, private repository)
 ## Platforms
 
 Jig is TypeScript on Node, as Pi is, so it runs on Linux and macOS.
-- **The sandbox is the exception.** Bubblewrap is Linux-only, so macOS needs
-  its own sandbox later. That is the real work for a Mac, not passwords.
+- **The sandbox is the exception.** `jig-sandbox` uses Anthropic's sandbox
+  runtime: bubblewrap on Linux and WSL2, Seatbelt on macOS. The Mac side is written
+  and not yet tested on a Mac. Native Windows is not supported.
 - **Secrets have a backend per platform** (see Secrets).

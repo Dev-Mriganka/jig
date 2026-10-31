@@ -11,10 +11,10 @@ the environment variables. Back to the [jig-core overview](../README.md#configur
   cannot be redefined, and an environment a company plugin made production
   cannot be lowered.
 - **`rules`:** most specific first. A rule names a `tool`, optionally an
-  `action`, `environment` or `effect`, and a `decision` (`allow`, `ask` or
-  `deny`), and optionally an `approval` kind (`dialog`, `review` or `form`). A
-  rule that would lower the floor is refused at load, naming the file and the
-  key.
+  `action`, `environment`, `effect` or `command` (a pattern for the call's
+  `command`, see [Rules](#rules)), and a `decision` (`allow`, `ask` or `deny`),
+  and optionally an `approval` kind (`dialog`, `review` or `form`). A rule that
+  would lower the floor is refused at load, naming the file and the key.
 - **`classify`:** a `tool`, optionally an `action`, a `param` with a `value` (or
   a `pattern`), and the resulting `environment` and `effect`.
 - **`protectedPaths`:** `{ "secret": [...], "guarded": [...] }`, each path
@@ -31,15 +31,18 @@ the environment variables. Back to the [jig-core overview](../README.md#configur
 
 ## The `/jig` commands
 
-- **`/jig`** shows the tools governed and the plugins loaded, the tools still on
-  the unknown default, and the open watches (and how many are paused or wait
+- **`/jig`** shows the tools governed, whether `bash` is sandboxed and in which
+  network mode (with no sandbox it says plainly that it is not), the plugins
+  loaded, the tools still on the unknown default, and the open watches (and how many are paused or wait
   for their plugin). It also shows the configuration file with the state of each
   plugin section, configuration errors, a failed records write, and problems
   with saved watches.
 - **`/jig rules [tool]`** shows the effective decision per tool and action,
   with where each came from: declaration, rule, hint or default.
   - A tool whose schema lists its actions gets a line for each.
-  - A declared tool that classifies from the call itself says so.
+  - A declared tool that classifies from the call itself says so, unless it gave
+    `examples`, which add a line for each action it picks from its input, such as
+    `bash outside`.
   - The protected paths of the file tools follow, each with its source: default,
     your `jig.json` or a company plugin.
 - **`/jig records`** shows where today's records are, and a one-line summary:
@@ -61,9 +64,21 @@ the environment variables. Back to the [jig-core overview](../README.md#configur
   - An environment name nobody defined counts as production.
 - **A wildcard rule cannot allow a tool that nothing classified.** Name the
   tool exactly, or classify it.
+- **`command` is a pattern for the `command` the call carries** (a `bash`
+  command). `*` stands for any run of characters that holds no `;`, `&`, `|`,
+  `<`, `>`, backquote, `$(` or line break, so a pattern that allows
+  `docker compose *` allows no second command chained after it. A call with no
+  `command` never matches a rule that has one.
+- **Only a rule that names it allows `bash` outside its sandbox:** the tool
+  `bash`, the action `outside` and a `command` that names something, such as
+  `{ "tool": "bash", "action": "outside", "command": "docker compose *",
+  "decision": "allow" }`. No wildcard rule and no default ever does; a rule that
+  tries is refused at load. Everything else asks, and with no screen it is
+  refused (see [Running one command outside](plugin-contract.md#running-one-command-outside)).
 - **"Allow for this session" is remembered for a tool, an action and an
   environment.** Approving a deploy to one test environment does not approve a
-  deploy to another.
+  deploy to another. For `bash` outside its sandbox it is remembered for the
+  exact command text.
 
 ## Classification rules
 
@@ -126,8 +141,9 @@ removes one. `/jig rules` lists them all, each with where it came from
 - **A refusal** is a deny with one line that names the protected path and never
   shows content. The record says `decisionSource: "floor"`.
 - **Not covered.**
-  - `bash` and `powershell` are the sandbox's job: until the sandbox runs, a
-    shell command can still read and write these paths.
+  - `bash` and `powershell` are the sandbox's job: until a sandbox runs, a
+    shell command can still read and write these paths. `jig-sandbox` hides the
+    same list from `bash`, through `protectedPaths.list()`.
   - Variables that move a tool's folder (`GH_CONFIG_DIR`, `CLOUDSDK_CONFIG`) are
     not read: list that folder yourself.
   - The check is made when the call starts, so a link swapped afterwards by a

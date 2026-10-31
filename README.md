@@ -6,7 +6,7 @@ Jig is a set of plugins for the [Pi](https://pi.dev) coding agent. They decide
 what the agent may do, ask you when it matters, keep secrets out of its reach,
 and record what happened so you can see it later.
 
-**Status:** eleven of the fourteen plugins are built, and `jig-sandbox` is being built. Each plugin's README is the
+**Status:** twelve of the fourteen plugins are built. Each plugin's README is the
 specification that its code follows. New to a word? See the [glossary](docs/glossary.md).
 
 ## What works today
@@ -27,7 +27,8 @@ In short:
   `jig-api` (your saved API requests, run by name) and `jig-mongo` (MongoDB, with
   allow and deny lists).
 - **Seeing and remembering:** `jig-lens` shows cost, failures and the time spent
-  waiting for you. `jig-memory` keeps a folder of notes and evidence per ticket.
+  waiting for you. `jig-memory` keeps a folder of notes and evidence per ticket, writes a card when
+  a ticket closes, and brings related earlier tickets back when a new one starts.
 - **How Pi looks:** `jig-theme` gives six palettes, a one-line footer and your
   own colours.
 - **Checked on every push:** the type check, Biome, over 5,000 tests, the
@@ -36,9 +37,9 @@ In short:
   MongoDB, Kubernetes, GitHub, an SSH server and an OAuth server
   ([Integration tests](docs/integration-tests.md)).
 
-Being built: [`jig-sandbox`](plugins/jig-sandbox/README.md), which runs the
+Also built: [`jig-sandbox`](plugins/jig-sandbox/README.md), which runs the
 agent's `bash` in an operating-system sandbox. Designs: `jig-workflow` and
-`jig-agents`.
+`jig-agents`, and the background tasks and two network modes of `jig-sandbox`.
 
 ## Install
 
@@ -60,7 +61,11 @@ first in the list, because every other plugin needs it:
   "packages": [
     {
       "source": "git:github.com/Dev-Mriganka/jig",
-      "extensions": ["plugins/jig-core/src/index.ts", "plugins/jig-git/src/index.ts"]
+      "extensions": [
+        "plugins/jig-core/src/index.ts",
+        "plugins/jig-sandbox/src/index.ts",
+        "plugins/jig-git/src/index.ts"
+      ]
     }
   ]
 }
@@ -83,11 +88,11 @@ first in the list, because every other plugin needs it:
 | Plugin | Status | What it gives you |
 |---|---|---|
 | [`jig-core`](plugins/jig-core/README.md) | built | The tool manager: rules per environment, approvals, secrets, masking, watches, records |
-| [`jig-sandbox`](plugins/jig-sandbox/README.md) | building | The agent's `bash` in an operating-system sandbox: credentials hidden, start-up files locked, everything else as outside |
+| [`jig-sandbox`](plugins/jig-sandbox/README.md) | built | The agent's `bash` in an operating-system sandbox: credentials hidden, start-up files locked, everything else as outside |
 | [`jig-git`](plugins/jig-git/README.md) | built | Local git, GitHub pull requests and reviews, tags and releases |
 | [`jig-lens`](plugins/jig-lens/README.md) | built | Cost, tool failures and time spent waiting for you, inside Pi; Grafana optional |
 | [`jig-workflow`](plugins/jig-workflow/README.md) | design | Named workflows you define: stages, exit conditions, holds, test runs |
-| [`jig-memory`](plugins/jig-memory/README.md) | built | Ticket folders, notes and evidence; later, recall of related tickets |
+| [`jig-memory`](plugins/jig-memory/README.md) | built | Ticket folders, notes and evidence; a card per closed ticket, and recall of related tickets |
 | [`jig-mongo`](plugins/jig-mongo/README.md) | built | MongoDB: explore, query, aggregate and write, with allow and deny lists |
 | [`jig-jira`](plugins/jig-jira/README.md) | built | Jira issues: read, comment, transition, update, with rendered previews |
 | [`jig-logs`](plugins/jig-logs/README.md) | built | Log search over Elasticsearch, OpenSearch or Grafana Loki |

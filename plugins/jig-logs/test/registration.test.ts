@@ -200,8 +200,9 @@ test("the plugin adds no run-time dependency", () => {
         dependencies?: Record<string, string>;
     };
     // The packages of the repository are jig-api's `yaml`, jig-review's `hono`, `@hono/node-server` and `ignore`, and
-    // jig-mongo's driver.
+    // jig-mongo's driver, and jig-sandbox's runtime.
     assert.deepEqual(Object.keys(manifest.dependencies ?? {}).sort(), [
+        "@anthropic-ai/sandbox-runtime",
         "@hono/node-server",
         "hono",
         "ignore",

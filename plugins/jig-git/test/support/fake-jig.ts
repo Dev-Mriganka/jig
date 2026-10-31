@@ -276,6 +276,8 @@ export function installFakeJig(): FakeJig {
                     : undefined;
             },
         },
+        protectedPaths: { list: () => [] },
+        sandbox: { register: () => undefined },
         exec: { run, git },
     };
 

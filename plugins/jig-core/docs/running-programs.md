@@ -18,6 +18,10 @@ options)` and never through a shell.
   the program.
 - **Only programs the agent did not plant.** A program found only in a folder
   the agent can write to is not run, and such a folder is left out of `PATH`.
+  The agent's shell can write Pi's working folder and, with a sandbox
+  registered, every place the sandbox lets `bash` write, such as `~/.local/bin`
+  when it is not locked. A program is judged by its real path, so a link
+  into such a place does not get it past, and an absolute path is checked too.
 - **A timeout, and an output cap.** A program that takes too long (60 seconds
   unless the caller sets it) is stopped with its whole process group, and the
   result has `timedOut: true` and exit code 124. Output beyond the cap (10 MiB
