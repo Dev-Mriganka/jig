@@ -328,6 +328,57 @@ test("log: never more than 400 lines, a named job, and a job that is not there",
     );
 });
 
+// What `gh help api` prints, cut to the line that matters. gh 2.97 added the flag, with a check that refuses a response that is
+// not JSON and holds escape sequences (the colour of every CI log) unless the flag is given. The messages are gh's own, taken
+// from gh 2.103 and from gh 2.92 reading a real job log.
+const HELP_NEW =
+    "FLAGS\n      --allow-escape-sequences   Allow printing terminal escape sequences\n  -i, --include   Include HTTP response status line and headers\n";
+const HELP_OLD = "FLAGS\n  -i, --include   Include HTTP response status line and headers\n";
+const REFUSED = "the response contains terminal escape sequences; pass --allow-escape-sequences to output it anyway\n";
+const UNKNOWN_FLAG = "unknown flag: --allow-escape-sequences\n\nUsage:  gh api <endpoint> [flags]\n";
+const logCalls = () => h.gh.callsOf("api").filter((entry) => entry.args.some((arg) => arg.endsWith("/logs")));
+
+test("log: a gh that refuses escape sequences is told they are expected, and the log still reaches the model without them", async () => {
+    h.gh.on("run view", JOBS);
+    h.gh.on("help api", { stdout: HELP_NEW });
+    // As gh 2.97 and later answer: the colour codes of the log are refused unless the flag is given.
+    h.gh.on("api", { code: 1, stderr: REFUSED }, ["actions/jobs/12/logs"]);
+    h.gh.on("api", { stdout: jobLog() }, ["actions/jobs/12/logs", "--allow-escape-sequences"]);
+    const text = ok(await call({ action: "log", run_id: 101 }));
+    assert.match(text, /^Run #101, job unit tests \(failure\): the last 80 lines; 520 earlier lines left out\n/);
+    assert.doesNotMatch(text, /\u001b|\[31m/, "the colour codes are taken out by the plugin");
+    assert.match(text, /\n##\[error\]Process completed with exit code 1\.\n/);
+    assert.deepEqual(logCalls()[0]?.args, ["api", "--allow-escape-sequences", `repos/${SLUG}/actions/jobs/12/logs`]);
+    // What gh can do is asked once, however many logs are read.
+    ok(await call({ action: "log", run_id: 101 }));
+    assert.equal(h.gh.callsOf("help api").length, 1);
+    assert.equal(logCalls().length, 2);
+    assert.ok(logCalls().every((entry) => entry.args.includes("--allow-escape-sequences")));
+});
+
+test("log: an older gh, which does not know the flag and fails on it, is not given it", async () => {
+    h.gh.on("run view", JOBS);
+    h.gh.on("help api", { stdout: HELP_OLD });
+    h.gh.on("api", { stdout: jobLog() }, ["actions/jobs/12/logs"]);
+    h.gh.on("api", { code: 1, stderr: UNKNOWN_FLAG }, ["--allow-escape-sequences"]);
+    const text = ok(await call({ action: "log", run_id: 101 }));
+    assert.match(text, /^Run #101, job unit tests \(failure\): the last 80 lines/);
+    assert.doesNotMatch(text, /\u001b/);
+    assert.deepEqual(logCalls()[0]?.args, ["api", `repos/${SLUG}/actions/jobs/12/logs`]);
+});
+
+test("log: when gh cannot say what it knows, the log is asked for without the flag, and gh is asked again next time", async () => {
+    h.gh.on("run view", JOBS);
+    h.gh.on("help api", { code: 1, stderr: "gh: something went wrong\n" });
+    h.gh.on("api", { stdout: jobLog() }, ["actions/jobs/12/logs"]);
+    ok(await call({ action: "log", run_id: 101 }));
+    assert.deepEqual(logCalls()[0]?.args, ["api", `repos/${SLUG}/actions/jobs/12/logs`]);
+    h.gh.on("help api", { stdout: HELP_NEW });
+    ok(await call({ action: "log", run_id: 101 }));
+    assert.ok(logCalls()[1]?.args.includes("--allow-escape-sequences"));
+    assert.equal(h.gh.callsOf("help api").length, 2);
+});
+
 test("log: without a run, the newest failed run of the branch; a run with no failed job is said so; an expired log too", async () => {
     h.gh.on("run list", { json: [{ databaseId: 101 }] });
     h.gh.on("run view", JOBS);

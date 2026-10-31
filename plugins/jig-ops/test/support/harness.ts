@@ -8,6 +8,7 @@ import { jigOps } from "../../src/index.ts";
 import type { OpsOptions } from "../../src/index.ts";
 import { fakeClock } from "./clock.ts";
 import type { FakeClock } from "./clock.ts";
+import { forgetGhFlags } from "../../src/ci/gh.ts";
 import { installFakeGh } from "./fake-gh.ts";
 import type { FakeGh } from "./fake-gh.ts";
 import { installFakeJig } from "./fake-jig.ts";
@@ -103,6 +104,8 @@ export function setupHarness(
     options: OpsOptions = {},
     real: false | { programEnv?: Readonly<Record<string, string>> } = false,
 ): Harness {
+    // What was learned about the last gh is not true of this one.
+    forgetGhFlags();
     const jig = installFakeJig();
     const cluster = real === false ? installFakePrograms() : (NO_FAKE_PROGRAMS as FakePrograms);
     const gh = real === false ? installFakeGh() : (NO_FAKE_PROGRAMS as FakeGh);

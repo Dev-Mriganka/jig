@@ -23,6 +23,7 @@ this repository's machine against a real API server, controller manager and sche
 | The words for a context nobody has, a release that was never installed and a chart that is not there | `cluster.test.ts` |
 | `runtime` logs, previous-run logs, events (core API and events API), and `curl` in a pod | `cluster.test.ts` |
 | Production is read, never deployed to, and no command runs in its pods | `cluster.test.ts` |
+| A job log read by `gh` 2.92 and by `gh` 2.103, which needs `--allow-escape-sequences` | `ci-github.test.ts`, `github.test.ts` |
 | The GitHub Actions adapter reading this repository's runs, a run's jobs, the checks of a commit and a job log, with a run's own token and read-only permissions; a token GitHub refuses | `github.test.ts` |
 | Health by address over HTTPS: a certificate nobody trusts, one whose authority is trusted, a redirect that is not followed, a long body, terminal sequences, a service that never answers, and a refused connection | `health.test.ts` |
 
@@ -182,6 +183,10 @@ What the tests could not settle:
 
 ### GitHub Actions, as `jig-git`'s `checks` tool left it
 
+- **The escape-sequence check of `gh`.** `gh` 2.97 refuses to print a job log, which holds colour codes, unless given
+  `--allow-escape-sequences`; an older `gh` fails on that flag. The plugin asks `gh help api` once and gives the flag only when it is
+  listed. Both `gh` 2.92 and 2.103 read a real log; the recorded answers of the unit tests are taken from them. A `gh` that prints its
+  help differently, or a distribution that patched the flag out, would be read as an older one.
 - **GitHub itself.** `gh api` prints a `304` as the status line and headers, then
   `gh: HTTP 304` on standard error, and exits with 1.
   - That was checked with gh 2.92 against a local server, and the tests rely on it.

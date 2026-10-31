@@ -4,7 +4,7 @@
 // on where it was; a read that is not part of a watch uses a state of its own and throws it away.
 import { fromCheckRun, fromStatus } from "./model.ts";
 import type { Check } from "./model.ts";
-import { apiGet, gh, ghFailure } from "./gh.ts";
+import { apiGet, gh, ghAllowsEscapes, ghFailure } from "./gh.ts";
 import type { GhOptions } from "./gh.ts";
 import type { Comment, Release, Tag } from "./artifacts.ts";
 
@@ -237,7 +237,13 @@ const LOG_BYTES = 8 * 1024 * 1024;
 
 /** The log of one job, as text. A job is a check run of GitHub Actions; its id is the check run's id. */
 export async function jobLog(slug: string, jobId: number, options: GhOptions = {}): Promise<string> {
-    const result = await gh(["api", `repos/${slug}/actions/jobs/${jobId}/logs`], { ...options, maxBytes: LOG_BYTES });
+    // A log is text with colour codes in it. A gh that checks for escape sequences must be told that this is expected; the
+    // log is cleaned of them when the model's text is made (see logs.ts).
+    const flags = (await ghAllowsEscapes(options)) ? ["--allow-escape-sequences"] : [];
+    const result = await gh(["api", ...flags, `repos/${slug}/actions/jobs/${jobId}/logs`], {
+        ...options,
+        maxBytes: LOG_BYTES,
+    });
     if (result.code !== 0 || result.timedOut) {
         if (/HTTP 410|HTTP 404/.test(result.stderr)) {
             throw new Error(
