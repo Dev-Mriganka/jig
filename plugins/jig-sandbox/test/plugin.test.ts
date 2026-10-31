@@ -192,12 +192,17 @@ function setup(
 }
 
 describe("what the plugin registers", () => {
-    test("the bash tool that replaces Pi's, the /sandbox command, and the two session hooks; it starts nothing", () => {
+    test("the bash tool that replaces Pi's, the three background tools, /sandbox and /ps, and the session hooks; it starts nothing", () => {
         const before = listeners();
         const s = setup();
-        assert.deepEqual([...s.pi.tools.keys()], ["bash"]);
-        assert.deepEqual([...s.pi.commands.keys()], ["sandbox"]);
-        assert.deepEqual([...s.pi.handlers.keys()].sort(), ["session_shutdown", "session_start"]);
+        assert.deepEqual([...s.pi.tools.keys()], ["bash", "bg_output", "bg_list", "bg_kill"]);
+        assert.deepEqual([...s.pi.commands.keys()].sort(), ["ps", "sandbox"]);
+        assert.deepEqual([...s.pi.handlers.keys()].sort(), [
+            "message_start",
+            "session_shutdown",
+            "session_start",
+            "tool_call",
+        ]);
         assert.equal(s.brokers.log.launches.length, 0, "no broker until a session starts");
         assert.deepEqual(listeners(), before);
     });
@@ -207,7 +212,15 @@ describe("what the plugin registers", () => {
         assert.ok(tool);
         assert.equal(tool.name, "bash");
         const properties = (tool.parameters as unknown as { properties: object }).properties;
-        assert.deepEqual(Object.keys(properties).sort(), ["command", "outside", "reason", "timeout"]);
+        assert.deepEqual(Object.keys(properties).sort(), [
+            "background",
+            "command",
+            "name",
+            "notifyOn",
+            "outside",
+            "reason",
+            "timeout",
+        ]);
         assert.equal(typeof tool?.renderCall, "function");
         assert.match(tool?.description ?? "", /Execute a bash command/);
         assert.match(tool?.description ?? "", /sandbox/);
@@ -270,12 +283,39 @@ describe("the broker's life", () => {
         await off.shutdown();
     });
 
-    test("filtered and ask are not built, so they mean off, and /sandbox says so", async () => {
-        const s = setup({ settings: { network: { ...DEFAULT_SETTINGS.network, mode: "filtered" } } });
+    test("filtered and ask give the runtime an empty allow list that only the callback widens, and ask the broker for the callback", async () => {
+        for (const mode of ["filtered", "ask"] as const) {
+            const s = setup({
+                settings: { network: { ...DEFAULT_SETTINGS.network, mode, allow: ["api.example.com"] } },
+            });
+            await s.start();
+            await s.bash("true");
+            const init = s.brokers.log.requests.find((request) => request.type === "init");
+            const config = init?.fields.config as Record<string, any>;
+            assert.deepEqual(config.network.allowedDomains, [], `${mode}: no list the runtime would decide from`);
+            assert.equal(config.network.strictAllowlist, undefined, `${mode}: strict would never ask the callback`);
+            assert.deepEqual(config.network.deniedDomains, []);
+            assert.equal(init?.fields.askHosts, true);
+            assert.equal(
+                JSON.stringify(config).includes("api.example.com"),
+                false,
+                "allow and deny are read by the callback",
+            );
+            assert.match((await s.command(""))[0] ?? "", new RegExp(`network ${mode}$`));
+            await s.shutdown();
+        }
+    });
+
+    test("on a platform where the bridge between commands is untried, filtered and ask mean off, and /sandbox says so", async () => {
+        const s = setup({
+            settings: { network: { ...DEFAULT_SETTINGS.network, mode: "filtered" } },
+            options: { platform: "darwin" },
+        });
         await s.start();
-        assert.equal(s.pi.tools.get("bash") !== undefined, true);
-        const lines = await s.command("");
-        assert.match(lines[0] ?? "", /network off \(network mode filtered is not built yet, so the network is off\)/);
+        assert.match(
+            (await s.command(""))[0] ?? "",
+            /network off \(network mode filtered is tested on Linux and WSL2 only, so the network is off\)/,
+        );
     });
 
     test("docker: true is accepted and not in effect, and /sandbox says so", async () => {

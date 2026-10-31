@@ -290,6 +290,40 @@ describe("one question at a time", () => {
         assert.equal(second.status, "fulfilled");
     });
 
+    test("a plugin's own question takes a turn in the same queue (inTurn)", async () => {
+        let open = 0;
+        let mostOpen = 0;
+        const held = async <T>(value: T): Promise<T> => {
+            open++;
+            mostOpen = Math.max(mostOpen, open);
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            open--;
+            return value;
+        };
+        const { ctx } = context({ select: () => held("Allow") });
+        const approvals = createApprovals();
+        const results = await Promise.all([
+            approvals.ask(ctx, request()),
+            approvals.inTurn(() => held("done")),
+            approvals.ask(ctx, request()),
+            approvals.inTurn(() => held("done")),
+        ]);
+        assert.equal(results[1], "done");
+        assert.equal(mostOpen, 1, "a question of the plugin's and one of jig-core's are never open together");
+    });
+
+    test("a job that fails in its turn does not stop the ones behind it", async () => {
+        const approvals = createApprovals();
+        const [first, second] = await Promise.allSettled([
+            approvals.inTurn(async () => {
+                throw new Error("broke");
+            }),
+            approvals.inTurn(async () => "fine"),
+        ]);
+        assert.equal(first.status, "rejected");
+        assert.deepEqual(second.status === "fulfilled" ? second.value : undefined, "fine");
+    });
+
     test("a question whose run was aborted while it waited is not shown", async () => {
         const controller = new AbortController();
         const gate: { release?: () => void } = {};

@@ -24,6 +24,13 @@ export interface FakePi {
     fire(type: string, event: Record<string, unknown>, ctx: unknown): Promise<unknown>;
     /** Events on the bus: what listeners got. */
     bus: { emit(channel: string, data: unknown): void };
+    /** Every event emitted on the bus, in order. */
+    emitted: Array<{ channel: string; data: unknown }>;
+    /** Every message the extension sent to the session, with how. */
+    messages: Array<{
+        message: { customType: string; content: unknown; display: boolean; details: unknown };
+        options: { triggerTurn?: boolean; deliverAs?: string } | undefined;
+    }>;
 }
 
 export function fakePi(): FakePi {
@@ -31,8 +38,11 @@ export function fakePi(): FakePi {
     const commands = new Map<string, Omit<RegisteredCommand, "name" | "sourceInfo">>();
     const tools = new Map<string, ToolDefinition>();
     const listeners = new Map<string, Array<(data: unknown) => void>>();
+    const emitted: FakePi["emitted"] = [];
+    const messages: FakePi["messages"] = [];
     const bus = {
         emit(channel: string, data: unknown) {
+            emitted.push({ channel, data });
             for (const listener of listeners.get(channel) ?? []) listener(data);
         },
     };
@@ -60,7 +70,9 @@ export function fakePi(): FakePi {
                 return () => {};
             },
         },
-        sendMessage() {},
+        sendMessage(message: FakePi["messages"][number]["message"], options?: FakePi["messages"][number]["options"]) {
+            messages.push({ message, options });
+        },
     } as unknown as ExtensionAPI;
     return {
         pi,
@@ -68,6 +80,8 @@ export function fakePi(): FakePi {
         commands,
         tools,
         bus,
+        emitted,
+        messages,
         async fire(type, event, ctx) {
             let answer: unknown;
             for (const handler of handlers.get(type) ?? []) {

@@ -544,6 +544,14 @@ export interface JigApi {
         register(provider: SandboxProvider): void;
     };
 
+    /** The queue jig-core's questions wait in. Pi has one dialog slot, so questions are asked one at a time. */
+    readonly approvals: {
+        /** Runs `job` when no question is open and holds the queue until it ends, so a plugin that asks the user
+         *  something of its own (a sandbox asking about a host) never opens a question over one of jig-core's. A job
+         *  that fails does not stop the ones behind it. */
+        inTurn<T>(job: () => Promise<T>): Promise<T>;
+    };
+
     /** Runs programs from an argument list, never a shell. */
     readonly exec: {
         /** Refuses a program whose real path is in a folder the agent's shell can write: the working folder, and with a

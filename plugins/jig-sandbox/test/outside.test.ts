@@ -397,14 +397,22 @@ describe("it never runs unless jig-core let this call through", () => {
 });
 
 describe("what the agent is told", () => {
-    test("the tool has the two parameters and its description says when to use them", async () => {
+    test("the tool has the parameters that ask to run outside and its description says when to use them", async () => {
         const s = await begin();
         const tool = s.pi.tools.get("bash");
         assert.ok(tool);
         const properties = (
             tool.parameters as unknown as { properties: Record<string, { description?: string; maxLength?: number }> }
         ).properties;
-        assert.deepEqual(Object.keys(properties).sort(), ["command", "outside", "reason", "timeout"]);
+        assert.deepEqual(Object.keys(properties).sort(), [
+            "background",
+            "command",
+            "name",
+            "notifyOn",
+            "outside",
+            "reason",
+            "timeout",
+        ]);
         assert.equal(properties.reason?.maxLength, 300);
         assert.match(
             properties.outside?.description ?? "",

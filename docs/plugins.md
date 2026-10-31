@@ -29,7 +29,7 @@ paths (see [Permissions](permissions.md#the-floor-what-configuration-cannot-chan
 | [`jig-core`](../plugins/jig-core/README.md) | built | `watch`; the tool manager and the `/jig` commands | 1 |
 | [`jig-git`](../plugins/jig-git/README.md) | built | `git`, `pr`, `release` | 2 |
 | [`jig-lens`](../plugins/jig-lens/README.md) | built | none: the `/lens` command | 2 |
-| [`jig-sandbox`](../plugins/jig-sandbox/README.md) | built, in part | `bash` (replaces Pi's); the `/sandbox` command | 2 |
+| [`jig-sandbox`](../plugins/jig-sandbox/README.md) | built | `bash` (replaces Pi's), `bg_output`, `bg_list`, `bg_kill`; the `/sandbox` and `/ps` commands | 2 |
 | [`jig-workflow`](../plugins/jig-workflow/README.md) | design | `workflow` | 3 |
 | [`jig-memory`](../plugins/jig-memory/README.md) | built | none: ticket folders, cards, recall and the `/ticket` command (`close`, `recall`) | 3 |
 | [`jig-mongo`](../plugins/jig-mongo/README.md) | built | `mongo` | 4 |
@@ -39,10 +39,11 @@ paths (see [Permissions](permissions.md#the-floor-what-configuration-cannot-chan
 | [`jig-ops`](../plugins/jig-ops/README.md) | built | `ci`, `deploy`, `runtime` | 7 |
 | [`jig-review`](../plugins/jig-review/README.md) | built | `start_interactive_code_review` and one more; `/code-review` | 8 |
 | [`jig-theme`](../plugins/jig-theme/README.md) | built | none: the `/theme` command, palettes and a footer | 8 |
-| [`jig-agents`](../plugins/jig-agents/README.md) | design | `subagent` and five more | 8 |
+| [`jig-agents`](../plugins/jig-agents/README.md) | design | `subagent`: start, status, message, stop | 8 |
 
-`jig-agents` is built only if a package from the Pi store does not do the job
-better. Each plugin's README has the full table of its tool's actions.
+`jig-agents` is Jig's own, on Pi's RPC mode: no Pi store package keeps every child
+under `jig-core` and `jig-sandbox` (see its [Options](../plugins/jig-agents/docs/options.md)).
+Each plugin's README has the full table of its tool's actions.
 
 ## The actions of every tool
 
@@ -69,8 +70,7 @@ better. Each plugin's README has the full table of its tool's actions.
 - **`runtime`:** `pods`, `rollout`, `logs`, `events`, `health`.
 - **`start_interactive_code_review`, `record_interactive_review_resolution`**
   (`jig-review`).
-- **`subagent`, `subagent_message`, `subagent_status`, `subagent_interrupt`,
-  `subagent_done`, `caller_ping`** (`jig-agents`, design).
+- **`subagent`:** start, status, message, stop (`jig-agents`, design).
 
 `jig-ops` has one adapter per system: `ci` has GitHub Actions, GitLab CI and
 Jenkins, `deploy` has Helm and `kubectl set image`, and `runtime` has

@@ -73,6 +73,8 @@ is refused and you see the new preview.
 | **Spill file** | Where the full result goes when the text shown to the model is cut. |
 | **Sandbox** | The operating-system box `jig-sandbox` runs the agent's `bash` in (bubblewrap on Linux and WSL2, Seatbelt on macOS). It hides credentials and keeps the agent from planting what runs later outside. |
 | **Broker** | The small process, one per session, in which the sandbox runtime runs, so its placeholder files and signal handlers stay out of Pi and the project. |
+| **Background task** | A command the agent starts with `background: true`: it runs in the sandbox, wakes the agent when it ends or prints what it asked for, and ends with the session. `/ps` lists them. |
+| **Localhost bridge** | What carries a background task's server, and the ports you list in `network.localhost`, into each command in the `filtered` and `ask` network modes, where every command has a network of its own. |
 | **Locked path** | A path the sandbox lets `bash` read and never write, because something outside the sandbox runs it later: `~/.bashrc`, `PATH` folders, git hooks, Pi's settings. |
 | **Ask-first path** | A toolchain folder such as `~/.sdkman` that `bash` can write once you say yes, for the session or always. |
 
@@ -174,8 +176,8 @@ is refused and you see the new preview.
 
 | Term | Meaning |
 |---|---|
-| **Subagent** | A child agent: a full Pi session that another session starts in its own terminal pane. |
-| **Agent file** | A file that sets a subagent's role, tools and model, such as a planner or a reviewer. |
+| **Subagent** | A child agent: a separate Pi process, in RPC mode, with the same plugins as the session that starts it, so Jig's rules govern it. |
+| **Agent file** | A file that sets a role: its description, tools and prompt, such as a scout, a reviewer or a worker. Its model comes from configuration. |
 
 ## The look
 

@@ -167,6 +167,7 @@ export function installFakeJig(): FakeJig {
         },
         protectedPaths: { list: () => [] },
         sandbox: { register: () => undefined },
+        approvals: { inTurn: (job) => job() },
         exec: {
             run: async () => {
                 throw new Error("jig-logs starts no programs");

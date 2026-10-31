@@ -46,7 +46,7 @@ jobs:
       - name: Install the programs the sandbox needs
         run: |
           sudo apt-get update
-          sudo apt-get install -y bubblewrap socat ripgrep
+          sudo apt-get install -y bubblewrap socat ripgrep python3
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
 
       - name: Types and Biome

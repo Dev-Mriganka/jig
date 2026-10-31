@@ -4,7 +4,9 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 
 ## Contents
 
+- [2026-10-31: jig-agents is built by us, on Pi's RPC mode](#2026-10-31-jig-agents-is-built-by-us-on-pis-rpc-mode)
 - [2026-10-31: jig-memory cards and recall: the agent writes the prose, keys and keywords find it](#2026-10-31-jig-memory-cards-and-recall-the-agent-writes-the-prose-keys-and-keywords-find-it)
+- [2026-10-31: jig-sandbox, background tasks and the network modes, as built](#2026-10-31-jig-sandbox-background-tasks-and-the-network-modes-as-built)
 - [2026-10-31: jig-sandbox, as built](#2026-10-31-jig-sandbox-as-built)
 - [2026-10-31: jig-sandbox, built on Anthropic's sandbox runtime](#2026-10-31-jig-sandbox-built-on-anthropics-sandbox-runtime)
 - [2026-10-31: gaps a company plugin found in jig-core, closed](#2026-10-31-gaps-a-company-plugin-found-in-jig-core-closed)
@@ -32,6 +34,54 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 - [2026-10-30: jig-git's tools, and a watch that knows when it is done](#2026-10-30-jig-gits-tools-and-a-watch-that-knows-when-it-is-done)
 - [2026-10-30: built clean, beside the existing harness](#2026-10-30-built-clean-beside-the-existing-harness)
 - [Earlier decisions that still hold (2026-10-29)](#earlier-decisions-that-still-hold-2026-10-29)
+
+## 2026-10-31: jig-agents is built by us, on Pi's RPC mode
+
+- **No package is adopted.** About 250 names were found, 146 sorted by name and weekly
+  downloads, about 20 read by README and 8 in the code that launches a child. None
+  keeps every child under `jig-core` and `jig-sandbox`, sends a child's question to the
+  parent's screen through `jig-core`'s own dialogs, and limits turns, time and cost. The
+  most used, `pi-subagents` (326,000 a week), does not govern its foreground children,
+  has no turn limit, and is 10.7 MB. The two small ones that run a separate Pi in RPC
+  mode, `@deathbeam/pi-delegate` and `@ferris1225/pi-subagents`, deny a child's
+  questions and have no limits ([Options](../plugins/jig-agents/docs/options.md)).
+- **A thin plugin around one does not help.** A child's dialogs are answered inside the
+  package's launch code, limits that stop a running child need an event stream the
+  package owns, and in several the list of extensions is set by an agent file or a call.
+  `pi-subagents` has a hook that forces plugins in, which fixes only the last.
+- **A child is `pi --mode rpc`, started by the plugin.** It is the same program with the
+  same plugins and `jig.json`, so every rule that governs the parent governs the child.
+  The command line is built from fixed parts and never holds `--no-extensions`, `-e` or
+  `--extension`. At start the plugin checks that the child lists `jig-core`'s commands,
+  and stops it if not. The estimate is about 1,000 lines and no dependency.
+- **A child's questions go to your screen, and every failure is a no.** In RPC mode Pi
+  turns the child's dialog into a request with a random id; the parent shows it under a
+  header it writes, queued, and answers on the pipe only it holds. No screen, no answer in
+  time, too many questions, or a request it cannot read: the question is cancelled, which
+  the child's `jig-core` counts as a decline. It is the "approving from another session"
+  that [Approvals](approvals.md) lists as later, with no file and no web endpoint, and
+  the floor is still decided in the child.
+- **The parent enforces the limits.** Turns come from the child's events, minutes from a
+  timer that does not count time spent waiting for you, and cost from `get_session_stats`.
+  At a limit the child is told to write its report, then aborted, then ended. The earlier
+  harness asked in a prompt and checked time only at a turn end, and a long tool call
+  overran it.
+- **A result is a watch.** `jig-core`'s engine already sends one follow-up message that
+  starts a turn, combined, spaced and cleaned, so the parent never polls. The engine's
+  outcome words are CI-shaped (`passed` for a clean finish); a `finished` word is a later,
+  small change.
+- **Models and limits are configuration, not agent files.** A public agent file never
+  names a company's model, and a company plugin sets models through `jig-core`'s section
+  defaults. Agent files are read only from the plugin, the company plugin and the user's
+  agent folder, never from the project, which the model can write.
+- **Terminal panes are dropped.** That gives up a live view of a child, children that
+  survive a `/reload`, and interactive roles such as the earlier planner. It buys no
+  tmux, no orphans (a child ends with its parent session), and a screen that only the
+  parent owns, which is what makes forwarding questions safe.
+- **Nothing has been run.** The first thing built is a test with a real Pi child and a
+  scripted model: a question reaches a fake screen and the answer returns, a child
+  without `jig-core` is stopped, each limit stops a looping child, and the child's own
+  `bash` cannot answer for it.
 
 ## 2026-10-31: jig-memory cards and recall: the agent writes the prose, keys and keywords find it
 
@@ -63,6 +113,45 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
   Pi's event bus, so recall uses the activating message and the key. `jig-jira` was
   left alone: a new event there is its own decision.
 
+## 2026-10-31: jig-sandbox, background tasks and the network modes, as built
+
+The last two build steps are built and tested. What building them changed in the design:
+- **Tasks are started by Pi's side,** not through Pi's bash tool, so it owns the process
+  group and the pipes. A task is wrapped with the rules of a foreground command, and its
+  output is cleaned and has credential values taken out before it is written, so the log
+  holds nothing that needs cleaning later.
+- **Logs live in the agent folder,** not in the session's folder under `/tmp`. The sandbox
+  can write `/tmp`, and a command could swap a log for a link to a file Pi can read and the
+  command cannot; `bg_output` would then show it.
+- **Wake-up patterns are regular expressions,** as the design said, checked for the three
+  constructs that make matching slow and for a pattern that matches an empty line. The
+  earlier harness took literal text only. A line is cut to 4 KiB before it is matched.
+- **A task cannot run outside the sandbox.** `jig-core` refuses `background` with
+  `outside` and nobody is asked: a task outlives the call a person could watch. With the
+  sandbox switched off, a task is refused too.
+- **`approvals.inTurn` is the one new `jig-core` call.** It runs a plugin's own question in
+  `jig-core`'s queue, so a question about a host never opens over one of `jig-core`'s. The
+  question about a write uses it too, which retires the separate queue.
+- **Names and addresses are checked by Pi, not by the runtime.** `allow` and `deny` are
+  read by the callback and not given to the runtime, which does not check an address it
+  decides itself. A spelling that a program may read as `127.0.0.1` (`2130706433`,
+  `0x7f000001`, `127.1`) is refused as not being a host name.
+- **A port in `network.localhost` opens loopback and this machine's own addresses at that
+  port,** not link-local, private or carrier addresses: a listed database port must not open
+  a neighbour's. Metadata stays refused whatever is listed.
+- **The runtime has no option for a named Unix socket on Linux,** so the bridge does not
+  use one. A forwarder in each command asks the proxy for `127.0.0.1:<port>` over TCP, and
+  the callback allows exactly the ports a listener of the bridge is on. A tunnel's port is
+  not one, because the machine already uses it.
+- **`nsenter` cannot enter a task's network.** The network namespace belongs to a user
+  namespace that no process is in. A short `python3` helper joins that user namespace (the
+  kernel names it for the network namespace's file) and then the network namespace; the
+  bridge needs `python3` for task ports, and says so when it is missing.
+- **`Once` lasts 15 seconds.** A command opens several connections, and asking for each
+  would be asking about the same thing again.
+- **On macOS `filtered` and `ask` mean `off`.** The bridge is written for Linux's network
+  namespaces and has not been tried on a Mac.
+
 ## 2026-10-31: jig-sandbox, as built
 
 The first two build steps (everything except background tasks and the `filtered` and
@@ -84,7 +173,8 @@ The first two build steps (everything except background tasks and the `filtered`
   locked link that was removed and made again is put back. Moving a locked path's folder
   aside is refused by the kernel, so that case needs no code.
 - **The question about a write has its own queue,** one at a time, and can overlap a
-  `jig-core` question. The host questions of `ask` mode will share `jig-core`'s queue.
+  `jig-core` question. The host questions of `ask` mode will share `jig-core`'s queue
+  (done, with the question about a write, in the entry above).
 - **`outside` is hardened where the design left it open:** a command pattern's `*` does not
   reach across `;`, `&`, `|`, `<`, `>`, a backquote, `$(` or a line break; the dialog shows
   control characters as escapes and refuses a command too long to read (1,000 characters,

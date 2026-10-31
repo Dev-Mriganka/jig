@@ -11,14 +11,23 @@ export interface SandboxSettings {
     lock: string[];
     network: {
         mode: NetworkMode;
-        /** For `filtered` and `ask`, which a later build adds. */
+        /** For `ask`: hosts allowed without asking. In `filtered` every public host is allowed already. */
         allow: string[];
         deny: string[];
         localhost: number[];
     };
     env: { keep: string[] };
     docker: boolean;
-    background: { maxTasks: number; maxRuntimeMinutes: number };
+    background: {
+        /** Tasks running at once. */
+        maxTasks: number;
+        /** The longest run, and the default deadline. */
+        maxRuntimeMinutes: number;
+        /** Finished tasks kept for `bg_list` and `bg_output`. */
+        keepFinished: number;
+        /** `off` sends the messages without waking the agent. */
+        wake: "on" | "off";
+    };
     /** Where the programs the runtime needs are, when they are not on `PATH`. Absolute paths. */
     programs: { bwrap?: string; socat?: string; ripgrep?: string };
 }
@@ -30,7 +39,7 @@ export const DEFAULT_SETTINGS: SandboxSettings = {
     network: { mode: "open", allow: [], deny: [], localhost: [] },
     env: { keep: [] },
     docker: false,
-    background: { maxTasks: 4, maxRuntimeMinutes: 240 },
+    background: { maxTasks: 4, maxRuntimeMinutes: 240, keepFinished: 12, wake: "on" },
     programs: {},
 };
 
@@ -45,6 +54,7 @@ const FIELDS: ReadonlySet<string> = new Set([
     "background",
     "programs",
 ]);
+const BACKGROUND_FIELDS: ReadonlySet<string> = new Set(["maxTasks", "maxRuntimeMinutes", "keepFinished", "wake"]);
 const NETWORK_FIELDS: ReadonlySet<string> = new Set(["mode", "allow", "deny", "localhost"]);
 const PROGRAMS: readonly string[] = ["bwrap", "socat", "ripgrep"];
 
@@ -136,14 +146,16 @@ export function validateSandbox(raw: unknown): string[] {
         if (!isObject(background)) errors.push("sandbox.background: must be an object");
         else {
             for (const name of Object.keys(background)) {
-                if (name !== "maxTasks" && name !== "maxRuntimeMinutes")
-                    errors.push(`sandbox.background.${name}: unknown field`);
+                if (!BACKGROUND_FIELDS.has(name)) errors.push(`sandbox.background.${name}: unknown field`);
             }
-            for (const name of ["maxTasks", "maxRuntimeMinutes"] as const) {
+            for (const name of ["maxTasks", "maxRuntimeMinutes", "keepFinished"] as const) {
                 const value = background[name];
                 if (value !== undefined && !(typeof value === "number" && Number.isInteger(value) && value >= 1)) {
                     errors.push(`sandbox.background.${name}: must be a whole number of at least 1`);
                 }
+            }
+            if (background.wake !== undefined && background.wake !== "on" && background.wake !== "off") {
+                errors.push("sandbox.background.wake: must be on or off");
             }
         }
     }
@@ -198,6 +210,8 @@ export function settingsFrom(raw: unknown): SandboxSettings {
         background: {
             maxTasks: whole(background.maxTasks, DEFAULT_SETTINGS.background.maxTasks),
             maxRuntimeMinutes: whole(background.maxRuntimeMinutes, DEFAULT_SETTINGS.background.maxRuntimeMinutes),
+            keepFinished: whole(background.keepFinished, DEFAULT_SETTINGS.background.keepFinished),
+            wake: background.wake === "off" ? "off" : "on",
         },
         programs: {
             ...(bwrap === undefined ? {} : { bwrap }),

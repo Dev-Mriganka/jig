@@ -14,9 +14,23 @@ each refusal into one line after the command's own output:
 [sandbox] cannot reach 169.254.169.254: cloud metadata addresses are always blocked.
 ```
 
-The third kind comes with the `filtered` and `ask` modes, which are not built yet. With
-the network `off`, a command that cannot connect gets
-`[sandbox] no network: the sandbox's network mode is off.`
+The third kind comes with the `filtered` and `ask` modes: the proxy refuses a connection
+and the callback's reason is the line. With the network `off`, a command that cannot connect
+gets `[sandbox] no network: the sandbox's network mode is off.`
+
+| The reason in the line | What it means |
+|---|---|
+| it is a cloud metadata address, and those are always blocked | Metadata services give out credentials; no setting opens them |
+| it is this machine's own address; list its port in `sandbox.network.localhost` | A service on this machine is reachable only for a port you listed |
+| it is a private network address, link-local, or in 100.64.0.0/10 | The machine's neighbours are always blocked |
+| it is on `sandbox.network.deny` (the entry) | You refused the host |
+| it was refused: the user said no | You answered No when asked |
+| it is not allowed, and there is no screen to ask on | `ask` mode with no screen: `/sandbox allowed add <host>` allows it |
+| it is not a valid host name or address | A spelling a program could read as another address, such as `2130706433` |
+
+In `filtered` and `ask`, a name that does not resolve for a program that ignores the proxy
+settings (`dig`, `getent`, `ping`) and a direct connection with no route each get a line
+that says so.
 
 ## The ways through
 
@@ -49,15 +63,22 @@ Allow writes to ~/.sdkman?   [This session]  [Always]  [No]
 For a new host in `ask` mode, while the connection waits:
 
 ```text
-bash wants to reach api.example.com:443.   [Once]  [This session]  [Always]  [No]
+bash wants to reach api.example.com:443.
+The network mode is ask: a new host waits for your answer.
+[Once]  [This session]  [Always]  [No]
 ```
 
 - The question comes inside the waiting tool call, as every Jig approval does.
 - With no screen to ask on (headless, or a subagent), the answer is no, and the line
-  says that a person can allow it with `/sandbox allowed add <folder>`.
-- Questions from commands running at the same time wait in line, one at a time.
+  says that a person can allow it with `/sandbox allowed add <folder>` or, for a host,
+  `/sandbox allowed add <host>`.
+- Questions from commands running at the same time wait in line, one at a time, in
+  `jig-core`'s queue with its own questions. Connections to one host and port that arrive
+  together share one question.
+- **Once** allows that host and port for 15 seconds, so a command that opens several
+  connections asks once. A question nobody answers closes after two minutes, as a no.
 - `Always` is kept in Pi's agent folder, which the sandbox cannot write, so the agent
-  cannot approve itself.
+  cannot approve itself. `/sandbox allowed` lists what is kept.
 
 ## Git configuration
 
