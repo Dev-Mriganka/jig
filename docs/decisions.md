@@ -4,6 +4,7 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 
 ## Contents
 
+- [2026-10-31: small gaps the example company plugin and later builds found, closed](#2026-10-31-small-gaps-the-example-company-plugin-and-later-builds-found-closed)
 - [2026-10-31: jig-git talks to GitLab through glab api, and the repository decides the forge](#2026-10-31-jig-git-talks-to-gitlab-through-glab-api-and-the-repository-decides-the-forge)
 - [2026-10-31: jig-workflow, evidence and holds: a gate in jig-core, tests in the sandbox](#2026-10-31-jig-workflow-evidence-and-holds-a-gate-in-jig-core-tests-in-the-sandbox)
 - [2026-10-31: an example company plugin, jig-acme, proves the generic plugins need no company code](#2026-10-31-an-example-company-plugin-jig-acme-proves-the-generic-plugins-need-no-company-code)
@@ -38,6 +39,85 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 - [2026-10-30: jig-git's tools, and a watch that knows when it is done](#2026-10-30-jig-gits-tools-and-a-watch-that-knows-when-it-is-done)
 - [2026-10-30: built clean, beside the existing harness](#2026-10-30-built-clean-beside-the-existing-harness)
 - [Earlier decisions that still hold (2026-10-29)](#earlier-decisions-that-still-hold-2026-10-29)
+
+## 2026-10-31: small gaps the example company plugin and later builds found, closed
+
+`examples/jig-acme` listed what it had to work around ([its entry](#2026-10-31-an-example-company-plugin-jig-acme-proves-the-generic-plugins-need-no-company-code)),
+and later builds left a few more. Each is closed here, as a commit of its own with tests and docs. Nothing is specific to a company.
+
+**What `/jig` shows**
+- **The environments, and who defined them.** `environments.list()` gives `{ name, kind, source }` with `source` one of `built-in`,
+  `company` and `personal`, and `/jig` prints the same list grouped by source. A company plugin no longer keeps a list of its own;
+  jig-acme's status line dropped its list. A refused definition is not listed, and nor is a name nobody defined (it counts as production).
+- **"Not set" and "not set or invalid" are different things.** A registered section that no company default and no line of `jig.json`
+  set says `not set`. A section the file has and the plugin did not get keeps the old words, as does a file that cannot be read.
+
+**Jira: project keys.** `jira.projects` lists keys. A `search` with no JQL looks in them, newest first, and says which query it ran;
+`create` refuses any other project before anyone is asked or Jira is called. A company can default it and the user's list replaces
+it whole. With no list nothing changes: `search` needs JQL and `create` takes any project.
+
+**Secret backends a company turns on**
+- **Decided:** a company plugin may call `config.enableSecretBackends(["cmd", ...])`, and `secrets.disabledBackends` in the user's
+  `jig.json` turns any backend off, whoever turned it on. The backends on are the user's list (`pass` alone by default), plus the
+  company's, less the disabled ones. Without a company plugin nothing changes.
+- **It adds no power.** A company plugin is code that already runs in Pi's process with the user's rights: it can read a file or start
+  a program itself. Turning a backend on lets its own references resolve and nothing else. `cmd` still runs only commands declared
+  by name, and `file` still refuses Pi's agent folder. The agent cannot call it: no tool offers it.
+- **The old rule cost more than it protected.** Every user had to paste the same line before a company's sign-in worked, and the
+  failure looked like a broken sign-in (`auth_failed`).
+- **The user keeps the last word, and can see it.** A disabled backend stays off, and the refusal says the user turned it off.
+  `/jig` lists the backends that are on and which a company enabled, so none turns on unseen.
+- **Rejected:** letting an explicit `secrets.backends` override the company (it would silently undo the company's sign-in), and
+  asking the user to confirm each enabled backend (that is the old rule again).
+- **jig-acme** enables `cmd`, which its default token needs, and leaves `env` and the rest to the user.
+
+**Transports.** A transport is told the caller's `maxBytes` and `timeoutMs` (the request's own, or the defaults), and may return a
+repeated header as a list. `jig-core` folds a list with `, ` for the tool, as it folds a reply from the network, and keeps a
+`set-cookie` list as whole cookies, so a date with a comma in it is never split.
+- **Stop one byte past `maxBytes`,** not at it, so a reply of exactly that size and a longer one look different and `truncated` is
+  right: a transport that stops at the cap hides the cut.
+- **The fields are required in the type,** and `jig-core` fills them in for a caller of `transports.request` that leaves them out.
+
+**Sandbox.** `network.allow` and `network.deny` are read by the proxy that `filtered` and `ask` route commands through. `allow` matters
+in `ask` alone, and `deny` does nothing in `open` (or `off`). The docs say so, `/sandbox` shows a note from the check made when the
+sandbox starts, and `/sandbox doctor` prints a warning line (not a failed check) when `deny` is set in `open`.
+
+**Tunnel helpers.** `kit/ports.ts` has a port that is really free (handed out once it refuses connections), tests for a port that
+accepts or answers a SOCKS5 greeting, and a wait that ends on a timeout, a cancel, or the failure of the program that should open
+the port. `jig-mongo` imports it. A package of its own cannot import `jig-core`'s files, so jig-acme keeps a copy, as it does of
+`client.ts`, and a test holds the two identical.
+
+**GitLab, further**
+- **`exec.run` vets the repository for `glab`,** as it does for `gh`, and gives glab git's fixed environment and its own. `jig-git`
+  dropped its `git rev-parse` call and its environment.
+- **`jig-workflow` reads a GitLab merge request.** `pull-request-open` and `checks-pass` read the merge request of the branch and the
+  jobs of its latest pipeline with `glab api`, as `jig-git` does, and map them to the pull request and roll-up the conditions use.
+  - **Why a copy of the forge decision:** plugins never import each other. The workflow reads the `git` section through `jig-core`
+    (`forges`, `cloneHost`) and keeps the few rules itself; any other host stays on `gh`, as before.
+  - **Subgroups:** a project is named by its whole path, so a CI watch of `platform/payments/orders-api` matches.
+  - **Not verified:** the answers are recorded, not live.
+- **`jig-ops` matches a project in subgroups.** The `jig-git:pushed` payload accepts up to twenty parts (refusing `.` and `..`).
+- **An ssh alias for a real host.** A `git.forges` entry may be `{ "forge": "github", "host": "github.com" }` as well as `"github"` or
+  `"gitlab"`. git keeps the alias in `origin`; `gh` gets `-R host/owner/name` (and `GH_HOST` for `gh api` and the comment watch)
+  and `glab` gets `--hostname`. It is configuration only: no parameter can name a host. An alias that is not mapped is refused, now
+  with a line that shows the object form.
+  - **A change to the word form:** `"github"` used to leave `gh` to find a GitHub Enterprise Server repository from the remotes; it is
+    now named as `host/owner/name`, which `gh` accepts and which also lets `requireSlug` calls work there.
+
+**Tests.** The fake Pi that every plugin's tests load has `registerEntryRenderer`, `registerMessageRenderer`, `appendEntry`,
+`sendUserMessage`, `getThinkingLevel` and `sessionManager.getBranch`, and keeps what a plugin sent; jig-acme's stand-ins are gone.
+- **The acme tunnel test** failed with `ECONNRESET` or `ECONNREFUSED` on a busy machine. The fake `ssh` did not handle an error on a
+  connection that the client had already closed (the readiness probe hangs up at once), so the reply failed, the process ended, and
+  the next client was refused or reset. A test that hangs up 300 connections reproduced it on each try before the fix.
+- **A sandbox wake-up test** slept 5 ms and expected the agent's read to beat a 40 ms burst, and its read was satisfied by the task's
+  command in the header instead of its output. The burst is now held for 1.5 s, the read waits for the line, and the task's end shows
+  that the burst was sent.
+
+**Left.**
+- **The contract grew two required members** (`environments.list`, `config.enableSecretBackends`), and `TransportRequest` two required
+  fields; every plugin's test fake of `JigApi` gained them. A fake outside this repository must too.
+- **`jig-sandbox`'s real-sandbox tests need `socat` and `rg`,** which this machine lacks, so its doctor test for the warning ran in CI
+  only; the plugin-level tests of the same warning ran here.
 
 ## 2026-10-31: jig-git talks to GitLab through glab api, and the repository decides the forge
 
