@@ -45,6 +45,8 @@ export interface Task {
     sandboxLines: string[];
     /** The ports the task listens on that other commands reach (`filtered` and `ask` modes). */
     ports: number[];
+    /** Things the agent should know about the task that are not in its output, such as a port that could not be bridged. */
+    notes: string[];
     // ---- what the manager keeps while the task runs
     child?: ChildProcess;
     prepared?: Prepared;

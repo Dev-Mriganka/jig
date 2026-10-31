@@ -185,7 +185,9 @@ export function backgroundTools(tasks: Tasks): AnyTool[] {
                     : all
                           .map(
                               (task) =>
-                                  taskLine(task, now) + (task.log?.error ? ` | log stopped (${task.log.error})` : ""),
+                                  taskLine(task, now) +
+                                  (task.log?.error ? ` | log stopped (${task.log.error})` : "") +
+                                  task.notes.map((note) => `\n  note: ${note}`).join(""),
                           )
                           .join("\n"),
             );

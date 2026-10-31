@@ -35,8 +35,8 @@ In short:
   review page's build and every link in these docs run on GitHub Actions.
 
 Also built: [`jig-sandbox`](plugins/jig-sandbox/README.md), which runs the
-agent's `bash` in an operating-system sandbox, with background tasks. Designs:
-`jig-workflow` and `jig-agents`, and the two network modes of `jig-sandbox`.
+agent's `bash` in an operating-system sandbox, with background tasks and a network that
+can be filtered or asked about. Designs: `jig-workflow` and `jig-agents`.
 
 ## Install
 
@@ -85,7 +85,7 @@ first in the list, because every other plugin needs it:
 | Plugin | Status | What it gives you |
 |---|---|---|
 | [`jig-core`](plugins/jig-core/README.md) | built | The tool manager: rules per environment, approvals, secrets, masking, watches, records |
-| [`jig-sandbox`](plugins/jig-sandbox/README.md) | built | The agent's `bash` in an operating-system sandbox: credentials hidden, start-up files locked, everything else as outside |
+| [`jig-sandbox`](plugins/jig-sandbox/README.md) | built | The agent's `bash` in an operating-system sandbox: credentials hidden, start-up files locked, everything else as outside; background tasks; a filtered network |
 | [`jig-git`](plugins/jig-git/README.md) | built | Local git, GitHub pull requests and reviews, tags and releases |
 | [`jig-lens`](plugins/jig-lens/README.md) | built | Cost, tool failures and time spent waiting for you, inside Pi; Grafana optional |
 | [`jig-workflow`](plugins/jig-workflow/README.md) | design | Named workflows you define: stages, exit conditions, holds, test runs |

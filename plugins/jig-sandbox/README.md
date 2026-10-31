@@ -1,6 +1,6 @@
 # jig-sandbox: the agent's shell, in a sandbox that stays out of the way
 
-**Status: built, except the `filtered` and `ask` network modes, which are design.**
+**Status: built.**
 Built on [Anthropic's sandbox runtime](https://github.com/anthropics/sandbox-runtime) (Apache-2.0): bubblewrap on
 Linux and WSL2, Seatbelt on macOS. The escape and keep-working tests run on Linux and WSL2; the macOS side is
 written from the runtime's documentation and not yet tested on a Mac.
@@ -69,19 +69,29 @@ entry and its reason is in [The rules](docs/rules.md).
 |---|---|
 | `open` (default) | The machine's own network, as outside: every host, plain DNS, `localhost` |
 | `off` | No network at all, `localhost` included |
-| `filtered` (design) | Through the sandbox's proxy: every public host, except cloud metadata addresses, private and `localhost` addresses, and hosts on `deny` |
-| `ask` (design) | `filtered`, and a new host waits while Pi asks you: once, this session, always or no |
+| `filtered` | Through the sandbox's proxy: every public host, except metadata and local addresses, and `deny` |
+| `ask` | `filtered`, and a new host waits while Pi asks you: once, this session, always or no |
 
-A mode that is not built yet means `off`, and `/sandbox` says so: a setting is never
-read as a more open one. In every mode, `ssh` has no keys (they are hidden), so git
-over SSH goes through Jig's `git` tool, and Unix sockets are closed, the Docker socket
-included: through Docker a command could run anything as root. For Docker, the agent
-asks to [run that command outside](docs/when-blocked.md#running-one-command-outside).
+In `filtered` and `ask` each command has a network of its own, and a refused connection
+says why: `cannot reach 169.254.169.254:80: it is a cloud metadata address, and those are
+always blocked.`
+- **Names resolve in the proxy,** so HTTP clients work and `dig` and `getent` do not.
+- **A port on this machine** (a local database) is reachable when you list it in
+  `network.localhost`. A `jig-core` tunnel on `localhost` is not, unless listed.
+- **A [background task's server](docs/background.md#reaching-a-tasks-server)** is carried into
+  later commands, and to you, at the same port.
+- **macOS:** `filtered` and `ask` are tested on Linux and WSL2, and mean `off` on a Mac;
+  `/sandbox` says so.
 
-**When to choose `off`, and later `filtered`.** In `open` mode a command can reach
-anything on this machine's `localhost`, including a tunnel `jig-core` opened for a
-database. If your tunnels lead to production, a mode with its own network keeps bash
-away from them. A server a command starts lives as long as the command does.
+In every mode, `ssh` has no keys (they are hidden), so git over SSH goes through Jig's
+`git` tool, and Unix sockets are closed, the Docker socket included: through Docker a
+command could run anything as root. For Docker, the agent asks to
+[run that command outside](docs/when-blocked.md#running-one-command-outside).
+
+**When to choose which.** In `open` a command can reach anything on this machine's
+`localhost`, including a tunnel `jig-core` opened for a database. If your tunnels lead to
+production, `filtered` or `ask` keeps bash away from them. `ask` is for when you want to see
+every new host; `network.allow` lists the ones that never need asking.
 
 ## Fails closed, says so
 
@@ -98,7 +108,7 @@ away from them. A server a command starts lives as long as the command does.
 |---|---|
 | `/sandbox` | Whether bash is sandboxed, every rule and where it came from, and this session's outside runs |
 | `/sandbox doctor` | Checks the requirements and runs the proof commands |
-| `/sandbox allowed` | Folders you allowed; `add <folder>` and `forget <folder>` |
+| `/sandbox allowed` | Folders and hosts you allowed; `add <folder\|host>` and `forget <folder\|host>` |
 | `/sandbox off`, `/sandbox on` | Turns it off or on for this session only |
 | `/ps` | The [background tasks](docs/background.md): their output as it grows, and stopping one |
 
@@ -110,8 +120,10 @@ In `~/.pi/agent/jig.json`, under `sandbox`. Every field is optional.
 |---|---|---|
 | `share` | none | Folders writable although a rule hides them, such as a Windows work folder under `/mnt` |
 | `hide`, `lock` | none | More hidden or locked paths |
-| `network.mode` | `open` | `open` or `off`; `filtered` and `ask` mean `off` until they are built |
-| `network.allow`, `network.deny`, `network.localhost` | none | Hosts and `localhost` ports for `filtered` and `ask`; checked now, used later |
+| `network.mode` | `open` | `open`, `filtered`, `ask` or `off` |
+| `network.allow` | none | Hosts `ask` lets through without asking: `api.example.com`, `*.example.com:443` |
+| `network.deny` | none | Hosts always refused in `filtered` and `ask`, in the same form |
+| `network.localhost` | none | Ports on this machine that commands may reach in `filtered` and `ask` |
 | `env.keep` | none | Variables passed in although their names look like credentials |
 | `programs` | found on `PATH` | Absolute paths of `bwrap`, `socat` and `ripgrep` when they are elsewhere |
 | `background.maxTasks`, `.maxRuntimeMinutes`, `.keepFinished`, `.wake` | 4, 240, 12, `on` | Tasks at once, longest run, finished tasks kept, `off` to not wake the agent ([limits](docs/background.md#limits)) |
@@ -119,7 +131,8 @@ In `~/.pi/agent/jig.json`, under `sandbox`. Every field is optional.
 
 ## Install
 
-Linux and WSL2: `sudo apt install bubblewrap socat ripgrep`. On Ubuntu 24.04, if the doctor
+Linux and WSL2: `sudo apt install bubblewrap socat ripgrep`, and `python3` (usually there
+already) to carry a background task's server in `filtered` and `ask`. On Ubuntu 24.04, if the doctor
 says bubblewrap cannot make a user namespace:
 `sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0`. macOS: nothing to
 install, the sandbox is part of the system. Native Windows is not supported yet.
@@ -131,7 +144,6 @@ locked paths, through `jig-core`'s section defaults and protected paths.
 
 ## Later
 
-- **The `filtered` and `ask` network modes** and the `localhost` bridge that goes with them.
 - **Stand-in credentials:** a command gets a placeholder, and the proxy puts the real
   value back only on the way to an allowed host, so a build can reach a private
   repository without ever seeing its token.
@@ -146,6 +158,8 @@ src/                index.ts (entry), bash.ts (the tool, and one command outside
                     ask.ts + allowed.ts (questions), explain.ts, env.ts, output.ts, commands.ts, doctor.ts
 src/background/     the tasks: tasks.ts (start, stop, limits), notify.ts (waking), patterns.ts, logfile.ts + output.ts
                     (the log and its reading), process.ts + sessions.ts (stopping, crash clean-up), tools.ts, ps.ts
+src/network/        the callback's rules (addresses.ts, hosts.ts, policy.ts), the question to you (ask-host.ts),
+                    and the localhost bridge (bridge.ts)
 test/               rules as data, and the escape and keep-working tests in the real sandbox
 ```
 

@@ -2,12 +2,14 @@
 //   /sandbox                       whether bash is sandboxed, and every rule with where it came from
 //   /sandbox doctor                checks the requirements and proves the sandbox with real commands
 //   /sandbox off, /sandbox on      for this session only
-//   /sandbox allowed               the folders you allowed always or for this session
+//   /sandbox allowed               the folders and hosts you allowed always or for this session
 //   /sandbox allowed forget <x>    takes one back
-//   /sandbox allowed add <folder>  allows an ask-first folder without waiting for a question
+//   /sandbox allowed add <x>       allows an ask-first folder, or a host in the ask network mode, without a question
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import type { Allowed } from "./allowed.ts";
 import { formatDoctor, runDoctor } from "./doctor.ts";
+import { classifyHost } from "./network/addresses.ts";
+import { parsePattern } from "./network/hosts.ts";
 import { shown } from "./pathing.ts";
 import type { OutsideRun } from "./outside.ts";
 import type { Rule, RuleKind, RuleSet } from "./rules.ts";
@@ -62,6 +64,7 @@ export function statusLines(deps: CommandDeps, cwd: string): string[] {
             lines.push("the sandbox is not running (no session)");
             break;
     }
+    lines.push(...networkLines(deps));
     if (sandbox.sessionDir !== undefined)
         lines.push(`  broker: process ${sandbox.pid ?? "none"}, session folder ${sandbox.sessionDir}`);
     const found = Object.entries(sandbox.programs.found).map(([name, place]) => `${name} ${place}`);
@@ -94,6 +97,11 @@ export function statusLines(deps: CommandDeps, cwd: string): string[] {
         lines.push("", "Allowed by you (writable although they ask first):");
         for (const folder of allowedFolders) lines.push(`  ${shown(folder, rules.home)}`);
     }
+    const allowedHosts = deps.allowed.hosts();
+    if (allowedHosts.length > 0) {
+        lines.push("", "Hosts allowed by you (reachable without asking in the ask network mode):");
+        for (const host of allowedHosts) lines.push(`  ${host}`);
+    }
     lines.push("", "Writable:");
     for (const item of rules.writable) lines.push(`  ${item.shown}   (${item.source})`);
     if (rules.reopened.length > 0) {
@@ -102,6 +110,27 @@ export function statusLines(deps: CommandDeps, cwd: string): string[] {
     }
     lines.push("", "Everything else under those folders is writable, as it is outside the sandbox.");
     lines.push(...outsideLines(deps.outsideRuns, rules.home));
+    return lines;
+}
+
+/** What the network mode lets through, for the modes that filter. */
+export function networkLines(deps: CommandDeps): string[] {
+    const { sandbox } = deps;
+    if (sandbox.mode !== "filtered" && sandbox.mode !== "ask") return [];
+    const settings = sandbox.settings();
+    const lines: string[] = [];
+    if (sandbox.mode === "ask") {
+        const allowed = [...settings.network.allow, ...deps.allowed.hosts()];
+        lines.push(`  hosts allowed without asking: ${allowed.length === 0 ? "none yet" : allowed.join(", ")}`);
+    }
+    if (settings.network.deny.length > 0) lines.push(`  hosts refused: ${settings.network.deny.join(", ")}`);
+    lines.push(
+        `  ports on this machine commands may reach: ${settings.network.localhost.length === 0 ? "none" : settings.network.localhost.join(", ")}`,
+    );
+    const tasks = sandbox.bridge.forwarderPorts().filter((port) => !settings.network.localhost.includes(port));
+    if (tasks.length > 0) lines.push(`  ports of background tasks carried into each command: ${tasks.join(", ")}`);
+    const problem = sandbox.bridge.problem;
+    if (problem !== undefined) lines.push(`  ${problem}`);
     return lines;
 }
 
@@ -187,32 +216,47 @@ async function allowed(deps: CommandDeps, ctx: ExtensionCommandContext, words: s
     const target = rest.join(" ").trim();
     const home = deps.sandbox.rulesFor(cwd).home;
     if (action === undefined || action === "") {
-        const always = deps.allowed.always().folders;
-        const session = deps.allowed.session().filter((folder) => !always.includes(folder));
+        const kept = deps.allowed.always();
+        const session = deps.allowed.session().filter((folder) => !kept.folders.includes(folder));
+        const sessionHosts = deps.allowed.sessionHosts().filter((host) => !kept.hosts.includes(host));
+        const list = (title: string, items: string[]): string =>
+            items.length === 0 ? `${title}: nothing` : `${title}:\n${items.map((item) => `  ${item}`).join("\n")}`;
         const lines = [
-            always.length === 0
-                ? "Allowed always: nothing"
-                : `Allowed always:\n${always.map((folder) => `  ${shown(folder, home)}`).join("\n")}`,
-            session.length === 0
-                ? "Allowed for this session: nothing"
-                : `Allowed for this session:\n${session.map((folder) => `  ${shown(folder, home)}`).join("\n")}`,
-            "/sandbox allowed forget <folder> takes one back; /sandbox allowed add <folder> allows an ask-first folder.",
+            list(
+                "Allowed always",
+                kept.folders.map((folder) => shown(folder, home)),
+            ),
+            list(
+                "Allowed for this session",
+                session.map((folder) => shown(folder, home)),
+            ),
+            list("Hosts allowed always", kept.hosts),
+            list("Hosts allowed for this session", sessionHosts),
+            "/sandbox allowed forget <folder|host> takes one back; /sandbox allowed add <folder|host> allows an ask-first folder, or a host in the ask network mode.",
         ];
         return show(ctx, "sandbox allowed", lines.join("\n").split("\n"));
     }
     if (action === "forget") {
-        if (target === "") return ctx.ui.notify("Usage: /sandbox allowed forget <folder>", "info");
+        if (target === "") return ctx.ui.notify("Usage: /sandbox allowed forget <folder|host>", "info");
         const removed = deps.allowed.forget(target.replace(/^~(?=\/)/, home));
+        const names = [...removed.folders.map((folder) => shown(folder, home)), ...removed.hosts];
         ctx.ui.notify(
-            removed.folders.length === 0
+            names.length === 0
                 ? `Nothing allowed matches ${target}. /sandbox allowed lists what is.`
-                : `Forgot ${removed.folders.map((folder) => shown(folder, home)).join(", ")}: it asks again.`,
+                : `Forgot ${names.join(", ")}: it asks again.`,
             "info",
         );
         return;
     }
     if (action === "add") {
-        if (target === "") return ctx.ui.notify("Usage: /sandbox allowed add <folder>", "info");
+        if (target === "") return ctx.ui.notify("Usage: /sandbox allowed add <folder|host>", "info");
+        if (
+            !/^[/~]/.test(target) &&
+            (target.includes(".") || target.startsWith("[")) &&
+            parsePattern(target) !== undefined
+        ) {
+            return allowHost(deps, ctx, target);
+        }
         const want = target.replace(/^~(?=\/)/, home);
         const rule = deps.sandbox
             .rulesFor(cwd)
@@ -240,5 +284,34 @@ async function allowed(deps: CommandDeps, ctx: ExtensionCommandContext, words: s
         }
         return;
     }
-    ctx.ui.notify("Usage: /sandbox allowed [add <folder> | forget <folder>]", "info");
+    ctx.ui.notify("Usage: /sandbox allowed [add <folder|host> | forget <folder|host>]", "info");
+}
+
+/** `/sandbox allowed add api.example.com[:443]`: a host the ask network mode lets through without asking. */
+function allowHost(deps: CommandDeps, ctx: ExtensionCommandContext, target: string): void {
+    const pattern = parsePattern(target);
+    if (pattern === undefined) {
+        ctx.ui.notify(`${target} is not a host such as api.example.com or *.example.com:443.`, "warning");
+        return;
+    }
+    const kind = classifyHost(pattern.host);
+    if (kind.kind === "ip" && kind.range !== undefined) {
+        ctx.ui.notify(
+            `${target} is an address the sandbox always refuses (${kind.range}); allowing it would change nothing. A port on this machine goes in sandbox.network.localhost.`,
+            "warning",
+        );
+        return;
+    }
+    const note =
+        deps.sandbox.mode === "ask" ? "" : ` It matters in the ask network mode; the mode now is ${deps.sandbox.mode}.`;
+    try {
+        deps.allowed.allowHostAlways(target);
+        ctx.ui.notify(`Allowed ${target}, always. /sandbox allowed forget ${target} takes it back.${note}`, "info");
+    } catch (error) {
+        deps.allowed.allowHostSession(target);
+        ctx.ui.notify(
+            `Allowed ${target} for this session only: it could not be kept (${(error as Error).message}).${note}`,
+            "warning",
+        );
+    }
 }

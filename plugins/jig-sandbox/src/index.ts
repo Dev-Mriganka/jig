@@ -14,7 +14,7 @@ import type { SandboxProvider } from "../../jig-core/src/contract.ts";
 import { createAftermath } from "./aftermath.ts";
 import type { Aftermath } from "./aftermath.ts";
 import { createAllowed } from "./allowed.ts";
-import { createAsker } from "./ask.ts";
+import { createAsker, serialQueue } from "./ask.ts";
 import { backgroundDeclarations } from "./background/declarations.ts";
 import { registerPs } from "./background/ps.ts";
 import { Tasks } from "./background/tasks.ts";
@@ -36,7 +36,9 @@ import type { SandboxDeps } from "./sandbox.ts";
 import type { ProtectedEntry } from "./rules.ts";
 
 /** The parts a test replaces, so that no test starts a sandbox it did not mean to. */
-export type SandboxOptions = Partial<Omit<SandboxDeps, "createdByAgent">> & {
+export type SandboxOptions = Partial<Omit<SandboxDeps, "createdByAgent" | "network">> & {
+    /** Parts of the network modes a test replaces. */
+    network?: SandboxDeps["network"];
     /** The aftermath of a command; default is the real one. */
     aftermath?: Aftermath;
     /** The name `/sandbox doctor` looks up. */
@@ -107,6 +109,17 @@ export function sandbox(options: SandboxOptions = {}): ExtensionFactory {
         const agentDir = options.agentDir ?? (() => getAgentDir());
         const homeOf = options.home ?? (() => userInfo().homedir);
         const allowed = createAllowed(agentDir);
+        // The screen to ask on during a connection: the latest one Pi gave this plugin.
+        let screen: ExtensionContext | undefined;
+        // Questions wait in jig-core's queue when it is loaded, and in one of this plugin's own otherwise.
+        const ownQueue = serialQueue();
+        const inTurn = <T>(job: () => Promise<T>): Promise<T> => {
+            try {
+                return jig().approvals.inTurn(job);
+            } catch {
+                return ownQueue(job);
+            }
+        };
         const settings: () => SandboxSettings = options.settings ?? (() => settingsFrom(sandboxSection()));
         const exec: BashOperations["exec"] = options.exec ?? createLocalBashOperations().exec;
         const core = new Sandbox({
@@ -128,6 +141,19 @@ export function sandbox(options: SandboxOptions = {}): ExtensionFactory {
             exec,
             random: options.random ?? (() => randomBytes(4).toString("hex")),
             now: options.now ?? (() => Date.now()),
+            network: {
+                allowed,
+                screen: () => screen,
+                inTurn,
+                notify: (message) => {
+                    try {
+                        screen?.ui.notify(message, "warning");
+                    } catch {
+                        // A screen that has ended.
+                    }
+                },
+                ...options.network,
+            },
         });
 
         // jig-core announces every decision; the tool reads them, so that what it runs is only what jig-core let through.
@@ -188,7 +214,7 @@ export function sandbox(options: SandboxOptions = {}): ExtensionFactory {
                 sandbox: core,
                 agentDir,
                 now: options.now ?? (() => Date.now()),
-                asker: createAsker(allowed, homeOf),
+                asker: createAsker(allowed, homeOf, inTurn),
             });
         const tasks = new Tasks({
             sandbox: core,
@@ -203,6 +229,7 @@ export function sandbox(options: SandboxOptions = {}): ExtensionFactory {
                     return { shell: found.shell, args: found.args };
                 }),
             now: options.now ?? (() => Date.now()),
+            bridge: core.bridge,
             send: (message, sendOptions) => pi.sendMessage(message, sendOptions),
             emit: (channel, data) => pi.events.emit(channel, data),
             ...(options.background?.timing === undefined ? {} : { timing: options.background.timing }),
@@ -244,7 +271,13 @@ export function sandbox(options: SandboxOptions = {}): ExtensionFactory {
             ...(options.lookupName === undefined ? {} : { lookupName: options.lookupName }),
         });
 
+        // Every tool call carries the screen as it is now: a question about a host during a connection goes to it.
+        pi.on("tool_call", (_event, ctx) => {
+            screen = ctx;
+            return undefined;
+        });
         pi.on("session_start", (_event, ctx) => {
+            screen = ctx;
             sessionFolder = ctx.cwd;
             tasks.sessionStart(ctx);
             const started = core.start(ctx.sessionManager.getSessionId(), ctx.cwd);

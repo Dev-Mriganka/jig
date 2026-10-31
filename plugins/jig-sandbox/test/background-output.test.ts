@@ -36,6 +36,7 @@ function taskWith(log: TaskLog, over: Partial<Task> = {}): Task {
         log,
         sandboxLines: [],
         ports: [],
+        notes: [],
         settled: Promise.resolve(),
         markSettled: () => undefined,
         ...over,

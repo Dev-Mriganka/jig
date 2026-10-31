@@ -32,8 +32,16 @@ export interface Broker {
     stop(): Promise<void>;
     /** Runs once when the process ends, however it ends. */
     onExit(listener: (code: number | null) => void): void;
+    /** Events the broker sends on its own (a question about a host), as opposed to answers to requests. */
+    onEvent(listener: (event: BrokerEvent) => void): void;
     /** The last lines the broker wrote to its error output, for a message when it fails. */
     stderrTail(): string;
+}
+
+/** Something the broker says without being asked. `ask-host` is a connection the proxy wants decided. */
+export interface BrokerEvent {
+    event: string;
+    [field: string]: unknown;
 }
 
 /** The broker could not do what was asked. `timedOut` means it did not answer in time. */
@@ -76,6 +84,7 @@ export async function startBroker(launch: BrokerLaunch): Promise<Broker> {
     return new Promise<Broker>((resolve, reject) => {
         const pending = new Map<number, Pending>();
         const exitListeners: Array<(code: number | null) => void> = [];
+        const eventListeners: Array<(event: BrokerEvent) => void> = [];
         let stderr = "";
         let exited = false;
         let ready = false;
@@ -107,7 +116,13 @@ export async function startBroker(launch: BrokerLaunch): Promise<Broker> {
                 resolve(broker);
                 return;
             }
-            if (!isAnswer(message)) return;
+            if (!isAnswer(message)) {
+                const event = message as { event?: unknown } | null;
+                if (typeof event?.event === "string") {
+                    for (const listener of eventListeners) listener(message as BrokerEvent);
+                }
+                return;
+            }
             const entry = pending.get(message.id);
             if (entry === undefined) return;
             clearTimeout(entry.timer);
@@ -176,6 +191,9 @@ export async function startBroker(launch: BrokerLaunch): Promise<Broker> {
             onExit(listener) {
                 if (exited) listener(child.exitCode);
                 else exitListeners.push(listener);
+            },
+            onEvent(listener) {
+                eventListeners.push(listener);
             },
             stderrTail: () => stderr,
         };

@@ -76,6 +76,11 @@ export interface ExplainOptions {
 /** Network refusals for a command run with the network off: connection and name errors in its output. */
 const NO_NETWORK =
     /could not resolve host|network is unreachable|temporary failure in name resolution|name or service not known|no route to host|cannot assign requested address/i;
+/** In `filtered` and `ask` a name resolves only in the proxy, so a program that ignores the proxy settings finds none. */
+const NO_NAME =
+    /could not resolve host|temporary failure in name resolution|name or service not known|nodename nor servname|no address associated with hostname/i;
+/** A direct connection to anything but the command's own `localhost` has no route there. */
+const UNREACHABLE = /network is unreachable|no route to host/i;
 
 /**
  * The lines to put after a command's output, from its last output lines. `output` is the tail of what the command printed.
@@ -85,10 +90,15 @@ export function explainBlocks(output: string, set: RuleSet, options: ExplainOpti
     const askFirst = new Map<string, { rule: Rule; path: string }>();
     let generalWrite = false;
     let noNetwork = false;
+    let noName = false;
+    let unreachable = false;
+    const proxied = options.mode === "filtered" || options.mode === "ask";
 
     for (const raw of output.split("\n")) {
         const line = raw.length > MAX_LINE_CHARS ? raw.slice(0, MAX_LINE_CHARS) : raw;
         if (options.mode === "off" && NO_NETWORK.test(line)) noNetwork = true;
+        if (proxied && NO_NAME.test(line)) noName = true;
+        if (proxied && UNREACHABLE.test(line)) unreachable = true;
         const refusal = refusalOf(line);
         if (refusal === undefined) continue;
         let explained = false;
@@ -133,6 +143,16 @@ export function explainBlocks(output: string, set: RuleSet, options: ExplainOpti
         lines.push(
             "[sandbox] no network: the sandbox's network mode is off. Set sandbox.network.mode to open in jig.json to allow it.",
         );
+    if (noName) {
+        lines.push(
+            `[sandbox] a name does not resolve here for a program that ignores the proxy settings (dig, getent, ping, most clients that are not HTTP): in network mode ${options.mode} names resolve in the proxy. Use an HTTP client, or a tool of Jig's.`,
+        );
+    }
+    if (unreachable) {
+        lines.push(
+            `[sandbox] a direct connection has no route: in network mode ${options.mode} a command reaches only the proxy, which refuses private and local addresses. A port on this machine is carried in when sandbox.network.localhost lists it.`,
+        );
+    }
     if (lines.length === 0 && generalWrite) {
         lines.push(
             "[sandbox] a write was refused (read-only file system). Bash may write your home folder, the working folder and /tmp; /sandbox shows every rule.",
@@ -154,12 +174,29 @@ function wording(verb: "read" | "write", place: string, rule: Rule, set: RuleSet
     return rule.way === "" ? text : `${text} ${rule.way}`;
 }
 
-/** Network refusals the runtime recorded for a command (`filtered` and `ask` modes, a later build), one line each. */
+/**
+ * Network refusals the runtime recorded for a command (`filtered` and `ask` modes), one line each. The runtime writes a refusal as
+ * `deny network-outbound host:port (reason)`, and the reason is the one this plugin gave.
+ */
 export function explainViolations(violations: ReadonlyArray<{ line: string }>): string[] {
     const seen = new Set<string>();
     for (const violation of violations) {
-        const text = violation.line.replace(/\s+/g, " ").trim().slice(0, 300);
-        if (text !== "") seen.add(`[sandbox] network refused: ${text}`);
+        const text = violation.line.replace(/\s+/g, " ").trim().slice(0, 400);
+        if (text === "") continue;
+        const parsed = /^deny network-outbound (\S+) \((.*)\)$/.exec(text);
+        if (parsed === null) {
+            seen.add(`[sandbox] network refused: ${text}`);
+            continue;
+        }
+        const target = parsed[1] as string;
+        // The reason often starts with the target, which the line has already said.
+        const given = (parsed[2] as string).replace(/\.$/, "");
+        const reason = given.startsWith(`${target} `) ? `it ${given.slice(target.length + 1)}` : given;
+        seen.add(
+            reason === "user denied"
+                ? `[sandbox] cannot reach ${target}: refused.`
+                : `[sandbox] cannot reach ${target}: ${reason}.`,
+        );
     }
     return [...seen].slice(0, MAX_LINES);
 }

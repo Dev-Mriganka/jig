@@ -119,14 +119,22 @@ The footer shows how many tasks run, through `jig-theme`'s `jig-theme:segment` e
 - **In `open` mode** (the default), a task shares the machine's network: later
   commands and you reach its server at `localhost` and its port, as outside.
 - **In `filtered` and `ask` modes,** each command has a network of its own, so
-  `jig-sandbox` bridges each port a task listens on into every later command and to
-  the host. See [Design](design.md#localhost-across-commands-in-filtered-and-ask).
+  `jig-sandbox` carries each port a task listens on into every later command, and to
+  you on this machine, at the same port. `bg_list` shows `listening on 3000` once it is
+  carried.
+- **A port already in use on this machine** (a tunnel `jig-core` opened, say) is not
+  carried: the task's list says so, and nothing reaches what is there. Use another port.
+- **In `off` mode** there is no way across, and a task's server is reachable only inside
+  the task.
+
+How it works is in [Design](design.md#localhost-across-commands-in-filtered-and-ask).
 
 ## Credit
 
 The idea (a `background` flag on `bash` and three tools to read, list and stop tasks),
 the paging helpers, the layout of the log and the order of the group stop are adapted from
 [gvanderclay/pi-bg-bash](https://github.com/gvanderclay/pi-bg-bash) (MIT, Copyright (c)
-2026 Gage Vander Clay; the notice is in [LICENSE-pi-bg-bash](LICENSE-pi-bg-bash)). Waking
-on a pattern, limiting repeats and holding a message while one is on its way are
-behaviours described in aliou/pi-processes's README; no code was taken from it.
+2026 Gage Vander Clay; the notice is in [LICENSE-pi-bg-bash](LICENSE-pi-bg-bash)).
+
+Waking on a pattern, limiting repeats and holding a message while one is on its way are
+behaviours described in aliou/pi-processes's README. No code was taken from it.

@@ -23,6 +23,7 @@ function task(over: Partial<Task> = {}): Task {
         streamBytes: 0,
         sandboxLines: [],
         ports: [],
+        notes: [],
         settled: Promise.resolve(),
         markSettled: () => undefined,
         ...over,

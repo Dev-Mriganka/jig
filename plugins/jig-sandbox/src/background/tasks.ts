@@ -289,6 +289,7 @@ export class Tasks {
             log,
             sandboxLines: [],
             ports: [],
+            notes: [],
             child,
             prepared,
             snapshot,
@@ -337,6 +338,7 @@ export class Tasks {
             streamBytes: 0,
             sandboxLines: [],
             ports: [],
+            notes: [],
             settled: Promise.resolve(),
             markSettled: () => undefined,
         };

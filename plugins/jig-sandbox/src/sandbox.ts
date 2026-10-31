@@ -6,13 +6,21 @@
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, statSync } from "node:fs";
 import path from "node:path";
 import type { BashOperations } from "@earendil-works/pi-coding-agent";
+import { createAllowed } from "./allowed.ts";
+import type { Allowed } from "./allowed.ts";
 import { BrokerError } from "./broker-client.ts";
-import type { Broker, BrokerLaunch } from "./broker-client.ts";
+import type { Broker, BrokerEvent, BrokerLaunch } from "./broker-client.ts";
 import type { NetworkMode, SandboxSettings } from "./config.ts";
 import { scrubEnvironment } from "./env.ts";
 import { withRealCache } from "./files.ts";
 import type { FileView } from "./files.ts";
-import { installCommand, findPrograms } from "./programs.ts";
+import { createHostAsker } from "./network/ask-host.ts";
+import type { HostAsker, Screen } from "./network/ask-host.ts";
+import { Bridge } from "./network/bridge.ts";
+import type { BridgeDeps } from "./network/bridge.ts";
+import { createPolicy } from "./network/policy.ts";
+import type { Policy, PolicyDeps } from "./network/policy.ts";
+import { installCommand, findPrograms, onPath } from "./programs.ts";
 import type { FoundPrograms } from "./programs.ts";
 import { inside } from "./pathing.ts";
 import { canWritePath, computeRules, runtimeFilesystem } from "./rules.ts";
@@ -28,6 +36,25 @@ export type SandboxState =
     /** The user turned it off for this session with `/sandbox off`. */
     | { kind: "off" }
     | { kind: "stopped" };
+
+/** What the `filtered` and `ask` network modes need from the plugin around the sandbox. All of it is optional. */
+export interface NetworkDeps {
+    /** What you allowed; hosts you answered `This session` or `Always` for are kept here. Default: nothing kept. */
+    allowed?: Allowed;
+    /** The screen to ask on, or undefined for none. Default: none, so `ask` refuses every new host. */
+    screen?: () => Screen | undefined;
+    /** Runs a question in jig-core's queue. Default: at once. */
+    inTurn?: <T>(job: () => Promise<T>) => Promise<T>;
+    /** Says something to you that is not an answer to a command. */
+    notify?: (message: string) => void;
+    /** Tests only: the parts that make the policy and the bridge reach outside the test. */
+    range?: PolicyDeps["range"];
+    own?: PolicyDeps["own"];
+    onceMs?: number;
+    processes?: BridgeDeps["processes"];
+    enter?: BridgeDeps["enter"];
+    python?: string | undefined;
+}
 
 export interface SandboxDeps {
     brokerScript: string;
@@ -55,6 +82,7 @@ export interface SandboxDeps {
     /** For a name that is not guessed. */
     random: () => string;
     now: () => number;
+    network?: NetworkDeps;
 }
 
 /** What `prepare` hands the caller: the command to spawn and the environment to spawn it with. */
@@ -98,6 +126,12 @@ export class Sandbox {
     private cache: { cwd: string; at: number; rules: RuleSet } | undefined;
     /** Credential names removed from Pi's environment, handed to the runtime to remove again. */
     private removedNames: string[] = [];
+    /** The localhost bridge: ports of background tasks and of `network.localhost`, carried into each command. */
+    readonly bridge: Bridge;
+    /** What the proxy's callback asks, in `filtered` and `ask` modes. */
+    readonly policy: Policy;
+    /** Asking you about a host, in `ask` mode. */
+    readonly hostAsker: HostAsker;
     /** What was wrong before the user turned the sandbox off, so turning it on again says it. */
     private lastProblem: string | undefined;
 
@@ -114,6 +148,44 @@ export class Sandbox {
         const mine = (place: string): boolean =>
             [deps.home(), "/tmp", deps.tmpRoot, this.lastCwd].some((root) => inside(place, root));
         this.files = withRealCache(deps.files, (place) => !mine(place), 30_000, deps.now);
+
+        const network = deps.network ?? {};
+        const allowed = network.allowed ?? createAllowed(deps.agentDir);
+        this.hostAsker = createHostAsker({
+            allowed,
+            screen: network.screen ?? (() => undefined),
+            inTurn: network.inTurn ?? ((job) => job()),
+            now: deps.now,
+            ...(network.onceMs === undefined ? {} : { onceMs: network.onceMs }),
+            ...(network.notify === undefined ? {} : { notify: network.notify }),
+        });
+        this.bridge = new Bridge({
+            mode: () => this.mode,
+            localhost: () => deps.settings().network.localhost,
+            socat: () => this.programs.found.socat,
+            python: () => ("python" in network ? network.python : onPath("python3", deps.env.PATH)),
+            platform: deps.platform,
+            now: deps.now,
+            ...(network.processes === undefined ? {} : { processes: network.processes }),
+            ...(network.enter === undefined ? {} : { enter: network.enter }),
+            ...(network.notify === undefined ? {} : { notify: network.notify }),
+        });
+        this.policy = createPolicy({
+            config: () => {
+                const settings = deps.settings();
+                return {
+                    mode: this.mode,
+                    allow: settings.network.allow,
+                    deny: settings.network.deny,
+                    localhost: settings.network.localhost,
+                };
+            },
+            bridged: (port) => this.bridge.serves(port),
+            allowedHosts: () => this.hostAsker.allowed(),
+            ask: (host, port) => this.hostAsker.ask(host, port),
+            ...(network.own === undefined ? {} : { own: network.own }),
+            ...(network.range === undefined ? {} : { range: network.range }),
+        });
     }
 
     // ---- state ----------------------------------------------------------------------------------------------------------
@@ -125,6 +197,11 @@ export class Sandbox {
 
     get active(): boolean {
         return this.state.kind === "ready" || this.state.kind === "starting";
+    }
+
+    /** The settings now. */
+    settings(): SandboxSettings {
+        return this.deps.settings();
     }
 
     get pid(): number | undefined {
@@ -170,10 +247,11 @@ export class Sandbox {
                 "sandbox.docker is not supported: the runtime cannot open the Docker socket alone. The agent can ask to run a Docker command outside the sandbox.",
             );
         }
-        if (settings.network.mode === "filtered" || settings.network.mode === "ask") {
-            // Fail closed: a mode that is asked for and not built never means a more open one.
+        if ((settings.network.mode === "filtered" || settings.network.mode === "ask") && deps.platform !== "linux") {
+            // Fail closed: a mode that is asked for and not available never means a more open one. The bridge between
+            // commands is written for Linux's network namespaces, and the Mac side has not been tried.
             this.mode = SAFE_NETWORK;
-            this.modeNote = `network mode ${settings.network.mode} is not built yet, so the network is off`;
+            this.modeNote = `network mode ${settings.network.mode} is tested on Linux and WSL2 only, so the network is off`;
         }
         if (deps.platform !== "linux" && deps.platform !== "darwin") {
             this.state = { kind: "unavailable", reason: `the sandbox is not supported on ${deps.platform} yet` };
@@ -256,7 +334,12 @@ export class Sandbox {
         });
         this.removedNames = scrubEnvironment(deps.env, { keep: settings.env.keep }).removed;
         try {
-            await broker.request("init", { config: this.runtimeConfig() }, 20_000);
+            broker.onEvent((event) => this.onBrokerEvent(broker, event));
+            await broker.request(
+                "init",
+                { config: this.runtimeConfig(), askHosts: this.mode === "filtered" || this.mode === "ask" },
+                20_000,
+            );
         } catch (error) {
             const stderr = broker.stderrTail().trim();
             await this.shutdownBroker();
@@ -272,11 +355,15 @@ export class Sandbox {
         const found = this.programs.found;
         return {
             // Network `open` is the absence of an allow list: the runtime then leaves the network alone. `off` is an empty one
-            // that nothing may widen.
+            // that nothing may widen. `filtered` and `ask` are an empty one that nothing widens either, except through the
+            // callback, which asks this plugin about each host (see `network/policy.ts`): the allow and deny lists are read
+            // there, and not given to the runtime, since a list entry the runtime decides is not checked for a private address.
             network:
                 this.mode === "off"
                     ? { allowedDomains: [], deniedDomains: [], strictAllowlist: true }
-                    : { deniedDomains: [] },
+                    : this.mode === "open"
+                      ? { deniedDomains: [] }
+                      : { allowedDomains: [], deniedDomains: [] },
             filesystem: { denyRead: [], allowWrite: [], denyWrite: [], allowGitConfig: true },
             // The environment is cleaned before the command starts; the runtime removes the same names a second time.
             credentials: { envVars: this.removedNames.map((name) => ({ name, mode: "deny" })) },
@@ -286,6 +373,22 @@ export class Sandbox {
             // The runtime looks for dangerous files near the folder it runs in, the session's, which holds none.
             mandatoryDenySearchDepth: 1,
         };
+    }
+
+    /** The broker asks about a host the proxy met: decide, and answer. A failure to answer is the broker's timeout, which refuses. */
+    private onBrokerEvent(broker: Broker, event: BrokerEvent): void {
+        if (event.event !== "ask-host") return;
+        const askId = event.askId;
+        void this.policy
+            .decide(String(event.host), Number(event.port))
+            .then((decision) =>
+                broker.request("answer-host", {
+                    askId,
+                    allow: decision.allow,
+                    ...(decision.allow ? {} : { reason: decision.reason }),
+                }),
+            )
+            .catch(() => undefined);
     }
 
     private async shutdownBroker(): Promise<void> {
@@ -300,6 +403,7 @@ export class Sandbox {
         this.state = { kind: "stopped" };
         this.started = false;
         await this.shutdownBroker();
+        this.bridge.close();
         const folder = this.sessionDir;
         this.sessionDir = undefined;
         if (folder !== undefined) {
@@ -403,6 +507,7 @@ export class Sandbox {
         cwd: string,
         baseEnv: NodeJS.ProcessEnv | undefined,
         tweak?: (fs: RuntimeFilesystem) => RuntimeFilesystem,
+        forwarders = true,
     ): Promise<Prepared> {
         const broker = this.broker;
         if (broker === undefined || !broker.alive) throw new BrokerError("the sandbox broker is not running");
@@ -418,8 +523,14 @@ export class Sandbox {
         });
         const filesystem = tweak === undefined ? runtimeFilesystem(rules) : tweak(runtimeFilesystem(rules));
         const commandId = `${this.deps.random()}-${++this.counter}`;
+        // In `filtered` and `ask` the command's own network has nothing on `localhost`: the ports a task's server or a listed
+        // service is on are carried in by forwarders that start first, on the same line, so line numbers do not move.
+        // A command run for the sandbox's own sake (the start-up test, the doctor) needs none.
+        if (forwarders) await this.bridge.sync();
+        const start = forwarders ? this.bridge.preamble() : "";
         const answer = await broker.request<{ wrapped: string }>("wrap", {
-            command,
+            command: `${start}${command}`,
+            commandText: command,
             commandId,
             customConfig: { filesystem },
         });
@@ -465,7 +576,7 @@ export class Sandbox {
     ): Promise<Captured> {
         let prepared: Prepared;
         try {
-            prepared = await this.wrap(command, cwd, env, tweak);
+            prepared = await this.wrap(command, cwd, env, tweak, false);
         } catch (error) {
             return { exitCode: null, output: messageOf(error) };
         }

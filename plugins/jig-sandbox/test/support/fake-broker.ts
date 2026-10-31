@@ -1,6 +1,6 @@
 // A broker that does not sandbox: it answers like the real one and hands the command back as it was given, so the plugin's
 // own work (rules, environment, output, explanations, lifecycle) can be tested on any machine.
-import type { Broker, BrokerLaunch } from "../../src/broker-client.ts";
+import type { Broker, BrokerEvent, BrokerLaunch } from "../../src/broker-client.ts";
 
 export interface FakeBrokerLog {
     launches: BrokerLaunch[];
@@ -19,10 +19,16 @@ export interface FakeBrokerOptions {
 export function fakeBrokers(options: FakeBrokerOptions = {}): {
     start: (launch: BrokerLaunch) => Promise<Broker>;
     log: FakeBrokerLog;
+    /** Sends an event as the running broker would. */
+    emit(event: BrokerEvent): void;
 } {
     const log: FakeBrokerLog = { launches: [], requests: [], stops: 0, brokers: [] };
+    const listeners: Array<(event: BrokerEvent) => void> = [];
     return {
         log,
+        emit(event) {
+            for (const listener of listeners) listener(event);
+        },
         async start(launch) {
             log.launches.push(launch);
             let alive = true;
@@ -47,6 +53,9 @@ export function fakeBrokers(options: FakeBrokerOptions = {}): {
                 },
                 onExit(listener) {
                     exits.push(listener);
+                },
+                onEvent(listener) {
+                    listeners.push(listener);
                 },
                 stderrTail: () => "",
             };
