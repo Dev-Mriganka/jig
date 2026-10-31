@@ -20,6 +20,8 @@ const T_WRITE = 90_000;
 const T_VET = 10_000;
 
 export interface GlabOptions {
+    /** Written for a status a caller knows how to explain, such as the 409 of a merge whose head moved. */
+    hints?: Readonly<Record<number, string>> | undefined;
     cwd?: string | undefined;
     signal?: AbortSignal | undefined;
     timeoutMs?: number | undefined;
@@ -90,13 +92,21 @@ export function statusOf(result: RunResult): number | undefined {
 }
 
 /** A one-line error for a failed glab call: what was run, glab's own first line of complaint, and how to mend a sign-in. */
-export function glabFailure(what: string, result: RunResult, host?: string): Error {
+export function glabFailure(
+    what: string,
+    result: RunResult,
+    host?: string,
+    hints: Readonly<Record<number, string>> = {},
+): Error {
     const reason = result.timedOut ? "timed out" : summaryOf(result.stderr || result.stdout) || `exit ${result.code}`;
     const status = statusOf(result);
     let hint = "";
     if (SIGN_IN.test(result.stderr))
         hint = ` (glab is not signed in${host ? ` for ${host}` : ""}: run glab auth login${host ? ` --hostname ${host}` : ""} yourself)`;
+    else if (status !== undefined && hints[status] !== undefined) hint = ` (${hints[status]})`;
     else if (status === 403) hint = " (GitLab refused it: your role, or the token's scope, does not allow this)";
+    else if (status === 404)
+        hint = " (GitLab has nothing at that address: it is gone, or the account glab is signed in as cannot see it)";
     return new Error(`${what} failed: ${reason}${hint}`);
 }
 
@@ -249,7 +259,7 @@ export async function glabWrite(
                   : summaryOf(result.stderr),
         };
     }
-    throw glabFailure(what, result, home.host);
+    throw glabFailure(what, result, home.host, options.hints);
 }
 
 /** The JSON a successful write answered with; undefined for an empty answer (204) or one that is not JSON. */

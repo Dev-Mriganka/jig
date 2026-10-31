@@ -31,11 +31,15 @@ const TEMPLATE_FILES = [
     "docs/PULL_REQUEST_TEMPLATE.md",
 ];
 
-/** The body template: the file `git.prTemplate` names, else the repository's own. */
-function readTemplate(repo: Repo, prTemplate: string | undefined): string | undefined {
+/** The body template: the file `git.prTemplate` names, else the repository's own, found among `candidates`. */
+export function readTemplate(
+    repo: Repo,
+    prTemplate: string | undefined,
+    candidates: readonly string[] = TEMPLATE_FILES,
+): string | undefined {
     const files =
         prTemplate === undefined
-            ? TEMPLATE_FILES.map((file) => path.join(repo.root, file))
+            ? candidates.map((file) => path.join(repo.root, file))
             : [path.resolve(repo.root, prTemplate.replace(/^~(?=\/|$)/, os.homedir()))];
     for (const file of files) {
         try {
@@ -54,7 +58,7 @@ function readTemplate(repo: Repo, prTemplate: string | undefined): string | unde
  * match `git.commitMessage`. The pattern is in the message, so the model sees what to write. This runs while the plan is
  * made, before anyone is asked and before anything is sent.
  */
-function ruledTitle(value: unknown, settings: GitSettings): string {
+export function ruledTitle(value: unknown, settings: GitSettings): string {
     const title = checkTitle(value);
     const pattern = settings.prTitle;
     if (pattern !== undefined && !new RegExp(pattern).test(title))
@@ -100,7 +104,7 @@ async function options(repo: Repo, call: Call): Promise<{ flags: string[]; run: 
  * The call for the one read that follows a lost reply. A call that was cancelled has an aborted signal, and the check must
  * still run: it is how we learn whether the request went through before it was cancelled.
  */
-function afterwards(call: Call): Call {
+export function afterwards(call: Call): Call {
     return { ...call, signal: undefined };
 }
 

@@ -5,9 +5,10 @@ import { after, before, beforeEach, test } from "node:test";
 import { settingsFrom, validateGitSection } from "../src/config.ts";
 import { forgeOf, gitlabHome, UnknownForgeHost } from "../src/forge.ts";
 import { parseRemotePath, resolveRepo } from "../src/repo.ts";
-import { setupHarness } from "./support/harness.ts";
+import { ok, setupHarness } from "./support/harness.ts";
 import type { Harness } from "./support/harness.ts";
-import { git, makeRepo } from "./support/repos.ts";
+import { HEAD, mr } from "./support/gitlab-answers.ts";
+import { commitFile, git, makeRepo } from "./support/repos.ts";
 
 let h: Harness;
 let counter = 0;
@@ -187,4 +188,88 @@ test("git.forges must map host names to github or gitlab", () => {
         false,
         "an invalid section gives the defaults",
     );
+});
+
+// ---- the tools follow the repository ------------------------------------------------------------------------------
+
+/** A clone on feature/one with a commit, whose origin is `git@<host>:<owner>/<name>.git`. */
+function featureRepo(owner: string, host: "github.com" | "gitlab.com" | "gitlab.example.com") {
+    const r = makeRepo(h.sb, `route${++counter}`, owner, host);
+    git(r.dir, "switch", "-q", "-c", "feature/one", "--no-track", "origin/main");
+    commitFile(r.dir, "x.ts", "x\n", "Add x");
+    return r;
+}
+
+const GITHUB_PR = {
+    number: 42,
+    title: "Add the thing",
+    state: "OPEN",
+    isDraft: false,
+    baseRefName: "main",
+    headRefName: "feature/one",
+    headRefOid: HEAD,
+    mergeable: "MERGEABLE",
+    reviewDecision: "",
+    statusCheckRollup: [],
+    url: "https://github.com/acme/svc/pull/42",
+    body: "",
+};
+
+test("a GitHub repository goes through gh, a GitLab one through glab, and neither starts the other's program", async () => {
+    const hub = featureRepo("acme", "github.com");
+    h.gh.on("pr view", { json: GITHUB_PR });
+    assert.match(ok(await h.call("pr", { action: "view", repo: hub.name, number: 42 })), /^PR #42 /);
+    assert.equal(h.glab.calls().length, 0);
+    const lab = featureRepo("acme", "gitlab.com");
+    h.glab.on("api", { json: mr({}, `acme/${lab.name}`) }, [
+        `=projects/${encodeURIComponent(`acme/${lab.name}`)}/merge_requests/42`,
+    ]);
+    h.glab.on("api", { json: [] }, ["pipelines"]);
+    assert.match(ok(await h.call("pr", { action: "view", repo: lab.name, number: 42 })), /^MR !42 /);
+    assert.equal(h.gh.callsOf("pr").length, 1, "gh was not asked again");
+});
+
+test("the model cannot choose the forge: no parameter names it, and a call cannot reach glab for a GitHub repository", async () => {
+    const hub = featureRepo("acme", "github.com");
+    h.gh.on("pr view", { json: GITHUB_PR });
+    const tool = h.tools.get("pr")?.parameters as unknown as { properties: Record<string, unknown> };
+    for (const name of ["forge", "host", "gitlab", "project", "provider"])
+        assert.equal(name in tool.properties, false, name);
+    const refused = await h.call("pr", { action: "view", repo: hub.name, number: 42, forge: "gitlab" });
+    assert.match(refused.error?.message ?? "", /pr view does not use forge/);
+    ok(await h.call("pr", { action: "view", repo: hub.name, number: 42 }));
+    assert.equal(h.glab.calls().length, 0);
+});
+
+test("a self-hosted GitLab needs git.forges: without it the pr tool refuses the repository, and nothing is run", async () => {
+    const r = featureRepo("acme", "gitlab.example.com");
+    h.glab.on("api", { json: [] });
+    h.gh.on("pr", { json: [] });
+    for (const input of [
+        { action: "view", number: 42 },
+        { action: "list" },
+        { action: "comments", number: 42 },
+        { action: "create", title: "t", body: "b" },
+        { action: "edit", number: 42, title: "t" },
+        { action: "ready", number: 42 },
+        { action: "comment", number: 42, body: "b" },
+        { action: "review", number: 42, event: "comment", body: "b" },
+        { action: "merge", number: 42, method: "merge" },
+        { action: "watch", number: 42 },
+    ]) {
+        const result = await h.call("pr", { ...input, repo: r.name });
+        assert.equal(
+            result.error?.message,
+            `origin of ${r.name} is on gitlab.example.com, which jig-git does not know as GitHub or GitLab; name it in jig.json, such as "git": { "forges": { "gitlab.example.com": "gitlab" } }`,
+            input.action,
+        );
+    }
+    assert.equal(h.glab.calls().length, 0);
+    assert.equal(h.gh.calls().length, 0);
+    h.jig.setSection("git", { forges: { "gitlab.example.com": "gitlab" } });
+    h.glab.on("api", { json: mr({}, `acme/${r.name}`) }, [
+        `=projects/${encodeURIComponent(`acme/${r.name}`)}/merge_requests/42`,
+    ]);
+    h.glab.on("api", { json: [] }, ["pipelines"]);
+    assert.match(ok(await h.call("pr", { action: "view", repo: r.name, number: 42 })), /^MR !42 /);
 });

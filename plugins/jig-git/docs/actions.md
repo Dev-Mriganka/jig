@@ -16,6 +16,9 @@ overview.
 
 ## `pr`
 
+On a GitLab project every `pr` action works on merge requests, and a few differ in small ways: a thread is `<number>:<id>`, a draft is a
+title prefix, and `merge` with `method: rebase` is refused ([GitLab](gitlab.md)). The notes below are for GitHub unless they say otherwise.
+
 - **`list`** filters by state, author or branch. For the checks themselves, use
   `ci`.
 - **`comments`** filters by author or unresolved, and gives full bodies.

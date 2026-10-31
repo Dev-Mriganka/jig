@@ -155,13 +155,42 @@ test("a failure is one line that names the call, and a sign-in that is missing s
     );
     h.glab.reset();
     h.glab.on("api", { code: 1, stderr: "glab: 404 Not Found (HTTP 404)\n" });
-    await assert.rejects(
-        glabJson(HOME, "glab api", "user", { cwd: r.dir }),
-        /^Error: glab api failed: glab: 404 Not Found \(HTTP 404\)$/,
-    );
+    await assert.rejects(glabJson(HOME, "glab api", "user", { cwd: r.dir }), {
+        message:
+            "glab api failed: glab: 404 Not Found (HTTP 404) (GitLab has nothing at that address: it is gone, or the account glab is signed in as cannot see it)",
+    });
     h.glab.reset();
     h.glab.on("api", { stdout: "<html>maintenance</html>" });
     await assert.rejects(glabJson(HOME, "glab api", "user", { cwd: r.dir }), /returned output that is not JSON/);
+});
+
+test("a caller can explain a status it knows, and the sign-in hint still comes first", async () => {
+    const r = fresh();
+    h.glab.on("api", { code: 1, stderr: "glab: 409 Conflict (HTTP 409)" });
+    await assert.rejects(
+        glabWrite(
+            "glab api (merge)",
+            HOME,
+            "PUT",
+            `${BASE}/merge_requests/42/merge`,
+            { sha: "a" },
+            { cwd: r.dir, hints: { 409: "the head moved" } },
+        ),
+        { message: "glab api (merge) failed: glab: 409 Conflict (HTTP 409) (the head moved)" },
+    );
+    h.glab.reset();
+    h.glab.on("api", { code: 1, stderr: "glab: 401 Unauthorized (HTTP 401)" });
+    await assert.rejects(
+        glabWrite(
+            "glab api (merge)",
+            HOME,
+            "PUT",
+            `${BASE}/merge_requests/42/merge`,
+            { sha: "a" },
+            { cwd: r.dir, hints: { 401: "no" } },
+        ),
+        /glab is not signed in for gitlab\.example\.com/,
+    );
 });
 
 test("the status glab reports, and the line a failure keeps", () => {
@@ -207,7 +236,8 @@ test("pages are followed while GitLab names a next page, up to the limit, and th
     h.glab.reset();
     h.glab.on("api", { status: 404, json: { message: "404 Not found" } });
     await assert.rejects(glabPages(HOME, "glab api (discussions)", `${BASE}/discussions`, 5, { cwd: r.dir }), {
-        message: "glab api (discussions) failed: glab: 404 Not found (HTTP 404)",
+        message:
+            "glab api (discussions) failed: glab: 404 Not found (HTTP 404) (GitLab has nothing at that address: it is gone, or the account glab is signed in as cannot see it)",
     });
 });
 
