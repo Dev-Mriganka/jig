@@ -153,18 +153,21 @@ locked paths, through `jig-core`'s section defaults and protected paths.
 
 ```text
 broker/broker.mjs   the only place the runtime runs: a plain-JavaScript child process
-src/                index.ts (entry), bash.ts (the tool, and one command outside), sandbox.ts (the session),
-                    rules.ts + lists.ts + repos.ts (the rules as data), audit.ts + gitconfig.ts (after a command),
-                    ask.ts + allowed.ts (questions), explain.ts, env.ts, output.ts, commands.ts, doctor.ts
-src/background/     the tasks: tasks.ts (start, stop, limits), notify.ts (waking), patterns.ts, logfile.ts + output.ts
-                    (the log and its reading), process.ts + sessions.ts (stopping, crash clean-up), tools.ts, ps.ts
+src/                index.ts (entry), bash.ts (the tool, and one command outside), sandbox.ts + sandbox-types.ts +
+                    sandbox-setup.ts + sandbox-messages.ts (the session), rules.ts + lists.ts + repos.ts (the rules as
+                    data), audit.ts + gitconfig.ts (after a command), ask.ts + allowed.ts (questions), explain.ts,
+                    env.ts, output.ts, commands.ts, doctor.ts
+src/background/     the tasks: tasks.ts (start, stop, limits) with tasks-deps.ts, task-record.ts, capture.ts and
+                    after-end.ts, notify.ts (waking), patterns.ts, logfile.ts + output.ts (the log and its reading),
+                    process.ts + sessions.ts (stopping, crash clean-up), tools.ts, ps.ts
 src/network/        the callback's rules (addresses.ts, hosts.ts, policy.ts), the question to you (ask-host.ts),
-                    and the localhost bridge (bridge.ts)
+                    the localhost bridge (bridge.ts) and how they are wired to the sandbox (wiring.ts)
 test/               rules as data, and the escape and keep-working tests in the real sandbox
 ```
 
 ## More detail
 
+- [Code map](docs/code-map.md): every file, who calls it, and a `bash` command followed through them
 - [The rules](docs/rules.md): every hidden, locked and ask-first path, and why
 - [When a command hits a rule](docs/when-blocked.md): the messages, the prompts, the ways through
 - [Background tasks](docs/background.md): the tools, limits, waking, `/ps`

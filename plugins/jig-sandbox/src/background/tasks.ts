@@ -5,18 +5,14 @@
 // the order of the group kill follow gvanderclay/pi-bg-bash (MIT, see docs/background.md, "Credit"), reworked for bubblewrap
 // and for tasks that end with the session.
 import { spawn } from "node:child_process";
-import { constants as osConstants } from "node:os";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { Aftermath } from "../aftermath.ts";
 import type { SandboxSettings } from "../config.ts";
-import { createOutputCleaner } from "../output.ts";
-import type { OutputCleaner } from "../output.ts";
-import type { Sandbox } from "../sandbox.ts";
+import { afterEnd } from "./after-end.ts";
+import { captureOutput } from "./capture.ts";
 import { buildTaskEnv } from "./env.ts";
-import { defaultName, formatRuntime, stateText } from "./format.ts";
+import { describeStop, stateText } from "./format.ts";
 import { TaskLog } from "./logfile.ts";
 import { Notifier, WAKE_TYPE } from "./notify.ts";
-import type { SendOptions, Timing } from "./notify.ts";
 import { tailText } from "./output.ts";
 import { GRACE_MS, realPort, terminate } from "./process.ts";
 import type { ProcessPort } from "./process.ts";
@@ -28,86 +24,20 @@ import {
     writeManifest,
     writeOwner,
 } from "./sessions.ts";
-import type { KillReason, NotifyOn, StopOutcome, Task } from "./types.ts";
+import { failedTask, runningTask } from "./task-record.ts";
+import type { StartRequest, StopReport, TasksDeps } from "./tasks-deps.ts";
+import type { KillReason, StopOutcome, Task } from "./types.ts";
 import { LineMatcher } from "./patterns.ts";
 
 /** Logs rotate at 4 MiB. */
 export const LOG_SEGMENT_BYTES = 4 * 1024 * 1024;
 const SHUTDOWN_CAP_MS = 5_000;
-/** After the shell exits a grandchild may hold the pipes open; the task is over anyway after this. */
-const STDIO_GRACE_MS = 200;
 const SEGMENT = "jig-theme:segment";
-
-export interface TasksDeps {
-    sandbox: Sandbox;
-    aftermath: Aftermath;
-    agentDir: () => string;
-    settings: () => SandboxSettings["background"];
-    /** Pi's environment, which a task starts from as a foreground command does. */
-    env: NodeJS.ProcessEnv;
-    /** The shell and its arguments that run a wrapped command, as Pi runs one. */
-    shell: () => { shell: string; args: string[] };
-    now?: () => number;
-    /** `pi.sendMessage`. */
-    send: (
-        message: { customType: string; content: string; display: boolean; details: unknown },
-        options: SendOptions,
-    ) => void;
-    /** `pi.events.emit`. */
-    emit: (channel: string, data: unknown) => void;
-    port?: ProcessPort;
-    timing?: Partial<Timing>;
-    graceMs?: number;
-    /** Tests: a smaller log segment. */
-    segmentBytes?: number;
-    /** Tells the localhost bridge about a task starting and ending (`filtered` and `ask` modes). */
-    bridge?: {
-        taskStarted(task: Task): void;
-        taskEnded(task: Task): void;
-    };
-}
-
-export interface StartRequest {
-    command: string;
-    name?: string;
-    notifyOn: NotifyOn;
-    /** Seconds; cut to the longest run. Absent means the longest run. */
-    timeoutSeconds?: number;
-}
-
-export interface StopReport {
-    id: string;
-    text: string;
-}
 
 const sleep = (ms: number): Promise<void> =>
     new Promise((resolve) => {
         setTimeout(resolve, ms).unref();
     });
-
-/** Turns carriage returns into line feeds across chunks, so a progress meter is lines and `\r\n` is one line break. */
-export class LineEndings {
-    private afterReturn = false;
-
-    push(chunk: Buffer): Buffer {
-        if (chunk.length === 0) return chunk;
-        const out: number[] = [];
-        for (const byte of chunk) {
-            if (byte === 0x0d) {
-                out.push(0x0a);
-                this.afterReturn = true;
-                continue;
-            }
-            if (byte === 0x0a && this.afterReturn) {
-                this.afterReturn = false;
-                continue;
-            }
-            this.afterReturn = false;
-            out.push(byte);
-        }
-        return Buffer.from(out);
-    }
-}
 
 export class Tasks {
     readonly notifier: Notifier;
@@ -269,42 +199,25 @@ export class Tasks {
         }
         const { id, log } = created;
 
-        let markSettled!: () => void;
-        const started = this.now();
-        const task: Task = {
+        const task = runningTask({
             id,
-            name: request.name || defaultName(request.command),
-            command: request.command,
+            request,
             cwd,
             pid: child.pid,
-            startedAt: started,
-            state: "running",
-            deadline: started + timeoutMs,
+            startedAt: this.now(),
             timeoutMs,
-            notifyOn: request.notifyOn,
-            cursor: 0,
-            ready: false,
-            errorMatches: 0,
-            streamBytes: 0,
             log,
-            sandboxLines: [],
-            ports: [],
-            notes: [],
             child,
             prepared,
             snapshot,
-            settled: new Promise<void>((resolve) => {
-                markSettled = resolve;
-            }),
-            markSettled: () => markSettled(),
-        };
+        });
         task.matcher = new LineMatcher({
             ready: request.notifyOn.ready,
             error: request.notifyOn.error,
             onMatch: (match) => this.onMatch(task, match.kind, match.pattern, match.line, match.offset),
         });
         this.tasks.set(id, task);
-        this.watch(task, child, prepared.values);
+        captureOutput(task, child, prepared.values, this.now, (code) => void this.finish(task, code));
         task.deadlineTimer = setTimeout(() => {
             void this.stop(task, "max runtime");
         }, timeoutMs);
@@ -318,30 +231,7 @@ export class Tasks {
     /** A process that could not be created is kept as a `failed` task, so `bg_list` can say why. */
     private recordFailure(request: StartRequest, cwd: string, error: Error): Error {
         const id = `bg-${this.nextId++}`;
-        const at = this.now();
-        const task: Task = {
-            id,
-            name: request.name || defaultName(request.command),
-            command: request.command,
-            cwd,
-            pid: 0,
-            startedAt: at,
-            endedAt: at,
-            state: "failed",
-            reason: error.message,
-            deadline: at,
-            timeoutMs: 0,
-            notifyOn: request.notifyOn,
-            cursor: 0,
-            ready: false,
-            errorMatches: 0,
-            streamBytes: 0,
-            sandboxLines: [],
-            ports: [],
-            notes: [],
-            settled: Promise.resolve(),
-            markSettled: () => undefined,
-        };
+        const task = failedTask(id, request, cwd, this.now(), error.message);
         this.tasks.set(id, task);
         this.evict();
         this.changed();
@@ -359,40 +249,6 @@ export class Tasks {
                 if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
             }
         }
-    }
-
-    private watch(task: Task, child: NonNullable<Task["child"]>, values: string[]): void {
-        // One cleaner per stream: an escape sequence or a credential value cut between two chunks is joined again, and the
-        // two streams cannot join halves of each other.
-        const endings = new LineEndings();
-        const cleaners: OutputCleaner[] = [createOutputCleaner(values), createOutputCleaner(values)];
-        const take = (data: Buffer): void => {
-            if (data.length === 0) return;
-            const text = endings.push(data);
-            task.log?.append(text, this.now());
-            task.matcher?.push(text, task.streamBytes);
-            task.streamBytes += text.length;
-        };
-        child.stdout?.on("data", (chunk: Buffer) => take(cleaners[0]?.push(chunk) ?? Buffer.alloc(0)));
-        child.stderr?.on("data", (chunk: Buffer) => take(cleaners[1]?.push(chunk) ?? Buffer.alloc(0)));
-        let finished = false;
-        const finish = (code: number | null, signal: NodeJS.Signals | null): void => {
-            if (finished) return;
-            finished = true;
-            child.stdout?.destroy();
-            child.stderr?.destroy();
-            for (const cleaner of cleaners) take(cleaner.end());
-            void this.finish(task, code ?? (signal ? 128 + (osConstants.signals[signal] ?? 0) : 1));
-        };
-        // `close` waits for the pipes, and a grandchild that kept them open must not keep the task running.
-        child.once("exit", (code, signal) => {
-            const timer = setTimeout(() => finish(code, signal), STDIO_GRACE_MS);
-            timer.unref();
-            child.once("close", () => {
-                clearTimeout(timer);
-                finish(code, signal);
-            });
-        });
     }
 
     private onMatch(task: Task, kind: "ready" | "error", pattern: string, line: string, offset: number): void {
@@ -429,7 +285,8 @@ export class Tasks {
         task.markSettled();
         this.writeState();
         this.changed();
-        if (prepared !== undefined && !this.closed) await this.afterEnd(task, prepared, snapshot);
+        if (prepared !== undefined && !this.closed)
+            await afterEnd(this.deps.aftermath, () => this.ctx, task, prepared, snapshot, this.now);
         else await prepared?.finish();
         if (!this.closed) {
             switch (task.killReason) {
@@ -446,33 +303,6 @@ export class Tasks {
             this.evict();
         }
         this.changed();
-    }
-
-    /** What the sandbox does after any command: the audit of what it created and the explanation of what it was refused. */
-    private async afterEnd(task: Task, prepared: NonNullable<Task["prepared"]>, snapshot: unknown): Promise<void> {
-        let violations: ReadonlyArray<{ line: string }> = [];
-        try {
-            violations = (await prepared.finish()).violations;
-        } catch {
-            // The broker is gone; there is nothing to read.
-        }
-        const ctx = this.ctx;
-        if (ctx === undefined) return;
-        try {
-            const tail = tailText(task, 200, 64 * 1024, this.now()).text;
-            task.sandboxLines = await this.deps.aftermath.after({
-                prepared,
-                output: tail,
-                cwd: task.cwd,
-                ctx,
-                snapshot,
-                violations,
-            });
-        } catch (error) {
-            task.sandboxLines = [
-                `[sandbox] the check of what the task changed failed (${(error as Error).message}); look at your shell start-up files and git hooks.`,
-            ];
-        }
     }
 
     // ---- stopping
@@ -630,15 +460,6 @@ export class Tasks {
             // The bus of a session that has ended.
         }
     }
-}
-
-function describeStop(task: Task, outcome: StopOutcome | undefined): string {
-    if (!outcome) return `${task.id} had already finished: ${stateText(task)}.`;
-    if (outcome.how === "stuck") return `${task.id} is still running after SIGKILL; /ps shows it.`;
-    if (outcome.how === "kill") {
-        return `${task.id} ignored SIGTERM; killed with SIGKILL after ${Math.round(outcome.ms / 1000)}s.`;
-    }
-    return `${task.id} stopped by SIGTERM after ${formatRuntime(outcome.ms)} (exited, code ${task.exitCode ?? "?"}).`;
 }
 
 export type { Task };

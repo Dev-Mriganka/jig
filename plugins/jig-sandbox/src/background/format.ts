@@ -1,5 +1,5 @@
 // The words for a task, shared by the tools, `/ps` and the wake-up messages, so a state reads the same everywhere.
-import type { Task } from "./types.ts";
+import type { StopOutcome, Task } from "./types.ts";
 
 /** `1.2s`, or `2m 5s` from a minute on, or `1h 4m` from an hour. */
 export function formatRuntime(ms: number): string {
@@ -64,4 +64,14 @@ export function taskLine(task: Task, now: number): string {
         ...(watching.length > 0 ? [watching.join(", ")] : []),
         ...(task.ports.length > 0 && task.state === "running" ? [`listening on ${task.ports.join(", ")}`] : []),
     ].join(" | ");
+}
+
+/** What the agent hears after `bg_kill` for one task. */
+export function describeStop(task: Task, outcome: StopOutcome | undefined): string {
+    if (!outcome) return `${task.id} had already finished: ${stateText(task)}.`;
+    if (outcome.how === "stuck") return `${task.id} is still running after SIGKILL; /ps shows it.`;
+    if (outcome.how === "kill") {
+        return `${task.id} ignored SIGTERM; killed with SIGKILL after ${Math.round(outcome.ms / 1000)}s.`;
+    }
+    return `${task.id} stopped by SIGTERM after ${formatRuntime(outcome.ms)} (exited, code ${task.exitCode ?? "?"}).`;
 }

@@ -6,7 +6,8 @@ import type { Asker } from "./ask.ts";
 import { audit, takeSnapshot } from "./audit.ts";
 import type { AuditSnapshot } from "./audit.ts";
 import { explainBlocks, explainViolations } from "./explain.ts";
-import type { Prepared, Sandbox } from "./sandbox.ts";
+import type { Sandbox } from "./sandbox.ts";
+import type { Prepared } from "./sandbox-types.ts";
 
 export interface AfterInput {
     prepared: Prepared;

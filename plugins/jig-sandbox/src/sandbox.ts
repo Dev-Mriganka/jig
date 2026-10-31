@@ -3,108 +3,30 @@
 //
 // Fail closed: while the sandbox is not ready, or when it could not start, `prepare` refuses with the steps to fix it.
 // A command never runs bare because something went wrong; only the user's `/sandbox off` runs one unsandboxed.
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, statSync } from "node:fs";
+import { rmSync } from "node:fs";
 import path from "node:path";
-import type { BashOperations } from "@earendil-works/pi-coding-agent";
-import { createAllowed } from "./allowed.ts";
-import type { Allowed } from "./allowed.ts";
 import { BrokerError } from "./broker-client.ts";
-import type { Broker, BrokerEvent, BrokerLaunch } from "./broker-client.ts";
+import type { Broker, BrokerEvent } from "./broker-client.ts";
 import type { NetworkMode, SandboxSettings } from "./config.ts";
 import { scrubEnvironment } from "./env.ts";
 import { withRealCache } from "./files.ts";
 import type { FileView } from "./files.ts";
-import { createHostAsker } from "./network/ask-host.ts";
-import type { HostAsker, Screen } from "./network/ask-host.ts";
-import { Bridge } from "./network/bridge.ts";
-import type { BridgeDeps } from "./network/bridge.ts";
-import { createPolicy } from "./network/policy.ts";
-import type { Policy, PolicyDeps } from "./network/policy.ts";
-import { installCommand, findPrograms, onPath } from "./programs.ts";
+import type { HostAsker } from "./network/ask-host.ts";
+import type { Bridge } from "./network/bridge.ts";
+import type { Policy } from "./network/policy.ts";
+import { installCommand, findPrograms } from "./programs.ts";
 import type { FoundPrograms } from "./programs.ts";
 import { inside } from "./pathing.ts";
 import { canWritePath, computeRules, runtimeFilesystem } from "./rules.ts";
-import type { ProtectedEntry, RuleSet, RuntimeFilesystem } from "./rules.ts";
+import { wireNetwork } from "./network/wiring.ts";
+import { firstLine, messageOf, refusal, userNamespaceHint } from "./sandbox-messages.ts";
+import { makeSessionFolders, runtimeConfig } from "./sandbox-setup.ts";
+import type { Captured, Prepared, SandboxDeps, SandboxState } from "./sandbox-types.ts";
+import type { RuleSet, RuntimeFilesystem } from "./rules.ts";
 
 /** A command was not run because the sandbox cannot run it. The message is for the agent: what happened and what to do. */
 export class SandboxRefused extends Error {}
 
-export type SandboxState =
-    | { kind: "starting" }
-    | { kind: "ready" }
-    | { kind: "unavailable"; reason: string }
-    /** The user turned it off for this session with `/sandbox off`. */
-    | { kind: "off" }
-    | { kind: "stopped" };
-
-/** What the `filtered` and `ask` network modes need from the plugin around the sandbox. All of it is optional. */
-export interface NetworkDeps {
-    /** What you allowed; hosts you answered `This session` or `Always` for are kept here. Default: nothing kept. */
-    allowed?: Allowed;
-    /** The screen to ask on, or undefined for none. Default: none, so `ask` refuses every new host. */
-    screen?: () => Screen | undefined;
-    /** Runs a question in jig-core's queue. Default: at once. */
-    inTurn?: <T>(job: () => Promise<T>) => Promise<T>;
-    /** Says something to you that is not an answer to a command. */
-    notify?: (message: string) => void;
-    /** Tests only: the parts that make the policy and the bridge reach outside the test. */
-    range?: PolicyDeps["range"];
-    own?: PolicyDeps["own"];
-    onceMs?: number;
-    processes?: BridgeDeps["processes"];
-    enter?: BridgeDeps["enter"];
-    python?: string | undefined;
-}
-
-export interface SandboxDeps {
-    brokerScript: string;
-    /** Pi's environment. */
-    env: NodeJS.ProcessEnv;
-    files: FileView;
-    platform: NodeJS.Platform;
-    /** The home folder from the password database. */
-    home: () => string;
-    uid: number;
-    wsl: boolean;
-    /** Where the per-session folders go: the system's temporary folder. */
-    tmpRoot: string;
-    agentDir: () => string;
-    settings: () => SandboxSettings;
-    protectedPaths: () => ProtectedEntry[];
-    /** The folders of the Node.js and Pi that run Pi. */
-    runtimePaths: () => string[];
-    /** The ask-first folders the user allowed. */
-    approved: () => string[];
-    createdByAgent: Set<string>;
-    startBroker: (launch: BrokerLaunch) => Promise<Broker>;
-    /** Runs a wrapped command with a shell, the way Pi runs one. */
-    exec: BashOperations["exec"];
-    /** For a name that is not guessed. */
-    random: () => string;
-    now: () => number;
-    network?: NetworkDeps;
-}
-
-/** What `prepare` hands the caller: the command to spawn and the environment to spawn it with. */
-export interface Prepared {
-    wrapped: string;
-    env: NodeJS.ProcessEnv;
-    /** Credential values to replace if they show up in output. */
-    values: string[];
-    rules: RuleSet;
-    mode: NetworkMode;
-    commandId: string;
-    /** Ends the command in the broker. Safe to call twice. */
-    finish(): Promise<{ violations: Array<{ line: string }> }>;
-}
-
-/** What a command run for the sandbox's own sake (the start-up probe, the doctor) printed. */
-export interface Captured {
-    exitCode: number | null;
-    output: string;
-}
-
-const STALE_SESSION_MS = 24 * 3_600_000;
 const SAFE_NETWORK: NetworkMode = "off";
 
 export class Sandbox {
@@ -149,46 +71,14 @@ export class Sandbox {
             [deps.home(), "/tmp", deps.tmpRoot, this.lastCwd].some((root) => inside(place, root));
         this.files = withRealCache(deps.files, (place) => !mine(place), 30_000, deps.now);
 
-        const network = deps.network ?? {};
-        const allowed = network.allowed ?? createAllowed(deps.agentDir);
-        this.hostAsker = createHostAsker({
-            allowed,
-            screen: network.screen ?? (() => undefined),
-            inTurn: network.inTurn ?? ((job) => job()),
-            now: deps.now,
-            ...(network.onceMs === undefined ? {} : { onceMs: network.onceMs }),
-            ...(network.notify === undefined ? {} : { notify: network.notify }),
-        });
-        this.bridge = new Bridge({
+        const wired = wireNetwork(deps, {
             mode: () => this.mode,
-            localhost: () => deps.settings().network.localhost,
             socat: () => this.programs.found.socat,
-            python: () =>
-                "python" in network
-                    ? network.python
-                    : onPath("python3", deps.env.PATH, (place) => this.canWrite(place)),
-            platform: deps.platform,
-            now: deps.now,
-            ...(network.processes === undefined ? {} : { processes: network.processes }),
-            ...(network.enter === undefined ? {} : { enter: network.enter }),
-            ...(network.notify === undefined ? {} : { notify: network.notify }),
+            canWrite: (place) => this.canWrite(place),
         });
-        this.policy = createPolicy({
-            config: () => {
-                const settings = deps.settings();
-                return {
-                    mode: this.mode,
-                    allow: settings.network.allow,
-                    deny: settings.network.deny,
-                    localhost: settings.network.localhost,
-                };
-            },
-            bridged: (port) => this.bridge.serves(port),
-            allowedHosts: () => this.hostAsker.allowed(),
-            ask: (host, port) => this.hostAsker.ask(host, port),
-            ...(network.own === undefined ? {} : { own: network.own }),
-            ...(network.range === undefined ? {} : { range: network.range }),
-        });
+        this.hostAsker = wired.hostAsker;
+        this.bridge = wired.bridge;
+        this.policy = wired.policy;
     }
 
     // ---- state ----------------------------------------------------------------------------------------------------------
@@ -270,7 +160,7 @@ export class Sandbox {
             };
             return;
         }
-        this.makeSessionFolders(sessionId);
+        this.sessionDir = makeSessionFolders(this.deps, sessionId);
         await this.launch();
         if (this.state.kind !== "starting") return;
         // A real command with the real rules, so a rule or a kernel setting that stops every command is found now and not
@@ -285,31 +175,6 @@ export class Sandbox {
             return;
         }
         this.state = { kind: "ready" };
-    }
-
-    private makeSessionFolders(sessionId: string): void {
-        const root = path.join(this.deps.tmpRoot, `jig-sandbox-${this.deps.uid}`);
-        mkdirSync(root, { recursive: true, mode: 0o700 });
-        chmodSync(root, 0o700);
-        this.removeStaleSessions(root);
-        const short = sessionId.replace(/[^A-Za-z0-9]/g, "").slice(0, 8) || "session";
-        const folder = mkdtempSync(path.join(root, `${short}-`));
-        mkdirSync(path.join(folder, "broker"), { mode: 0o700 });
-        mkdirSync(path.join(folder, "tmp"), { mode: 0o700 });
-        this.sessionDir = this.deps.files.real(folder) ?? folder;
-    }
-
-    /** Session folders that a crash left behind: nothing in them is wanted a day later. */
-    private removeStaleSessions(root: string): void {
-        for (const name of this.deps.files.list(root)) {
-            const folder = path.join(root, name);
-            try {
-                if (this.deps.now() - statSync(folder).mtimeMs > STALE_SESSION_MS)
-                    rmSync(folder, { recursive: true, force: true });
-            } catch {
-                // Not ours to worry about.
-            }
-        }
     }
 
     /** Starts the broker and gives the runtime its base configuration. */
@@ -340,7 +205,10 @@ export class Sandbox {
             broker.onEvent((event) => this.onBrokerEvent(broker, event));
             await broker.request(
                 "init",
-                { config: this.runtimeConfig(), askHosts: this.mode === "filtered" || this.mode === "ask" },
+                {
+                    config: runtimeConfig(this.mode, this.programs.found, this.removedNames),
+                    askHosts: this.mode === "filtered" || this.mode === "ask",
+                },
                 20_000,
             );
         } catch (error) {
@@ -351,31 +219,6 @@ export class Sandbox {
                 reason: `the sandbox could not start: ${messageOf(error)}${stderr === "" ? "" : ` (${firstLine(stderr)})`}`,
             };
         }
-    }
-
-    /** The runtime's configuration for the whole session. The file-system rules come with each command. */
-    private runtimeConfig(): Record<string, unknown> {
-        const found = this.programs.found;
-        return {
-            // Network `open` is the absence of an allow list: the runtime then leaves the network alone. `off` is an empty one
-            // that nothing may widen. `filtered` and `ask` are an empty one that nothing widens either, except through the
-            // callback, which asks this plugin about each host (see `network/policy.ts`): the allow and deny lists are read
-            // there, and not given to the runtime, since a list entry the runtime decides is not checked for a private address.
-            network:
-                this.mode === "off"
-                    ? { allowedDomains: [], deniedDomains: [], strictAllowlist: true }
-                    : this.mode === "open"
-                      ? { deniedDomains: [] }
-                      : { allowedDomains: [], deniedDomains: [] },
-            filesystem: { denyRead: [], allowWrite: [], denyWrite: [], allowGitConfig: true },
-            // The environment is cleaned before the command starts; the runtime removes the same names a second time.
-            credentials: { envVars: this.removedNames.map((name) => ({ name, mode: "deny" })) },
-            ...(found.bwrap === undefined ? {} : { bwrapPath: found.bwrap }),
-            ...(found.socat === undefined ? {} : { socatPath: found.socat }),
-            ...(found.ripgrep === undefined ? {} : { ripgrep: { command: found.ripgrep } }),
-            // The runtime looks for dangerous files near the folder it runs in, the session's, which holds none.
-            mandatoryDenySearchDepth: 1,
-        };
     }
 
     /** The broker asks about a host the proxy met: decide, and answer. A failure to answer is the broker's timeout, which refuses. */
@@ -597,30 +440,4 @@ export class Sandbox {
             await prepared.finish();
         }
     }
-}
-
-function refusal(reason: string): string {
-    return `bash is refused: ${reason}. Tell the user: /sandbox doctor checks each requirement, and /sandbox off runs commands without the sandbox for this session.`;
-}
-
-function messageOf(error: unknown): string {
-    return error instanceof Error ? error.message : String(error);
-}
-
-function firstLine(text: string): string {
-    return (
-        text
-            .trim()
-            .split("\n")
-            .find((line) => line.trim() !== "")
-            ?.trim()
-            .slice(0, 300) ?? ""
-    );
-}
-
-/** What to try when bubblewrap cannot make a user namespace, as Ubuntu 24.04 does by default. */
-function userNamespaceHint(output: string): string {
-    return /namespace|setting up uid map|operation not permitted|permission denied/i.test(output)
-        ? ". Unprivileged user namespaces may be off: on Ubuntu 24.04, sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0"
-        : "";
 }

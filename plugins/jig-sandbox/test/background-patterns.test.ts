@@ -1,7 +1,7 @@
 // The patterns that wake the agent: which are refused before a task starts, and how lines are matched.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { LineEndings } from "../src/background/tasks.ts";
+import { LineEndings } from "../src/background/capture.ts";
 import { LineMatcher, MAX_PATTERN_CHARS, patternProblem, screenPatterns } from "../src/background/patterns.ts";
 import type { Match } from "../src/background/patterns.ts";
 
