@@ -41,8 +41,6 @@ export interface World {
     jigLines(argument?: string): Promise<string[]>;
     /** Everything jig-core says is wrong with the configuration, as `/jig` shows it. */
     problems(): Promise<string[]>;
-    /** Writes `personal` as jig.json and starts the session again. */
-    restart(personal: unknown): Promise<void>;
     close(): Promise<void>;
 }
 
@@ -144,10 +142,6 @@ export async function startWorld(options: WorldOptions = {}): Promise<World> {
             const lines = await jigLines();
             const from = lines.findIndex((line) => line.startsWith("Configuration problems"));
             return from === -1 ? [] : lines.slice(from + 1).map((line) => line.trim());
-        },
-        async restart(personal) {
-            write(personal);
-            await host.fire("session_start", { reason: "reload" }, ctx);
         },
         async close() {
             await host.fire("session_shutdown", { reason: "quit" }, ctx);

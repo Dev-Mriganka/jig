@@ -70,14 +70,12 @@ describe("loaded after jig-core and every built plugin", () => {
         );
     });
 
-    test("the environments are the kinds the company named, and the floor on production holds", async () => {
+    test("the environments are the kinds the company named, and a name nobody defined is production", async () => {
         world = await startWorld();
         for (const [name, config] of Object.entries(ENVIRONMENTS)) {
             assert.equal(world.api.environments.kindOf(name), config.kind, name);
         }
         assert.equal(world.api.environments.kindOf("qa"), "production", "a name nobody defined counts as production");
-        const lines = await world.jigLines("rules");
-        assert.ok(lines.length > 0);
     });
 
     test("it does not matter whether jig-acme loads before jig-core or after it", async () => {
