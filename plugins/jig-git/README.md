@@ -87,7 +87,7 @@ The notes on single actions are in [Actions](docs/actions.md).
   means the repository Pi started in. The workspace is the folder Pi started
   in, or, inside a repository, the folder that holds it.
 - **The forge comes from the repository.** `github.com` is GitHub, `gitlab.com` is GitLab, and `git.forges` names a self-hosted
-  host. An origin on any other host is refused with the line that fixes it ([GitLab](docs/gitlab.md#which-forge-a-repository-is-on)).
+  host or an ssh alias for a real one. An origin on any other host is refused with the line that fixes it ([GitLab](docs/gitlab.md#which-forge-a-repository-is-on)).
   `gh` and `glab` own the sign-in; Jig never signs in.
 - **Writes are previewed, and never repeated blindly.** A write that asks shows
   what it will do, and refuses if anything changed since. A lost reply is read
@@ -114,7 +114,7 @@ invalid field, and the defaults apply instead.
 | `cloneHost` | `github.com` | The ssh host `clone` connects to: `github.com` or a `Host` alias |
 | `watchComments` | `"after-create"` | `"after-create"`: `pr create` starts the comment watch. `"off"`: only `pr watch` does |
 | `watchBots` | `false` | Whether the watch also tells the agent about comments by bots |
-| `forges` | none | Hosts that are not github.com or gitlab.com: `{ "gitlab.example.com": "gitlab" }` |
+| `forges` | none | Hosts that are not github.com or gitlab.com: `{ "gitlab.example.com": "gitlab" }`; an ssh alias maps to its real host ([GitLab](docs/gitlab.md#an-ssh-alias-for-a-real-host)) |
 
 The fields in detail are in [Configuration](docs/configuration.md).
 

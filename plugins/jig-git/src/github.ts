@@ -4,8 +4,8 @@
 import type { RunResult } from "../../jig-core/src/contract.ts";
 import { jig } from "../../jig-core/src/client.ts";
 import type { GitSettings } from "./config.ts";
-import { githubRepo } from "./repo.ts";
-import type { Repo } from "./repo.ts";
+import { GITHUB_COM, githubRepo } from "./repo.ts";
+import type { Remote, Repo } from "./repo.ts";
 import { mayHaveLanded, summaryOf } from "./run.ts";
 import type { Reply } from "./previews.ts";
 import { parseApiOutput } from "./api-output.ts";
@@ -21,6 +21,11 @@ export interface GhOptions {
     /** Written to gh's standard input, for `--body-file -` and `--input -`. */
     input?: string;
     maxBytes?: number;
+    /**
+     * The GitHub host gh is told (`GH_HOST`) for a call that names no repository, such as `gh api` and `gh api graphql`. Left out
+     * for github.com, which is gh's own default. It is the real host, never an ssh alias that only git understands.
+     */
+    host?: string | undefined;
 }
 
 export function gh(args: readonly string[], options: GhOptions = {}): Promise<RunResult> {
@@ -30,6 +35,7 @@ export function gh(args: readonly string[], options: GhOptions = {}): Promise<Ru
         signal: options.signal,
         input: options.input,
         maxOutputBytes: options.maxBytes,
+        ...(options.host === undefined || options.host === GITHUB_COM ? {} : { env: { GH_HOST: options.host } }),
     });
 }
 
@@ -52,18 +58,28 @@ export function ghJson<T>(what: string, result: RunResult): T {
     }
 }
 
-/** `-R owner/name` when origin is a github.com repository, else nothing: gh then reads the repository's own remotes. */
+/** What names a repository to gh: `owner/name` on github.com, `host/owner/name` on another host (gh's `[HOST/]OWNER/REPO`). */
+export function repoArgument(remote: Remote): string {
+    return remote.host === GITHUB_COM ? remote.slug : `${remote.host}/${remote.slug}`;
+}
+
+/** `-R owner/name` when origin is a GitHub repository, else nothing: gh then reads the repository's own remotes. */
 export async function repoFlags(repo: Repo, settings: GitSettings, signal?: AbortSignal): Promise<string[]> {
     const remote = await githubRepo(repo, settings, signal);
-    return remote ? ["-R", remote.slug] : [];
+    return remote ? ["-R", repoArgument(remote)] : [];
+}
+
+/** The GitHub repository behind origin, for a call that has to name it. `remote.host` is the host gh is told. */
+export async function requireRemote(repo: Repo, settings: GitSettings, signal?: AbortSignal): Promise<Remote> {
+    const remote = await githubRepo(repo, settings, signal);
+    if (!remote)
+        throw new Error(`origin of ${repo.name} is not a GitHub repository, so GitHub cannot be asked about it`);
+    return remote;
 }
 
 /** The `owner/name` that `gh api` paths need. */
 export async function requireSlug(repo: Repo, settings: GitSettings, signal?: AbortSignal): Promise<string> {
-    const remote = await githubRepo(repo, settings, signal);
-    if (!remote)
-        throw new Error(`origin of ${repo.name} is not a github.com repository, so GitHub cannot be asked about it`);
-    return remote.slug;
+    return (await requireRemote(repo, settings, signal)).slug;
 }
 
 // ---- gh api with ETags ---------------------------------------------------------------------------------------------
@@ -76,10 +92,10 @@ export type { ApiResponse } from "./api-output.ts";
  */
 export async function apiGet(
     path: string,
-    options: { etag?: string | undefined; signal?: AbortSignal | undefined } = {},
+    options: { etag?: string | undefined; signal?: AbortSignal | undefined; host?: string | undefined } = {},
 ): Promise<ApiResponse> {
     const args = ["api", "-i", ...(options.etag ? ["-H", `If-None-Match: ${options.etag}`] : []), path];
-    const result = await gh(args, { signal: options.signal });
+    const result = await gh(args, { signal: options.signal, host: options.host });
     const response = parseApiOutput(result);
     // No status line and a failure: the request never got an answer. The caller reads status 0 as "try again later".
     if (response.status === 0) return { ...response, body: summaryOf(result.stderr || result.stdout) };

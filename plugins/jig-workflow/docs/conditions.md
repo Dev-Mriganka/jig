@@ -49,7 +49,7 @@ repository, only that repository counts.
     own. `opened` is `OPEN`, and a draft is a flag or a `Draft:` title.
   - **Which forge** is decided from the host of `origin` and the `git.forges` setting of `jig-git`, never by the
     agent: GitHub and `gitlab.com` need nothing, a self-hosted GitLab is named in `git.forges`, and any other host
-    stays on `gh`. An ssh alias for a host is mapped there to the real one (see the `jig-git` page on GitLab).
+    stays on `gh`. An ssh alias for a host is mapped there to the real one ([an ssh alias for a real host](../../jig-git/docs/gitlab.md#an-ssh-alias-for-a-real-host)).
 - **`checks-pass`.** The pull request's head must be HEAD now ("push first" otherwise). Then either:
   1. a `jig-ops` CI watch ended `passed` for that commit (the event `jig-ops:ci-finished`, with a finish
      line that covers the required checks), which is the precise answer; or

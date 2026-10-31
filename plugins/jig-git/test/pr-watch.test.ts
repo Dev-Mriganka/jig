@@ -592,6 +592,51 @@ const row = (number: number, extra: Record<string, unknown> = {}) => ({
     ...extra,
 });
 
+describe("a watch on a host other than github.com", () => {
+    const ALIAS_SPEC = { ...SPEC, host: "ghe.example.com" };
+
+    test("every request of the poll is told the host, and the title names it", async () => {
+        serve({ lines: [], reviews: [], talk: [] });
+        await poll(undefined, ALIAS_SPEC);
+        const calls = h.gh.callsOf("api");
+        assert.ok(calls.length >= 4, "the user, the pull request, line comments, reviews and the conversation");
+        for (const call of calls) assert.equal(call.host, "ghe.example.com", call.args.join(" "));
+        assert.equal(titleOf(ALIAS_SPEC), "comments on pull request 42 in ghe.example.com/acme/svc");
+        assert.equal(titleOf(SPEC), "comments on pull request 42 in acme/svc", "github.com is as it always was");
+    });
+
+    test("a watch saved before the host existed is polled as it was, with no host", async () => {
+        serve({ lines: [], reviews: [], talk: [] });
+        await poll(undefined, SPEC);
+        for (const call of h.gh.callsOf("api")) assert.equal(call.host, undefined);
+    });
+
+    test("the host of a saved watch is checked: one that could be an option or a URL is refused", async () => {
+        for (const host of ["-x", "https://ghe.example.com", "ghe.example.com/x", 7]) {
+            await assert.rejects(poll(undefined, { ...SPEC, host }), /does not name a pull request/, String(host));
+        }
+    });
+
+    test("pr watch on an alias mapped to a real host starts the watch with that host", async () => {
+        h.jig.setSection("git", { forges: { "ghe-alias": { forge: "github", host: "ghe.example.com" } } });
+        const r = featureRepo();
+        git(r.dir, "remote", "set-url", "origin", `git@ghe-alias:acme/${r.name}.git`);
+        h.gh.on("pr list", { json: [row(42)] });
+        ok(await h.call("pr", { action: "watch", repo: r.name }));
+        assert.deepEqual(h.jig.started[0]?.spec, { slug: `acme/${r.name}`, number: 42, host: "ghe.example.com" });
+        assert.equal(h.jig.started[0]?.title, `comments on pull request 42 in ghe.example.com/acme/${r.name}`);
+    });
+
+    test("pr watch on an alias for github.com starts the watch as before: github.com is gh's default", async () => {
+        h.jig.setSection("git", { forges: { "gh-work": { forge: "github", host: "github.com" } } });
+        const r = featureRepo();
+        git(r.dir, "remote", "set-url", "origin", `git@gh-work:acme/${r.name}.git`);
+        h.gh.on("pr list", { json: [row(42)] });
+        ok(await h.call("pr", { action: "watch", repo: r.name }));
+        assert.deepEqual(h.jig.started[0]?.spec, { slug: `acme/${r.name}`, number: 42 });
+    });
+});
+
 describe("pr watch", () => {
     test("is a local write: it starts a poll of GitHub and changes nothing there, so it does not ask", async () => {
         assert.deepEqual(h.jig.declared.get("pr")?.classify({ action: "watch" }), {

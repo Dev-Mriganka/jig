@@ -20,7 +20,7 @@ merge request, and `pr` and `release` work the same way with these differences:
 - `pr merge` cannot `rebase`, and `release_create` cannot `draft`, `prerelease` or `generate_notes`: each is refused with a line
   that says the GitLab way. Do not try to work around a refusal; tell the user.
 - `pr review` publishes a review. If the user has draft comments waiting in GitLab it refuses, because they would go out too.
-- If a call is refused because the host is not known, `git.forges` in `jig.json` must name it; ask the user to add it.
+- If a call is refused because the host is not known, `git.forges` in `jig.json` must name it (or, for an ssh alias such as `github.com-work`, map it to the real host); ask the user to add it. Never try to name a host in a call.
 - A call that finds `glab` not signed in says to run `glab auth login`; the user does that, never you.
 
 ## The order of work

@@ -3,7 +3,7 @@
 // are read in one call, with the thread ids that `pr reply` and `pr resolve` take.
 import { count, describeCounts, fromRollup } from "./ci.ts";
 import type { Check } from "./ci.ts";
-import { gh, ghJson, graphql, repoFlags, requireSlug } from "./github.ts";
+import { gh, ghJson, graphql, repoFlags, requireRemote } from "./github.ts";
 import { checkBranch, checkLine, checkNumber } from "./names.ts";
 import type { Call, Planned } from "./previews.ts";
 import { readOnly } from "./previews.ts";
@@ -215,7 +215,8 @@ export function planComments(
     const author = params.author === undefined ? undefined : checkLine(params.author, "author").replace(/^@/, "");
     return readOnly(`pr comments ${params.number ?? params.branch ?? "here"} in ${params.repo ?? "here"}`, async () => {
         const repo = await resolveRepo(params.repo, call.signal);
-        const slug = await requireSlug(repo, call.settings, call.signal);
+        const remote = await requireRemote(repo, call.settings, call.signal);
+        const { slug } = remote;
         const number =
             params.number ??
             ghJson<{ number: number }>(
@@ -236,7 +237,7 @@ export function planComments(
         const data = await graphql<{ repository: { pullRequest: PullComments | null } }>(
             QUERY,
             { owner, name, number },
-            { cwd: repo.root, signal: call.signal },
+            { cwd: repo.root, signal: call.signal, host: remote.host },
         );
         const pr = data.repository.pullRequest;
         if (!pr) throw new Error(`pull request ${number} was not found in ${slug}`);

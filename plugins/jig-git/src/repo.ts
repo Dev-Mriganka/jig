@@ -233,20 +233,33 @@ export async function originUrl(repo: Repo, signal?: AbortSignal): Promise<strin
     return out === undefined ? undefined : scrub(out.trim());
 }
 
+/** Where `gh` is told to look when origin is on github.com or an ssh alias for it. */
+export const GITHUB_COM = "github.com";
+
 /**
- * The GitHub repository behind origin, when origin is on github.com. The configured clone host counts as github.com: it
- * is an ssh alias the user chose for it.
+ * The GitHub repository behind origin, when origin is on GitHub. The configured clone host and `github.com-*` count as
+ * github.com: they are ssh aliases the user chose for it. A host that `git.forges` maps to GitHub counts too, with the real
+ * host its entry names (an ssh alias for github.com, or for a GitHub Enterprise Server host), else its own name.
+ *
+ * `host` in the answer is the host `gh` is told, which is not always the host in origin's address: git goes on using the
+ * alias, and the aliases are never put in a `gh` command.
  */
 export async function githubRepo(repo: Repo, settings: GitSettings, signal?: AbortSignal): Promise<Remote | undefined> {
     const remote = parseRemote(await originUrl(repo, signal));
     if (!remote) return undefined;
     const host = remote.host.toLowerCase();
+    const entry = settings.forges?.[host];
+    const configured = typeof entry === "string" ? entry : entry?.forge;
+    if (configured === "gitlab") return undefined;
+    if (configured === "github") {
+        return { ...remote, host: typeof entry === "object" && entry.host !== undefined ? entry.host : host };
+    }
     const isGithub =
-        host === "github.com" ||
+        host === GITHUB_COM ||
         host === "ssh.github.com" ||
         host.startsWith("github.com-") ||
         host === settings.cloneHost.toLowerCase();
-    return isGithub ? remote : undefined;
+    return isGithub ? { ...remote, host: GITHUB_COM } : undefined;
 }
 
 // ---- branches ------------------------------------------------------------------------------------------------------
