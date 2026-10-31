@@ -20,7 +20,7 @@ import { errorMessage } from "./errors.ts";
 import { gate } from "./gate.ts";
 import { configFile } from "./paths.ts";
 import { cleanupPreviews } from "./preview-html.ts";
-import { cleanupRecords } from "./records.ts";
+import { cleanupRecords, conditionProblem } from "./records.ts";
 import { finishCall, finishTurn, toolResult } from "./results.ts";
 import { createState, loadPersonalConfig } from "./state.ts";
 import type { JigCoreOptions, JigState } from "./state.ts";
@@ -35,6 +35,8 @@ export function jigCore(options: JigCoreOptions = {}): ExtensionFactory {
         state.configPath = () => configFile(getAgentDir());
         state.agentDir = () => getAgentDir();
         const api = buildApi(state);
+        const badCondition = conditionProblem(process.env);
+        if (badCondition !== undefined) state.startupProblems.push(badCondition);
 
         pi.on("session_start", (_event, ctx) => startSession(state, ctx));
         pi.on("tool_call", (event, ctx) => gate(state, event, ctx));

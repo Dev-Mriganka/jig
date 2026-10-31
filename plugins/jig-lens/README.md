@@ -50,14 +50,19 @@ Ticket PROJ-123, all time
 | `/lens ticket KEY` | One ticket, over all time |
 | `/lens session [id]` | One session. Without an id, this one |
 | `/lens days N` | The last N days, from 1 to 90, the last of them today |
+| `/lens compare [days N]` | Sessions grouped by condition, side by side, over the last N days (30 by default). See [Comparing conditions](docs/compare.md) |
 | `/lens usage` | An interactive view of cost and tokens from Pi's own session files |
 | `/lens grafana` | Imports, starts Grafana if it is not running, and opens its dashboards |
 | `/lens datasette` | The same for Datasette |
 | `/lens rebuild` | Deletes the index and imports every record file again. The viewers are not touched |
 | `/lens status` | The viewer on the port, the index size, the last import, and the lines skipped |
 
+`/lens compare` groups main sessions by the `condition` tag (`$JIG_CONDITION`) and counts a child's lines toward its
+parent. A short separate Pi process, such as a judge model call, is a side call: give it a `JIG_AGENT_ROLE` other than
+`main` and its cost joins its condition without making it a session.
+
 Anything else, or the wrong arguments (`/lens days 91`), shows the usage line and
-does nothing: `Usage: /lens [ticket KEY | session [id] | days N | usage | grafana | datasette | rebuild | status]`.
+does nothing: `Usage: /lens [ticket KEY | session [id] | days N | compare [days N] | usage | grafana | datasette | rebuild | status]`.
 
 ## Rules
 
@@ -109,6 +114,7 @@ jig-lens/
 ## More detail
 
 - [The summary](docs/summary.md): scopes, sections, how it is shown, the commands
+- [Comparing conditions](docs/compare.md): `/lens compare`, the `condition` tag, side calls
 - [The usage view](docs/usage.md): `/lens usage`, its keys, what it reads, naming the models
 - [From the records to the index](docs/import.md): imports, retention, one viewer process
 - [The index](docs/index-schema.md): tables, SQL indexes, how fast

@@ -9,7 +9,7 @@ import { CALL, SCHEMA, TURN } from "../src/fields.ts";
 import { importRecords } from "../src/import.ts";
 import { hasRecords, summarize } from "../src/queries.ts";
 import { deleteIndex, openForReading, openIndex, readStatus } from "../src/store.ts";
-import { appendLines, NOW, paths, sampleIndex, tempState, writeSample } from "./support.ts";
+import { appendLines, call, NOW, paths, sampleIndex, tempState, turn, writeRecords, writeSample } from "./support.ts";
 
 const mode = (file: string) => statSync(file).mode & 0o777;
 
@@ -230,6 +230,78 @@ test("an index made before the ticket indexes gets them when it is next opened, 
         .all()
         .map((row) => String(row.detail));
     assert.match(plan.join(" | "), /USING (COVERING )?INDEX call_ticket/);
+});
+
+test("a fresh index has the condition column on both tables, empty until a record sets it", (t) => {
+    const db = open(t, paths(tempState(t)).index);
+    for (const table of ["call", "turn"]) {
+        const column = db
+            .prepare(`PRAGMA table_info(${table})`)
+            .all()
+            .find((row) => row.name === "condition");
+        assert.equal(column?.type, "TEXT", table);
+        assert.equal(column?.notnull, 0, table);
+    }
+});
+
+test("an index made before the condition column gets it when next opened, and keeps its rows", async (t) => {
+    const state = tempState(t);
+    const where = paths(state);
+    const before = SCHEMA.replace(/^ {4}condition TEXT,\n/gm, "");
+    assert.notEqual(before, SCHEMA);
+    mkdirSync(where.lens, { recursive: true });
+    const old = new DatabaseSync(where.index);
+    old.exec("PRAGMA journal_mode = WAL");
+    old.exec(before);
+    assert.equal(
+        old
+            .prepare("PRAGMA table_info(turn)")
+            .all()
+            .some((row) => row.name === "condition"),
+        false,
+    );
+    old.exec(
+        `INSERT INTO turn (id, time, session, agentRole, model, input, output, cacheRead, cacheWrite, cost)
+         VALUES ('old-1', 1793268000, 's-old', 'main', 'm', 1, 1, 0, 0, 0.5)`,
+    );
+    old.close();
+
+    const db = open(t, where.index);
+    for (const table of ["call", "turn"]) {
+        assert.ok(
+            db
+                .prepare(`PRAGMA table_info(${table})`)
+                .all()
+                .some((row) => row.name === "condition"),
+            table,
+        );
+    }
+    assert.deepEqual(
+        { ...db.prepare("SELECT session, cost, condition FROM turn").get() },
+        {
+            session: "s-old",
+            cost: 0.5,
+            condition: null,
+        },
+    );
+
+    // New lines carry the tag into the upgraded table, and opening it once more is harmless.
+    writeRecords(state, [
+        call("n1", "2026-10-30T10:00:00Z", "s-new", "read", {}, { JIG_CONDITION: "baseline" }),
+        turn("n2", "2026-10-30T10:01:00Z", "s-new", "m", 0.1, {}, { JIG_CONDITION: "baseline" }),
+    ]);
+    const result = await importRecords(db, { records: where.records, now: NOW });
+    assert.deepEqual([result.calls, result.turns], [1, 1]);
+    db.close();
+    const again = open(t, where.index);
+    assert.deepEqual(
+        again
+            .prepare("SELECT condition FROM turn ORDER BY id")
+            .all()
+            .map((row) => row.condition),
+        ["baseline", null],
+    );
+    assert.equal(again.prepare("SELECT condition FROM call").get()?.condition, "baseline");
 });
 
 test("opening the index again changes nothing, and a rebuild makes the same indexes", async (t) => {

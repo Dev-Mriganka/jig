@@ -475,7 +475,7 @@ test("an unknown word shows the usage, and does nothing else", async (t) => {
     assert.deepEqual(notices, [
         {
             level: "warning",
-            text: "Usage: /lens [ticket KEY | session [id] | days N | usage | grafana | datasette | rebuild | status]",
+            text: "Usage: /lens [ticket KEY | session [id] | days N | compare [days N] | usage | grafana | datasette | rebuild | status]",
         },
     ]);
     assert.deepEqual([r.spawned, r.opened, r.probes], [[], [], []]);
@@ -501,7 +501,17 @@ test("the command is /lens, with completions for its words", (t) => {
     assert.ok(command?.description);
     const words = (prefix: string) =>
         (command.getArgumentCompletions?.(prefix) as Array<{ value: string }> | null)?.map((item) => item.value);
-    assert.deepEqual(words(""), ["ticket", "session", "days", "usage", "grafana", "datasette", "rebuild", "status"]);
+    assert.deepEqual(words(""), [
+        "ticket",
+        "session",
+        "days",
+        "compare",
+        "usage",
+        "grafana",
+        "datasette",
+        "rebuild",
+        "status",
+    ]);
     assert.deepEqual(words("u"), ["usage"]);
     assert.deepEqual(words("r"), ["rebuild"]);
     assert.deepEqual(words("st"), ["status"]);

@@ -2,6 +2,9 @@
 // summary.ts; this is only which blocks, and in which order.
 import type { DatabaseSync } from "node:sqlite";
 import type { SummaryCommand } from "./command.ts";
+import { compareBlock } from "./compare-format.ts";
+import { compareOf } from "./compare.ts";
+import { lastDays } from "./period.ts";
 import { activeTicket, hasRecords } from "./queries.ts";
 import { blockFor, daysRequest, sessionRequest, ticketRequest } from "./summary.ts";
 import type { Block, Request } from "./summary.ts";
@@ -47,4 +50,11 @@ export const NO_RECORDS: Block = {
 export function summaryFor(command: SummaryCommand, db: DatabaseSync, now: Date, session: string | undefined): Block[] {
     if (!hasRecords(db)) return [NO_RECORDS];
     return requestsFor(command, db, now, session).map((request) => blockFor(db, request, now));
+}
+
+/** The comparison of conditions over the last `days` days: its block, or the note that there are no records. */
+export function compareFor(db: DatabaseSync, now: Date, days: number): Block {
+    if (!hasRecords(db)) return NO_RECORDS;
+    const range = lastDays(now, days);
+    return compareBlock(compareOf(db, range.from, range.to), now, days);
 }

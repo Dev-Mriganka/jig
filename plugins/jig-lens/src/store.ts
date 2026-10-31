@@ -6,7 +6,8 @@
 import { chmodSync, closeSync, existsSync, mkdirSync, openSync, rmSync, statSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { SCHEMA } from "./fields.ts";
+import { CALL, columnSql, SCHEMA, TURN } from "./fields.ts";
+import type { Field } from "./fields.ts";
 
 /** How long a connection waits for another one's write to finish. Two Pi sessions may import at the same moment. */
 const BUSY_MS = 5000;
@@ -39,6 +40,29 @@ function whileBusy(step: () => void): void {
     }
 }
 
+/**
+ * Gives a table made by an earlier version the optional columns it lacks. `CREATE TABLE IF NOT EXISTS` leaves an
+ * existing table as it is, and SQLite adds a column without rewriting the rows, so an old index gains the column with
+ * no rebuild: its rows hold NULL there, which is what the record lines they came from said.
+ */
+function addMissingColumns(db: DatabaseSync, table: string, fields: readonly Field[]): void {
+    const present = new Set(
+        db
+            .prepare(`PRAGMA table_info(${table})`)
+            .all()
+            .map((row) => String(row.name)),
+    );
+    for (const field of fields) {
+        if (present.has(field.name) || field.required) continue;
+        try {
+            db.exec(`ALTER TABLE ${table} ADD COLUMN ${columnSql(field)}`);
+        } catch (error) {
+            // Another session added it between the check and here.
+            if (!/duplicate column name/i.test(String((error as Error).message))) throw error;
+        }
+    }
+}
+
 /** The files SQLite keeps for one database in WAL mode. */
 const FILES = ["", "-wal", "-shm"];
 
@@ -58,6 +82,8 @@ export function openIndex(file: string): DatabaseSync {
         db.exec("PRAGMA journal_mode = WAL");
         db.exec("PRAGMA synchronous = NORMAL");
         db.exec(SCHEMA);
+        addMissingColumns(db, "call", CALL);
+        addMissingColumns(db, "turn", TURN);
     });
     return db;
 }
