@@ -8,14 +8,11 @@
 // config.ts accepts nothing but a local one, so nothing is sent in clear text across a network. To reach a gateway that is not on
 // this machine, speak CONNECT and TLS to it instead (node:http's `connect` event, then node:tls).
 import { request as httpRequest } from "node:http";
-import type { IncomingHttpHeaders } from "node:http";
+
 import { hostAllowed } from "./hosts.ts";
 import type { JigApi, Transport, TransportRequest, TransportResponse } from "./jig/types.ts";
 
 export const GATEWAY_TRANSPORT = "acme-gateway";
-
-/** The most reply text that is read: the same as the default cap of `http.request`. A transport is not told the caller's own. */
-const MAX_BODY_BYTES = 4 * 1024 * 1024;
 
 export interface GatewayOptions {
     /** The address of the gateway, such as http://127.0.0.1:3128. Asked for every request. */
@@ -24,11 +21,13 @@ export interface GatewayOptions {
     hosts: readonly string[];
 }
 
-/** The reply's headers as text, in lower case (Node already lower-cases the names); a repeated header is folded. */
-function headersOf(raw: IncomingHttpHeaders): Record<string, string> {
-    const headers: Record<string, string> = {};
-    for (const [name, value] of Object.entries(raw)) {
-        if (value !== undefined) headers[name] = Array.isArray(value) ? value.join(", ") : value;
+/** The reply's headers, in lower case (Node already lower-cases the names). A header the gateway sent more than once, such as
+ *  `set-cookie`, is given as a list, one entry for each time, and jig-core folds it the way it folds a reply from the network. */
+function headersOf(raw: Readonly<Record<string, readonly string[] | undefined>>): Record<string, string | string[]> {
+    const headers: Record<string, string | string[]> = {};
+    for (const [name, values] of Object.entries(raw)) {
+        if (values === undefined || values.length === 0) continue;
+        headers[name] = values.length === 1 ? (values[0] as string) : [...values];
     }
     return headers;
 }
@@ -56,6 +55,10 @@ export function createGatewayTransport(options: GatewayOptions): Transport {
                 }
                 const target = new URL(request.url);
                 const proxy = options.proxy();
+                // The caller's limits: read no more than it will use, and give up when its time is over (the signal says so as
+                // well, so this only keeps a stalled gateway from holding the socket). One byte more than the caller's cap is
+                // read, so that jig-core can tell a reply of exactly that size from a longer one and set `truncated`.
+                const limit = request.maxBytes + 1;
                 const body = request.body === undefined ? undefined : Buffer.from(request.body, "utf8");
                 const call = httpRequest(
                     {
@@ -65,27 +68,30 @@ export function createGatewayTransport(options: GatewayOptions): Transport {
                         method: request.method,
                         path: request.url,
                         headers: forwarded(request, body, target),
+                        timeout: request.timeoutMs,
                         ...(signal === undefined ? {} : { signal }),
                     },
                     (reply) => {
                         const chunks: Buffer[] = [];
                         let size = 0;
                         reply.on("data", (chunk: Buffer) => {
-                            if (size >= MAX_BODY_BYTES) return;
-                            chunks.push(
-                                size + chunk.length > MAX_BODY_BYTES ? chunk.subarray(0, MAX_BODY_BYTES - size) : chunk,
-                            );
+                            if (size >= limit) return;
+                            chunks.push(size + chunk.length > limit ? chunk.subarray(0, limit - size) : chunk);
                             size += chunk.length;
                         });
                         reply.on("error", reject);
                         reply.on("end", () =>
                             resolve({
                                 status: reply.statusCode ?? 502,
-                                headers: headersOf(reply.headers),
+                                headers: headersOf(reply.headersDistinct),
                                 body: Buffer.concat(chunks).toString("utf8"),
                             }),
                         );
                     },
+                );
+                // A gateway that goes quiet for the caller's whole time limit.
+                call.on("timeout", () =>
+                    call.destroy(Object.assign(new Error("the gateway did not answer in time"), { code: "ETIMEDOUT" })),
                 );
                 // A refused or reset connection: say that the gateway failed, with its error code and nothing from the request.
                 call.on("error", (error: NodeJS.ErrnoException) =>

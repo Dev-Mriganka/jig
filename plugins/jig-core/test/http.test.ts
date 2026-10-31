@@ -871,10 +871,51 @@ describe("a transport", () => {
             url: base.url,
             headers: { Accept: "application/json" },
             body: "{}",
+            maxBytes: 8,
+            timeoutMs: 30_000,
         });
         assert.deepEqual([reply.body, reply.bytes, reply.truncated], ["01234567", 8, true]);
         assert.equal(reply.headers["x-total"], "3", "names are lower case");
         assert.deepEqual(reply.cookies, ["crumb=abc", "other=1"]);
+    });
+
+    test("is told the caller's byte and time limits, or the defaults, and is given the signal to honour", async () => {
+        const t = rig();
+        const seen: TransportRequest[] = [];
+        t.transports.set("company-proxy", (request) => {
+            seen.push(request);
+            return { status: 200, headers: {}, body: "" };
+        });
+        await t.http.request({ ...base, transport: "company-proxy", maxBytes: 100, timeoutMs: 2500 });
+        await t.http.request({ ...base, transport: "company-proxy" });
+        // The limits are clamped as they are for the network: from 1 byte and 1 ms, to 64 MiB and 10 minutes.
+        await t.http.request({ ...base, transport: "company-proxy", maxBytes: 10 ** 12, timeoutMs: 10 ** 9 });
+        assert.deepEqual(
+            seen.map((request) => [request.maxBytes, request.timeoutMs]),
+            [
+                [100, 2500],
+                [4 * 1024 * 1024, 30_000],
+                [64 * 1024 * 1024, 10 * 60_000],
+            ],
+        );
+    });
+
+    test("a repeated header returned as a list is folded for the tool, and a cookie list is kept whole", async () => {
+        const t = rig();
+        t.transports.set("company-proxy", () => ({
+            status: 200,
+            headers: {
+                "Set-Cookie": ["a=1; Expires=Wed, 21 Oct 2026 07:28:00 GMT; Path=/", "b=2; Path=/"],
+                "X-Trace": ["t-1", "t-2"],
+                Via: "proxy",
+            },
+            body: "",
+        }));
+        const reply = await t.http.request({ ...base, transport: "company-proxy" });
+        assert.deepEqual(reply.cookies, ["a=1", "b=2"]);
+        assert.equal(reply.headers["set-cookie"], "a=1; Expires=Wed, 21 Oct 2026 07:28:00 GMT; Path=/, b=2; Path=/");
+        assert.equal(reply.headers["x-trace"], "t-1, t-2");
+        assert.equal(reply.headers.via, "proxy");
     });
 
     test("an unknown transport is no_transport and notSent; a transport that fails is transport_failed, and may have sent", async () => {

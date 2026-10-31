@@ -131,6 +131,9 @@ that names it (`transport` in its section) holds no credential at all.
 
 - **A transport gets** the system, method, address, headers and a text body, and **returns** a status, headers in lower case and
   a text body. It carries `GET`, `POST`, `PUT`, `PATCH` and `DELETE` only.
+- **It is told the caller's limits:** `maxBytes` (read no more, and one byte past it so `truncated` can be set) and `timeoutMs`.
+  [`transport.ts`](../examples/jig-acme/src/transport.ts) stops reading at the first and drops a stalled gateway at the second.
+- **A header the gateway repeated is returned as a list** (`set-cookie` above all), one entry for each time it was sent.
 - **It fails with a line that names no address.** The address may hold a query, and `jig-core` never repeats it either.
 - **It honours the call's signal,** so a cancelled call stops the request.
 - **Nothing in clear text crosses a network.** The example accepts only a gateway on this machine, because it speaks plain http

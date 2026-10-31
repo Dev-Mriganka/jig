@@ -247,11 +247,21 @@ export interface TransportRequest {
     url: string;
     headers?: Readonly<Record<string, string>>;
     body?: string;
+    /** The most reply bytes the caller will read: the request's `maxBytes` (4 MiB when it gave none). jig-core cuts a
+     *  longer reply to this and sets `truncated`, so a transport may stop reading instead of buffering a reply that will be
+     *  thrown away. Stop one byte past it, not at it: a reply of exactly this many bytes and a longer one then look different. */
+    maxBytes: number;
+    /** How long the whole request may take, in milliseconds: the request's `timeoutMs` (30 s when it gave none). The
+     *  `signal` fires when it runs out, so a transport that honours the signal needs nothing more; this is for one that
+     *  sets a limit of its own, such as a socket's. */
+    timeoutMs: number;
 }
 
 export interface TransportResponse {
     status: number;
-    headers: Readonly<Record<string, string>>;
+    /** A header the reply repeated, such as `set-cookie`, may be given as a list, one entry for each time it was sent.
+     *  Names may be in any case; jig-core lower-cases them. */
+    headers: Readonly<Record<string, string | readonly string[]>>;
     body: string;
 }
 
