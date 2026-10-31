@@ -2,8 +2,18 @@
 // there; the actions, their names and their parameters are the same.
 import { forgeOf } from "./forge.ts";
 import type { GitlabHome, Home } from "./forge.ts";
-import { getMr, openMrFor, planComments, planList, planView } from "./gitlab-pr-read.ts";
+import { getMr, openMrFor, parseThread, planComments, planList, planView } from "./gitlab-pr-read.ts";
 import type { Gl } from "./gitlab-pr-read.ts";
+import {
+    planComment,
+    planCreate,
+    planEdit,
+    planMerge,
+    planReady,
+    planReply,
+    planResolve,
+    planReview,
+} from "./gitlab-pr-write.ts";
 import { checkBranch, checkNumber } from "./names.ts";
 import { startCommentWatch, watchingText } from "./pr-watch.ts";
 import type { Call, Planned } from "./previews.ts";
@@ -12,8 +22,7 @@ import type { Repo } from "./repo.ts";
 import { currentBranch } from "./run.ts";
 
 /** Whether a thread id has the shape of a GitLab one: the merge request, a colon, and the discussion. */
-export const looksLikeGitlabThread = (value: unknown): boolean =>
-    typeof value === "string" && /^\d{1,9}:[0-9a-f]{8,64}$/.test(value);
+export const looksLikeGitlabThread = (value: unknown): boolean => parseThread(value) !== undefined;
 
 /**
  * The forge of the repository a `pr` call means. The repository decides, never the call. A reply or a resolve names no
@@ -87,9 +96,25 @@ export function planGitlabPr(
             return planList(p, call, home);
         case "comments":
             return planComments(p, call, home);
+        case "create":
+            return planCreate(p, call, home);
+        case "edit":
+            return planEdit(p, call, home);
+        case "ready":
+            return planReady(p, call, home);
+        case "comment":
+            return planComment(p, call, home);
+        case "reply":
+            return planReply(p, call, home);
+        case "resolve":
+            return planResolve(p, call, home);
+        case "review":
+            return planReview(p, call, home);
+        case "merge":
+            return planMerge(p, call, home);
         case "watch":
             return planWatch(p, call, home);
         default:
-            throw new Error(`pr ${String(params.action)} on GitLab is not built yet`);
+            throw new Error(`pr: unknown action ${String(params.action)}`);
     }
 }

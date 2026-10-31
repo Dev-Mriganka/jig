@@ -305,6 +305,12 @@ export interface GlDiscussion {
 /** The thread a reply or a resolve takes: the merge request and the discussion, which GitLab needs both of. */
 export const threadId = (iid: number, discussion: string): string => `${iid}:${discussion}`;
 
+/** A thread id taken apart: the merge request number and the discussion. Undefined when the text is not one. */
+export function parseThread(value: unknown): { number: number; discussion: string } | undefined {
+    const found = typeof value === "string" ? /^(\d{1,9}):([0-9a-f]{8,64})$/.exec(value) : null;
+    return found ? { number: Number(found[1]), discussion: found[2] as string } : undefined;
+}
+
 const login = (note: GlNote): string => note.author?.username ?? "unknown";
 const MAX_CHARS = 60_000;
 
