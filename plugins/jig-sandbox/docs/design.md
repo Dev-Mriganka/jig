@@ -75,6 +75,15 @@ as not installed.
 `@anthropic-ai/sandbox-runtime` is pinned to an exact version at least two weeks old;
 it is still `0.0.x`. An upgrade is its own change, with the escape tests run on it.
 
+Versions taken, newest first:
+
+- **0.0.81** (published 2026-10-20). From its release notes: every change is on Windows (write-restricted
+  token, profile read grant, loopback mode, network fence fixes); nothing changes on Linux or macOS. All
+  553 `jig-sandbox` tests passed against the real sandbox. It was 11 days old when adopted, short of the
+  two-week rule, and was taken on purpose because the release cannot reach the Linux path.
+- **0.0.80**. On Linux a command can no longer create a user or mount namespace, `denyWrite` wins over
+  `allowWrite` however they nest, and the ask callback allows only on `true`.
+
 ## Mapping the rules onto the runtime
 
 | Rule | Runtime setting |
