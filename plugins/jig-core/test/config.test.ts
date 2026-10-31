@@ -163,7 +163,11 @@ describe("an unknown field is an error", () => {
         const masking = personal({ environments: { prod: { kind: "production", mask: false } } });
         assert.ok(masking.problems.some((problem) => problem.key === "environments.prod.mask"));
         const merged = buildEnvironments([
-            { source: FILE, environments: { production: { kind: "test" }, local: { kind: "production" } } },
+            {
+                source: FILE,
+                origin: "personal",
+                environments: { production: { kind: "test" }, local: { kind: "production" } },
+            },
         ]);
         assert.equal(merged.problems.length, 2);
         assert.equal(merged.environments.kindOf("production"), "production");
@@ -260,7 +264,9 @@ describe("a rule that would lower the floor is refused, with the file and the ke
     });
 
     test("floorViolation can be asked directly", () => {
-        const { environments } = buildEnvironments([{ source: FILE, environments: { prod: { kind: "production" } } }]);
+        const { environments } = buildEnvironments([
+            { source: FILE, origin: "personal", environments: { prod: { kind: "production" } } },
+        ]);
         assert.equal(floorViolation(rule({ environment: "local", effect: "write" }), environments), undefined);
         assert.notEqual(floorViolation(rule({ environment: "prod", effect: "write" }), environments), undefined);
     });

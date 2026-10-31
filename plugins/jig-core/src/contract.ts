@@ -12,6 +12,15 @@ export type EnvironmentName = string;
 /** The kind of an environment decides its default rules. */
 export type EnvironmentKind = "local" | "external" | "test" | "production";
 
+/** One environment as `environments.list()` gives it. */
+export interface EnvironmentInfo {
+    name: EnvironmentName;
+    kind: EnvironmentKind;
+    /** Who defined it: Jig itself, your `jig.json`, or a company plugin. When a later definition made it production, the one
+     *  that did. */
+    source: "built-in" | "personal" | "company";
+}
+
 export type Effect = "read" | "write";
 
 export type Decision = "allow" | "ask" | "deny";
@@ -507,6 +516,9 @@ export interface JigApi {
         /** The kind of an environment name: built in, configured or added by a company plugin. A name nobody defined
          *  counts as production. */
         kindOf(name: EnvironmentName): EnvironmentKind;
+        /** Every environment that is defined, with its kind and who defined it: the built-in ones first, then a company
+         *  plugin's, then yours. A name nobody defined is not in it (it counts as production). */
+        list(): readonly EnvironmentInfo[];
     };
 
     /** Tunnel providers a company plugin registers, for tools that need a network route of their own, such as a

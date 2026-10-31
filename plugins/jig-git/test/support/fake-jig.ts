@@ -215,6 +215,7 @@ export function installFakeJig(): FakeJig {
                     : name === "production" || name === "prod"
                       ? "production"
                       : "test",
+            list: () => [],
         },
         tunnels: {
             register: () => {},

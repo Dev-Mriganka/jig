@@ -73,6 +73,8 @@ export function jigAcme(): ExtensionFactory {
 - **A test environment can ask to be masked** with `mask: true`, as `staging` does because it holds copies of customer data.
 - **These are the names every plugin's settings use:** the keys of `logs.environments`, `mongo.connections` and
   `ops.services.*.environments`.
+- **`/jig` lists them,** grouped by who defined them (built in, a company plugin, your `jig.json`). A plugin reads the same list
+  with `environments.list()`, so a company plugin keeps no list of its own.
 
 ### 2. Section defaults
 
@@ -230,7 +232,7 @@ A company plugin is configuration, so its tests load the real thing and look at 
 - **Load the real `jig-core` and every plugin you configure** into the fake Pi that `jig-core`'s own tests use, with a `jig.json`
   in a temporary agent folder, then start a session. [`test/support/world.ts`](../examples/jig-acme/test/support/world.ts) does it.
 - **Check that nothing is reported** at start-up or in `/jig`, that each section you gave defaults for is valid, and that `/jig`
-  lists the environments and the company's status.
+  lists the environments (the company's among them) and the company's status.
 - **Check the layering** with small `jig.json` files: one change each, and what the plugin gets back. Cover each `replace` and
   `oneOf` key you rely on.
 - **Run the code against fakes.** A fake server on `127.0.0.1` for a sign-in service and a transport, and a fake `ssh` script first on

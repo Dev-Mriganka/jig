@@ -62,8 +62,10 @@ closed instead of running ungoverned.
   [Watches](watches.md)).
 - **`environments`** has `kindOf(name)`: the kind of an environment (`local`,
   `external`, `test` or `production`), built in, configured or added by a
-  company plugin.
-  - A name nobody defined counts as production.
+  company plugin. `list()` gives every defined environment as `{ name, kind,
+  source }`, where `source` is `built-in`, `company` or `personal`; `/jig`
+  shows the same list.
+  - A name nobody defined counts as production, and is not in the list.
   - A tool uses it to refuse an action by kind, such as never in production,
     whatever a company names its environments.
 - **`tunnels`** has `register(name, provider)` and `open(name, { host, port })`.

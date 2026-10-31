@@ -7,6 +7,7 @@ describe("environment kinds", () => {
     const { environments } = buildEnvironments([
         {
             source: "company",
+            origin: "company",
             environments: { staging: { kind: "test" }, qa: { kind: "test", mask: true }, prod: { kind: "production" } },
         },
     ]);
@@ -43,10 +44,63 @@ describe("environment kinds", () => {
     });
 });
 
+describe("the list of environments", () => {
+    test("the built-in names come first, then each defined name with its kind and who defined it", () => {
+        const { environments } = buildEnvironments([
+            {
+                source: "company",
+                origin: "company",
+                environments: { staging: { kind: "test" }, prod: { kind: "production" } },
+            },
+            { source: "/home/me/jig.json", origin: "personal", environments: { sandbox: { kind: "test" } } },
+        ]);
+        assert.deepEqual(environments.list(), [
+            { name: "local", kind: "local", source: "built-in" },
+            { name: "external", kind: "external", source: "built-in" },
+            { name: "production", kind: "production", source: "built-in" },
+            { name: "staging", kind: "test", source: "company" },
+            { name: "prod", kind: "production", source: "company" },
+            { name: "sandbox", kind: "test", source: "personal" },
+        ]);
+    });
+
+    test("a name both define is listed once, under whoever set its kind", () => {
+        const { environments } = buildEnvironments([
+            { source: "company", origin: "company", environments: { a: { kind: "test" }, b: { kind: "test" } } },
+            {
+                source: "/home/me/jig.json",
+                origin: "personal",
+                environments: { a: { kind: "test", mask: true }, b: { kind: "production" } },
+            },
+        ]);
+        const defined = environments.list().filter((entry) => entry.source !== "built-in");
+        assert.deepEqual(defined, [
+            { name: "a", kind: "test", source: "company" },
+            { name: "b", kind: "production", source: "personal" },
+        ]);
+    });
+
+    test("a refused definition is not listed, and a name nobody defined is not either", () => {
+        const { environments } = buildEnvironments([
+            {
+                source: "/home/me/jig.json",
+                origin: "personal",
+                environments: { local: { kind: "production" } },
+            },
+        ]);
+        assert.deepEqual(
+            environments.list().map((entry) => entry.name),
+            ["local", "external", "production"],
+        );
+        assert.equal(environments.list().find((entry) => entry.name === "local")?.kind, "local");
+    });
+});
+
 describe("masking", () => {
     const { environments } = buildEnvironments([
         {
             source: "company",
+            origin: "company",
             environments: { staging: { kind: "test" }, qa: { kind: "test", mask: true }, prod: { kind: "production" } },
         },
     ]);
@@ -71,9 +125,14 @@ describe("masking", () => {
 describe("layers", () => {
     test("a later layer can add a mask, but never remove one or lower production", () => {
         const merged = buildEnvironments([
-            { source: "company", environments: { a: { kind: "test", mask: true }, b: { kind: "production" } } },
+            {
+                source: "company",
+                origin: "company",
+                environments: { a: { kind: "test", mask: true }, b: { kind: "production" } },
+            },
             {
                 source: "personal",
+                origin: "personal",
                 environments: {
                     a: { kind: "test", mask: false },
                     b: { kind: "test" },
@@ -91,8 +150,8 @@ describe("layers", () => {
 
     test("a later layer can make a test environment production", () => {
         const merged = buildEnvironments([
-            { source: "company", environments: { x: { kind: "test" } } },
-            { source: "personal", environments: { x: { kind: "production" } } },
+            { source: "company", origin: "company", environments: { x: { kind: "test" } } },
+            { source: "personal", origin: "personal", environments: { x: { kind: "production" } } },
         ]);
         assert.equal(merged.environments.kindOf("x"), "production");
         assert.equal(merged.environments.masks("x"), true);
@@ -101,7 +160,11 @@ describe("layers", () => {
 
     test("the built-in names cannot be redefined", () => {
         const merged = buildEnvironments([
-            { source: "personal", environments: { local: { kind: "production" }, external: { kind: "test" } } },
+            {
+                source: "personal",
+                origin: "personal",
+                environments: { local: { kind: "production" }, external: { kind: "test" } },
+            },
         ]);
         assert.equal(merged.problems.length, 2);
         assert.equal(merged.environments.kindOf("local"), "local");

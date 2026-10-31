@@ -114,6 +114,7 @@ export function installFakeJig(): FakeJig {
         },
         environments: {
             kindOf: (name: string) => kinds.get(name) ?? "production",
+            list: () => [],
         },
         tunnels: {
             register: () => {},

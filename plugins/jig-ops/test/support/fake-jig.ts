@@ -215,6 +215,7 @@ export function installFakeJig(): FakeJig {
             // As in jig-core: a name nobody defined counts as production.
             kindOf: (name) =>
                 Object.hasOwn(environments, name) ? (environments[name] as EnvironmentKind) : "production",
+            list: () => [],
         },
         tunnels: {
             register: () => {},

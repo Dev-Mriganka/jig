@@ -314,6 +314,26 @@ describe("the API that plugins get", () => {
         withdrawJig(api);
     });
 
+    test("environments.list gives every defined environment with its kind and who defined it", () => {
+        const { api } = load();
+        assert.deepEqual(
+            api.environments.list().map((entry) => `${entry.name} ${entry.kind} ${entry.source}`),
+            ["local local built-in", "external external built-in", "production production built-in"],
+        );
+        api.config.addEnvironments({ staging: { kind: "test" }, prod: { kind: "production" } });
+        assert.deepEqual(
+            api.environments.list().map((entry) => `${entry.name} ${entry.kind} ${entry.source}`),
+            [
+                "local local built-in",
+                "external external built-in",
+                "production production built-in",
+                "staging test company",
+                "prod production company",
+            ],
+        );
+        withdrawJig(api);
+    });
+
     test("declareTool checks what it is given, and declaring a tool again replaces it", () => {
         const { api } = load();
         assert.throws(() => api.declareTool({ tool: "", plugin: "p", classify: () => undefined }), TypeError);

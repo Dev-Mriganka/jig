@@ -233,6 +233,25 @@ describe("/jig", () => {
         assert.match(status, /jig\.json: lens: lens\.port must be a number/);
     });
 
+    test("lists the environments by who defined them, with the kind of each that is not built in", async () => {
+        const harness = await begin({
+            config: { environments: { sandbox: { kind: "test" } } },
+            plugins: (api) => api.config.addEnvironments({ staging: { kind: "test" }, prod: { kind: "production" } }),
+        });
+        assert.match(
+            await jigCommand(harness),
+            /^Environments \(any other name counts as production\): built in: local, external, production; a company plugin: staging \(test\), prod \(production\); your jig\.json: sandbox \(test\)$/m,
+        );
+    });
+
+    test("shows only the built-in environments when nobody defined more", async () => {
+        const harness = await begin();
+        assert.match(
+            await jigCommand(harness),
+            /^Environments \(any other name counts as production\): built in: local, external, production$/m,
+        );
+    });
+
     test("an unknown word shows the usage", async () => {
         const harness = await begin();
         assert.match(await jigCommand(harness, "frobnicate"), /Usage: \/jig, \/jig rules \[tool\], \/jig records/);

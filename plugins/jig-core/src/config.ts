@@ -713,8 +713,8 @@ export function buildPolicy(
     const problems = [...personal.problems, ...company.problems];
 
     const merged = buildEnvironments([
-        { source: COMPANY, environments: company.environments },
-        { source: personal.file, environments: personal.config.environments },
+        { source: COMPANY, origin: "company", environments: company.environments },
+        { source: personal.file, origin: "personal", environments: personal.config.environments },
     ]);
     problems.push(...merged.problems);
 

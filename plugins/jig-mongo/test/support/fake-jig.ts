@@ -150,7 +150,7 @@ export function installFakeJig(): FakeJig {
                 return value;
             },
         },
-        environments: { kindOf: (name) => kinds.get(name) ?? "production" },
+        environments: { kindOf: (name) => kinds.get(name) ?? "production", list: () => [] },
         tunnels: {
             register: (name, provider) => tunnels.register(name, provider),
             open: (name, target, signal) => tunnels.open(name, target, signal),
