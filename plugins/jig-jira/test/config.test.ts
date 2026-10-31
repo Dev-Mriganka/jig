@@ -224,6 +224,35 @@ describe("auth is exactly one way", () => {
     });
 });
 
+describe("projects", () => {
+    test("a list of project keys, written in any case and kept in upper case", () => {
+        assert.deepEqual(settings({ ...cloud, projects: ["PROJ", "ops_2", " web "] }).projects, [
+            "PROJ",
+            "OPS_2",
+            "WEB",
+        ]);
+        assert.deepEqual(settings(cloud).projects, [], "none by default");
+        assert.deepEqual(settings({ ...cloud, projects: [] }).projects, []);
+    });
+
+    test("a mistake is named with its position", () => {
+        assert.deepEqual(validateJira({ ...cloud, projects: "PROJ" }), [
+            'jira.projects: must be a list of at most 50 project keys, such as ["PROJ"]',
+        ]);
+        assert.deepEqual(validateJira({ ...cloud, projects: ["PROJ", "PROJ-1", "", 7, "9ABC", "proj"] }), [
+            "jira.projects[1]: must be a project key such as PROJ",
+            "jira.projects[2]: must be a project key such as PROJ",
+            "jira.projects[3]: must be a project key such as PROJ",
+            "jira.projects[4]: must be a project key such as PROJ",
+            "jira.projects[5]: PROJ is listed twice",
+        ]);
+        assert.match(
+            validateJira({ ...cloud, projects: Array.from({ length: 51 }, (_, i) => `P${i}`) })[0] ?? "",
+            /^jira\.projects: must be a list of at most 50 project keys/,
+        );
+    });
+});
+
 describe("the other fields", () => {
     test("an unknown field is an error, not a silent default", () => {
         assert.deepEqual(validateJira({ ...cloud, updateField: ["summary"] }), ["jira.updateField: unknown field"]);

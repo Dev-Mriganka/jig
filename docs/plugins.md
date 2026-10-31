@@ -97,7 +97,7 @@ tested example that supplies a part for every plugin that has one:
 - **`jig-memory`:** ticket key patterns and the folder's location.
 - **`jig-mongo`:** its connections and routes (for example a tunnel through its
   own jump hosts), its production allow lists and secret references.
-- **`jig-jira`:** the Jira site and its sign-in.
+- **`jig-jira`:** the Jira site, its sign-in, and the project keys.
 - **`jig-logs`:** the log backend, its type and address, indexes or selectors,
   environment names and sign-in.
 - **`jig-api`:** where its collections live, how their environments map, and a

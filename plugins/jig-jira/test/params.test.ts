@@ -1,7 +1,7 @@
 // The parameters of the tool: one flat schema, a table of what each action takes, and errors that show the right usage.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { ACTION_NAMES, ACTIONS, isAction, parameters, parseCall, usage } from "../src/params.ts";
+import { ACTION_NAMES, ACTIONS, isAction, parameters, parseCall, projectsQuery, usage } from "../src/params.ts";
 import type { Call } from "../src/params.ts";
 
 const parse = (input: Record<string, unknown>): Call => parseCall(input);
@@ -71,6 +71,36 @@ describe("the schema", () => {
             for (const param of [...ACTIONS[name].required, ...ACTIONS[name].optional])
                 assert.ok(param in schema.properties, `${name} uses ${param}`);
         }
+    });
+});
+
+describe("a search with no JQL", () => {
+    test("is refused without projects, as it always was", () => {
+        assert.equal(
+            problem({ action: "search" }),
+            "jira search needs jql. Usage: jira search {jql, limit?, page?, include?}",
+        );
+        assert.throws(() => parseCall({ action: "search" }, { projects: [] }), /jira search needs jql/);
+    });
+
+    test("looks in the user's projects, newest first", () => {
+        assert.deepEqual(parseCall({ action: "search", limit: 5 }, { projects: ["PROJ", "OPS"] }), {
+            action: "search",
+            jql: 'project in ("PROJ", "OPS") ORDER BY updated DESC',
+            limit: 5,
+            page: undefined,
+            include: [],
+        });
+        assert.equal(projectsQuery(["PROJ"]), 'project in ("PROJ") ORDER BY updated DESC');
+    });
+
+    test("is not used when the call has its own JQL, which is sent as it is", () => {
+        const call = parseCall({ action: "search", jql: "assignee = currentUser()" }, { projects: ["PROJ"] });
+        assert.equal(call.action === "search" && call.jql, "assignee = currentUser()");
+    });
+
+    test("the projects open nothing else: other actions still need their parameters", () => {
+        assert.throws(() => parseCall({ action: "get" }, { projects: ["PROJ"] }), /jira get needs key/);
     });
 });
 

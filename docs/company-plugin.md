@@ -84,7 +84,7 @@ documents under "Configure".
 
 | Section | What jig-acme gives it |
 |---|---|
-| `jira` | The site, a Cloud login by token reference, the fields `update` may set, a default priority |
+| `jira` | The site, a Cloud login by token reference, the project keys, the fields `update` may set, a default priority |
 | `logs` | An OpenSearch backend behind the sign-in service, an index per environment, a list filter |
 | `mongo` | A connection per environment, a tunnel for two, a production allow list with a reference collection |
 | `api` | The folder of saved requests, and environment names, one of them through the transport |

@@ -204,6 +204,7 @@ describe("the README", () => {
         assert.deepEqual(documented, [
             "site",
             "auth",
+            "projects",
             "updateFields",
             "fields",
             "createDefaults",
