@@ -50,9 +50,9 @@ Pi's `write`. A name alone matches every action of the tool.
   does not escape a hold, and `../` is folded away.
 - **A per-repository condition** (`tests-pass-at-head`, `review-done`, `pull-request-open`,
   `checks-pass`) is checked for that repository alone, so a push of one is not held by another's tests.
-- **The reason** names the workflow, the ticket, the condition and what is missing, and the action that
-  fixes it: `held by workflow feature on PROJ-123: tests-pass-at-head is not met for orders-api (no test
-  run at 1a2b3c4); run workflow test`.
+- **The reason** names the workflow, the ticket, the call, the condition, what is missing and the action that
+  fixes it: `held by workflow feature on PROJ-123: git push waits for tests-pass-at-head, which is not met:
+  orders-api: no test run at 1a2b3c4: run workflow test`.
 - **A hold is in force from the start,** whatever the stage, and ends when its condition holds. If the
   condition stops holding (an edited plan, a new commit), the hold is back. `status` lists them.
 
