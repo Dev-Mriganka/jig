@@ -1,0 +1,112 @@
+# Dependabot keeps every dependency on its latest stable release, as exact pins (see AGENTS.md, "Dependencies").
+#
+# - Weekly. Patch and minor updates of a folder come as one grouped PR; each major comes as its own PR, so a
+#   breaking change is reviewed alone.
+# - The cooldown lets a new release age before Dependabot proposes it: 3 days for patch and minor, 7 for a
+#   major. A release that is pulled or found broken usually is within that time.
+# - @anthropic-ai/sandbox-runtime is security-critical and still 0.0.x: its update is always a PR of its own,
+#   and CI runs the real-sandbox tests on it (plugins/jig-sandbox/docs/design.md, "Pinned, and upgraded on purpose").
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    versioning-strategy: increase
+    cooldown:
+      default-days: 3
+      semver-patch-days: 3
+      semver-minor-days: 3
+      semver-major-days: 7
+    labels:
+      - dependencies
+    groups:
+      sandbox-runtime:
+        patterns:
+          - "@anthropic-ai/sandbox-runtime"
+      patch-and-minor:
+        update-types:
+          - patch
+          - minor
+
+  - package-ecosystem: npm
+    directory: /plugins/jig-review/web
+    schedule:
+      interval: weekly
+    versioning-strategy: increase
+    cooldown:
+      default-days: 3
+      semver-patch-days: 3
+      semver-minor-days: 3
+      semver-major-days: 7
+    labels:
+      - dependencies
+      - jig-review
+    groups:
+      patch-and-minor:
+        update-types:
+          - patch
+          - minor
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
+      semver-patch-days: 3
+      semver-minor-days: 3
+      semver-major-days: 7
+    labels:
+      - dependencies
+      - github-actions
+    groups:
+      patch-and-minor:
+        update-types:
+          - patch
+          - minor
+
+  # Service images for the integration tests live in compose files. Dependabot does not recurse, so each folder
+  # has its own entry. The "previous" folder tests the older release line and must stay on it.
+  - package-ecosystem: docker-compose
+    directory: /.github/integration
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
+      semver-patch-days: 3
+      semver-minor-days: 3
+      semver-major-days: 7
+    labels:
+      - dependencies
+      - docker
+    groups:
+      patch-and-minor:
+        update-types:
+          - patch
+          - minor
+
+  - package-ecosystem: docker-compose
+    directory: /.github/integration/previous
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
+      semver-patch-days: 3
+      semver-minor-days: 3
+      semver-major-days: 7
+    labels:
+      - dependencies
+      - docker
+    groups:
+      patch-and-minor:
+        update-types:
+          - patch
+          - minor
+    ignore:
+      - dependency-name: docker.elastic.co/elasticsearch/elasticsearch
+        update-types: ["version-update:semver-major"]
+      - dependency-name: opensearchproject/opensearch
+        update-types: ["version-update:semver-major"]
+      - dependency-name: mongo
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]

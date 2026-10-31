@@ -71,5 +71,12 @@ changes, the other changes in the same commit. Tests read the tool tables of
   block) is built at run time from parts, such as `["PMAK", "1a2b"].join("-")`.
   Push protection rejects a commit that holds one, and history must then be
   rewritten. `plugins/jig-core/test/no-secret-literals.test.ts` checks this.
+- **Dependencies:** every npm dependency, in the root and in `plugins/jig-review/web`, is on its latest stable
+  release (no pre-release) and pinned to an exact version, with no `^` or `~`. Dependabot
+  (`.github/dependabot.yml`) opens a weekly PR for patch and minor updates together and one PR per major, and waits
+  3 days (7 for a major) after a release before proposing it. `@anthropic-ai/sandbox-runtime` is `0.0.x` and
+  security-critical: its update is its own change, with the real-sandbox tests run and the version noted in
+  `plugins/jig-sandbox/docs/design.md`. TypeScript is the native 7.x compiler: it has no programmatic API, so no
+  code here may `import "typescript"`. Pi's packages stay peer dependencies (`*`).
 - **Git:** clear commit messages, no `Co-Authored-By` lines. Push only when
   asked.

@@ -20,8 +20,7 @@
             "@earendil-works/pi-ai": ["./.pi-host/node_modules/@earendil-works/pi-ai/dist/index.d.ts"],
             "@earendil-works/pi-tui": ["./.pi-host/node_modules/@earendil-works/pi-tui/dist/index.d.ts"],
             "@earendil-works/pi-agent-core": ["./.pi-host/node_modules/@earendil-works/pi-agent-core/dist/index.d.ts"]
-        },
-        "baseUrl": "."
+        }
     },
     "include": ["plugins/**/*.ts", "examples/**/*.ts", "test/**/*.ts"],
     "exclude": ["plugins/jig-review/web"]

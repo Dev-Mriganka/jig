@@ -4,6 +4,7 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 
 ## Contents
 
+- [2026-10-31: every dependency is on its latest stable release, pinned, and kept there by Dependabot](#2026-10-31-every-dependency-is-on-its-latest-stable-release-pinned-and-kept-there-by-dependabot)
 - [2026-10-31: CI runs the latest and the previous line of every service, and MongoDB starts by a setting](#2026-10-31-ci-runs-the-latest-and-the-previous-line-of-every-service-and-mongodb-starts-by-a-setting)
 - [2026-10-31: big files are split by job, big plugins have a code map, and growth is a warning](#2026-10-31-big-files-are-split-by-job-big-plugins-have-a-code-map-and-growth-is-a-warning)
 - [2026-10-31: jig-workflow: test variables, tests outside the sandbox, and folders that add up](#2026-10-31-jig-workflow-test-variables-tests-outside-the-sandbox-and-folders-that-add-up)
@@ -43,6 +44,22 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 - [2026-10-30: jig-git's tools, and a watch that knows when it is done](#2026-10-30-jig-gits-tools-and-a-watch-that-knows-when-it-is-done)
 - [2026-10-30: built clean, beside the existing harness](#2026-10-30-built-clean-beside-the-existing-harness)
 - [Earlier decisions that still hold (2026-10-29)](#earlier-decisions-that-still-hold-2026-10-29)
+
+## 2026-10-31: every dependency is on its latest stable release, pinned, and kept there by Dependabot
+
+- **Latest stable, exact pins.** All npm dependencies of the root and of the review page moved to their latest
+  release, including TypeScript 7.0 (the native compiler), Vitest 5, Biome 2.6, `@types/node` 26 and
+  `@anthropic-ai/sandbox-runtime` 0.0.81. No `^` or `~`: the lock file and `package.json` agree, and an upgrade is
+  a visible change.
+- **Dependabot keeps it there.** Weekly, patch and minor together in one PR, each major alone, with a cooldown of
+  3 days (7 for a major) so a bad release is pulled before it reaches us. The sandbox runtime is its own PR.
+- **What the upgrades forced.** TypeScript 7 removed `baseUrl` (the `paths` were already relative) and checks
+  side-effect imports, so the review page loads `vite/client` types for its CSS imports. Biome 2.6 formats Markdown
+  and YAML by default; both are turned off here, as they would rewrite most docs and the workflow file. Vitest 5
+  and `@types/node` 26 needed nothing.
+- **Sandbox runtime 0.0.81** was adopted 11 days after release, short of the two-week rule in the sandbox design
+  doc, because its release notes list Windows-only changes. The doc records it.
+- **Not held back:** nothing. TypeScript 7 works for both the plugins and the review page.
 
 ## 2026-10-31: CI runs the latest and the previous line of every service, and MongoDB starts by a setting
 
