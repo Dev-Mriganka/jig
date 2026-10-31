@@ -86,7 +86,9 @@ jobs:
       ES_IMAGE: docker.elastic.co/elasticsearch/elasticsearch:8.19.23@sha256:4d0724bb8d78d7a2330693623e26ca4d621079d062ecc8a30b3e1fc180ec14c1
       OPENSEARCH_IMAGE: opensearchproject/opensearch:2.19.7@sha256:3bfa1ec74d56928c2e018033d45c460ce2c0ea65a5cedd577de3102326c31b89
       LOKI_IMAGE: grafana/loki:3.7.9@sha256:0db216b630ae1f348a1584c67f3cead8b4c1fc839169a39501db664744158e28
-      MONGO_IMAGE: mongo:8.0.34@sha256:b9924c330a8bbc5800fe9c69f04a84e221eca7b28fd049a0354147d9908fa142
+      # MongoDB 7.0: the 8.x releases exit at start-up on the runner's Linux kernel (6.19 and later), and only 7.0 starts on every
+      # kernel (https://jira.mongodb.org/browse/SERVER-125742 has the table of versions and kernels).
+      MONGO_IMAGE: mongo:7.0.45@sha256:8bb4442761a63a8dda452744082cdac9644b429807eb977b42324a63cef59ca4
       HTTPBIN_IMAGE: mccutchen/go-httpbin:2.26.0@sha256:873b4fdb27fe7cc66fa12cb9362574e1b0bf31df7ca8a71b2502988327a0b8a4
       KEYCLOAK_IMAGE: quay.io/keycloak/keycloak:26.8.1@sha256:a78d6b79572168cb25886b80a8b5b8d4ed4390743e3eecb810538683e209dd6b
       SSH_IMAGE: linuxserver/openssh-server:10.3_p1-r1-ls240@sha256:b07414bb329b86a00525c9256711a7855fc3a369e9f62c36f1de8d1923197580
@@ -180,24 +182,42 @@ jobs:
       - name: Set up the replica set and wait for the jump host
         if: ${{ !cancelled() }}
         run: |
+          # Waits until a command succeeds. A container that has stopped ends the wait at once, with its log, so a member that
+          # cannot start fails this step in seconds and not after all the time it would have waited.
+          wait_until() {
+            local what=$1
+            shift
+            for _ in $(seq 1 90); do
+              if "$@" > /dev/null 2>&1; then return 0; fi
+              for name in mongo1 mongo2 mongo3 jump; do
+                if [ "$(docker inspect -f '{{.State.Running}}' "$name")" != true ]; then
+                  echo "::error::$name stopped while waiting for $what"
+                  docker logs --tail 60 "$name" 2>&1
+                  return 1
+                fi
+              done
+              sleep 2
+            done
+            echo "::error::gave up waiting for $what"
+            return 1
+          }
           mongo() { docker exec "$1" mongosh --quiet -u root -p "$JIG_IT_MONGO_PASSWORD" --authenticationDatabase admin --eval "$2"; }
           # The image first starts a mongod of its own to make the root user. Only after it says so is the real one coming up.
+          initialised() { docker logs "$1" 2>&1 | grep -q "MongoDB init process complete"; }
+          answers() { mongo "$1" 'db.hello().ok'; }
+          is_primary() { [ "$(mongo mongo1 'db.hello().isWritablePrimary')" = true ]; }
+          reads() {
+            docker exec "$1" mongosh --quiet -u agent-readonly -p "$JIG_IT_MONGO_PASSWORD" --authenticationDatabase admin \
+              --eval 'db.hello().ok'
+          }
+          host_key() { [ -n "$(ssh-keyscan -p 2222 127.0.0.1 2>/dev/null)" ]; }
           for n in 1 2 3; do
-            for _ in $(seq 1 90); do
-              docker logs "mongo$n" 2>&1 | grep -q "MongoDB init process complete" && break
-              sleep 2
-            done
-            for _ in $(seq 1 60); do
-              mongo "mongo$n" 'db.hello().ok' > /dev/null 2>&1 && break
-              sleep 2
-            done
+            wait_until "mongo$n to finish its set-up" initialised "mongo$n"
+            wait_until "mongo$n to answer" answers "mongo$n"
           done
           mongo mongo1 'rs.initiate({_id: "rs0", members: [
             {_id: 0, host: "mongo1:27017", priority: 10}, {_id: 1, host: "mongo2:27017"}, {_id: 2, host: "mongo3:27017"}]}).ok'
-          for _ in $(seq 1 60); do
-            [ "$(mongo mongo1 'db.hello().isWritablePrimary' 2>/dev/null)" = true ] && break
-            sleep 2
-          done
+          wait_until "mongo1 to be the primary" is_primary
           mongo mongo1 "
             const admin = db.getSiblingDB('admin');
             const options = {w: 'majority'};
@@ -205,16 +225,10 @@ jobs:
               roles: ['readWriteAnyDatabase', 'dbAdminAnyDatabase', 'clusterMonitor']}, options);
             admin.createUser({user: 'agent-readonly', pwd: '$JIG_IT_MONGO_PASSWORD', roles: ['readAnyDatabase']}, options);"
           # The users are on every member, so a read from a secondary can sign in.
-          for n in 1 2 3; do
-            for _ in $(seq 1 60); do
-              docker exec "mongo$n" mongosh --quiet -u agent-readonly -p "$JIG_IT_MONGO_PASSWORD" --authenticationDatabase admin \
-                --eval 'db.hello().ok' > /dev/null 2>&1 && break
-              sleep 2
-            done
-          done
+          for n in 1 2 3; do wait_until "the users to reach mongo$n" reads "mongo$n"; done
           mongo mongo1 'rs.status().members.map((m) => m.name + " " + m.stateStr).join(", ")'
           mongo mongo1 'db.version()'
-          for _ in $(seq 1 60); do ssh-keyscan -p 2222 127.0.0.1 > /dev/null 2>&1 && break; sleep 2; done
+          wait_until "the jump host to answer" host_key
           ssh-keyscan -v -p 2222 127.0.0.1 2>&1 | grep -i "remote software version" | head -1
           ssh -V
 

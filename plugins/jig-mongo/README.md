@@ -1,6 +1,6 @@
 # jig-mongo: MongoDB, with reads, writes, indexes and aggregation
 
-**Status: built.** Every action below is tested against fakes, and in CI against a real MongoDB 8.0 replica set, reached directly, through an
+**Status: built.** Every action below is tested against fakes, and in CI against a real MongoDB 7.0 replica set, reached directly, through an
 SSH forward and through a SOCKS tunnel (`ssh -D`) to a real SSH server. What is still unproved is in
 [Not verified yet](docs/not-verified.md).
 

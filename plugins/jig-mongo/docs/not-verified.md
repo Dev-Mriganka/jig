@@ -14,7 +14,7 @@ against a server of your own when `JIG_TEST_MONGO_URI` is set.
 
 ## Verified in CI
 
-A three-member MongoDB 8.0 replica set with authentication, and an OpenSSH 10.3 server on the same Docker network. The members are
+A three-member MongoDB 7.0 replica set with authentication, and an OpenSSH 10.3 server on the same Docker network. The members are
 named `mongo1` to `mongo3`, which only that network can look up, so the routes are the only way to them.
 
 | What | Proved by |
@@ -38,7 +38,9 @@ named `mongo1` to `mongo3`, which only that network can look up, so the routes a
 
 Not tried:
 
-- **A server that is not that one.** A managed service (Atlas, DocumentDB and the like), a sharded cluster, an older server, and TLS.
+- **A server that is not that one.** MongoDB 8.x (CI runs 7.0, because the 8.x releases exit at start-up on Linux kernel 6.19 and later,
+  which the runner has; the same tests passed on 8.0.34 on this machine, whose kernel is older), a managed service (Atlas, DocumentDB and
+  the like), a sharded cluster, an older server, and TLS.
 - **The shapes of `explain`** beyond a find with and without an index: an aggregation, the slot-based engine and a sort. The plan summary was
   written from the documented shapes.
 - **`$collStats` on a managed service,** and a view, which has no storage statistics.

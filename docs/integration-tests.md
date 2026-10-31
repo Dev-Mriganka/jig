@@ -105,7 +105,8 @@ Each makes a database of its own and drops it at the end.
 | `JIG_IT_SSH_KEY_FILE` | The private key of that user, an unencrypted file |
 | `JIG_IT_MONGO_MEMBERS_HIDDEN` | Set it when this machine cannot look up the members; the check for that then must not skip |
 
-- **The replica set** has three members with a key file and authentication, named `mongo1` to `mongo3` on a Docker network. The
+- **The replica set** is MongoDB 7.0, because the 8.x releases refuse to start on Linux kernel 6.19 and later, as the runner's is
+  (SERVER-125742). It has three members with a key file and authentication, named `mongo1` to `mongo3` on a Docker network. The
   official image makes the root user when it starts, the workflow starts the set, and `agent` and `agent-readonly` are made with
   `readWriteAnyDatabase`, `dbAdminAnyDatabase` and `clusterMonitor`, and with `readAnyDatabase`.
 - **The jump host** is an OpenSSH server in a container on that network, with TCP forwarding switched on and the workflow's
