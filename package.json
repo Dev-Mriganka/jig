@@ -42,6 +42,7 @@
             "./plugins/jig-sandbox/src/index.ts",
             "./plugins/jig-memory/src/index.ts",
             "./plugins/jig-workflow/src/index.ts",
+            "./plugins/jig-agents/src/index.ts",
             "./plugins/jig-git/src/index.ts",
             "./plugins/jig-lens/src/index.ts",
             "./plugins/jig-jira/src/index.ts",
