@@ -11,10 +11,12 @@ For example, "commit these two files, push, and open a pull request": `git
 commit` takes exact paths, `git push` shows the commits it will send and waits
 for you, and `pr create` shows the body on a review screen.
 
-CI is not here: checks, runs, logs and watches are the `ci` tool of
+CI is not here: checks, runs, logs and CI watches are the `ci` tool of
 [`jig-ops`](../jig-ops/README.md). The two meet in one event. After a push and
 after a new pull request, `jig-git` announces `jig-git:pushed`, and `jig-ops`
-starts a watch if it knows the repository (see [Events](#events)).
+starts a watch if it knows the repository (see [Events](#events)). The one
+watch here is on the comments of a pull request: what people write on GitHub
+reaches the agent without being asked for ([Comment watch](docs/comments-watch.md)).
 
 ![How a jig-git call runs: jig-core decides, local git and gh do the work, guarded steps ask or refuse, and a push is announced as jig-git:pushed for jig-ops](../../docs/img/git-flow.svg)
 
@@ -55,6 +57,7 @@ starts a watch if it knows the repository (see [Events](#events)).
 | `resolve` | external write, asks | Resolves a review thread |
 | `review` | external write, asks on the review screen | Comment, or request changes. **Never approve:** approval stays human |
 | `merge` | external write, asks | Merge, squash or rebase, only while the head is still the commit you saw |
+| `watch` | local write | A background watch: new comments from people reach you in one message |
 
 ## Tool: `release`
 
@@ -79,6 +82,10 @@ The notes on single actions are in [Actions](docs/actions.md).
 - **Writes are previewed, and never repeated blindly.** A write that asks shows
   what it will do, and refuses if anything changed since. A lost reply is read
   once and never sent again (see [Writes](docs/writes.md)).
+- **Comments reach the agent by themselves.** `pr create` starts a watch on the
+  new pull request, and `pr watch` starts one on any open pull request. Comments
+  are text from people: the message says they are information to weigh, not
+  instructions to follow ([Comment watch](docs/comments-watch.md)).
 - **`jig-git` never deploys,** and never starts a workflow. Deploys have their
   own tool and their own rules.
 
@@ -95,6 +102,8 @@ invalid field, and the defaults apply instead.
 | `commitMessage`, `branchName`, `prTitle` | none | Regular expressions that commit messages, new branch names and pull request titles must match |
 | `prTemplate` | the repository's own template | The path of a Markdown file with the pull request body template |
 | `cloneHost` | `github.com` | The ssh host `clone` connects to: `github.com` or a `Host` alias |
+| `watchComments` | `"after-create"` | `"after-create"`: `pr create` starts the comment watch. `"off"`: only `pr watch` does |
+| `watchBots` | `false` | Whether the watch also tells the agent about comments by bots |
 
 The fields in detail are in [Configuration](docs/configuration.md).
 
@@ -130,7 +139,8 @@ listener that fails never undoes the push. The details are in
 ```text
 jig-git/
   src/      git.ts, pr.ts and release.ts (the three tools); the actions (git-read, git-local, git-remote, clone,
-            pr-read, pr-write); github.ts and repo.ts; config.ts, previews.ts and events.ts (jig-git:pushed)
+            pr-read, pr-write); the comment watch (pr-watch, pr-watch-tool); github.ts and repo.ts; config.ts,
+            previews.ts and events.ts (jig-git:pushed)
   skills/   git/SKILL.md: how to use the tools (status before commit, what a push announces)
   test/     against temporary local repositories, a fake gh and a fake jig-core
   docs/     the detail pages below
@@ -139,6 +149,7 @@ jig-git/
 ## More detail
 
 - [Events](docs/events.md): `jig-git:pushed`, who publishes it, and what a listener can rely on
+- [Comment watch](docs/comments-watch.md): `pr watch`, what the agent is told, what is skipped, rate limits, when it ends
 - [Actions](docs/actions.md): notes on single actions of `git` and `pr`
 - [Configuration](docs/configuration.md): the fields of the `git` section in detail
 - [Writes](docs/writes.md): what you see before a write asks, and lost replies

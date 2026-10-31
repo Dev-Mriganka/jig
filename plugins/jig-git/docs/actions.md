@@ -23,3 +23,6 @@ overview.
   must match `git.prTitle` when that is set, and so must the title of an `edit`
   (see [Configuration](configuration.md)).
 - **`merge`** can also turn on auto-merge.
+- **`watch`** starts the background watch on a pull request's comments
+  ([Comment watch](comments-watch.md)). It takes a `number`, a `branch` or neither
+  (the checked-out branch), and refuses a pull request that is not open.

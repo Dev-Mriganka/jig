@@ -66,7 +66,12 @@ describe("a read in production", () => {
             ok(result),
             'mongo find production orders.orders: 1 document\n{"_id":1,"status":"open","items":[{"sku":"a"}]}',
         );
-        assert.deepEqual((h.backend.calls[0]!.query as any).projection, { _id: 1, status: 1, items: 1, createdAt: 1 });
+        assert.deepEqual((h.backend.of("find")[0]!.query as any).projection, {
+            _id: 1,
+            status: 1,
+            items: 1,
+            createdAt: 1,
+        });
         assert.deepEqual(h.connects[0], {
             environment: "production",
             uri: "mongodb://db.example.com:27017",

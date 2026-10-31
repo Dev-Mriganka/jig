@@ -125,12 +125,26 @@ export interface WatchResult {
     facts?: Facts;
 }
 
+/** News for the agent while a watch goes on, such as new comments on a pull request. */
+export interface WatchUpdate {
+    /** One line for the agent and the user. */
+    summary: string;
+    /** More lines, up to 40, such as the text of the news. jig-core masks and redacts them. */
+    details?: string;
+    links?: readonly string[];
+}
+
 /** One poll of a watch. */
 export interface PollOutcome<State> {
     /** Saved with the watch, so polling resumes where it stopped after Pi restarts. */
     state: State;
     /** Set when the finish line is reached. */
     done?: WatchResult;
+    /**
+     * Tells the agent now, in a message of its own, and the watch goes on. Send it with the state that remembers what it
+     * says, so the next poll does not say it again. A poll that is also `done` sends its update first, in the same message.
+     */
+    update?: WatchUpdate;
     /** The next poll sooner or later than the kind's interval, such as GitHub's `X-Poll-Interval`. */
     nextPollMs?: number;
 }
@@ -550,6 +564,16 @@ export interface JigApi {
          *  something of its own (a sandbox asking about a host) never opens a question over one of jig-core's. A job
          *  that fails does not stop the ones behind it. */
         inTurn<T>(job: () => Promise<T>): Promise<T>;
+    };
+
+    /**
+     * Lines for `/jig` that a plugin wants the user to see about its own state, such as a safety check that the user turned
+     * off. Always present in `jig-core`; optional here only so that a test's stand-in for `jig-core` need not have it.
+     */
+    readonly status?: {
+        /** `lines` is asked each time `/jig` runs, and returns nothing when there is nothing to say. Each line is cut to one
+         *  line of 300 characters. Registering the same `plugin` again replaces its lines. */
+        register(plugin: string, lines: () => readonly string[]): void;
     };
 
     /** Runs programs from an argument list, never a shell. */

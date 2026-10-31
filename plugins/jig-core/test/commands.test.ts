@@ -91,6 +91,29 @@ describe("/jig", () => {
         assert.match(status, /Configuration: none found \(.*jig\.json\), defaults apply/);
     });
 
+    test("shows the lines plugins registered for it, one line each; a plugin that fails is named and the others still show", async () => {
+        const harness = await begin({
+            plugins: (api) => {
+                api.status?.register("jig-test", () => ["jig-test: a check is off\nby your setting", "x".repeat(400)]);
+                api.status?.register("quiet", () => []);
+                api.status?.register("broken", () => {
+                    throw new Error("secret detail");
+                });
+                api.status?.register("replaced", () => ["the first"]);
+                api.status?.register("replaced", () => ["the second"]);
+            },
+        });
+        const status = await jigCommand(harness);
+        assert.match(status, /\njig-test: a check is off by your setting\n/);
+        assert.match(status, new RegExp(`\\n${"x".repeat(299)}…\\n`));
+        assert.match(status, /\nbroken: its status could not be read\n/);
+        assert.ok(!status.includes("secret detail"));
+        assert.ok(!status.includes("the first"));
+        assert.match(status, /\nthe second$/);
+        assert.throws(() => harness.api.status?.register("", () => []), /the plugin needs a name/);
+        assert.throws(() => harness.api.status?.register("x", "no" as never), /lines must be a function/);
+    });
+
     test("counts the open watches, and says which of them are paused or wait for their plugin", async () => {
         // A watch this session saved before Pi was closed, whose plugin is not loaded now.
         const earlier = rig();

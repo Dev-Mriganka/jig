@@ -259,7 +259,14 @@ describe("waking the agent from real output", () => {
             notifyOn: { ready: ["Listening on"] },
         });
         await until(() => wake(s).length > 0, 8000, "the ready message");
-        await new Promise((resolve) => setTimeout(resolve, 600));
+        // Wait for the second matching line to be in the log rather than for a fixed time: on a loaded machine the task's
+        // output can lag, and the point is that the second match does not wake the agent again.
+        await until(
+            async () => (await s.tool("bg_output", { id: "bg-1", tail: 5 })).text.includes("again"),
+            8000,
+            "the second ready line",
+        );
+        await new Promise((resolve) => setTimeout(resolve, 300));
         assert.equal(wake(s).length, 1, "ready matches once per task");
         const message = wake(s)[0];
         assert.deepEqual(message?.options, { deliverAs: "followUp", triggerTurn: true });
@@ -279,13 +286,16 @@ describe("waking the agent from real output", () => {
             notifyOn: { error: ["ERROR"] },
         });
         await until(() => wake(s).length > 0, 8000, "the error message");
-        await new Promise((resolve) => setTimeout(resolve, 400));
+        // All three lines counted, however long the output took on a loaded machine; then still one message.
+        await until(
+            async () => /3 error matches/.test((await s.tool("bg_list", {})).text),
+            8000,
+            "all three errors counted",
+        );
         assert.equal(wake(s).length, 1);
         const content = String(wake(s)[0]?.message.content);
         assert.match(content, /ERROR, matched \/ERROR\/ at \d+s \(still running\)\./);
         assert.match(content, /Matched line: ERROR one/);
-        const list = await s.tool("bg_list", {});
-        assert.match(list.text, /3 error matches/, "all three were counted");
     });
 
     test("the end of the task wakes the agent with how it ended", async () => {

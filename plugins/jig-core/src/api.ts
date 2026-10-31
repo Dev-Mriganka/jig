@@ -192,6 +192,17 @@ export function buildApi(state: JigState): JigApi {
             inTurn: (job) => state.approvals.inTurn(job),
         },
 
+        status: {
+            register(plugin, lines) {
+                if (typeof plugin !== "string" || plugin === "") {
+                    throw new TypeError("status.register: the plugin needs a name");
+                }
+                if (typeof lines !== "function")
+                    throw new TypeError(`status.register(${plugin}): lines must be a function`);
+                state.statusLines.set(plugin, lines);
+            },
+        },
+
         exec: {
             run: (file, args, options) => run(file, args, options, guard),
             git: (repo, args, options) => git(repo, args, options, guard),

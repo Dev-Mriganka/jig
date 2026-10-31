@@ -477,8 +477,12 @@ test("create announces the new pull request, so a watch on the pushed commit can
         { repo: `acme/${r.name}`, branch: "feature/one", sha: head },
         { repo: `acme/${r.name}`, branch: "feature/one", sha: head, pr: 77 },
     ]);
-    assert.equal(h.jig.started.length, 0, "jig-git starts no watch");
-    assert.doesNotMatch(text, /Watching/);
+    // jig-git starts no CI watch: the one watch it starts is on the comments of the new pull request (see pr-watch.test.ts).
+    assert.deepEqual(
+        h.jig.started.map((watch) => watch.kind),
+        ["pr-comments"],
+    );
+    assert.match(text, /\nWatching the comments on pull request 77 in acme\/svc\d+ as w1\./);
 });
 
 // ---- a lost reply -------------------------------------------------------------------------------------------------
@@ -937,7 +941,7 @@ test("a call the action does not take, or lacks what it needs, is refused with t
     );
     assert.match(
         (await h.call("pr", { action: "approve" })).error?.message ?? "",
-        /^pr: unknown action "approve"; use one of view, list, comments, create, edit, ready, comment, reply, resolve, review, merge$/,
+        /^pr: unknown action "approve"; use one of view, list, comments, create, edit, ready, comment, reply, resolve, review, merge, watch$/,
     );
     assert.equal(h.gh.calls().length, 0, "no gh call was made");
 });

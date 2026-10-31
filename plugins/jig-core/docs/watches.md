@@ -30,9 +30,11 @@ The actions are in the overview. Their details:
   title, timeoutMinutes, stallMinutes })`. The call returns the watch's id at
   once. A kind that is not registered is an error, and so is a start while no
   session is running. The title is one line of at most 200 characters.
-- **`poll(spec, state, signal)`** returns `{ state, done, nextPollMs }`. `done`
-  is the finish line: `{ outcome, summary, details, links, facts }`. `state`
-  comes back with the next poll, and after a restart.
+- **`poll(spec, state, signal)`** returns `{ state, done, update, nextPollMs }`.
+  `done` is the finish line: `{ outcome, summary, details, links, facts }`.
+  `update` is news for the agent while the watch goes on (see
+  [News while a watch goes on](#news-while-a-watch-goes-on)). `state` comes back
+  with the next poll, and after a restart.
 - **`spec` and `state` are plain JSON,** saved as plain text. Put a reference to
   a secret in them, never the secret.
 
@@ -56,9 +58,32 @@ The actions are in the overview. Their details:
 - **A paused watch** is picked up again, with a fresh count, when the session
   next starts.
 
+## News while a watch goes on
+
+A watch that waits for a finish line says nothing until it ends. A watch that
+reports as it goes, such as new comments on a pull request, returns an `update`
+from a poll: `{ summary, details?, links? }`.
+
+- **The agent gets one message** with the title, the summary, all the details and
+  the first 5 links, and a line that says how to stop the watch. The watch polls
+  again as usual.
+- **Return the state that remembers it.** The state of the poll that sent the
+  update is saved with it, so the next poll does not say it again. A message that
+  was sent and a state that was saved are not one step: if Pi closes in the
+  second between them, the news is lost and not said twice.
+- **It is cleaned like a result,** in the same order, with the same limits: the
+  summary is one line of 500 characters, and the details are up to 40 lines of
+  1 000 characters. Nothing keeps an update after it is sent, so a plugin that
+  has more to say sends it in the next poll.
+- **A poll that is also `done`** sends its update first, in the same message as
+  the ending. The update is not part of the saved result.
+- **An `update` of the wrong shape** is a failed poll, like a wrong result.
+- **Messages keep their spacing:** updates join the others that wait, and no two
+  messages are less than 10 seconds apart.
+
 ## What the agent is told
 
-- **One message per result,** sent with `deliverAs: "followUp"` and `triggerTurn:
+- **One message per result or update,** sent with `deliverAs: "followUp"` and `triggerTurn:
   true`: an idle agent starts a turn, and a busy one reads it when its turn ends.
   The message has the type `jig-watch` and is shown on screen.
 - **In plain words:** the title, the outcome, the summary, the first 10 lines of

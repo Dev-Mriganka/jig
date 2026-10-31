@@ -10,6 +10,7 @@ import { afterLostReply, gh, ghJson, ghWrite, graphql, lastLine, prNumberFromUrl
 import type { GhOptions } from "./github.ts";
 import { checkBody, checkBranch, checkNumber, checkTitle, checkWords } from "./names.ts";
 import { checksOfPr, viewPr } from "./pr-read.ts";
+import { startCommentWatch, watchingText } from "./pr-watch.ts";
 import type { PrDetail } from "./pr-read.ts";
 import type { GitSettings } from "./config.ts";
 import type { Call, Planned } from "./previews.ts";
@@ -61,7 +62,7 @@ function ruledTitle(value: unknown, settings: GitSettings): string {
     return title;
 }
 
-interface OpenPr {
+export interface OpenPr {
     number: number;
     title: string;
     url: string;
@@ -69,7 +70,7 @@ interface OpenPr {
     headRefName: string;
 }
 
-async function openPrFor(repo: Repo, branch: string, call: Call): Promise<OpenPr | undefined> {
+export async function openPrFor(repo: Repo, branch: string, call: Call): Promise<OpenPr | undefined> {
     const flags = await repoFlags(repo, call.settings, call.signal);
     const result = await gh(
         [
@@ -215,7 +216,32 @@ async function finishCreate(
 ) {
     // The pull request now exists, so anyone watching the pushed commit can watch it as a pull request.
     await announcePushed({ repo, settings: call.settings, branch, sha, pr: number, signal: call.signal });
-    return { text, facts: { pr: number }, details: { number, created: true, base } };
+    const watching = await watchComments(repo, call, number);
+    return {
+        text: watching === undefined ? text : `${text}\n${watching.text}`,
+        facts: { pr: number },
+        details: { number, created: true, base, ...(watching?.id === undefined ? {} : { watch: watching.id }) },
+    };
+}
+
+/** With `git.watchComments` at `after-create`, the new pull request's comments are watched. A watch that cannot start is said, and never undoes the pull request. */
+async function watchComments(
+    repo: Repo,
+    call: Call,
+    number: number,
+): Promise<{ text: string; id?: string } | undefined> {
+    if (call.settings.watchComments !== "after-create") return undefined;
+    try {
+        const remote = await githubRepo(repo, call.settings, call.signal);
+        if (!remote) return undefined;
+        const spec = { slug: remote.slug, number };
+        const { id, already } = startCommentWatch(spec);
+        return { id, text: watchingText(spec, id, already) };
+    } catch (error) {
+        return {
+            text: `(The watch on its comments could not start: ${(error as Error).message}. pr watch starts it.)`,
+        };
+    }
 }
 
 // ---- edit and ready -----------------------------------------------------------------------------------------------

@@ -94,6 +94,10 @@ expectations hold for every backend, and they seed their own data (`test/support
 Three suites: `mongo.test.ts` (direct), `ssh.test.ts` (the SSH route) and `tunnel.test.ts` (a SOCKS tunnel to the replica set).
 Each makes a database of its own and drops it at the end.
 
+Production reads go through the [index check](../plugins/jig-mongo/docs/index-check.md), which is on for production by default, so
+the seed makes the indexes the reads need and the real planner decides. One test shows a `COLLSCAN` refused and an indexed read
+allowed. `requireIndex: false` is set on one extra connection only, to show that the switch works; no other test turns the check off.
+
 | Variable | What it holds |
 |---|---|
 | `JIG_IT_MONGO_DIRECT_URI` | A member that the test host can reach, with `directConnection=true` |

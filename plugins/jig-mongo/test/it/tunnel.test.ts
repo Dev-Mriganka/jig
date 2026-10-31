@@ -104,6 +104,8 @@ describeIt(
                     { n: 2, status: "open", secret: "not-allowed" },
                     { n: 3, status: "closed", secret: "not-allowed" },
                 ]);
+            // The index production reads are served by: production refuses a read that scans the collection.
+            await raw.db(db).collection("orders").createIndex({ n: 1 });
         });
 
         after(async () => {
@@ -213,8 +215,13 @@ describeIt(
                     "the field `secret` is not in the allow list",
                 );
             }
+            // The planner is asked on a secondary too, through the same tunnel: a read that would scan is refused there.
+            const scan = await h.call({ action: "find", ...on("orders", "production"), filter: { status: "open" } });
+            assert.match(scan.error?.message ?? "", /refused, the plan scans the whole collection \(COLLSCAN\)/);
             const before = await served();
-            for (let call = 0; call < 6; call++) ok(await h.call({ action: "find", ...on("orders", "production") }));
+            for (let call = 0; call < 6; call++) {
+                ok(await h.call({ action: "find", ...on("orders", "production"), sort: { n: 1 } }));
+            }
             const after = await served();
             const delta = new Map([...after].map(([member, count]) => [member, count - (before.get(member) ?? 0)]));
             const primary = [...roles].find(([, isPrimary]) => isPrimary)?.[0] ?? "";

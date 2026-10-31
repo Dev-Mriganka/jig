@@ -39,6 +39,8 @@ describeIt(
             connections: {
                 staging,
                 production: connection(uri(), who().readonlyUser),
+                // Production with the index check switched off, which only the person who writes jig.json can do.
+                "production-scan": connection(uri(), who().readonlyUser, { requireIndex: false }),
                 // A user that may only read, in a test environment, to see what the server says to a write.
                 reader: connection(uri(), who().readonlyUser),
             },
@@ -48,8 +50,12 @@ describeIt(
                 production: {
                     allow: {
                         [`${db}.orders`]: ["_id", "status", "total", "customer", "contactEmail", "createdAt"],
-                        [`${db}.customers`]: ["_id", "name"],
+                        // A small collection that is read whole, so the index check leaves it alone.
+                        [`${db}.customers`]: { fields: ["_id", "name"], reference: true },
                     },
+                },
+                "production-scan": {
+                    allow: { [`${db}.orders`]: ["_id", "status", "total", "customer", "contactEmail", "createdAt"] },
                 },
             },
         });
@@ -58,6 +64,7 @@ describeIt(
             const h = realHarness(t, section());
             // `reader` is a test environment for jig-core, as `staging` is.
             h.jig.kinds.set("reader", "test");
+            h.jig.kinds.set("production-scan", "production");
             return h;
         };
         const on = (collection: string, environment = "staging") => ({ environment, database: db, collection });
@@ -99,6 +106,8 @@ describeIt(
                     contactEmail: "jane@example.com",
                 },
             ]);
+            // The indexes the production reads below are served by: production refuses a read that scans the collection.
+            await orders.createIndexes([{ key: { status: 1 } }, { key: { customer: 1 } }, { key: { createdAt: 1 } }]);
             await raw
                 .db(db)
                 .collection("customers")
@@ -205,42 +214,63 @@ describeIt(
 
         test("indexes, explain, stats and index-stats: the plan uses the index that was made", async (t) => {
             const h = harness(t);
+            // A collection of its own, so that the indexes the production tests rely on stay as they are.
+            await raw
+                .db(db)
+                .collection("explained")
+                .insertMany([
+                    {
+                        status: "open",
+                        total: Decimal128.fromString("19.99"),
+                        createdAt: new Date("2026-01-02T03:04:05Z"),
+                    },
+                    {
+                        status: "open",
+                        total: Decimal128.fromString("5.00"),
+                        createdAt: new Date("2026-01-03T00:00:00Z"),
+                    },
+                    {
+                        status: "closed",
+                        total: Decimal128.fromString("7.50"),
+                        createdAt: new Date("2026-01-04T00:00:00Z"),
+                    },
+                ]);
             const created = await h.call({
                 action: "create-index",
-                ...on("orders"),
+                ...on("explained"),
                 keys: { status: 1, createdAt: -1 },
             });
             assert.equal(
                 ok(created),
-                `mongo create-index staging ${db}.orders: created the index status_1_createdAt_-1`,
+                `mongo create-index staging ${db}.explained: created the index status_1_createdAt_-1`,
             );
             assert.match(created.preview?.body ?? "", /Existing indexes: _id_\./);
-            const indexes = ok(await h.call({ action: "indexes", ...on("orders") }));
+            const indexes = ok(await h.call({ action: "indexes", ...on("explained") }));
             assert.match(indexes, /"name":"status_1_createdAt_-1","key":\{"status":1,"createdAt":-1\}/);
-            const explain = ok(await h.call({ action: "explain", ...on("orders"), filter: { status: "open" } }));
+            const explain = ok(await h.call({ action: "explain", ...on("explained"), filter: { status: "open" } }));
             assert.match(explain, /^plan: .*IXSCAN\(status_1_createdAt_-1\)$/m);
             assert.match(explain, /^executed: returned 2 documents, 2 index keys examined, 2 documents examined,/m);
             const collscan = ok(
                 await h.call({
                     action: "explain",
-                    ...on("orders"),
+                    ...on("explained"),
                     filter: { total: { $gt: { $numberDecimal: "1" } } },
                 }),
             );
             assert.match(collscan, /COLLSCAN/);
-            const stats = ok(await h.call({ action: "stats", ...on("orders") }));
+            const stats = ok(await h.call({ action: "stats", ...on("explained") }));
             assert.match(stats, /"count":3,.*"nindexes":2,/);
-            const used = ok(await h.call({ action: "index-stats", ...on("orders") }));
+            const used = ok(await h.call({ action: "index-stats", ...on("explained") }));
             assert.match(used, /status_1_createdAt_-1/);
             // The user that may only read lacks the privilege of $indexStats, and the tool says whose it is to fix.
-            const denied = await h.call({ action: "index-stats", ...on("orders", "reader") });
+            const denied = await h.call({ action: "index-stats", ...on("explained", "reader") });
             assert.equal(
                 denied.error?.message,
-                `mongo index-stats reader ${db}.orders: the database user cannot do this in reader (Unauthorized): it needs another role`,
+                `mongo index-stats reader ${db}.explained: the database user cannot do this in reader (Unauthorized): it needs another role`,
             );
-            const dropped = await h.call({ action: "drop-index", ...on("orders"), name: "status_1_createdAt_-1" });
+            const dropped = await h.call({ action: "drop-index", ...on("explained"), name: "status_1_createdAt_-1" });
             assert.match(ok(dropped), /dropped the index status_1_createdAt_-1/);
-            assert.equal((await raw.db(db).collection("orders").indexes()).length, 1);
+            assert.equal((await raw.db(db).collection("explained").indexes()).length, 1);
         });
 
         test("a write shows its preview with the count and a fingerprint, runs once, and the server holds the change", async (t) => {
@@ -403,7 +433,14 @@ describeIt(
 
         test("production reads only what the allow list names, refuses everything else, and cannot be written to", async (t) => {
             const h = harness(t);
-            const found = ok(await h.call({ action: "find", ...on("orders", "production") }));
+            // `status` leads an index, so production allows the read.
+            const found = ok(
+                await h.call({
+                    action: "find",
+                    ...on("orders", "production"),
+                    filter: { status: { $in: ["open", "closed"] } },
+                }),
+            );
             const rows = found
                 .split("\n")
                 .slice(1)
@@ -443,6 +480,86 @@ describeIt(
                 );
             }
             assert.equal(await raw.db(db).collection("orders").countDocuments({ a: 1 }), 0);
+        });
+
+        test("production refuses a read the server would answer by scanning the collection, and allows one an index serves", async (t) => {
+            const h = harness(t);
+            const orders = on("orders", "production");
+            // The plan is the real server's. Reads that an index serves are allowed.
+            assert.match(ok(await h.call({ action: "find", ...orders, filter: { status: "closed" } })), /1 document/);
+            assert.match(
+                ok(await h.call({ action: "count", ...orders, filter: { customer: "c1" } })),
+                /2 documents match/,
+            );
+            assert.match(
+                ok(await h.call({ action: "find", ...orders, filter: { _id: { $oid: FIRST.toHexString() } } })),
+                /1 document/,
+            );
+            assert.match(
+                ok(await h.call({ action: "find", ...orders, sort: { createdAt: -1 }, limit: 2 })),
+                /2 documents/,
+                "a sort an index serves, with a limit, reads no more than the limit",
+            );
+            assert.match(
+                ok(
+                    await h.call({
+                        action: "aggregate",
+                        ...orders,
+                        pipeline: [{ $match: { status: "open" } }, { $group: { _id: "$customer", n: { $sum: 1 } } }],
+                    }),
+                ),
+                /"n":1/,
+            );
+            assert.match(
+                ok(await h.call({ action: "distinct", ...orders, field: "status", filter: { status: "open" } })),
+                /open/,
+            );
+
+            // A field no index leads with is a COLLSCAN in the winning plan, and the refusal names the fields that do lead one.
+            const scan = await h.call({ action: "find", ...orders, filter: { contactEmail: "jane@example.com" } });
+            assert.equal(
+                scan.error?.message,
+                `mongo find production ${db}.orders: refused, the plan scans the whole collection (COLLSCAN), and reads in production must use an index. ` +
+                    "Filter on a field an index leads with: _id, status, customer, createdAt.",
+            );
+            assert.equal(scan.text, "");
+            // The rest of the reads that would scan: no filter, a count with none, an aggregation that opens with an unindexed group.
+            assert.match(
+                (await h.call({ action: "find", ...orders })).error?.message ?? "",
+                /refused, the plan scans the whole collection \(COLLSCAN\).* To see what the documents look like, use sample\.$/,
+            );
+            assert.match(
+                (await h.call({ action: "count", ...orders })).error?.message ?? "",
+                /refused, with no filter it reads every document.* For the size of the collection, use stats\.$/,
+            );
+            assert.match(
+                (await h.call({ action: "count", ...orders, filter: { contactEmail: "jane@example.com" } })).error
+                    ?.message ?? "",
+                /refused, the plan scans the whole collection/,
+            );
+            assert.match(
+                (await h.call({ action: "aggregate", ...orders, pipeline: [{ $group: { _id: "$contactEmail" } }] }))
+                    .error?.message ?? "",
+                /refused, the plan scans the whole collection/,
+            );
+            assert.match(
+                (await h.call({ action: "distinct", ...orders, field: "contactEmail" })).error?.message ?? "",
+                /refused, the plan scans the whole collection/,
+            );
+            // Only the connection's owner can turn the check off, and the same read then runs.
+            const off = on("orders", "production-scan");
+            assert.match(
+                ok(await h.call({ action: "find", ...off, filter: { contactEmail: "jane@example.com" } })),
+                /2 documents/,
+            );
+            // A test environment is not checked unless it asks to be.
+            assert.match(
+                ok(await h.call({ action: "find", ...on("orders"), filter: { contactEmail: "jane@example.com" } })),
+                /2 documents/,
+            );
+            // Reference data is read whole: no filter, no index.
+            assert.match(ok(await h.call({ action: "find", ...on("customers", "production") })), /Ada Lovelace/);
+            assert.match(ok(await h.call({ action: "count", ...on("customers", "production") })), /2 documents/);
         });
 
         test("a $lookup in production is cut to the fields the allow list names, on the server", async (t) => {

@@ -14,6 +14,8 @@ test("an empty section is valid and gives the defaults", () => {
         prTitle: undefined,
         prTemplate: undefined,
         cloneHost: "github.com",
+        watchComments: "after-create",
+        watchBots: false,
     });
     assert.deepEqual(settingsFrom(undefined), settingsFrom({}));
 });
@@ -27,9 +29,13 @@ test("every documented field is accepted", () => {
         prTitle: "^[A-Z]+-\\d+: ",
         prTemplate: "docs/pr.md",
         cloneHost: "gh-work",
+        watchComments: "off",
+        watchBots: true,
     };
     assert.deepEqual(validateGitSection(section), []);
     const settings = settingsFrom(section);
+    assert.equal(settings.watchComments, "off");
+    assert.equal(settings.watchBots, true);
     assert.equal(settings.base, "develop");
     assert.deepEqual(settings.protected, ["main", "release/*"]);
     assert.equal(settings.cloneHost, "gh-work");
@@ -65,6 +71,10 @@ test("values of the wrong type or range are errors that name the key", () => {
     assert.match(errors({ commitMessage: "(" })[0] ?? "", /^git\.commitMessage is not a valid regular expression: /);
     assert.match(errors({ branchName: "[" })[0] ?? "", /^git\.branchName is not a valid regular expression: /);
     assert.deepEqual(errors({ branchName: "" }), ["git.branchName must be a non-empty regular expression"]);
+    assert.deepEqual(errors({ watchComments: "always" }), ['git.watchComments must be "after-create" or "off"']);
+    assert.deepEqual(errors({ watchComments: true }), ['git.watchComments must be "after-create" or "off"']);
+    assert.deepEqual(errors({ watchBots: "yes" }), ["git.watchBots must be true or false"]);
+    assert.deepEqual(errors({ watchComments: "after-create", watchBots: false }), []);
     assert.match(errors({ prTitle: "(" })[0] ?? "", /^git\.prTitle is not a valid regular expression: /);
     assert.deepEqual(errors({ prTitle: "" }), ["git.prTitle must be a non-empty regular expression"]);
     assert.deepEqual(errors({ prTitle: 7 }), ["git.prTitle must be a non-empty regular expression"]);

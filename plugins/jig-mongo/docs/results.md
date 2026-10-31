@@ -49,6 +49,8 @@ mongo find staging orders.orders: 2 documents, possibly partial (limit 2 reached
 - **`stats`:** `count`, `size`, `avgObjSize`, `storageSize`, `nindexes` and `totalIndexSize` for a collection.
 - **`index-stats`:** how many times each index was used, and since when.
 - **`explain`:** with `executionStats` (the default) it also gives documents returned, keys and documents examined, and the time.
+  Where reads must use an index, `executionStats` runs the query and is checked first; `queryPlanner` is not
+  ([Index check](index-check.md)).
 
 ## The record
 

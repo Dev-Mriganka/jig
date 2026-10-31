@@ -27,6 +27,20 @@ put it in place. A test run has no key GitHub knows, so CI runs only the refusal
 - **Pi's event bus** was checked against an older Pi (1.2), not 1.4. `jig-git`
   only publishes `jig-git:pushed` with `pi.events.emit`; the watch messages that
   start a turn are `jig-core`'s, and the listener is `jig-ops`'s.
+- **The comment watch** was tested against answers written in the shape of
+  GitHub's REST API and a fake `gh`, not against GitHub. Not seen:
+  - the `304` that GitHub gives a conditional request for these four endpoints,
+    and that it is not counted against the rate limit (the same assumption as the
+    CI watch);
+  - a rate limit's real headers, and a secondary limit's message;
+  - the GraphQL read that finds the thread of a line comment (written from the
+    documentation of `reviewThreads`), and a pull request with more than 100
+    threads, which shows only the first 100;
+  - a pull request with more than 100 reviews or conversation comments, which
+    shows the oldest 100 of each, and GitHub Enterprise Server;
+  - a message reaching the agent through a real Pi: the watch is tested with a
+    fake `jig-core`, and once with `jig-core`'s own watch engine and a clock moved
+    by hand, whose messages are caught before Pi.
 - **GitHub's writes.** Replies, resolving a thread, comments, reviews, a merge, a push and a release are written from GitHub's
   documentation and were never sent to GitHub.
   - Comments and reviews are read from the first page only.

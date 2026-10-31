@@ -113,6 +113,11 @@ closed instead of running ungoverned.
   the user something (a sandbox asking about a host) calls `inTurn` with the
   question as `job`, and it never opens over one of `jig-core`'s. A job that fails
   does not stop the ones behind it.
+- **`status.register(plugin, lines)`** gives `/jig` lines to show about the
+  plugin's own state, such as a safety check the user turned off. `lines` is
+  asked each time `/jig` runs and may return nothing. Each line is cut to one
+  line of 300 characters; a `lines` that throws shows as `<plugin>: its status
+  could not be read`. Registering the same plugin again replaces it.
 - **`exec`** has `run` and `git`, which start programs without a shell (see
   [Running programs](running-programs.md)).
 

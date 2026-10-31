@@ -10,9 +10,17 @@
 // - A timer callback that throws takes Pi down, so every callback catches, and a plugin's poll that throws is a failed
 //   poll, not a crash.
 // - What a plugin returns is not trusted: it is checked, copied through JSON and cleaned before it is saved or shown.
-import type { JigApi, PollOutcome, WatchDoneEvent, WatchInfo, WatchKind, WatchResult } from "../contract.ts";
+import type {
+    JigApi,
+    PollOutcome,
+    WatchDoneEvent,
+    WatchInfo,
+    WatchKind,
+    WatchResult,
+    WatchUpdate,
+} from "../contract.ts";
 import { errorMessage } from "../errors.ts";
-import { cleanLine, cleanResult, isWatchResult, plainLine } from "./clean.ts";
+import { cleanLine, cleanResult, cleanUpdate, isWatchResult, isWatchUpdate, plainLine } from "./clean.ts";
 import type { Protect } from "./clean.ts";
 import { formatAge } from "./format.ts";
 import { composeMessage } from "./message.ts";
@@ -247,10 +255,14 @@ export function createWatchEngine(options: WatchEngineOptions): WatchEngine {
         if (raw.done !== undefined && !isWatchResult(raw.done)) {
             throw new Error("the poll's finish line is not a result");
         }
+        if (raw.update !== undefined && !isWatchUpdate(raw.update)) {
+            throw new Error("the poll's update is not a summary with optional details and links");
+        }
         const nextPollMs = finite(raw.nextPollMs);
         return {
             state: plainJson(raw.state, "the state a poll returns"),
             ...(raw.done === undefined ? {} : { done: raw.done }),
+            ...(raw.update === undefined ? {} : { update: raw.update }),
             ...(nextPollMs === undefined ? {} : { nextPollMs }),
         };
     }
@@ -302,6 +314,8 @@ export function createWatchEngine(options: WatchEngineOptions): WatchEngine {
             saved.state = outcome.state;
             saved.failures = 0;
             entry.lastError = undefined;
+            // News goes first, so a poll that is also the end tells both in one message, in this order.
+            if (outcome.update !== undefined) tellUpdate(entry, outcome.update);
             if (outcome.done !== undefined) {
                 finish(entry, outcome.done, ending);
                 return;
@@ -323,6 +337,19 @@ export function createWatchEngine(options: WatchEngineOptions): WatchEngine {
         checkStall(entry);
         persist(saved);
         arm(entry, nextDelay(saved, kind, outcome));
+    }
+
+    /** News from a watch that goes on: cleaned like a result, and told to the agent with the others that wait. */
+    function tellUpdate(entry: Held, raw: WatchUpdate): void {
+        const { saved } = entry;
+        outbox.add({
+            event: "update",
+            id: saved.id,
+            kind: saved.kind,
+            plugin: saved.plugin,
+            title: titleOf(saved),
+            update: cleanUpdate(raw, protect),
+        });
     }
 
     function timedOut(entry: Held): WatchResult {
