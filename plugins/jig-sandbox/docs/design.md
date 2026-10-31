@@ -64,6 +64,12 @@ to wrap each command, then spawns the wrapped command itself. The spike showed w
 The broker is started with the Node that runs Pi, from the plugin's own files, and
 its pipe is private to the Pi process. It holds no credentials.
 
+The programs the host runs for the sandbox (bubblewrap, `socat`, ripgrep, and `python3` for the
+bridge) come from `sandbox.programs` when set, and otherwise from `PATH`, but only from a place a
+command in the sandbox cannot write, following links: a copy in a project's `bin` folder could have
+been planted there, and would run outside the sandbox. With only such copies, the program counts
+as not installed.
+
 ### Pinned, and upgraded on purpose
 
 `@anthropic-ai/sandbox-runtime` is pinned to an exact version at least two weeks old;

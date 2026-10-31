@@ -163,7 +163,10 @@ export class Sandbox {
             mode: () => this.mode,
             localhost: () => deps.settings().network.localhost,
             socat: () => this.programs.found.socat,
-            python: () => ("python" in network ? network.python : onPath("python3", deps.env.PATH)),
+            python: () =>
+                "python" in network
+                    ? network.python
+                    : onPath("python3", deps.env.PATH, (place) => this.canWrite(place)),
             platform: deps.platform,
             now: deps.now,
             ...(network.processes === undefined ? {} : { processes: network.processes }),
@@ -258,7 +261,7 @@ export class Sandbox {
             return;
         }
         const platform = deps.platform;
-        this.programs = findPrograms(platform, settings.programs, deps.env.PATH);
+        this.programs = findPrograms(platform, settings.programs, deps.env.PATH, (place) => this.canWrite(place));
         if (this.programs.missing.length > 0) {
             const names = this.programs.missing.map((item) => item.command).join(", ");
             this.state = {
