@@ -8,8 +8,10 @@ import { evaluate, evaluateAll } from "./conditions.ts";
 import type { ConditionResult } from "./conditions.ts";
 import { callText } from "./definition.ts";
 import type { Stage, Workflow } from "./definition.ts";
+import { environmentLines } from "./environment.ts";
 import { digest, hash } from "./host.ts";
-import { matching } from "./load.ts";
+import { disabledLines, matching, missingWorkflow } from "./load.ts";
+import { outsideRunner } from "./outside.ts";
 import { fingerprintOf, MAX_PLAN_CHARS, parsePlan, repositoryWarnings } from "./plan.ts";
 import { inspect, short } from "./repos.ts";
 import type { RepoView } from "./repos.ts";
@@ -26,7 +28,7 @@ import {
     writeState,
 } from "./store.ts";
 import type { EvidenceKind, WorkflowState } from "./store.ts";
-import { planTests, runTests } from "./tests.ts";
+import { planTests, runTests, testIdentity } from "./tests.ts";
 import type { TestPlan } from "./tests.ts";
 import { addBound, isTicketKey } from "./ticket.ts";
 import { readText } from "./files.ts";
@@ -83,9 +85,7 @@ export function started(rt: Runtime, ticket: string): Started {
     if (work.read.kind === "invalid") throw new InputError(`${work.read.problem}; mend or delete the file`);
     const loaded = rt.definition(work.read.state);
     if (loaded === undefined) {
-        throw new InputError(
-            `the workflow ${work.read.state.workflow} of ${ticket} is not loaded: /workflow reload, or /workflow list for files that failed`,
-        );
+        throw new InputError(missingWorkflow(rt.loaded, work.read.state.workflow, ticket));
     }
     return { work, state: work.read.state, workflow: loaded.workflow };
 }
@@ -141,6 +141,7 @@ export function list(rt: Runtime): ActionResult {
             ...failures.map((failure) => `  ${failure.file}: ${failure.reason}`),
         );
     }
+    lines.push(...disabledLines(rt.loaded));
     return { text: lines.join("\n"), details: { workflows: [...workflows.keys()].sort(), failures: failures.length } };
 }
 
@@ -547,11 +548,7 @@ export async function plannedTests(rt: Runtime, params: Params): Promise<TestsTo
 
 /** The fingerprint of what a test call would run, which the user's yes has to carry when there is no sandbox. */
 export function testFingerprint(ticket: string, plans: readonly TestPlan[], views: readonly RepoView[]): string {
-    return digest(
-        "test",
-        ticket,
-        ...plans.flatMap((plan, index) => [plan.root, plan.command, plan.timeoutSeconds, views[index]?.head]),
-    );
+    return digest("test", ticket, ...plans.flatMap((plan, index) => [...testIdentity(plan), views[index]?.head]));
 }
 
 export async function runTestsAction(rt: Runtime, params: Params, call: Call): Promise<ActionResult> {
@@ -577,8 +574,11 @@ export async function runTestsAction(rt: Runtime, params: Params, call: Call): P
     for (const [index, plan] of plans.entries()) {
         const view = views[index] as RepoView;
         try {
+            // With a sandbox, a command set to run outside goes through the bash tool's own question; without one the call asked above.
+            const outside = sandboxed && plan.outside === true;
             const run = await runTests(rt.host, plan, view, {
-                sandboxed,
+                sandboxed: sandboxed && !outside,
+                ...(outside ? { outside: outsideRunner(call.ctx) } : {}),
                 ...(call.signal === undefined ? {} : { signal: call.signal }),
             });
             updateState(work.paths.dir, (state) => {
@@ -594,7 +594,7 @@ export async function runTestsAction(rt: Runtime, params: Params, call: Call): P
                 : " on a tree with uncommitted changes, which does not count: commit, then run again";
             if (run.result.passed && run.result.clean) passed++;
             lines.push(
-                `${view.name}: ${verdict} at ${short(view.head)}${note} · ${plan.command} · ${sandboxed ? "in the sandbox" : "outside the sandbox, as you approved"} · ${(run.result.durationMs / 1000).toFixed(1)} s`,
+                `${view.name}: ${verdict} at ${short(view.head)}${note} · ${plan.command} · ${run.result.sandboxed ? "in the sandbox" : "outside the sandbox, as you approved"} · ${(run.result.durationMs / 1000).toFixed(1)} s`,
                 ...(run.result.passed && run.result.clean ? [] : [indent(run.tail)]),
             );
         } catch (error) {
@@ -628,6 +628,7 @@ export function testQuestion(ticket: string, plans: readonly TestPlan[]): { summ
             ...plans.flatMap((plan) => [
                 `- ${plan.name}: ${plan.command}`,
                 `    in ${plan.root}, at most ${plan.timeoutSeconds} s (${plan.source ?? "set in jig.json"})`,
+                ...environmentLines(plan.env),
             ]),
             "",
             "A test can run anything. With jig-sandbox active, these would run inside it without asking.",

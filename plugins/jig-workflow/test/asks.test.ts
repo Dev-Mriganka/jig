@@ -304,6 +304,21 @@ describe("test, where there is no sandbox", () => {
         assert.equal(w.state()?.tests[w.orders].head, headOf(w.orders));
     });
 
+    test("the question names the variables the commands run with, and the shell gets them", async (t) => {
+        const w = await started(t, {
+            run: script,
+            config: { tests: { "orders-api": { command: "npm test", env: { JAVA_HOME: "/opt/jdk-17" } } } },
+        });
+        w.host.sandboxOn = false;
+        const result = await w.call({ action: "test" });
+        assert.equal(result.isError, false, result.text);
+        assert.match(
+            w.asked[0]?.title ?? "",
+            /- orders-api-PROJ-1: npm test\n {4}in .*\n {4}with JAVA_HOME=\/opt\/jdk-17/,
+        );
+        assert.deepEqual(w.host.ran[0]?.env, { JAVA_HOME: "/opt/jdk-17" });
+    });
+
     test("an allow rule and a session answer do not remove the question", async (t) => {
         const w = await bare(t);
         w.core.api.config.addRules([{ tool: "workflow", action: "test", decision: "allow" }]);
@@ -376,6 +391,23 @@ describe("test, in the sandbox", () => {
         assert.equal(saved.passed, true);
         assert.equal(saved.sandboxed, true);
         assert.equal(saved.head, headOf(w.orders));
+    });
+
+    test("variables of the entry go with the command into the sandbox, and the record is of the configured command", async (t) => {
+        const w = await started(t, {
+            config: {
+                tests: { "orders-api": { command: "./gradlew test", env: { JAVA_HOME: "/opt/jdk-17" } } },
+            },
+        });
+        const result = await w.call({ action: "test" });
+        assert.equal(result.isError, false, result.text);
+        assert.equal(w.asked.length, 0);
+        assert.deepEqual(
+            w.host.sandboxed.map((run) => run.command),
+            ["export JAVA_HOME=/opt/jdk-17 && ./gradlew test"],
+        );
+        assert.equal(w.state()?.tests[w.orders].command, "./gradlew test");
+        assert.equal(w.state()?.tests[w.orders].passed, true);
     });
 
     test("a sandbox that goes away between the classification and the run is not an unasked run", async (t) => {

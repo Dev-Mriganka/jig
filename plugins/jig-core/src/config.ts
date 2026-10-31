@@ -91,6 +91,8 @@ export interface SectionLayers {
     replace: ReadonlyMap<string, readonly string[]>;
     /** Per section, lists of paths that exclude each other; see `layered`. */
     oneOf?: ReadonlyMap<string, readonly (readonly string[])[]>;
+    /** Per section, the paths of lists that add up: the company's entries first, then yours. */
+    union?: ReadonlyMap<string, readonly string[]>;
 }
 
 const NO_LAYERS: SectionLayers = { defaults: new Map(), replace: new Map() };
@@ -230,7 +232,13 @@ function readSection(name: string, raw: unknown, check: SectionCheck, layers: Se
         const messages = runSectionCheck(check, raw);
         return { value: raw, use: messages.length === 0, messages };
     }
-    const merged = layered(layers.defaults.get(name), raw, layers.replace.get(name), layers.oneOf?.get(name));
+    const merged = layered(
+        layers.defaults.get(name),
+        raw,
+        layers.replace.get(name),
+        layers.oneOf?.get(name),
+        layers.union?.get(name),
+    );
     const messages = runSectionCheck(check, merged);
     if (messages.length === 0) return { value: merged, use: true, messages };
     const said = `the company defaults for "${printable(name)}", with your settings laid over them, are not valid: `;

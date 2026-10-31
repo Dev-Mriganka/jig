@@ -153,6 +153,15 @@ export function buildApi(state: JigState): JigApi {
                         `registerSection(${name}): replace must be a list of paths such as "auth" or "services.*.ci.auth"`,
                     );
                 }
+                const union = options?.union;
+                if (
+                    union !== undefined &&
+                    (!Array.isArray(union) || union.some((path) => typeof path !== "string" || path === ""))
+                ) {
+                    throw new TypeError(
+                        `registerSection(${name}): union must be a list of paths such as "folders" or "services.*.hosts"`,
+                    );
+                }
                 const oneOf = options?.oneOf;
                 if (oneOf !== undefined) {
                     if (!Array.isArray(oneOf)) throw new TypeError(`registerSection(${name}): oneOf must be a list`);
@@ -174,9 +183,11 @@ export function buildApi(state: JigState): JigApi {
                         name,
                         oneOf.map((paths) => [...paths]),
                     );
-                // Registering again replaces what the first call said, the keys that replace included.
+                // Registering again replaces what the first call said, the keys that replace and the lists that add up included.
                 if (replace === undefined || replace.length === 0) state.sectionReplace.delete(name);
                 else state.sectionReplace.set(name, [...replace]);
+                if (union === undefined || union.length === 0) state.sectionUnion.delete(name);
+                else state.sectionUnion.set(name, [...union]);
                 // A section registered after the file was read is checked now, so the order plugins load in does not matter.
                 if (state.configLoaded) loadPersonalConfig(state, state.personal.file);
             },

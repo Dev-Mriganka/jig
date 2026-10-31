@@ -1,7 +1,7 @@
 // The plugin in a session: the line at its start, the events of other plugins kept as evidence, the /workflow command, what
 // follows a compaction, and the folders and files it guards.
 import assert from "node:assert/strict";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { describe, test } from "node:test";
 import { fingerprintOf } from "../src/plan.ts";
@@ -400,6 +400,107 @@ describe("a company's files", () => {
         assert.deepEqual(
             w.host.sandboxed.map((run) => run.command),
             ["make check"],
+        );
+    });
+});
+
+describe("a company's folders and yours add up", () => {
+    type Company = NonNullable<Parameters<typeof world>[1]>["company"];
+
+    /** A company plugin with a `policy` workflow and a `feature` of its own, in a folder of its package. */
+    function company(over: { tests?: Record<string, unknown> } = {}): NonNullable<Company> {
+        return (api, workspace) => {
+            const folder = path.join(workspace, "company-workflows");
+            mkdirSync(folder, { recursive: true });
+            for (const [name, description] of [
+                ["policy", "the company's"],
+                ["feature", "the company's feature"],
+            ] as const) {
+                writeFileSync(
+                    path.join(folder, `${name}.json`),
+                    JSON.stringify({ name, description, match: { ticket: "^PROJ-" }, stages: [{ id: "only" }] }),
+                );
+            }
+            api.config.addSectionDefaults("workflow", { folders: [folder], ...over });
+        };
+    }
+
+    test("a folder of yours does not take the company's away: both are read", async (t) => {
+        const w = await world(t, { company: company(), userWorkflow: { folders: ["$workflows"] } });
+        const text = (await w.call({ action: "list" })).text;
+        assert.match(text, /^policy: the company's$/m, "the company's workflow is still there");
+        assert.match(text, /^feature: /m, "and the one from your folder");
+    });
+
+    test("when both have a file of one name, yours wins, because your folders are read after the company's", async (t) => {
+        const w = await world(t, { company: company(), userWorkflow: { folders: ["$workflows"] } });
+        const text = (await w.call({ action: "list" })).text;
+        assert.doesNotMatch(text, /the company's feature/);
+        assert.match(text, /^feature: A change to a service/m, "the example feature file of your folder");
+        assert.match(
+            text,
+            /^policy: the company's\n.*\n.*\n {2}from the configured: .*company-workflows\/policy\.json$/m,
+        );
+    });
+
+    test("with no folders of yours, the company's alone, as before", async (t) => {
+        const w = await world(t, { company: company(), userWorkflow: {} });
+        const text = (await w.call({ action: "list" })).text;
+        assert.match(text, /^feature: the company's feature$/m);
+        assert.match(text, /^policy: the company's$/m);
+    });
+
+    test("workflow.disabled drops a company workflow, and the list says so", async (t) => {
+        const w = await world(t, {
+            company: company(),
+            userWorkflow: { folders: ["$workflows"], disabled: ["policy"] },
+        });
+        const text = (await w.call({ action: "list" })).text;
+        assert.doesNotMatch(text, /^policy/m);
+        assert.match(
+            text,
+            /Left out by workflow\.disabled in jig\.json:\n {2}policy: .*company-workflows\/policy\.json/,
+        );
+        w.activate("PROJ-1");
+        const started = await w.call({ action: "start", name: "policy" });
+        assert.equal(started.isError, true, "it cannot be started either");
+    });
+
+    test("a ticket that already runs a workflow that is turned off is told so, and its holds are not enforced", async (t) => {
+        // The same ticket, first on a world where the company's `policy` is on, then on one where it is turned off.
+        const on = await world(t, { company: company(), userWorkflow: { folders: ["$workflows"] } });
+        on.activate("PROJ-1");
+        on.bind(on.orders);
+        assert.equal((await on.call({ action: "start", name: "policy" })).isError, false);
+        const off = await world(t, {
+            company: company(),
+            userWorkflow: { folders: ["$workflows"], disabled: ["policy"] },
+        });
+        off.activate("PROJ-1");
+        off.bind(off.orders);
+        copyFileSync(path.join(on.ticketDir(), "workflow.json"), path.join(off.ticketDir(), "workflow.json"));
+        assert.match(
+            (await off.call({ action: "status" })).text,
+            /the workflow policy is at stage only, and workflow\.disabled in jig\.json turns it off\. Its holds are not enforced while it is off\./,
+        );
+        assert.match(
+            (await off.call({ action: "test" })).text,
+            /the workflow policy of PROJ-1 is turned off by workflow\.disabled in jig\.json/,
+        );
+    });
+
+    test("the company's test commands and yours merge by repository, as before", async (t) => {
+        const w = await world(t, {
+            company: company({ tests: { "orders-api": "make check", unbound: "make other" } }),
+            userWorkflow: { folders: ["$workflows"], tests: { "orders-api": "make mine" } },
+        });
+        w.activate("PROJ-1");
+        w.bind(w.orders);
+        await w.call({ action: "start", name: "policy" });
+        await w.call({ action: "test" });
+        assert.deepEqual(
+            w.host.sandboxed.map((run) => run.command),
+            ["make mine"],
         );
     });
 });

@@ -4,6 +4,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { TestRule, WorkflowSettings } from "./config.ts";
+import { withEnvironment } from "./environment.ts";
 import type { Host } from "./host.ts";
 import type { RepoView } from "./repos.ts";
 import type { TestResult } from "./store.ts";
@@ -15,6 +16,10 @@ export interface TestPlan {
     /** Absent when no command is known: then `problem` says what to set. */
     command?: string;
     timeoutSeconds: number;
+    /** Plain variables the command runs with. */
+    env?: Readonly<Record<string, string>>;
+    /** Set in configuration for a command that needs what the sandbox hides: it runs outside, only with approval. */
+    outside?: boolean;
     /** Where the command came from: `jig.json` or the build file that was found. */
     source?: string;
     problem?: string;
@@ -92,6 +97,8 @@ export function planTests(settings: WorkflowSettings, view: RepoView, cwd: strin
             name: view.name,
             command: rule.command,
             timeoutSeconds: rule.timeoutSeconds ?? settings.testTimeoutSeconds,
+            ...(rule.env === undefined ? {} : { env: rule.env }),
+            ...(rule.outside === true ? { outside: true } : {}),
             source: `workflow.tests "${rule.key}"`,
         };
     }
@@ -113,7 +120,23 @@ export function planTests(settings: WorkflowSettings, view: RepoView, cwd: strin
     };
 }
 
+/** What a user's yes to a plan rests on, besides the commits: the folder, the command, its variables and its time limit. */
+export function testIdentity(plan: TestPlan): Array<string | number | boolean | undefined> {
+    return [plan.root, plan.command, plan.timeoutSeconds, JSON.stringify(plan.env ?? {}), plan.outside === true];
+}
+
 // ---- running it ---------------------------------------------------------------------------------------------------------
+
+/** How a command ended when something other than the sandbox or a plain shell ran it. */
+export interface ShellRun {
+    code: number | null;
+    timedOut: boolean;
+    output: string;
+    truncated: boolean;
+}
+
+/** Runs a plan's command in its repository some other way: the one that asks the user (see outside.ts). */
+export type OutsideRunner = (plan: TestPlan, options: { signal?: AbortSignal }) => Promise<ShellRun>;
 
 export interface TestRun {
     result: TestResult;
@@ -130,14 +153,15 @@ export function tailOf(output: string): string {
 
 /**
  * Runs the command of a plan in its repository and describes how it ended, against the commit and tree the repository was in
- * when the run began (`view`). `sandboxed` says where: in the sandbox through `host.sandbox`, or as the user through a shell.
+ * when the run began (`view`). `sandboxed` says where: in the sandbox through `host.sandbox`, or as the user through a shell;
+ * `outside` replaces both with a runner that has its own way to ask (and then `sandboxed` is false).
  * A run that is cancelled throws; nothing is recorded for it.
  */
 export async function runTests(
     host: Host,
     plan: TestPlan,
     view: RepoView,
-    options: { sandboxed: boolean; signal?: AbortSignal },
+    options: { sandboxed: boolean; outside?: OutsideRunner; signal?: AbortSignal },
 ): Promise<TestRun> {
     if (plan.command === undefined) throw new Error(plan.problem ?? "no test command");
     if (view.head === undefined) throw new Error(view.problem ?? `${view.name} has no commit to test`);
@@ -148,11 +172,23 @@ export async function runTests(
     let timedOut: boolean;
     let output: string;
     let truncated = false;
-    if (options.sandboxed) {
-        const ran = await host.sandbox.run(plan.command, { cwd: plan.root, timeoutMs, ...signal });
+    if (options.outside !== undefined) {
+        ({ code, timedOut, output, truncated } = await options.outside(plan, signal));
+    } else if (options.sandboxed) {
+        // The sandbox takes a command and nothing else, so the variables are set by the command line itself.
+        const ran = await host.sandbox.run(withEnvironment(plan.command, plan.env), {
+            cwd: plan.root,
+            timeoutMs,
+            ...signal,
+        });
         ({ code, timedOut, output, truncated } = ran);
     } else {
-        const ran = await host.run("/bin/sh", ["-c", plan.command], { cwd: plan.root, timeoutMs, ...signal });
+        const ran = await host.run("/bin/sh", ["-c", plan.command], {
+            cwd: plan.root,
+            timeoutMs,
+            ...(plan.env === undefined ? {} : { env: plan.env }),
+            ...signal,
+        });
         code = ran.code;
         timedOut = ran.timedOut;
         output = [ran.stdout, ran.stderr].filter((part) => part !== "").join("\n");

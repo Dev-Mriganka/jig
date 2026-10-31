@@ -266,6 +266,9 @@ such as `git`, `lens` or `memory`.
     `{ oneOf: [["backend.auth", "backend.transport"]] }`. When you set one of
     them, the company's value for the others is dropped. For example, your own
     `backend.auth` removes the company's `backend.transport`.
+  - **A plugin names lists that add up,** with `{ union: ["folders"] }`. The company's
+    entries come first, then yours, each once, so a list of yours does not take the
+    company's away. Any other list of yours still replaces theirs.
   - **A section with no defaults is checked as you wrote it,** as before.
 - **Defaults can lack what only you can give.** With no section of yours, the
   defaults alone are checked. When they are not valid, the plugin is not

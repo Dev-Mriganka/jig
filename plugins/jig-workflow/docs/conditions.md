@@ -34,7 +34,8 @@ repository, only that repository counts.
   now. Any edit, even a comma, ends it. See [Plan](plan.md).
 - **`tests-pass-at-head`.** Holds when the last result for the repository passed, on a clean tree, at the
   commit HEAD is now. Uncommitted changes after the run do not undo it, because a push sends commits, not
-  the tree; `status` mentions them. See [Tests](tests.md).
+  the tree; `status` mentions them. A run outside the sandbox that you approved counts the same, and `status`
+  says where it ran. See [Tests](tests.md).
 - **`review-done`.** `jig-review` publishes `jig-review:approved` when you approve a review, and the plugin
   saves the ones that **cover** commits (a branch review whose diff was still the one you saw) with each
   repository's folder and HEAD. The condition holds when an event names the repository's folder and its

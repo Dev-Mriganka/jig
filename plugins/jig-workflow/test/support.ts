@@ -62,7 +62,7 @@ export type RunScript = (file: string, args: readonly string[], options: RunOpti
 
 export interface FakeHost extends Host {
     /** Every program the plugin ran through `run`, in order. */
-    ran: Array<{ file: string; args: readonly string[]; cwd?: string }>;
+    ran: Array<{ file: string; args: readonly string[]; cwd?: string; env?: Readonly<Record<string, string>> }>;
     /** Every command sent to the sandbox. */
     sandboxed: Array<{ command: string; cwd: string; timeoutMs?: number }>;
     /** Whether the sandbox can run commands now; a test flips it. */
@@ -109,7 +109,12 @@ export function fakeHost(
                 );
             }),
         async run(file, args, options) {
-            host.ran.push({ file, args, ...(options.cwd === undefined ? {} : { cwd: options.cwd }) });
+            host.ran.push({
+                file,
+                args,
+                ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+                ...(options.env === undefined ? {} : { env: options.env }),
+            });
             if (over.run === undefined) throw new Error(`no program ${file} in this test`);
             return over.run(file, args, options);
         },

@@ -180,6 +180,106 @@ describe("running them", () => {
         assert.equal(run.tail, "3 passing");
     });
 
+    test("variables of the entry: set by the command line in the sandbox, and by the environment of a shell", async (t) => {
+        const host = fakeHost({ run: () => ok() });
+        const root = makeRepo(tempFolder(t), "orders-api", "git@github.example.com:acme/orders-api.git");
+        const view = await inspect(host, root);
+        const plan = planTests(
+            settingsFrom({
+                tests: {
+                    "orders-api": {
+                        command: "./gradlew test",
+                        env: { JAVA_HOME: "/opt/jdk-17", GRADLE_OPTS: "-Xmx2g -Dx=y" },
+                    },
+                },
+            }),
+            view,
+            path.dirname(root),
+        );
+        assert.deepEqual(plan.env, { JAVA_HOME: "/opt/jdk-17", GRADLE_OPTS: "-Xmx2g -Dx=y" });
+        const inside = await runTests(host, plan, view, { sandboxed: true });
+        assert.deepEqual(host.sandboxed, [
+            {
+                command: "export JAVA_HOME=/opt/jdk-17 GRADLE_OPTS='-Xmx2g -Dx=y' && ./gradlew test",
+                cwd: root,
+                timeoutMs: 900_000,
+            },
+        ]);
+        assert.equal(inside.result.command, "./gradlew test", "what is recorded is the command that was configured");
+        await runTests(host, plan, view, { sandboxed: false });
+        assert.deepEqual(host.ran, [
+            {
+                file: "/bin/sh",
+                args: ["-c", "./gradlew test"],
+                cwd: root,
+                env: { JAVA_HOME: "/opt/jdk-17", GRADLE_OPTS: "-Xmx2g -Dx=y" },
+            },
+        ]);
+    });
+
+    test("a runner for outside replaces the sandbox and the shell, and the result is not a sandboxed one", async (t) => {
+        const host = fakeHost({ run: () => ok() });
+        const controller = new AbortController();
+        const root = makeRepo(tempFolder(t), "orders-api", "git@github.example.com:acme/orders-api.git");
+        const view = await inspect(host, root);
+        const plan = planTests(
+            settingsFrom({ tests: { "orders-api": { command: "./gradlew test", outside: true } } }),
+            view,
+            path.dirname(root),
+        );
+        assert.equal(plan.outside, true);
+        const seen: Array<{ plan: unknown; signal: AbortSignal | undefined }> = [];
+        const run = await runTests(host, plan, view, {
+            sandboxed: false,
+            signal: controller.signal,
+            outside: async (given, options) => {
+                seen.push({ plan: given, signal: options.signal });
+                return { code: 0, timedOut: false, output: "BUILD SUCCESSFUL\n", truncated: false };
+            },
+        });
+        assert.deepEqual(seen, [{ plan, signal: controller.signal }]);
+        assert.deepEqual([host.sandboxed, host.ran], [[], []], "neither the sandbox nor the shell was used");
+        assert.deepEqual(
+            [run.result.passed, run.result.sandboxed, run.result.command, run.result.head],
+            [true, false, "./gradlew test", headOf(root)],
+        );
+        assert.equal(run.tail, "BUILD SUCCESSFUL");
+        const failed = await runTests(host, plan, view, {
+            sandboxed: false,
+            outside: async () => ({ code: 2, timedOut: false, output: "", truncated: false }),
+        });
+        assert.deepEqual([failed.result.passed, failed.result.exitCode], [false, 2]);
+        await assert.rejects(
+            runTests(host, plan, view, {
+                sandboxed: false,
+                outside: async () => {
+                    throw new Error("outside the sandbox was refused: the user declined this call");
+                },
+            }),
+            /declined/,
+        );
+    });
+
+    test("a plan has no outside unless the entry says true", async (t) => {
+        const root = makeRepo(tempFolder(t), "orders-api", "git@github.example.com:acme/orders-api.git");
+        const view = await inspect(fakeHost(), root);
+        const plan = (entry: unknown) =>
+            planTests(settingsFrom({ tests: { "orders-api": entry } }), view, path.dirname(root));
+        assert.equal(plan("npm test").outside, undefined);
+        assert.equal(plan({ command: "npm test", outside: false }).outside, undefined);
+        assert.equal(plan({ command: "npm test", outside: true }).outside, true);
+    });
+
+    test("an entry without variables runs the command as it is", async (t) => {
+        const host = fakeHost({ run: () => ok() });
+        const { view, plan } = await ready(t, host);
+        assert.equal(plan.env, undefined);
+        await runTests(host, plan, view, { sandboxed: true });
+        await runTests(host, plan, view, { sandboxed: false });
+        assert.equal(host.sandboxed[0]?.command, "npm test");
+        assert.equal(host.ran[0]?.env, undefined);
+    });
+
     test("a failing command, and one that ran out of time, are not passes", async (t) => {
         const host = fakeHost({
             sandbox: () => ({ code: 1, output: "1 failing\n", timedOut: false, truncated: false }),
