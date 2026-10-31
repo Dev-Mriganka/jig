@@ -83,7 +83,7 @@ async function run(steps) {
 }
 
 function commandsList() {
-    return (script.commands ?? ["jig"]).map((name) => ({ name, source: "extension" }));
+    return (script.commands ?? ["jig", "sandbox"]).map((name) => ({ name, source: "extension" }));
 }
 
 const model = script.model ?? {

@@ -14,8 +14,11 @@ its report work, and how it is tested. Back to the [jig-agents overview](../READ
    run, a message that cannot be read: the child is refused, cancelled or stopped.
 4. **Small.** Pi supplies the protocol, the session files, `abort` and `steer`;
    `jig-core` supplies the watch engine that returns results. The plugin adds policy. It
-   has no dependency. The source is about 3,000 lines with its comments: the estimate of
-   1,000 left out the checks, the cleaning of text and the orphan sweep.
+   has no dependency. The source is about 3,500 lines with its comments: the estimate of
+   1,000 left out the checks, the cleaning of text, the orphan sweep and the roles' policy.
+5. **A role only narrows, and the child enforces it.** What a role says about what its child
+   may do is checked in the child, by a gate in its own `jig-core`, and it can only make
+   the child's rules stricter ([below](#a-role-only-narrows-and-the-child-enforces-it)).
 
 ## One child, end to end
 
@@ -23,8 +26,11 @@ its report work, and how it is tested. Back to the [jig-agents overview](../READ
 agent calls subagent {action: "start", role: "scout", task: "..."}
   -> jig-core's rules (subagent start: a local write, allowed by default)
   -> jig-agents, in the parent
-       check    role, cwd, counts, model (configuration, then enabledModels), a worktree for a writer
-       launch   Pi's own program with --mode rpc; stdin and stdout are pipes
+       check    role, cwd, counts, model (configuration, then enabledModels)
+       plan     the role with configuration laid over it: its policy, the skills it sees, its prompt;
+                refused here when it cannot run (bash with no sandbox, a skill it lacks)
+       worktree for a writer
+       launch   Pi's own program with --mode rpc; stdin and stdout are pipes; JIG_ROLE_POLICY in its environment
        verify   get_commands lists jig-core's commands, or the child is stopped
        prompt   the task, the report format and the limits, as one prompt command
        watch    a jig-core watch of kind "subagent"; the tool returns at once
@@ -51,10 +57,12 @@ call or the project reaches it as a flag.
 |---|---|
 | `--mode rpc` | Dialogs, events, `abort` and `steer` as documented JSON lines |
 | `--session-id agent-<id>` | A session file Pi lists, `message` can resume, and `/lens usage` counts once |
-| `--model`, `--thinking` | From configuration, or the parent's own, after the check against `enabledModels` |
+| `--model`, `--thinking` | From configuration, or the parent's own, after the check against `enabledModels`; the thinking level is [chosen below](#skills-which-a-child-sees) |
 | `--tools <list>` | The role's list, which can only narrow |
 | `--exclude-tools subagent,mcp__*` | No children of children; no MCP tools unless the role names one |
-| `--append-system-prompt <file>` | The role's prompt, from a file in the run folder |
+| `--no-skills`, `--skill <file>` | The child sees the skills its role gives it and no other ([Skills](#skills-which-a-child-sees)) |
+| `--no-context-files` | Only for `context: none`: the child does not read AGENTS.md or CLAUDE.md |
+| `--append-system-prompt <file>` | The role's prompt and the skills it preloads, from a file in the run folder |
 | `--no-approve` | A `.pi/` folder the model wrote in the project does not load in the child |
 
 **Never passed:** `--no-extensions`, `-ne`, `-e`, `--extension`, `--approve`, `-a`. A test
@@ -83,6 +91,9 @@ builds the command line for every shipped role and fails if any of them can appe
 - **Who the child is.** It gets `PI_SUBAGENT_ID`, which `jig-theme` and `jig-review` already
   read, `JIG_PARENT_SESSION` and `JIG_AGENT_ROLE`, which `jig-core`'s records already read,
   `PI_SUBAGENT_NAME`, `PI_SUBAGENT_PARENT_PID` and `PI_SKIP_VERSION_CHECK=1`.
+- **What it may do.** It gets `JIG_ROLE_POLICY`, the role's limits as one JSON line. The
+  parent's own value, if it has one, is never copied: the list of names above leaves it out, and only
+  the policy built for this role is set.
 - **The task** goes in a `prompt` command on stdin, not on the command line, so it does
   not show in `ps`. It follows a line that names the role, so it never starts with `/`
   and cannot run a command in the child. The run folder is created with private permissions.
@@ -97,7 +108,8 @@ Before the task is sent, the plugin sends `get_commands` and `get_state` and che
 - no `extension_error` arrived.
 
 A child that fails is stopped and `start` says why. This catches a Pi that could not load
-its plugins, for example because of a broken settings file, which would run ungoverned. A
+its plugins, for example because of a broken settings file, which would run ungoverned, and a
+child that cannot read its role's policy, which reports it the same way (below). A
 child that does not answer within 60 seconds, dies, or does not start a run for its task
 is refused the same way, and a worktree made for it is taken away again.
 
@@ -258,31 +270,30 @@ a small change in `jig-core`, and can come later. The backstop is `maxMinutes` +
 
 ## Roles and agent files
 
-```markdown
----
-name: worker
-description: Implements one scoped change in a worktree, tests it and reports
-tools: read, write, edit, bash, git
-writes: true
----
+An agent file is front matter and a prompt. Its fields, who may change each, and an annotated example are in the
+[README](../README.md#roles-and-agent-files); this page has how they are read and what is done with them.
 
-You implement the one task in the parent's message, in this folder, and report.
-```
-
-| Field | Meaning |
+| Field | How it is read |
 |---|---|
 | `name` | Letters, digits, `-` and `_`; defaults to the file name |
-| `description` | One line the parent agent reads in the tool's role list |
-| `tools` | A list of tool names that narrows; omitted means the child's usual tools |
-| `writes` | `true` if the role may write; default `false` |
+| `description` | One line of at most 200 characters, which the parent agent reads in the tool's role list |
+| `tools` | A comma-separated list of tool names; only a role that writes may leave it out |
+| `actions`, `ask` | `tool action\|action, tool action`: a tool, then its actions. A tool is named once and must be in `tools` |
+| `writes` | `true` or `false`; default `false` |
+| `skills` | `none`, or a list of skill names (lowercase letters, digits and hyphens) |
+| `preload` | A list of skill names, each of which must be seen |
+| `context` | `project` or `none` |
+| `thinking` | One of Pi's levels: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` |
 
-- **Unknown fields are errors,** and so is a `model`, `thinking`, `limits` or
-  `extensions` field: those belong to configuration or are not allowed at all.
-- **A role with `writes: false`** needs a `tools` list, because the child's usual tools
-  include `bash`, `write` and `edit`, and is refused if the list names `bash`, `powershell`,
-  `write`, `edit` or `notebook_edit`. `jig-core`'s contract has no way to ask which other
-  tools write, so the child's own `jig-core` rules govern the rest: `scout` and `reviewer`
-  list `git`, whose commit and branch actions are local writes the rules allow.
+- **Unknown fields are errors,** and so is a `model`, `limits` or `extensions` field: those belong
+  to configuration or are not allowed at all. The message lists the fields there are.
+- **A role with `writes: false`** needs a `tools` list, because the child's usual tools include `bash`, `write` and
+  `edit`. It is refused if the list names `powershell`, `write`, `edit` or `notebook_edit`. It may list `bash`, which the
+  launcher allows only where the child has a sandbox ([Read-only bash](#read-only-bash)).
+- **Other tools are judged call by call.** `jig-core`'s contract has no way to ask which tools write, so the child's own
+  `jig-core` classifies each call, and the gate below refuses the writes among them.
+- **`ask` cannot name an action that `actions` does not allow,** and `preload` cannot name a skill that
+  `skills` leaves out: each would never be reached.
 - **Where files are read,** lowest first: the plugin's `agents/`, `agents.folders`, then
   `~/.pi/agent/agents/`. A file with an earlier name replaces it. Project folders are
   never read. The tool's description lists the roles, and is registered again at session
@@ -295,6 +306,134 @@ You implement the one task in the parent's message, in this folder, and report.
   child here has no screen, so planning stays with the parent, in `jig-workflow`'s plan
   stage.
 
+## A role only narrows, and the child enforces it
+
+The rule is Codex's: a role may customise its child or reduce what it can do, never replace the parent's
+authority ([compared](options.md#specialisation-compared-2026-11-01)).
+
+Before this, a role narrowed only by tool name, and `writes: false` only checked the tool list, so the shipped scout
+and reviewer had the whole `git` tool, push included. Now what a role says about what its child may do is enforced in the child.
+
+```text
+agent file ──┐
+             ├─ policy.ts: the effective role ─ role-plan.ts ─ launch.ts ── JIG_ROLE_POLICY ──┐
+configuration┘   (writes, actions, ask)         (skills, prompt, checks)                        │
+                                                                                                ▼
+  in the child: jig-agents reads the variable at start ── role-gate.ts: a jig-core gate ── every tool call
+                jig-sandbox reads it too ── locks the home and working folders when the role does not write
+```
+
+### The policy variable
+
+`JIG_ROLE_POLICY` is JSON on one line: `{"v":1,"role":"scout","writes":false,"actions":{"git":["status","log"]},"ask":{}}`.
+`jig-core`'s kit writes and reads it (`kit/role-policy.ts`), so `jig-agents` and `jig-sandbox` cannot read it two ways.
+A value that is set and cannot be read is `unreadable`, never `absent`.
+
+**Why an environment variable is safe, and what is assumed.** A process's environment is fixed when it starts. The
+model can run commands, and a command changes only the environment of its own child process; it cannot give the Pi
+that runs it another variable. What is assumed:
+- **Only trusted code runs inside the Pi process.** Extensions can change `process.env`, and they are the user's own
+  packages, loaded from places the model cannot write.
+- **The sandbox keeps a command from the child's memory and `/proc`.** Writing `/proc/<pid>/mem` or attaching with `ptrace`
+  would change the process; the sandbox gives a command its own process space ([Not verified](not-verified.md) says
+  what has not been proved of `ptrace_scope`).
+- **The gate was registered before any call.** It is registered when the plugin loads, before a session starts.
+
+### The gate
+
+The plugin reads the variable once, when it loads in a child, and registers a `jig-core` gate named `role-policy`
+([Gates](../../jig-core/docs/plugin-contract.md#gates)). The gate sees every call after the rules have decided, and can only
+make the decision stricter:
+
+| The policy says | The gate does |
+|---|---|
+| `writes: false` | Refuses every write, except a plain `bash` while the sandbox is active |
+| `actions` names a tool | Refuses any other action of that tool, and a call with no action |
+| `ask` names a tool action | Turns an allow into an ask, naming the role in the question |
+| none of these | Says nothing, and the child's usual rules decide |
+
+- **An empty list of actions refuses the tool whole,** and "allow for this session" does not stop an `ask` asking again.
+- **The words name the role,** such as `the role "scout" may not write, and git commit writes`. The record of a refused call
+  has the decision source `gate` and says `held by gate role-policy`; `jig-core` never records a gate's reason, but every
+  record of a child carries its role (`JIG_AGENT_ROLE`).
+- **A policy that cannot be read refuses everything.** The gate then denies every call, and the plugin throws when the
+  session starts. Pi reports that as an `extension_error`, which is the path the start-up check already has for a plugin
+  that failed to load: `start` fails with `a plugin failed to load in the child: ... JIG_ROLE_POLICY cannot be read`.
+- **Only `JIG_ROLE_POLICY` is looked for.** A session with `JIG_AGENT_ROLE` and no policy is not refused, because a user
+  may set that name to label records.
+- **Tool names are looked up as own properties,** so a tool called `constructor` is not found in a list by accident.
+- **The parent checks action names** against the tool's own `action` parameter when it can, and refuses a start for an
+  action the tool does not have: a misspelt `statuss` would otherwise refuse everything, and a misspelt `ask` would ask about nothing.
+
+### Read-only bash
+
+`jig-core` classifies `bash` as a write whatever the command is, because a shell string can do anything. So a read-only role
+could not have it, and a scout could not run `rg` or `git log`. Now it can, where the child has `jig-sandbox`:
+
+1. **The launcher checks.** A role with `writes: false` and `bash` is refused at `start`, before a worktree or a process
+   exists, when the parent has no `/sandbox` command. `/agents roles` shows the same warning. The child must then list
+   `/sandbox` too, which the start-up check already requires when the parent has it.
+2. **The sandbox locks.** `jig-sandbox` reads the policy and, for a role that does not write, adds two locked rules, for the
+   home folder and the working folder ([its design](../../jig-sandbox/docs/design.md#a-child-agent-that-may-not-write)). A
+   command reads them and writes neither. `/tmp` and the session's scratch folder stay writable.
+   - **The caches are locked with the home folder:** the runtime lays a read-only mount over a folder after the writable ones.
+   - **That is a loss and a gain.** A role that wants to build cannot, and a changed file in a cache, which is how a writing
+     agent could affect a later build outside the sandbox, cannot be made.
+3. **The gate checks at each call** that the sandbox is registered, on and able to run commands (`sandbox.canRun`), and
+   refuses `bash` otherwise. `bash` with `outside: true` is the action `outside`, which is a write, so a read-only role
+   cannot run a command outside the sandbox.
+
+`write`, `edit`, `powershell` and `notebook_edit` stay forbidden in a read-only role: they have no sandbox around them.
+
+### Skills: which a child sees
+
+Pi advertises every skill to the model, and its own documentation says a model may fail to load a relevant one. The parent
+works out the list and starts the child with `--no-skills` and one `--skill <file>` for each skill the child keeps.
+
+- **Where the list comes from.** Pi gives an extension no call for its skills, only `pi.getCommands()`, which lists each as
+  `skill:<name>` with the path of its file. A skill's folder and its `metadata` are read from that file.
+- **By default they follow the tools.** A skill belongs to a plugin when its file is in `plugins/<plugin>/skills/`, as Jig's are, or
+  when its front matter says `metadata: jig-tool: <tool>` (one tool, or several separated by commas). The front matter wins.
+- **A skill is seen** when the role has a tool that its plugin declared to `jig-core` (`jig().tools.declared()`) or that it names.
+  A skill with no owner, or whose plugin declared no tool, is always seen, and so is every skill for a role with no `tools` list.
+- **Why `metadata`.** The Agent Skills format defines it for keys of the author's own, and Pi's parser ignores the keys it does not
+  read (a test loads a skill with the field through Pi's own loader). The alternatives were a side file, or the company's `agents`
+  configuration; the field keeps the claim next to the skill that makes it.
+- **`skills: a, b`** is exactly those, in that order, whatever the tools are. A name the session does not have refuses the start and lists
+  the ones it has. `skills: none` is `--no-skills` alone.
+- **`preload`** reads each skill's file, drops its front matter, and appends it to the role's prompt under `## Skill: <name>`, with the
+  folder its relative paths are for. A skill longer than 64 KiB is refused. It must also be seen.
+- **`context: none`** is `--no-context-files`, so the child does not read AGENTS.md or CLAUDE.md.
+- **`thinking`** is `--thinking`. From strongest: `agents.roles.<role>.thinking`, the `:level` on the configured model, the file's
+  `thinking`, and for a child that runs the parent's model, the parent's own level.
+
+### Configuration laid over a file
+
+| Value | How configuration combines with the file's |
+|---|---|
+| `writes`, `tools` | Not settable: the section that tries is refused, and the message says they are the file's |
+| `actions` | A tool in both keeps the actions both list; a tool only configuration names is narrowed to its list |
+| `ask` | The file's and configuration's together. A company's and yours add up as well |
+| `skills`, `preload`, `context`, `thinking` | Configuration's replaces the file's: they give a child less to read, and are not authority |
+
+A company's defaults and the user's section are laid over each other by `jig-core` first (a list of yours replaces a
+company's, except `ask`, which adds up), and the plugin then lays the result over the file. A resumed child gets the policy of
+the role as it is then.
+
+### Attacks on a role
+
+| Attack | Why it does not work |
+|---|---|
+| The child's model edits its own environment | A command changes only its own child process. Extensions that could are the user's own code |
+| The child unregisters or replaces the gate | Only plugin code can; a gate registered again by name replaces it, and no tool does that |
+| A project's agent file widens a role | Project folders are never read, and the user's own folder is one the model cannot write |
+| Configuration widens a role | `writes` and `tools` are not settings, `actions` only narrows, and `ask` only adds |
+| A read-only role runs a command outside the sandbox | `bash` with `outside: true` is its own action, a write, which the gate refuses |
+| A read-only role uses `bash` with the sandbox off or broken | The gate asks `sandbox.canRun` at each call; the sandbox refuses when it cannot start |
+| A read-only role writes a cache that a later build uses | The home folder is locked, the caches included |
+| A policy is damaged on the way | An unreadable policy refuses every call, and the start fails |
+| A skill claims a tool to be seen | It can only make itself seen by a role that has the tool; a role's `skills` list still decides |
+
 ## Configuration
 
 | Field | Type and range | Default |
@@ -302,6 +441,12 @@ You implement the one task in the parent's message, in this folder, and report.
 | `roles.<role>.model` | `provider/id` or `provider/id:thinking`, in `enabledModels` | the parent's model |
 | `roles.<role>.maxTurns` / `maxMinutes` / `maxCost` | the ranges above | `limits` |
 | `roles.<role>.approvals` | `forward` or `deny` | `approvals` |
+| `roles.<role>.actions` | `{ "tool": ["action", ...] }`, at most 40 tools and 60 actions each; an empty list refuses the tool | the file's |
+| `roles.<role>.ask` | `{ "tool": ["action", ...] }`, each list of at least one action | the file's |
+| `roles.<role>.skills` | `"none"`, or 1 to 30 skill names | the file's, else the tools' |
+| `roles.<role>.preload` | 1 to 10 skill names, each also seen | the file's |
+| `roles.<role>.context` | `"project"` or `"none"` | the file's, else `project` |
+| `roles.<role>.thinking` | one of Pi's levels | the model's `:level`, else the file's |
 | `limits.maxTurns` / `maxMinutes` / `maxCost` | the ranges above | 40 / 30 / 2 |
 | `maxRunning`, `maxStarted` | 1 to 16, and 1 to 200 | 4, 30 |
 | `approvals` | `forward` or `deny` | `forward` |
@@ -316,7 +461,10 @@ You implement the one task in the parent's message, in this folder, and report.
   is allowed, which is what Pi itself means by it. A model Pi does not know is refused too.
 - **A role in the configuration with no agent file** is a warning in `/agents roles`.
 - **Company defaults** arrive through `config.addSectionDefaults("agents", ...)`, and the
-  user's own section is laid over them.
+  user's own section is laid over them. The section is registered with `union: ["roles.*.ask.*"]`, so a company's
+  `ask` and yours add up and neither replaces the other.
+- **`writes`, `tools`, `description`, `prompt` and `name` under a role** are refused with a message that says they are the
+  agent file's. Any other unknown field is an `unknown field`, as before.
 - **`maxAsks` of 0** means every ask is denied, the same as `approvals: "deny"`.
 
 ## Lifecycle
@@ -361,15 +509,21 @@ You implement the one task in the parent's message, in this folder, and report.
 ## Tests
 
 1. **Unit tests** for the arithmetic of limits, the RPC client (framing, ids, bad lines),
-   the cleaning of text, the reading of requests, agent files, configuration, the command
-   line and the environment.
+   the cleaning of text, the reading of requests, agent files (every field and every mistake),
+   configuration, the command line and the environment. The role's own parts have theirs:
+   `policy.test.ts` (configuration narrows and never widens), `skills.test.ts` (which skills follow
+   which tools, the `metadata` field, preloading) and `role-gate.test.ts` (the verdicts as data).
 2. **A parent session with a fake child.** `test/world.ts` runs a real Pi session (the
    SDK with its scripted model) with the real `jig-core` and the plugin, and
    `support/fake-child.mjs` stands in for Pi: a small Node program that speaks the protocol
    of Pi's docs from a script. Every line of "Every failure is a no" has a test, and so have
    the queue, each limit, steering, stopping, resuming, a worker's worktree, a child that
    is not what was asked for, a child that dies or floods, the end of the session, the
-   sweep for orphans and the check in a child.
+   sweep for orphans and the check in a child. `role-start.test.ts` starts the fake child from
+   each kind of role and reads its command line and environment: the policy, the skills, the
+   preloaded text, `--no-context-files`, the thinking level, configuration laid over the file, and the
+   refusals before anything starts. `role-gate.test.ts` also runs a session whose environment holds
+   a policy, which is what a child is, and calls tools through the real `jig-core`.
 3. **The stock Pi as a child.** `test/real-pi.test.ts` starts the Pi installed next to this
    Node with this repository's `jig-core` and `jig-agents` loaded through `settings.json`,
    and gives it a scripted model by an extension (`support/scripted-model.ts`) that
@@ -384,7 +538,16 @@ You implement the one task in the parent's message, in this folder, and report.
    - no screen is a no; a turn limit stops a looping child and ends its process;
    - ending the parent's session ends a child that is waiting on a question;
    - a Pi started without `jig-core` is refused before it gets its task;
-   - the child's call records name its role and its parent's session.
+   - the child's call records name its role and its parent's session;
+   - a role that may not write is refused a write by the child's own gate, which names the role, and a read runs;
+   - `actions` lets only the listed actions of a tool run, and `ask` asks about an action the rules allow;
+   - a policy the child cannot read fails the start the way a plugin that failed to load does;
+   - `bash` in a read-only role is refused by a child that has no sandbox, and runs for a role that writes;
+   - in a real child that loads `jig-sandbox` too, a read-only `bash` reads, writes `/tmp` and cannot write its working
+     folder, and `bash` with `outside: true` is refused before anyone is asked (skipped, with the reason, without
+     bubblewrap and its friends);
+   - the child's model is given only the skills its role names or its tools bring, the whole text of a preloaded one,
+     and no AGENTS.md for `context: none`, which the scripted model reports from the prompt it was given.
 
    It is skipped, with the reason, when no Pi 1.x is installed next to this Node
    (`JIG_AGENTS_TEST_PI` names another).

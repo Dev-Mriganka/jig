@@ -161,32 +161,60 @@ describe("/agents", () => {
         );
     });
 
-    test("roles lists the roles with their tools, model and limits, warns of a configured role with no file, and names a bad file", {
+    test("roles lists each role with its tools, actions, ask, writes, skills, preload, context, thinking, model and limits, and where each came from", {
         timeout: 30_000,
     }, async () => {
         w = await startWorld({
             config: {
                 agents: {
                     roles: {
-                        scout: { model: "faux/small-model:low", maxTurns: 12 },
+                        scout: {
+                            model: "faux/small-model:low",
+                            maxTurns: 12,
+                            actions: { git: ["status", "log", "push"] },
+                            ask: { git: ["log"] },
+                            context: "none",
+                        },
                         ghost: { model: "faux/big-model" },
                     },
                 },
             },
-            agentFiles: { "broken.md": "---\ndescription: d\ntools: read, bash\nwrites: false\n---\nx\n" },
+            agentFiles: { "broken.md": "---\ndescription: d\ntools: read, write\nwrites: false\n---\nx\n" },
         });
         const [text] = await w.command("roles");
-        assert.match(text ?? "", /scout \(read-only\): Read-only exploration/);
-        assert.match(
-            text ?? "",
-            /tools: read, grep, find, ls, git, logs; model: faux\/small-model:low; limits: 12 turns, 30 min, \$2;/,
-        );
-        assert.match(text ?? "", /worker \(writes\): /);
+        // A role is a line and the indented lines under it.
+        const scout = /(?:^|\n)(scout \(read-only\)[^\n]*(?:\n {2}[^\n]*)*)/.exec(text ?? "")?.[1] ?? "";
+        assert.match(scout, /^scout \(read-only\): Read-only exploration/);
+        assert.match(scout, /\n {2}file: .*scout\.md\n/);
+        assert.match(scout, /\n {2}tools: read, grep, find, ls, git, logs, bash \(file\)\n/);
+        assert.match(scout, /\n {2}writes: no \(file\)\n/);
+        // The file lists six git actions and configuration three; only the ones in both are left, and push is not added.
+        assert.match(scout, /\n {2}actions: git status\|log \(file and configuration\)\n/);
+        assert.match(scout, /\n {2}ask: git log \(configuration\)\n/);
+        assert.match(scout, /\n {2}skills: .*\(those that follow the tools\)\n/);
+        assert.match(scout, /\n {2}preload: none \(default\)\n/);
+        assert.match(scout, /\n {2}context: none \(configuration\)\n/);
+        assert.match(scout, /\n {2}thinking: low \(configuration, the model's :low\)\n/);
+        assert.match(scout, /\n {2}model: faux\/small-model:low \(configuration\); limits: 12 turns, 30 min, \$2/);
+        assert.match(text ?? "", /\nworker \(writes\): /);
+        assert.match(text ?? "", /\n {2}actions: every action of every tool \(default\)\n/);
         assert.match(
             text ?? "",
             /warning: agents\.roles\.ghost is set in jig\.json, but no agent file defines the role ghost/,
         );
-        assert.match(text ?? "", /skipped .*broken\.md: tools: a role with writes: false must not list bash/);
+        assert.match(text ?? "", /skipped .*broken\.md: tools: a role with writes: false must not list write/);
+    });
+
+    test("roles warns of a role that cannot start here: a read-only role with bash and no sandbox", {
+        timeout: 30_000,
+    }, async () => {
+        w = await startWorld({ commands: [] });
+        const [text] = await w.command("roles");
+        assert.match(
+            text ?? "",
+            /scout \(read-only\)[\s\S]*warning: it lists bash and does not write, which is safe only inside jig-sandbox/,
+        );
+        assert.doesNotMatch((text ?? "").split("\nworker ")[1] ?? "", /warning/);
     });
 
     test("show gives the end of a child's transcript, cleaned", { timeout: 30_000 }, async () => {

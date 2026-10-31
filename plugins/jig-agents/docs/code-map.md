@@ -13,7 +13,7 @@ so this table cannot drift from the code.
 
 | File | What it does | Called by |
 |---|---|---|
-| `index.ts` | The factory: registers the section, the tool, the watch kind, the command and the session hooks | Pi, which loads it |
+| `index.ts` | The factory: registers the section, the tool, the watch kind, the command, the role gate and the session hooks | Pi, which loads it |
 
 ### Tool and commands
 
@@ -21,6 +21,7 @@ so this table cannot drift from the code.
 |---|---|---|
 | `tool.ts` | The `subagent` tool: checks the input, classifies the call, runs `start`, `status`, `message`, `stop` | `index.ts` |
 | `commands.ts` | `/agents`: the children, the roles, a transcript, and `say` and `stop` typed by you | `index.ts` |
+| `role-report.ts` | `/agents roles`: each role as it would run here, with where every value came from | `commands.ts` |
 | `watch.ts` | The `subagent` watch kind that carries a child's report, and which watch belongs to which child | `index.ts`, `runtime.ts` |
 
 ### Domain logic
@@ -33,9 +34,13 @@ so this table cannot drift from the code.
 | `child-report.ts` | Which end a run was, the outcome line, `report.md`, and the result a watch hands the agent | `child.ts` |
 | `child-questions.ts` | A child's questions: refuse or forward them, and count the time you kept it waiting | `child.ts` |
 | `limits.ts` | The arithmetic of turns, minutes and cost, and the grace after a limit | `child.ts`, `child-report.ts` |
-| `roles.ts` | Reads the agent files (the roles) from the three places they may live | `index.ts`, `runtime.ts`, `tool.ts`, `launch.ts`, `start-plan.ts` |
-| `config.ts` | The `agents` section of `jig.json`: limits, models, counts and waits | `index.ts`, `runtime.ts`, `commands.ts`, `launch.ts`, `roles.ts`, `limits.ts` |
-| `launch.ts` | The child's command line, its environment, its model, and the check of a started child | `runtime.ts`, `child.ts`, `start-plan.ts`, `tool.ts`, `commands.ts` |
+| `roles.ts` | Reads the agent files (the roles) from the three places they may live, field by field | `index.ts`, `runtime.ts`, `tool.ts`, `launch.ts`, `start-plan.ts`, `policy.ts`, `role-plan.ts` |
+| `policy.ts` | A role with configuration laid over it: what limits the child only narrows, what it reads is replaced; the policy the child enforces | `role-plan.ts`, `role-report.ts` |
+| `role-plan.ts` | What a role comes to in this session: its policy, its skills, its prompt with the preloaded ones, and what stops it from running | `runtime.ts`, `role-report.ts` |
+| `skills.ts` | Which skills a child sees: Pi's list, the plugin each belongs to, the `metadata` field, preloading | `role-plan.ts` |
+| `role-gate.ts` | In the child: reads the policy from the environment and registers the `jig-core` gate that enforces it | `index.ts` |
+| `config.ts` | The `agents` section of `jig.json`: limits, models, counts, waits and a role's narrowing and reading | `index.ts`, `runtime.ts`, `launch.ts`, `roles.ts`, `limits.ts`, `policy.ts`, `skills.ts`, `role-report.ts` |
+| `launch.ts` | The child's command line, its environment, its model, and the check of a started child | `runtime.ts`, `child.ts`, `start-plan.ts`, `tool.ts`, `role-plan.ts` |
 | `worktree.ts` | A worker's own git worktree, made through `jig-core`'s `exec.git` | `runtime.ts` |
 
 ### I/O
@@ -68,13 +73,19 @@ The agent asks for a scout: `subagent start` with `role: "scout"` and a task. Th
    ends after one answer, an unknown role (`roles.ts`), a bad task, too many running or started children
    (`config.ts` settings), and a bad `cwd`. `start-plan.ts` makes the name and the id, finds the folder with
    `resolveCwd`, and picks the model with `modelFor` (which asks `launch.ts`).
+   Then `planRole` in `role-plan.ts` lays configuration over the role (`policy.ts`), works out the skills it
+   sees (`skills.ts`) and its prompt, and refuses a role that cannot run here: `bash` with no sandbox, a skill
+   the session lacks, an action its tool does not have.
 4. **The spec.** `start` builds a `ChildSpec` (`child-types.ts`) with the role's limits and approvals from
    `config.ts`, a run folder from `store.ts`, and a new `Child`. A role that writes first gets a git worktree of
    its own from `worktree.ts`.
 5. **The launch.** `Runtime.run` builds the flags and the environment in `launch.ts` (`flagsFor`,
-   `childEnvironment`), then calls `Child.launch`. That starts Pi in RPC mode through `child-process.ts`, opens
-   the pipes with `rpc.ts`, and asks the child which commands it lists and which model it runs. `checkStarted` in
-   `launch.ts` refuses a child that did not load the same plugins or runs another model.
+   `childEnvironment`, which sets `JIG_ROLE_POLICY`), then calls `Child.launch`. That starts Pi in RPC mode
+   through `child-process.ts`, opens the pipes with `rpc.ts`, and asks the child which commands it lists and
+   which model it runs. `checkStarted` in `launch.ts` refuses a child that did not load the same plugins or
+   runs another model. In the child, `index.ts` has already called `installRoleGate` in `role-gate.ts`, which
+   reads the policy and registers the gate that refuses what the role does not allow; a policy it cannot read
+   makes `session_start` throw, which `checkStarted` reads as a plugin that failed to load.
 6. **The task.** `Child.launch` sends the task, wrapped by `taskPrompt` in `start-plan.ts`, as the first prompt.
    The state becomes `running` and a one-second tick begins to look at the limits.
 7. **The watch.** `Runtime.start` starts a watch of kind `subagent` through `ChildWatches` in `watch.ts`, and

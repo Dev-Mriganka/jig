@@ -5,22 +5,24 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, test } from "node:test";
 import { DEFAULT_LIMITS, RANGES, SECTION_FIELDS, settingsFrom } from "../src/config.ts";
-import { loadRoles, shippedFolder } from "../src/roles.ts";
+import { loadRoles, parseRole, ROLE_FIELDS, shippedFolder } from "../src/roles.ts";
+import { bodyOf, frontMatterOf, toolsNamedBy } from "../src/skills.ts";
 import { ACTION_NAMES } from "../src/tool.ts";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const read = (file: string): string => readFileSync(path.join(ROOT, file), "utf8");
 
-/** The rows of the table under `heading`: the cells of each row, without backticks. */
+/** The rows of the first table under `heading` (a `##` or `###` one): the cells of each row, without backticks. */
 function table(markdown: string, heading: string): string[][] {
-    const start = markdown.indexOf(`\n## ${heading}`);
-    assert.ok(start >= 0, `a heading "${heading}"`);
+    const match = new RegExp(`\\n(#{2,3}) ${heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\n`).exec(markdown);
+    assert.ok(match, `a heading "${heading}"`);
+    const level = (match[1] ?? "##").length;
     const rows: string[][] = [];
     for (const line of markdown
-        .slice(start + 1)
+        .slice(match.index + 1)
         .split("\n")
         .slice(1)) {
-        if (line.startsWith("## ")) break;
+        if (new RegExp(`^#{1,${level}} `).test(line)) break;
         if (!line.startsWith("|")) continue;
         const cells = line
             .split("|")
@@ -35,8 +37,10 @@ function table(markdown: string, heading: string): string[][] {
 describe("the README", () => {
     const readme = read("README.md");
 
-    test("is about as long as a plugin README is, and opens with the status", () => {
-        assert.ok(readme.split("\n").length <= 160, `${readme.split("\n").length} lines`);
+    test("opens with the status, and stays short enough to read in one sitting", () => {
+        // Longer than most plugins' READMEs, on purpose: the roles and their fields are what a reader came to learn, and the owner asked
+        // for them in the README itself. The mechanism behind them is in docs/design.md.
+        assert.ok(readme.split("\n").length <= 280, `${readme.split("\n").length} lines`);
         assert.match(readme.split("\n")[2] ?? "", /^\*\*Status: built\.\*\*/);
     });
 
@@ -66,22 +70,63 @@ describe("the README", () => {
         for (const word of ["roles", "show", "say", "stop"]) assert.match(text, new RegExp(`/agents ${word}`), word);
     });
 
-    test("the roles table lists the roles that ship, and says which may write", () => {
+    test("the roles table lists the roles that ship, with whether each may write, its tools and its git actions", () => {
         const { roles } = loadRoles([shippedFolder()]);
-        const rows = table(readme, "Roles and agent files");
+        const rows = table(readme, "The roles that ship");
         assert.deepEqual(
-            rows.slice(0, 3).map((row) => row[0]),
+            rows.map((row) => row[0]),
             ["scout", "reviewer", "worker"],
         );
-        for (const [name, writes] of rows.slice(0, 3).map((row) => [row[0], row[1]] as const)) {
-            assert.equal(roles.get(name as string)?.writes, writes === "yes", String(name));
+        for (const row of rows) {
+            const role = roles.get(row[0] as string);
+            assert.equal(role?.writes, row[1] === "yes", String(row[0]));
+            assert.equal(row[2], role?.tools?.join(", "), `${row[0]}: tools`);
+            // A role narrowed to some git actions names every one of them; one that is not narrowed says all.
+            for (const action of role?.actions?.git ?? [])
+                assert.ok((row[3] ?? "").includes(action), `${row[0]}: ${action}`);
+            if (role?.actions === undefined) assert.match(row[3] ?? "", /^all/);
         }
     });
 
-    test("the example agent file is the scout's front matter", () => {
-        const front = (text: string) => /^---\n([\s\S]*?)\n---/m.exec(text)?.[1];
-        const example = /```markdown\n([\s\S]*?)```/.exec(readme)?.[1] ?? "";
-        assert.equal(front(example), front(read("agents/scout.md")));
+    test("the field table lists every field an agent file has, in the parser's order", () => {
+        const rows = table(readme, "Every field");
+        assert.deepEqual(
+            rows.slice(0, ROLE_FIELDS.length).map((row) => row[0]),
+            [...ROLE_FIELDS],
+        );
+        // Whoever may change a field is said in the last column, and `writes` is the file's alone.
+        assert.equal(rows.find((row) => row[0] === "writes")?.[3], "the file only");
+        for (const row of rows.slice(0, ROLE_FIELDS.length)) assert.match(row[3] ?? "", /^the file/, String(row[0]));
+    });
+
+    /** The Markdown code blocks of the README, each without the indent of the list item it may sit in. */
+    const blocks = [...readme.matchAll(/^ *```markdown\n([\s\S]*?)^ *```/gm)].map((match) =>
+        (match[1] ?? "").replace(/^ {2}/gm, ""),
+    );
+
+    test("the example agent file parses and uses every field, with its comments", () => {
+        const example = blocks[0] ?? "";
+        const role = parseRole(example, "/orders-fixer.md", "x");
+        assert.equal(role.name, "orders-fixer");
+        for (const field of ["tools", "actions", "ask", "writes", "skills", "preload", "context", "thinking"]) {
+            assert.ok(Object.hasOwn(role, field), field);
+        }
+        // Every field of the parser is written out in the example, once.
+        const lines = (/^---\n([\s\S]*?)\n---/m.exec(example)?.[1] ?? "")
+            .split("\n")
+            .filter((line) => !line.startsWith("#"));
+        assert.deepEqual(
+            lines.map((line) => line.split(":")[0]),
+            [...ROLE_FIELDS],
+        );
+        assert.equal(role.writes, true);
+        assert.deepEqual(role.ask, { git: ["push"] });
+    });
+
+    test("the skill example names the tool it extends in the field the code reads", () => {
+        const text = blocks.find((block) => block.includes("name: acme-jira")) ?? "";
+        assert.deepEqual(toolsNamedBy(frontMatterOf(text) ?? ""), ["jira"]);
+        assert.equal(bodyOf(text), "");
     });
 
     test("the limits table has the defaults the code has", () => {

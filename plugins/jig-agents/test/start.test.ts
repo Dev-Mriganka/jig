@@ -42,7 +42,7 @@ describe("starting a child", () => {
         const argv = log.start.argv;
         assert.deepEqual(argv.slice(0, 2), ["--mode", "rpc"]);
         assert.equal(argv[argv.indexOf("--session-id") + 1], `agent-${result.details.child}`);
-        assert.equal(argv[argv.indexOf("--tools") + 1], "read,grep,find,ls,git,logs");
+        assert.equal(argv[argv.indexOf("--tools") + 1], "read,grep,find,ls,git,logs,bash");
         assert.equal(argv[argv.indexOf("--exclude-tools") + 1], "subagent,mcp__*");
         assert.ok(argv.includes("--no-approve"));
         assert.ok(argv.includes("--model"));

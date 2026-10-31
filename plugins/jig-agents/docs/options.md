@@ -1,8 +1,9 @@
 # Options
 
 The Pi store's subagent packages compared against Jig's criteria, what each one does to
-Jig's rules, and what the earlier harness's pane-based copy taught. Back to the
-[jig-agents overview](../README.md).
+Jig's rules, what the earlier harness's pane-based copy taught, and
+[how Claude Code, Codex and `pi-subagents` specialise a subagent](#specialisation-compared-2026-11-01).
+Back to the [jig-agents overview](../README.md).
 
 Checked on 2026-10-31 against Pi 1.4.0. Nothing was installed or run. Statements come
 from each package's README and from reading the code that launches a child, answers its
@@ -209,6 +210,52 @@ Nothing is copied from these packages. What is borrowed is an idea each:
 - **Interactive roles,** such as the planner that asked you questions in its pane.
 - **What it buys:** no tmux needed, so it works in any terminal and on macOS; no orphans;
   and a screen that only the parent owns, which makes forwarding questions possible.
+
+## Specialisation compared (2026-11-01)
+
+What an agent file can set, in the tools people use most and in Jig, and what Jig took. This is from their public
+documentation and, for Codex, its source at version 0.166.0; nothing was installed or run. A dash means no such field was found.
+
+| An agent file can set | Claude Code | Codex | `pi-subagents` | `jig-agents` |
+|---|---|---|---|---|
+| The prompt | the body | `developer_instructions` | the body | the body |
+| Which tools | `tools`, `disallowedTools` | switch features off | `tools`, `excludeTools` | `tools` |
+| One action of a tool | no: shared permission rules | no: shared command rules | per tool only (`permission`) | `actions` and `ask`, enforced in the child |
+| Read-only | `permissionMode` | cannot change the parent's sandbox | `permission` | `writes: false`, a gate and the sandbox |
+| Model and effort | `model`, `effort` | model, reasoning effort | settings `agentOverrides` | model in configuration; `thinking` |
+| Skills | `skills`, whole text preloaded | switch skills off | `skills`, `inheritSkills` | `skills`, `preload`; by default they follow the tools |
+| Project instructions | `omitClaudeMd` | — | `inheritProjectContext` | `context` |
+| Memory | `memory` (a folder) | a feature switch | a `memory` scope | later |
+| Hooks and MCP servers | `hooks`, `mcpServers` | cannot override the parent | `extensions` | no: the parent's plugins, always |
+| Where a file may come from | managed settings, project, user, plugin | user, project | — | plugin, configured, user; never the project |
+
+- **Claude Code** reads agent files from [managed settings, the project, the user and plugins](https://code.claude.com/docs/en/sub-agents).
+  Its tool control in the file is whole tools; patterns such as `Bash(git status:*)` live in the general permission rules, which every
+  subagent inherits. A parent in a bypass mode wins over the file's `permissionMode`.
+- **Codex** reads [TOML files](https://learn.chatgpt.com/docs/agent-configuration/subagents) and applies only a whitelist: model, reasoning
+  effort, verbosity, personality, service tier, and switching features and skills off. `sandbox_mode`, `approval_policy` and
+  `mcp_servers` in a file do not override the parent. A comment in its source (`codex-rs/core/src/agent/role.rs`, in
+  [openai/codex](https://github.com/openai/codex)) says roles "may customize the child or reduce its capabilities, but never replace
+  the parent session's authority".
+- **[`pi-subagents`](https://www.npmjs.com/package/pi-subagents)** has the widest set of fields, and settings (`agentOverrides.<name>`)
+  that override the files.
+
+**The common ground.**
+- **Nobody controls one action of a tool in the agent file.** All of them rely on a separate permission layer that the child inherits.
+- **Specialising is** a prompt, a model and effort, tools, skills, project instructions on or off, and memory.
+- **Depth is kept low** (one to three levels). Readers run in parallel, writers are isolated, and the final report is the result.
+- **Teams are experimental everywhere,** and costly: Claude Code's costs page says about seven times the tokens of one session.
+
+**What Jig takes.**
+1. **A role can only narrow, and the child enforces it,** from Codex. Jig goes a step further than the others: `actions` and `ask` are
+   per action, and a gate in the child enforces them, because Jig has a permission layer that every child already runs.
+2. **More fields,** from Claude Code and `pi-subagents`: `skills` and `preload`, `context`, `thinking`. Configuration can replace them,
+   as `pi-subagents`' `agentOverrides` can, because they give a child less to read and are not authority.
+3. **Later:** structured verdicts for `jig-workflow`, `ask_parent` (which `@gotgenes/pi-subagents` has), a live view of a child (HazAT's
+   package has panes), a `memory` field and a way to measure delegation. A company's roles already come through `agents.folders`.
+
+**What Jig does not take:** teams, chain languages, scheduled agents, a model that chooses a child's model, hooks or MCP servers per
+role (a child has its parent's plugins), and a `permissionMode` (Jig's modes are the rules and the floor, which a role cannot change).
 
 ## Not verified
 

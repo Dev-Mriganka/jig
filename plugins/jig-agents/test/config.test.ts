@@ -102,6 +102,70 @@ describe("validateAgents", () => {
         assert.equal(validateAgents({ env: "PATH" }).length, 1);
     });
 
+    test("a role's actions, ask, skills, preload, context and thinking are accepted when they are well formed", () => {
+        assert.deepEqual(
+            validateAgents({
+                roles: {
+                    scout: {
+                        actions: { git: ["status", "log"], jira: [] },
+                        ask: { git: ["push"] },
+                        skills: ["git", "house-style"],
+                        preload: ["git"],
+                        context: "none",
+                        thinking: "high",
+                    },
+                    reviewer: { skills: "none", context: "project", thinking: "off" },
+                },
+            }),
+            [],
+        );
+    });
+
+    test("actions and ask are an object from a tool to a list of action names; ask needs at least one", () => {
+        const bad = (field: string, value: unknown) => validateAgents({ roles: { scout: { [field]: value } } });
+        assert.match(
+            bad("actions", ["git"])[0] ?? "",
+            /agents\.roles\.scout\.actions: must be an object from a tool to its actions/,
+        );
+        assert.match(bad("actions", { git: "status" })[0] ?? "", /actions\.git: must be a list of actions/);
+        assert.match(bad("actions", { git: [3] })[0] ?? "", /actions\.git: every action must be a name/);
+        assert.match(bad("actions", { git: ["no spaces"] })[0] ?? "", /every action must be a name/);
+        assert.match(bad("actions", { "bad tool": ["x"] })[0] ?? "", /"bad tool" is not a tool name/);
+        assert.match(bad("ask", { git: [] })[0] ?? "", /ask\.git: must be a list of one or more actions/);
+        assert.match(bad("ask", "git push")[0] ?? "", /agents\.roles\.scout\.ask: must be an object/);
+    });
+
+    test("skills is none or a list of skill names, preload a list, context project or none, thinking one of Pi's levels", () => {
+        const bad = (field: string, value: unknown) => validateAgents({ roles: { scout: { [field]: value } } });
+        assert.match(
+            bad("skills", "all")[0] ?? "",
+            /agents\.roles\.scout\.skills: must be a list of one to 30 skill names/,
+        );
+        assert.match(bad("skills", [])[0] ?? "", /skills: must be a list of one to 30/);
+        assert.match(
+            bad("skills", ["Git"])[0] ?? "",
+            /skills: every skill name is lowercase letters, digits and hyphens/,
+        );
+        assert.match(bad("preload", "git")[0] ?? "", /preload: must be a list of one to 10 skill names/);
+        assert.match(bad("preload", ["a_b"])[0] ?? "", /preload: every skill name/);
+        assert.match(bad("context", "some")[0] ?? "", /context: must be "project" or "none"/);
+        assert.match(bad("thinking", "deep")[0] ?? "", /thinking: must be one of off, minimal/);
+        assert.match(bad("thinking", 3)[0] ?? "", /thinking: must be one of/);
+    });
+
+    test("writes, tools, description, prompt and name are not settings: they are the agent file's, and the error says so", () => {
+        for (const field of ["writes", "tools", "description", "prompt", "name"]) {
+            const errors = validateAgents({ roles: { scout: { [field]: true } } });
+            assert.equal(errors.length, 1, field);
+            assert.match(errors[0] ?? "", new RegExp(`agents\\.roles\\.scout\\.${field}: `));
+            assert.doesNotMatch(errors[0] ?? "", /unknown field/);
+        }
+        // Anything else is still an unknown field.
+        assert.deepEqual(validateAgents({ roles: { scout: { memory: "project" } } }), [
+            "agents.roles.scout.memory: unknown field",
+        ]);
+    });
+
     test("a branch pattern must hold {name} and be a plausible branch name", () => {
         for (const branch of [
             "agent",
@@ -138,6 +202,36 @@ describe("settingsFrom", () => {
             assert.equal(s.branch, "agent/{name}");
         }
         assert.deepEqual(DEFAULT_LIMITS, { maxTurns: 40, maxMinutes: 30, maxCost: 2 });
+    });
+
+    test("keeps a role's actions, ask, skills, preload, context and thinking, as copies", () => {
+        const section = {
+            roles: {
+                scout: {
+                    actions: { git: ["status", "status", "log"] },
+                    ask: { git: ["push"] },
+                    skills: ["git"],
+                    preload: ["git"],
+                    context: "none",
+                    thinking: "low",
+                },
+                reviewer: { skills: "none" },
+            },
+        };
+        const s = settingsFrom(section, "/home/me");
+        assert.deepEqual(s.roles.scout, {
+            actions: { git: ["status", "log"] },
+            ask: { git: ["push"] },
+            skills: ["git"],
+            preload: ["git"],
+            context: "none",
+            thinking: "low",
+        });
+        assert.equal(s.roles.reviewer?.skills, "none");
+        const copy = s.roles.scout?.skills;
+        assert.ok(Array.isArray(copy));
+        copy.push("changed");
+        assert.deepEqual(section.roles.scout.skills, ["git"]);
     });
 
     test("reads the fields, expanding ~/ in folders", () => {

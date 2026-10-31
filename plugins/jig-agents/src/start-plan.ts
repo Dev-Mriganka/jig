@@ -71,14 +71,16 @@ export function modelFor(
     pi: ExtensionAPI,
     settings: AgentsSettings,
     agentDir: string,
-    role: string,
+    role: Pick<Role, "name" | "thinking">,
 ): ModelChoice | undefined {
-    const choice = chooseModel(settings, role, parentModel(ctx, pi), readEnabledModels(agentDir));
+    const choice = chooseModel(settings, role.name, parentModel(ctx, pi), readEnabledModels(agentDir), role.thinking);
     if (choice?.source === "role") {
         const [provider = "", ...rest] = choice.model.split("/");
         const known = ctx.modelRegistry?.find?.(provider, rest.join("/"));
         if (typeof ctx.modelRegistry?.find === "function" && known === undefined) {
-            throw new StartError(`Pi does not know the model ${choice.model} that agents.roles.${role}.model names`);
+            throw new StartError(
+                `Pi does not know the model ${choice.model} that agents.roles.${role.name}.model names`,
+            );
         }
     }
     return choice;

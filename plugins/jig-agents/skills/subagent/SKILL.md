@@ -15,6 +15,8 @@ A child is a separate Pi that loads the same plugins as you, so the same rules g
 | A fresh look at your own change before you call it done | a `reviewer` | It has not seen your reasoning, so it does not share your blind spots |
 | One scoped change that you can describe in a paragraph | a `worker` | It works in a git worktree and branch of its own, tests and commits there |
 
+A `scout` and a `reviewer` read and cannot write: their `bash` runs where the project and the home folder are read-only, and they have only the read actions of `git`. A call they are refused says that the role may not write; do not ask them to try again, start a `worker` for the change.
+
 Do not start a child for a question you can answer with one file, or for work that needs to talk to the user: a child cannot ask you anything, and its questions go to the user.
 
 ## Writing the task

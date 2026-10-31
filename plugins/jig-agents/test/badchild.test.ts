@@ -17,13 +17,16 @@ async function begin(options: WorldOptions = {}): Promise<World> {
     return w;
 }
 
+/** A role with no bash, for a parent that has no sandbox: a read-only role may have bash only where there is one. */
+const PLAIN = { "plain.md": "---\ndescription: Reads files\ntools: read, grep\nwrites: false\n---\nYou read.\n" };
+
 const alive = (world: World): boolean => world.rt.host.alive(world.log().start?.pid ?? 0);
 const types = (world: World) => world.log().commands.map((c) => c.type);
 
 describe("a child that is not what was asked for is stopped before it gets its task", () => {
     test("one that did not load jig-core is refused: it would run ungoverned", { timeout: 30_000 }, async () => {
-        const world = await begin({ script: { commands: ["mcp", "llama"] } });
-        const refused = await world.tool({ action: "start", role: "scout", task: "secret task" });
+        const world = await begin({ commands: [], agentFiles: PLAIN, script: { commands: ["mcp", "llama"] } });
+        const refused = await world.tool({ action: "start", role: "plain", task: "secret task" });
         assert.equal(refused.isError, true);
         assert.match(
             refused.text,
@@ -42,8 +45,12 @@ describe("a child that is not what was asked for is stopped before it gets its t
     });
 
     test("jig-sandbox is not required of a child when the parent has none", { timeout: 30_000 }, async () => {
-        const world = await begin({ script: { commands: ["jig"], steps: [{ hold: true }] } });
-        const started = await world.tool({ action: "start", role: "scout", task: "x" });
+        const world = await begin({
+            commands: [],
+            agentFiles: PLAIN,
+            script: { commands: ["jig"], steps: [{ hold: true }] },
+        });
+        const started = await world.tool({ action: "start", role: "plain", task: "x" });
         assert.equal(started.isError, false, started.text);
     });
 
