@@ -59,8 +59,11 @@ export interface FakeJig {
     /** The approved preview of each call that asked, by tool call id. */
     approved: Map<string, Preview>;
     facts: Map<string, Facts[]>;
-    /** Every program started, in order: the file, the arguments (git's fixed flags left out) and the working directory. */
-    started_processes: Array<{ file: string; args: string[]; cwd?: string }>;
+    /**
+     * Every program started, in order: the file, the arguments (git's fixed flags left out), the working directory, and the
+     * variables the call added to the minimal environment.
+     */
+    started_processes: Array<{ file: string; args: string[]; cwd?: string; env?: Readonly<Record<string, string>> }>;
     /** What `config.section("git")` returns. Set with `setSection`. */
     setSection(name: string, value: unknown): void;
     /** Makes the next git call fail as jig-core does when the repository's config would run a command. */
@@ -168,7 +171,7 @@ export function installFakeJig(): FakeJig {
         });
 
     const run = (file: string, args: readonly string[], options: RunOptions = {}): Promise<RunResult> => {
-        processes.push({ file, args: [...args], cwd: options.cwd });
+        processes.push({ file, args: [...args], cwd: options.cwd, env: options.env });
         return spawnProcess(file, args, options);
     };
 

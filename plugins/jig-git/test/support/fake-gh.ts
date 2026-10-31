@@ -1,10 +1,10 @@
-// A fake `gh`: an executable script first on PATH that answers from fixtures and logs every call. Nothing here reaches
-// GitHub. A fixture names the leading words of a call (`pr view`, `api`) and substrings that must appear among its
+// A fake `gh` (and, with the same script, a fake `glab`): an executable script first on PATH that answers from fixtures and
+// logs every call. Nothing here reaches GitHub or GitLab. A fixture names the leading words of a call (`pr view`, `api`) and substrings that must appear among its
 // other arguments or its standard input (`commits/abc/check-runs`, `resolveReviewThread`; a leading `=` means an argument
 // that is exactly that), and gives one reply, or a list of replies that are used in turn (the last
 // one repeats). For `gh api -i` the script prints a status line and headers like the real gh does, and a request whose
-// `If-None-Match` header equals the fixture's `etag` gets the `304` answer the real gh gives: the headers, then
-// `gh: HTTP 304` on standard error and exit code 1.
+// `If-None-Match` header equals the fixture's `etag` gets the `304` answer the real program gives: the headers, then
+// `gh: HTTP 304` (`glab: HTTP 304`) on standard error and exit code 1.
 import fs from "node:fs";
 import path from "node:path";
 import { setEnv } from "./repos.ts";
@@ -59,7 +59,7 @@ const found = fixtures.findIndex((f) => {
     return f.has.every((needle) => (needle.startsWith("=") ? rest.includes(needle.slice(1)) : haystack.includes(needle)));
 });
 if (found < 0) {
-    process.stderr.write("fake gh: no reply for " + args.join(" ") + "\\n");
+    process.stderr.write("fake __NAME__: no reply for " + args.join(" ") + "\\n");
     process.exit(2);
 }
 const counter = path.join(dir, "used-" + fixtures[found].id);
@@ -84,14 +84,14 @@ const finish = () => {
     const sent = args.filter((arg, i) => args[i - 1] === "-H" && /^if-none-match:/i.test(arg)).map((arg) => arg.replace(/^[^:]*:\\s*/, ""));
     if (reply.etag && sent.includes(reply.etag)) {
         process.stdout.write("HTTP/2.0 304 Not Modified\\nEtag: " + reply.etag + "\\n" + Object.entries(reply.headers ?? {}).map(([k, v]) => k + ": " + v + "\\n").join("") + "\\n");
-        process.stderr.write("gh: HTTP 304\\n");
+        process.stderr.write("__NAME__: HTTP 304\\n");
         process.exit(1);
     }
     const status = reply.status ?? 200;
     const headers = { "Content-Type": "application/json; charset=utf-8", ...(reply.etag ? { Etag: reply.etag } : {}), ...(reply.headers ?? {}) };
     process.stdout.write("HTTP/2.0 " + status + " " + (status < 300 ? "OK" : "Error") + "\\n" + Object.entries(headers).map(([k, v]) => k + ": " + v + "\\n").join("") + "\\n" + body);
     if (status >= 300) {
-        process.stderr.write("gh: " + (reply.stderr ?? "Error") + " (HTTP " + status + ")\\n");
+        process.stderr.write("__NAME__: " + (reply.stderr ?? "Error") + " (HTTP " + status + ")\\n");
         process.exit(1);
     }
     process.exit(reply.code ?? 0);
@@ -109,9 +109,20 @@ interface Fixture {
 
 /** Puts a fake `gh` first on PATH until the sandbox is cleaned up. */
 export function installFakeGh(sb: Sandbox): FakeGh {
-    const dir = path.join(sb.root, "fake-gh");
+    return installFakeProgram(sb, "gh");
+}
+
+/** Puts a fake `glab` first on PATH. It answers and logs like the fake `gh`; `glab api -i` prints what `gh api -i` does. */
+export function installFakeGlab(sb: Sandbox): FakeGh {
+    return installFakeProgram(sb, "glab");
+}
+
+function installFakeProgram(sb: Sandbox, name: "gh" | "glab"): FakeGh {
+    const dir = path.join(sb.root, `fake-${name}`);
     fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, "gh"), `#!${process.execPath}\n${SCRIPT}`, { mode: 0o755 });
+    fs.writeFileSync(path.join(dir, name), `#!${process.execPath}\n${SCRIPT.replaceAll("__NAME__", name)}`, {
+        mode: 0o755,
+    });
     setEnv("PATH", `${dir}${path.delimiter}${process.env.PATH ?? ""}`);
     const fixtures = path.join(dir, "fixtures.json");
     const log = path.join(dir, "calls.jsonl");

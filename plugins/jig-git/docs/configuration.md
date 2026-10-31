@@ -14,7 +14,8 @@ The fields of the `git` section of `jig.json`, in detail. The table is in the
     `pr edit` (when it sets a title) check it while the preview is built, so a title
     that does not match is refused before anyone is asked and before anything is
     sent. The message shows the pattern, as in `git.prTitle (^PROJ-\d+: )`. An
-    `edit` that leaves the title alone is not checked.
+    `edit` that leaves the title alone is not checked. On GitLab it is checked
+    against the title as written, before the `Draft: ` prefix of a draft is added.
 - **`prTemplate`:** the path of a Markdown file, absolute or relative to the
   repository.
 - **`cloneHost`:** the only host other than `github.com` that a clone request
@@ -25,6 +26,10 @@ The fields of the `git` section of `jig.json`, in detail. The table is in the
 - **`watchBots`:** `true` or `false` (the default). Whether the comment watch also
   tells the agent about comments made by bots. It is read at each poll, so a
   change applies to a watch that is already running.
+- **`forges`:** an object of host names and `"github"` or `"gitlab"`. It names the hosts that are not `github.com` or `gitlab.com`,
+  such as `{ "gitlab.example.com": "gitlab" }`; host names are compared without regard to case, and carry no port. An `origin` on any
+  other host is refused. A host set to `"github"` is accepted as GitHub, and `gh` finds the repository from the remotes
+  ([GitLab](gitlab.md#which-forge-a-repository-is-on)).
 
 ## Moved fields
 
