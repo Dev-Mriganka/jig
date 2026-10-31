@@ -177,7 +177,7 @@ test("/ticket recall says so when there is no ticket, no cards, or nothing that 
         "No active ticket. Use /ticket recall <text>, or make a ticket active first.",
     );
     await pi.command("recall the footer colour is wrong on the settings page");
-    assert.equal(pi.notices.at(-1)?.text, "No earlier ticket scores 2.5 or more among 2 cards.");
+    assert.equal(pi.notices.at(-1)?.text, "No earlier ticket scores 2 or more among 2 cards.");
 
     const empty = tempFolder(t);
     useJig(t, { memory: { ticketPattern: PATTERN, folder: empty } });

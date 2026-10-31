@@ -47,15 +47,17 @@ Shared keys come first, then keyword search. The two add up to one score.
 
 ## The threshold
 
-A card needs `memory.recall.minScore` points, **2.5** unless you change it. The
-number follows from the table above:
+A card needs `memory.recall.minScore` points, **2** unless you change it. In terms
+of the table above:
 
-- One rare shared identifier, error line or key passes alone.
-- A name shared by most cards does not: it is worth less than half a point.
-- Words alone need about five rare ones, since they are the weakest signal.
+- One rare shared key, error line or identifier passes alone.
+- A name shared by most cards does not: it is worth less than a point.
+- Words alone need about four rare ones, since they are the weakest signal.
 
-Raise it if recall brings cards that do not help; lower it if it stays silent when
-a card would have. The cards that pass are cut to `memory.recall.max`, 3 unless set.
+The number comes from the [recall test](#the-recall-test). It was tuned on 30 invented
+queries, so it is a starting point: raise it first if
+recall brings cards that do not help, and lower it if it stays silent when a card
+would have helped. The cards that pass are cut to `memory.recall.max`, 3 unless set.
 
 ## The message
 
@@ -90,17 +92,20 @@ A test builds 1,000 generated cards and recalls over them.
 
 ## The recall test
 
-`test/recall-eval/` holds invented cards and queries with the cards each should
-find. It is the measurement that decides whether keys and keywords are enough,
+`test/recall-eval/` holds 25 invented cards and 30 queries, each with the cards it
+should find. It is the measurement that decides whether keys and keywords are enough,
 before embeddings are considered.
 
 - **The cards** are fictional and generic: an orders service, a payments worker, a
-  reporting job, flaky CI, a timeout, a null value in a mapper, a wrong time zone,
-  a migration, and others.
+  reporting job, flaky CI, timeouts, a null value in a mapper, a wrong time zone, a
+  migration, and others. Their front matter is what the extractors would give.
 - **The queries** are written like the text of a new ticket. Some share a name with
-  their card, some only share the idea, and some have no card to find.
-- **The test** computes recall at 3 and precision with the default settings, prints
-  them, and fails when either drops below a floor.
+  their card, some paste an error line, some share only words, some say the same
+  thing in other words, and three have no card to find.
+- **The test** runs recall with the default settings, prints each query with what came
+  back and why, then prints recall at 3 and precision. It fails below a floor.
 
-Invented tickets cannot say how recall does on real ones. The floor guards the
-scoring against a change that makes it worse; it is not a claim about real tickets.
+**Recall at 3** is the share of the cards a query should find that came back in the top
+three. **Precision** is the share of the cards that came back that a query should have
+found. A card that is related but not on the list, such as a second null value in a
+mapper, counts against precision.

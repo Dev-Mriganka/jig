@@ -94,7 +94,7 @@ test("a recall setting that is wrong is an error that names its key", () => {
 });
 
 test("the recall settings take their defaults field by field", () => {
-    assert.deepEqual(recallOf(undefined), { enabled: true, max: 3, minScore: 2.5 });
-    assert.deepEqual(recallOf({ recall: { max: 5 } }), { enabled: true, max: 5, minScore: 2.5 });
+    assert.deepEqual(recallOf(undefined), { enabled: true, max: 3, minScore: 2 });
+    assert.deepEqual(recallOf({ recall: { max: 5 } }), { enabled: true, max: 5, minScore: 2 });
     assert.deepEqual(recallOf({ recall: { enabled: false, minScore: 4 } }), { enabled: false, max: 3, minScore: 4 });
 });

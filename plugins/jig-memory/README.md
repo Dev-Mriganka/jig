@@ -73,7 +73,7 @@ plugin's rules. An error names the key, and the plugin then uses its defaults.
 | `folder` | `~/.local/share/jig/tickets` | Where ticket folders live: an absolute path, or one that starts with `~/` |
 | `recall.enabled` | `true` | Run recall when a new ticket becomes active |
 | `recall.max` | `3` | Most cards in one recall message, from 1 to 10 |
-| `recall.minScore` | `2.5` | The score a card needs; see [Recall](docs/recall.md#the-threshold) |
+| `recall.minScore` | `2` | The score a card needs; see [Recall](docs/recall.md#the-threshold) |
 
 - **`ticketPattern`:** a key must not touch a letter or digit on either side.
   Without a pattern, only `/ticket KEY` activates a ticket.

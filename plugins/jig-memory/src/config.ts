@@ -9,12 +9,12 @@ export interface RecallSettings {
     enabled?: boolean;
     /** The most cards in one recall message, from 1 to 10. Default 3. */
     max?: number;
-    /** The score a card needs, above 0. Default 2.5 (see docs/recall.md#the-threshold). */
+    /** The score a card needs, above 0. Default 2 (see docs/recall.md#the-threshold). */
     minScore?: number;
 }
 
 /** The recall settings with their defaults filled in. */
-export const RECALL_DEFAULTS: Required<RecallSettings> = { enabled: true, max: 3, minScore: 2.5 };
+export const RECALL_DEFAULTS: Required<RecallSettings> = { enabled: true, max: 3, minScore: 2 };
 export const RECALL_MAX = 10;
 
 export interface MemorySettings {

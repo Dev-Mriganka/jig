@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { renderCard } from "../src/card.ts";
 import { type CardIndex, entryOf } from "../src/cards.ts";
-import { ticketRegex } from "../src/config.ts";
+import { RECALL_DEFAULTS, ticketRegex } from "../src/config.ts";
 import {
     buildQuery,
     COUNTED,
@@ -50,7 +50,7 @@ function index(specs: Record<string, Spec>): CardIndex {
     return cards;
 }
 
-const OPTIONS = { max: 3, minScore: 2.5 };
+const OPTIONS = { max: RECALL_DEFAULTS.max, minScore: RECALL_DEFAULTS.minScore };
 const query = (text: string, extra: { ticket?: string; evidence?: string } = {}) =>
     buildQuery({ ...extra, text, pattern: ticketRegex({ ticketPattern: PATTERN }) });
 const tickets = (matches: readonly Match[]) => matches.map((match) => match.ticket);
@@ -119,7 +119,7 @@ test("an error line passes alone, compared without its numbers, ids and times", 
     assert.match(reason(matches[0] as Match), /same error "ERROR order 9 failed: connection reset by peer"/);
 });
 
-test("one rare word is not enough, five are", () => {
+test("one rare word is not enough, several are", () => {
     const cards = index({
         ...filler,
         "PROJ-1": {
@@ -170,7 +170,7 @@ test("no more than max cards come back, and a card under minScore stays out", ()
         "PROJ-3": { keys: ["PROJ-9"] },
         "PROJ-4": { keys: ["PROJ-9"] },
     });
-    assert.equal(recall(cards, query("PROJ-9"), { max: 2, minScore: 2.5 }).length, 2);
+    assert.equal(recall(cards, query("PROJ-9"), { max: 2, minScore: RECALL_DEFAULTS.minScore }).length, 2);
     assert.equal(recall(cards, query("PROJ-9"), { max: 10, minScore: 7 }).length, 0, "one key is 6 points");
 });
 
