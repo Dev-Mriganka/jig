@@ -4,6 +4,7 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 
 ## Contents
 
+- [2026-10-31: big files are split by job, big plugins have a code map, and growth is a warning](#2026-10-31-big-files-are-split-by-job-big-plugins-have-a-code-map-and-growth-is-a-warning)
 - [2026-10-31: jig-agents, as built](#2026-10-31-jig-agents-as-built)
 - [2026-10-31: jig-git talks to GitLab through glab api, and the repository decides the forge](#2026-10-31-jig-git-talks-to-gitlab-through-glab-api-and-the-repository-decides-the-forge)
 - [2026-10-31: jig-workflow, evidence and holds: a gate in jig-core, tests in the sandbox](#2026-10-31-jig-workflow-evidence-and-holds-a-gate-in-jig-core-tests-in-the-sandbox)
@@ -39,6 +40,40 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 - [2026-10-30: jig-git's tools, and a watch that knows when it is done](#2026-10-30-jig-gits-tools-and-a-watch-that-knows-when-it-is-done)
 - [2026-10-30: built clean, beside the existing harness](#2026-10-30-built-clean-beside-the-existing-harness)
 - [Earlier decisions that still hold (2026-10-29)](#earlier-decisions-that-still-hold-2026-10-29)
+
+## 2026-10-31: big files are split by job, big plugins have a code map, and growth is a warning
+
+The owner learns the system by reading it, so the shape of the code is part of the documentation. No behaviour changed in
+this entry; it is about where things are.
+
+- **Files are split by what they do, not by size.** Ten files of 590 to 870 lines were read for their natural parts and
+  split where a part had one job: a family of actions, a way of reading a format, the process of a child, the questions it
+  asks. Exported names and behaviour are the same, and the tests changed only in their imports. Each new file opens with a
+  paragraph on what it does and why it is separate. The results:
+  - `jig-agents`: `child.ts` 865 to 539 (with `child-process`, `child-questions`, `child-report`, `child-types`) and
+    `runtime.ts` 618 to 480 (with `start-plan`, and `watch.ts` keeping which watch belongs to which child);
+  - `jig-workflow`: `actions.ts` 773 to a list of five files of 100 to 220 lines, one for each family of actions;
+  - `jig-api`: `openapi.ts` 749, `postman.ts` 716 and `bruno.ts` 692 to files of 60 to 270 lines;
+  - `jig-git`: `git-local.ts` 686 to `git-branch`, `git-changes`, `git-integrate` and `git-guards`;
+  - `jig-sandbox`: `sandbox.ts` 626 to 443 and `background/tasks.ts` 644 to 465;
+  - `jig-review`: `coordinator.ts` 587 to 469, with `RunTracker` in `run-tracker.ts`.
+- **A class that shares its private state is split only as far as its parts can stand alone.** `child.ts` is still the
+  longest at 539 lines, because its start, its events, its limits and its end all work on the same fields. Splitting it
+  further would mean exposing those fields, which is harder to follow than a long file with clear sections.
+- **A code map for six plugins** (`jig-core`, `jig-api`, `jig-ops`, `jig-sandbox`, `jig-agents`, `jig-workflow`): a
+  `docs/code-map.md` with every file, what it does and who calls it, grouped by layer, and one real call followed through
+  the files. A test fails when a file of `src/` is missing from its map or a listed file is gone, so a map cannot rot. It
+  does not check the "called by" cells; the code is the judge of those.
+- **[Your first hour with Jig](first-hour.md)** is the page for a newcomer: install, `/jig`, one plugin, one approval, the
+  sandbox doctor, `/lens`, and what to read next.
+- **Size and complexity are warnings, never failures.** Biome's `noExcessiveCognitiveComplexity` is on as a warning at 40,
+  which flags 29 functions today; Biome's own default of 15 would flag 287. A test prints a warning for every
+  source file over 500 lines (13 today), and an annotation on the file in GitHub Actions. Lower the threshold as functions
+  are simplified.
+- **Rejected: a limit that fails the build.** A hard limit invites splitting to meet the number, and a bad split is worse
+  than a long file. A warning keeps growth in sight and leaves the judgement to the person reading.
+- **Left:** the files the size test lists, such as `jig-core`'s `config.ts` and `contract.ts`, which are the next
+  candidates when someone has to change them.
 
 ## 2026-10-31: jig-agents, as built
 

@@ -26,6 +26,9 @@
         "enabled": true,
         "rules": {
             "preset": "recommended",
+            "complexity": {
+                "noExcessiveCognitiveComplexity": { "level": "warn", "options": { "maxAllowedComplexity": 40 } }
+            },
             "style": { "noNonNullAssertion": "off" },
             "suspicious": { "noControlCharactersInRegex": "off" }
         }
@@ -36,7 +39,11 @@
             "linter": {
                 "rules": {
                     "suspicious": { "noExplicitAny": "off", "noAssignInExpressions": "off" },
-                    "complexity": { "noCommaOperator": "off", "noAdjacentSpacesInRegex": "off" }
+                    "complexity": {
+                        "noCommaOperator": "off",
+                        "noAdjacentSpacesInRegex": "off",
+                        "noExcessiveCognitiveComplexity": "off"
+                    }
                 }
             }
         }

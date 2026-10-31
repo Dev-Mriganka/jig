@@ -21,6 +21,10 @@ changes, the other changes in the same commit. Tests read the tool tables of
   [plugins/jig-workflow/README.md](plugins/jig-workflow/README.md). Detail that would
   take it past about 120 lines goes to `plugins/<name>/docs/`, linked under
   "More detail".
+- **Code maps.** `jig-core`, `jig-api`, `jig-ops`, `jig-sandbox`, `jig-agents` and `jig-workflow` each have
+  `docs/code-map.md`: every file of `src/` with what it does and who calls it, and one call followed through
+  the files. When you add, rename or remove a file in one of them, change its map in the same commit; a test
+  fails when they disagree. A source file over 500 lines is reported as a warning: split it by job.
 - **Docs.** Write them by [Writing the docs](docs/writing.md): open with what
   it is and why, short paragraphs and table cells (about 350 and 100
   characters), lists with bold lead-ins, generic examples, tagged code blocks.
