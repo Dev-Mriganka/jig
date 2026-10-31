@@ -11,12 +11,10 @@
 // tunnel stops it with a signal. ssh signs in with your own agent (`SSH_AUTH_SOCK`), reads no configuration file that the agent
 // could have changed (`-F /dev/null`), and never asks a question (`BatchMode`), so an unknown host key is a clear failure, not a
 // prompt: connect to the bastion once with ssh yourself to add it to known_hosts.
-import { connect, createServer } from "node:net";
+import { freePort, PortWaitError, portAccepts, waitForPort } from "./jig/ports.ts";
 import type { JigApi, RunOptions, RunResult, TunnelProvider } from "./jig/types.ts";
 
 export const BASTION_TUNNEL = "acme-bastion";
-
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 export interface BastionDeps {
     /** jig-core's `exec.run`. */
@@ -35,45 +33,13 @@ export interface BastionDeps {
     lifetimeMs: number;
 }
 
-/**
- * A port nothing listens on. A listener that was just closed can go on accepting connections for a few milliseconds, which would
- * look like a tunnel that is up, so the port is only handed out once it refuses connections.
- */
-export async function freePort(): Promise<number> {
-    const port = await new Promise<number>((resolve, reject) => {
-        const server = createServer();
-        const fail = (): void => reject(new Error("cannot find a free local port for the tunnel"));
-        server.once("error", fail);
-        server.listen(0, "127.0.0.1", () => {
-            const address = server.address();
-            const found = typeof address === "object" && address !== null ? address.port : 0;
-            server.close(() => (found > 0 ? resolve(found) : fail()));
-        });
-    });
-    for (let attempt = 0; attempt < 100 && (await probe(port)); attempt++) await sleep(10);
-    return port;
-}
-
-export function probe(port: number): Promise<boolean> {
-    return new Promise((resolve) => {
-        const socket = connect({ host: "127.0.0.1", port });
-        const done = (ok: boolean): void => {
-            socket.destroy();
-            resolve(ok);
-        };
-        socket.setTimeout(2000, () => done(false));
-        socket.once("connect", () => done(true));
-        socket.once("error", () => done(false));
-    });
-}
-
 export function systemDeps(run: BastionDeps["run"], settings: BastionDeps["settings"]): BastionDeps {
     return {
         run,
         settings,
         env: process.env,
         freePort,
-        probe,
+        probe: portAccepts,
         readyTimeoutMs: 15_000,
         pollMs: 100,
         lifetimeMs: 4 * 60 * 60_000,
@@ -165,22 +131,30 @@ export function createBastionTunnels(deps: BastionDeps): TunnelProvider {
             const stop = (): void => stopper.abort();
             signal?.addEventListener("abort", stop, { once: true });
 
-            const deadline = Date.now() + deps.readyTimeoutMs;
             try {
-                for (;;) {
-                    if (cancelled()) throw new Error("the call was cancelled while the tunnel was opening");
-                    if (ended !== undefined) {
-                        throw ended instanceof Error
+                // `jig/ports.ts` is a copy of jig-core's helper: it asks the port until it accepts, and gives up when the time is
+                // over, the call is cancelled, or ssh has ended.
+                await waitForPort(port, {
+                    timeoutMs: deps.readyTimeoutMs,
+                    pollMs: deps.pollMs,
+                    ready: deps.probe,
+                    ...(signal === undefined ? {} : { signal }),
+                    failed: () => {
+                        if (ended === undefined) return undefined;
+                        return ended instanceof Error
                             ? new Error(`ssh could not start: ${ended.message.slice(0, 120)}`)
                             : failureOf(ended.code, ended.stderr);
-                    }
-                    if (await deps.probe(port)) break;
-                    if (Date.now() > deadline)
-                        throw new Error("the tunnel did not become ready in time: check the bastion and the network");
-                    await sleep(deps.pollMs);
-                }
+                    },
+                });
             } catch (error) {
                 stop();
+                if (error instanceof PortWaitError) {
+                    throw new Error(
+                        error.reason === "cancelled"
+                            ? "the call was cancelled while the tunnel was opening"
+                            : "the tunnel did not become ready in time: check the bastion and the network",
+                    );
+                }
                 throw error;
             } finally {
                 // After this the call's own signal no longer ends the tunnel: the tool closes it when it is done.

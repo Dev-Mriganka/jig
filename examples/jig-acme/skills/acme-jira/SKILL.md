@@ -11,7 +11,8 @@ its projects, its fields, its workflow and its manners.
 ## Projects and keys
 
 - **ACME** is the product project. Keys look like `ACME-123`. If the user gives a title and no key, `search` for it and
-  confirm the key before acting.
+  confirm the key before acting. Acme's setup lists ACME as the project, so a `search` with no JQL lists its newest issues, and
+  `create` refuses any other project.
 - Branches, commits and pull request titles start with the key (`feature/ACME-123`, `ACME-123: add the order filter`), and Jig
   refuses ones that do not. Use the key of the issue the work is for.
 

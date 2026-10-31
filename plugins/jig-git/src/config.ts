@@ -10,6 +10,13 @@ import { checkBranch } from "./names.ts";
 /** The kinds of forge jig-git can talk to: GitHub through `gh`, GitLab through `glab`. */
 export type Forge = "github" | "gitlab";
 
+/**
+ * What `git.forges` says about a host: the forge it is, as a word, or as an object with the real `host` when the host in origin
+ * is an ssh alias (`~/.ssh/config` `Host github.com-work`). git keeps using the alias, and `gh` and `glab` are told the real one.
+ * The setting is configuration only: no call can send it.
+ */
+export type ForgeEntry = Forge | { forge: Forge; host?: string };
+
 export interface GitSettings {
     base?: string;
     protected?: string[];
@@ -23,7 +30,7 @@ export interface GitSettings {
     /** Whether the watch tells the agent about comments by bots. */
     watchBots: boolean;
     /** Hosts that are not github.com or gitlab.com, and the forge each one is. Left out when none is configured. */
-    forges?: Readonly<Record<string, Forge>>;
+    forges?: Readonly<Record<string, ForgeEntry>>;
 }
 
 export type WatchComments = "after-create" | "off";
@@ -59,10 +66,23 @@ function checkRegExp(value: unknown, key: string, errors: string[]): void {
     }
 }
 
+const isForge = (value: unknown): value is Forge => value === "github" || value === "gitlab";
+
+/** A word, or `{ forge, host? }` where `host` is a bare host name: no scheme, port or path, since it is put in a command line. */
+function validForgeEntry(entry: unknown): boolean {
+    if (isForge(entry)) return true;
+    if (!isObject(entry) || !isForge(entry.forge)) return false;
+    if (Object.keys(entry).some((key) => key !== "forge" && key !== "host")) return false;
+    return (
+        entry.host === undefined ||
+        (typeof entry.host === "string" && HOST.test(entry.host) && entry.host.length <= 100)
+    );
+}
+
 function validForges(value: unknown): boolean {
     if (!isObject(value)) return false;
     return Object.entries(value).every(
-        ([host, forge]) => HOST.test(host) && host.length <= 100 && (forge === "github" || forge === "gitlab"),
+        ([host, entry]) => HOST.test(host) && host.length <= 100 && validForgeEntry(entry),
     );
 }
 
@@ -107,16 +127,29 @@ export function validateGitSection(raw: unknown): string[] {
     }
     if (raw.forges !== undefined && !validForges(raw.forges)) {
         errors.push(
-            'git.forges must map host names to "github" or "gitlab", such as { "gitlab.example.com": "gitlab" }',
+            'git.forges must map host names to "github" or "gitlab", such as { "gitlab.example.com": "gitlab" }, ' +
+                'or to { "forge": ..., "host": ... } when the host is an ssh alias for a real one, such as ' +
+                '{ "github.com-work": { "forge": "github", "host": "github.com" } }',
         );
     }
     return errors;
 }
 
-/** The configured forges with their host names in lower case, as a remote's host is compared. */
-function forgesFrom(value: unknown): Record<string, Forge> | undefined {
+/** The configured forges with their host names, and the real host of an alias, in lower case, as a remote's host is compared. */
+function forgesFrom(value: unknown): Record<string, ForgeEntry> | undefined {
     if (!isObject(value) || Object.keys(value).length === 0) return undefined;
-    return Object.fromEntries(Object.entries(value).map(([host, forge]) => [host.toLowerCase(), forge as Forge]));
+    return Object.fromEntries(
+        Object.entries(value).map(([host, entry]) => {
+            const given = entry as ForgeEntry;
+            if (typeof given === "string") return [host.toLowerCase(), given];
+            return [
+                host.toLowerCase(),
+                given.host === undefined
+                    ? { forge: given.forge }
+                    : { forge: given.forge, host: given.host.toLowerCase() },
+            ];
+        }),
+    );
 }
 
 /** The settings with every default filled in. Pure, so tests can feed it any section. */

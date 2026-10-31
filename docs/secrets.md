@@ -23,6 +23,11 @@ All six are built, and `secrets.backends` says which may resolve a reference
 (`pass` alone by default). A new machine or employer means setting a different
 reference, not changing tools.
 
+A company plugin can turn a backend on for its own references
+(`config.enableSecretBackends`), and `secrets.disabledBackends` turns any off
+again: you keep the last word. `/jig` lists the backends that are on and who
+turned them on.
+
 **Jig will not build its own password manager.** A homemade password store is a
 security liability, and every platform already has one with a command-line
 interface. **Nor does it sign in:** the tool that owns a login does it, and

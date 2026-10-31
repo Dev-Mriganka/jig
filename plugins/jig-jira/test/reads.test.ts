@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, test } from "node:test";
 import type { FakeComment, FakeIssue } from "./support/fake-jira.ts";
-import { ok, setupHarness } from "./support/harness.ts";
+import { cloudSection, ok, setupHarness } from "./support/harness.ts";
 import type { Harness } from "./support/harness.ts";
 
 let h: Harness;
@@ -221,6 +221,25 @@ describe("search", () => {
             result.error?.message ?? result.blocked ?? "",
             /page must be the page value the previous result gave/,
         );
+    });
+
+    test("with no JQL it looks in the user's projects, and says what it asked", async () => {
+        h.configure({ ...cloudSection(), projects: ["PROJ", "OPS"] });
+        const text = ok(await h.call({ action: "search", limit: 1 }));
+        assert.match(text, /^1 issue \(more follow\) for: project in \("PROJ", "OPS"\) ORDER BY updated DESC\n/);
+        assert.equal(h.jira.requests[0]?.query?.jql, 'project in ("PROJ", "OPS") ORDER BY updated DESC');
+    });
+
+    test("with no JQL and no projects it is refused before anything is sent", async () => {
+        const result = await h.call({ action: "search" });
+        assert.match(result.error?.message ?? result.blocked ?? "", /^jira search needs jql\./);
+        assert.equal(h.jira.requests.length, 0);
+    });
+
+    test("a JQL of its own is sent as written, whatever the projects", async () => {
+        h.configure({ ...cloudSection(), projects: ["OPS"] });
+        ok(await h.call({ action: "search", jql: "project = PROJ" }));
+        assert.equal(h.jira.requests[0]?.query?.jql, "project = PROJ");
     });
 
     test("no match says so, and extra fields are shown under each issue", async () => {

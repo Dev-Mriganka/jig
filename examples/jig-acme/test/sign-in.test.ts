@@ -180,15 +180,12 @@ describe("through jig-core", () => {
         assert.deepEqual(server.seen, []);
     });
 
-    test("with no setting of the user's, the token comes from the company's command, once the user allows `cmd`", async () => {
+    test("with no setting of the user's, the token comes from the company's command: the company turned `cmd` on", async () => {
         const programs: FakePrograms = fakePrograms();
         const path = process.env.PATH;
         process.env.PATH = `${programs.bin}:${path ?? ""}`;
         try {
-            world = await startWorld({
-                personal: { secrets: { backends: ["pass", "cmd"] } },
-                acme: { hosts: ["127.0.0.1"] },
-            });
+            world = await startWorld({ acme: { hosts: ["127.0.0.1"] } });
             server.reply((seen) => ({ body: String(seen.headers.authorization) }));
             const reply = await world.api.http.request({
                 system: "logs",
@@ -206,8 +203,11 @@ describe("through jig-core", () => {
         }
     });
 
-    test("without `cmd` allowed, the company's command is not run: a company cannot turn a secret backend on", async () => {
-        world = await startWorld({ acme: { hosts: ["127.0.0.1"] } });
+    test("a user who turned `cmd` off keeps it off: the company's command is not run, and the message says who turned it off", async () => {
+        world = await startWorld({
+            personal: { secrets: { disabledBackends: ["cmd"] } },
+            acme: { hosts: ["127.0.0.1"] },
+        });
         await assert.rejects(
             world.api.http.request({
                 system: "logs",
@@ -219,6 +219,7 @@ describe("through jig-core", () => {
                 assert.equal(error.code, "auth_failed");
                 assert.equal(error.notSent, true);
                 assert.match(error.message, /cmd/, "the message says which backend is off");
+                assert.match(error.message, /disabledBackends/, "and that the user turned it off");
                 return true;
             },
         );

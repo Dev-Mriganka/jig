@@ -12,6 +12,15 @@ export type EnvironmentName = string;
 /** The kind of an environment decides its default rules. */
 export type EnvironmentKind = "local" | "external" | "test" | "production";
 
+/** One environment as `environments.list()` gives it. */
+export interface EnvironmentInfo {
+    name: EnvironmentName;
+    kind: EnvironmentKind;
+    /** Who defined it: Jig itself, your `jig.json`, or a company plugin. When a later definition made it production, the one
+     *  that did. */
+    source: "built-in" | "personal" | "company";
+}
+
 export type Effect = "read" | "write";
 
 export type Decision = "allow" | "ask" | "deny";
@@ -238,11 +247,21 @@ export interface TransportRequest {
     url: string;
     headers?: Readonly<Record<string, string>>;
     body?: string;
+    /** The most reply bytes the caller will read: the request's `maxBytes` (4 MiB when it gave none). jig-core cuts a
+     *  longer reply to this and sets `truncated`, so a transport may stop reading instead of buffering a reply that will be
+     *  thrown away. Stop one byte past it, not at it: a reply of exactly this many bytes and a longer one then look different. */
+    maxBytes: number;
+    /** How long the whole request may take, in milliseconds: the request's `timeoutMs` (30 s when it gave none). The
+     *  `signal` fires when it runs out, so a transport that honours the signal needs nothing more; this is for one that
+     *  sets a limit of its own, such as a socket's. */
+    timeoutMs: number;
 }
 
 export interface TransportResponse {
     status: number;
-    headers: Readonly<Record<string, string>>;
+    /** A header the reply repeated, such as `set-cookie`, may be given as a list, one entry for each time it was sent.
+     *  Names may be in any case; jig-core lower-cases them. */
+    headers: Readonly<Record<string, string | readonly string[]>>;
     body: string;
 }
 
@@ -507,6 +526,9 @@ export interface JigApi {
         /** The kind of an environment name: built in, configured or added by a company plugin. A name nobody defined
          *  counts as production. */
         kindOf(name: EnvironmentName): EnvironmentKind;
+        /** Every environment that is defined, with its kind and who defined it: the built-in ones first, then a company
+         *  plugin's, then yours. A name nobody defined is not in it (it counts as production). */
+        list(): readonly EnvironmentInfo[];
     };
 
     /** Tunnel providers a company plugin registers, for tools that need a network route of their own, such as a
@@ -578,6 +600,13 @@ export interface JigApi {
          *  word is the program, the rest its arguments; no shell is used. A name the user also declares in `jig.json`
          *  (`secrets.commands`) takes the user's command. They run only when `cmd` is in `secrets.backends`. */
         addSecretCommands(commands: Readonly<Record<string, readonly string[]>>): void;
+        /** Turns secret backends on (`pass`, `env`, `keychain`, `op`, `cmd`, `file`) for the references a company's sign-in and
+         *  settings name, so each user need not add them. A company plugin is code that already runs in Pi with the user's
+         *  rights, so this gives it nothing new; the user keeps the last word, because `secrets.disabledBackends` in `jig.json`
+         *  turns any backend off whoever turned it on. Without a company plugin the default stays `pass` alone, and `/jig`
+         *  lists the backends that are on and who enabled them. A name that is not a backend is a configuration problem
+         *  named `company`. */
+        enableSecretBackends(backends: readonly string[]): void;
         /** Field names that hold personal data in a company's own systems. The masker treats them like its
          *  built-in personal fields and turns their values into `personal#` tokens. */
         addMaskFields(fields: readonly string[]): void;
@@ -659,7 +688,8 @@ export interface JigApi {
     readonly exec: {
         /** Refuses a program whose real path is in a folder the agent's shell can write: the working folder, and with a
          *  sandbox registered, every place the sandbox lets `bash` write. A program planted there would run with your
-         *  credentials. */
+         *  credentials. `git`, `gh` and `glab` are also refused in a repository whose own `.git/config` would run a command,
+         *  because all three start git. */
         run(file: string, args: readonly string[], options?: RunOptions): Promise<RunResult>;
         /** git with hooks, `core.fsmonitor` and prompts off. Refuses to run when the repository's `.git/config`
          *  holds a setting that would run a command, because the agent's shell can write that file. */

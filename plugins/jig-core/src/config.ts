@@ -52,7 +52,7 @@ export interface JigConfig {
     rules: Rule[];
     classify: ClassifyRule[];
     protectedPaths: ProtectedPathLists;
-    secrets: { backends: SecretBackend[]; commands: Record<string, string[]> };
+    secrets: { backends: SecretBackend[]; disabledBackends: SecretBackend[]; commands: Record<string, string[]> };
     records: { retentionDays: number };
     spill: { retentionDays: number };
 }
@@ -63,7 +63,7 @@ export function defaultConfig(): JigConfig {
         rules: [],
         classify: [],
         protectedPaths: { secret: [], guarded: [] },
-        secrets: { backends: ["pass"], commands: {} },
+        secrets: { backends: ["pass"], disabledBackends: [], commands: {} },
         records: { retentionDays: 90 },
         spill: { retentionDays: 7 },
     };
@@ -111,6 +111,9 @@ export interface LoadedConfig {
     /** Plugin sections that you have not written and whose company defaults are not valid alone, with the messages of
      *  the check: the plugin is not configured until you add your part. Not a problem, only a fact for `/jig`. */
     incomplete: Map<string, string[]>;
+    /** Plugin sections the file has and the plugin does not get, because they failed their check. A section the file
+     *  does not have is not here: it is simply not set. */
+    invalid: Set<string>;
 }
 
 /** Reads and checks the file. Never throws: every failure becomes a problem, and the defaults apply. `checks` holds the
@@ -125,6 +128,7 @@ export function loadConfigFile(
         found,
         config: defaultConfig(),
         problems,
+        invalid: new Set(),
         // A file that cannot be read still leaves the company's defaults.
         ...companyOnly(checks, layers, new Set()),
     });
@@ -156,16 +160,23 @@ export function parseConfig(
     source: string,
     checks: ReadonlyMap<string, SectionCheck> = new Map(),
     layers: SectionLayers = NO_LAYERS,
-): { config: JigConfig; problems: Problem[]; sections: Map<string, unknown>; incomplete: Map<string, string[]> } {
+): {
+    config: JigConfig;
+    problems: Problem[];
+    sections: Map<string, unknown>;
+    incomplete: Map<string, string[]>;
+    invalid: Set<string>;
+} {
     const problems: Problem[] = [];
     const fail: Fail = (key, message) => problems.push({ source, key, message });
     const sectionProblems: Problem[] = [];
     const sections = new Map<string, unknown>();
+    const invalid = new Set<string>();
     const config = defaultConfig();
 
     if (!isObject(value)) {
         fail("(file)", "must hold one JSON object");
-        return { config, problems, ...companyOnly(checks, layers, new Set()) };
+        return { config, problems, invalid, ...companyOnly(checks, layers, new Set()) };
     }
     const written = new Set<string>();
     for (const [key, raw] of Object.entries(value)) {
@@ -178,6 +189,7 @@ export function parseConfig(
         written.add(key);
         const read = readSection(key, raw, check, layers);
         if (read.use) sections.set(key, read.value);
+        else invalid.add(key);
         for (const message of read.messages) sectionProblems.push({ source, key: printable(key), message });
     }
     const company = companyOnly(checks, layers, written);
@@ -197,6 +209,7 @@ export function parseConfig(
         problems: [...problems, ...sectionProblems],
         sections,
         incomplete: company.incomplete,
+        invalid,
     };
 }
 
@@ -509,26 +522,48 @@ export function parseSecretCommands(raw: unknown, path: string, fail: Fail): Rec
     return out;
 }
 
-function parseSecrets(raw: unknown, fail: Fail): { backends: SecretBackend[]; commands: Record<string, string[]> } {
-    const out: { backends: SecretBackend[]; commands: Record<string, string[]> } = { backends: ["pass"], commands: {} };
+function parseBackendList(raw: unknown, path: string, fail: Fail): SecretBackend[] | undefined {
+    if (!Array.isArray(raw)) {
+        fail(path, `must be a list of ${SECRET_BACKENDS.join(", ")}`);
+        return undefined;
+    }
+    const backends: SecretBackend[] = [];
+    raw.forEach((name, index) => {
+        if (typeof name === "string" && (SECRET_BACKENDS as readonly string[]).includes(name))
+            backends.push(name as SecretBackend);
+        else fail(`${path}[${index}]`, `must be one of ${SECRET_BACKENDS.join(", ")}`);
+    });
+    return backends;
+}
+
+function parseSecrets(raw: unknown, fail: Fail): JigConfig["secrets"] {
+    const out: JigConfig["secrets"] = { backends: ["pass"], disabledBackends: [], commands: {} };
     if (!isObject(raw)) {
         fail("secrets", "must be an object");
         return out;
     }
-    knownFields(raw, ["backends", "commands"], "secrets", fail);
+    knownFields(raw, ["backends", "disabledBackends", "commands"], "secrets", fail);
     if (raw.commands !== undefined) out.commands = parseSecretCommands(raw.commands, "secrets.commands", fail);
-    if (raw.backends === undefined) return out;
-    if (!Array.isArray(raw.backends)) {
-        fail("secrets.backends", `must be a list of ${SECRET_BACKENDS.join(", ")}`);
-        return out;
-    }
-    const backends: SecretBackend[] = [];
-    raw.backends.forEach((name, index) => {
-        if (typeof name === "string" && (SECRET_BACKENDS as readonly string[]).includes(name))
-            backends.push(name as SecretBackend);
-        else fail(`secrets.backends[${index}]`, `must be one of ${SECRET_BACKENDS.join(", ")}`);
-    });
-    return { backends, commands: out.commands };
+    if (raw.backends !== undefined)
+        out.backends = parseBackendList(raw.backends, "secrets.backends", fail) ?? out.backends;
+    if (raw.disabledBackends !== undefined)
+        out.disabledBackends = parseBackendList(raw.disabledBackends, "secrets.disabledBackends", fail) ?? [];
+    return out;
+}
+
+/**
+ * The secret backends that may resolve a reference: yours (`pass` alone when you list none), and the ones company plugins
+ * enabled, less the ones you turned off. Your `disabledBackends` has the last word, so nothing a plugin does can turn on a
+ * backend that you switched off.
+ */
+export function effectiveBackends(
+    secrets: Pick<JigConfig["secrets"], "backends" | "disabledBackends">,
+    company: Pick<CompanyAdditions, "secretBackends">,
+): { on: SecretBackend[]; byCompany: SecretBackend[]; off: SecretBackend[] } {
+    const off = secrets.disabledBackends;
+    const on = [...new Set([...secrets.backends, ...company.secretBackends])].filter((name) => !off.includes(name));
+    const byCompany = company.secretBackends.filter((name) => on.includes(name) && !secrets.backends.includes(name));
+    return { on, byCompany: [...new Set(byCompany)], off: [...off] };
 }
 
 function parseRetention(
@@ -561,6 +596,8 @@ export interface CompanyAdditions {
     protectedPaths: ProtectedPathLists;
     /** Commands for `cmd:<name>` secret references that company plugins declared. */
     secretCommands: Record<string, string[]>;
+    /** Secret backends company plugins turned on. Your `secrets.disabledBackends` still turns any of them off. */
+    secretBackends: SecretBackend[];
     problems: Problem[];
     /** How many rules came in so far, valid or not, so a problem names a stable position. */
     received: { rules: number; classify: number };
@@ -573,6 +610,7 @@ export function emptyAdditions(): CompanyAdditions {
         classify: [],
         protectedPaths: { secret: [], guarded: [] },
         secretCommands: {},
+        secretBackends: [],
         problems: [],
         received: { rules: 0, classify: 0 },
     };
@@ -626,6 +664,14 @@ export function addCompanyProtectedPaths(additions: CompanyAdditions, raw: unkno
 export function addCompanySecretCommands(additions: CompanyAdditions, raw: unknown): void {
     const fail: Fail = (key, message) => additions.problems.push({ source: COMPANY, key, message });
     Object.assign(additions.secretCommands, parseSecretCommands(raw, "secretCommands", fail));
+}
+
+/** Backends a company plugin turns on. Each name is checked like one in `secrets.backends`; a wrong one is a problem and the
+ *  good ones still apply. */
+export function addCompanySecretBackends(additions: CompanyAdditions, raw: unknown): void {
+    const fail: Fail = (key, message) => additions.problems.push({ source: COMPANY, key, message });
+    for (const name of parseBackendList(raw, "secretBackends", fail) ?? [])
+        if (!additions.secretBackends.includes(name)) additions.secretBackends.push(name);
 }
 
 /** `rules[1].tool` becomes `rules[4].tool` when three rules came before this call. */
@@ -713,8 +759,8 @@ export function buildPolicy(
     const problems = [...personal.problems, ...company.problems];
 
     const merged = buildEnvironments([
-        { source: COMPANY, environments: company.environments },
-        { source: personal.file, environments: personal.config.environments },
+        { source: COMPANY, origin: "company", environments: company.environments },
+        { source: personal.file, origin: "personal", environments: personal.config.environments },
     ]);
     problems.push(...merged.problems);
 

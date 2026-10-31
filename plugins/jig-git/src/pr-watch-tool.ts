@@ -6,7 +6,8 @@ import { startCommentWatch, watchingText } from "./pr-watch.ts";
 import { openPrFor } from "./pr-write.ts";
 import type { Call, Planned } from "./previews.ts";
 import { resolveRepo } from "./repo.ts";
-import { requireSlug } from "./github.ts";
+import { requireRemote } from "./github.ts";
+import { GITHUB_COM } from "./repo.ts";
 import { currentBranch } from "./run.ts";
 
 export async function planWatch(
@@ -14,7 +15,8 @@ export async function planWatch(
     call: Call,
 ): Promise<Planned> {
     const repo = await resolveRepo(params.repo, call.signal);
-    const slug = await requireSlug(repo, call.settings, call.signal);
+    const remote = await requireRemote(repo, call.settings, call.signal);
+    const { slug } = remote;
     let number: number;
     if (params.number !== undefined) {
         number = checkNumber(params.number);
@@ -39,7 +41,8 @@ export async function planWatch(
     return {
         preview: { summary: `watch pull request ${number} in ${slug} for new comments, in the background` },
         run: async () => {
-            const spec = { slug, number };
+            // On github.com the spec is what it always was; on another host, the watch is told which.
+            const spec = { slug, number, ...(remote.host === GITHUB_COM ? {} : { host: remote.host }) };
             const { id, already } = startCommentWatch(spec);
             return {
                 text: watchingText(spec, id, already),

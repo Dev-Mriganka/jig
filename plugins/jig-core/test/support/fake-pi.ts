@@ -32,6 +32,15 @@ export interface FakePi {
         options: unknown;
     }>;
     tools: FakeTool[];
+    /** The entries `pi.appendEntry` was given, in order: they are kept in the session file and never reach the model. */
+    entries: Array<{ customType: string; data: unknown }>;
+    /** The messages `pi.sendUserMessage` was given, as if the user had typed them, with the options they were sent with. */
+    userMessages: Array<{ content: unknown; options: unknown }>;
+    /** The renderers extensions registered, by the type they draw (`registerEntryRenderer`, `registerMessageRenderer`). */
+    entryRenderers: Map<string, unknown>;
+    messageRenderers: Map<string, unknown>;
+    /** What `pi.getThinkingLevel()` answers. Default `off`. */
+    thinkingLevel: string;
     /** Runs every handler of an event, in order, and returns the last answer that was not undefined. */
     fire(type: string, event: Record<string, unknown>, ctx: unknown): Promise<unknown>;
 }
@@ -42,6 +51,11 @@ export function fakePi(tools: FakeTool[] = []): FakePi {
     const emitted: Array<{ channel: string; data: unknown }> = [];
     const registered = new Map<string, ToolDefinition>();
     const sent: FakePi["sent"] = [];
+    const entries: FakePi["entries"] = [];
+    const userMessages: FakePi["userMessages"] = [];
+    const entryRenderers = new Map<string, unknown>();
+    const messageRenderers = new Map<string, unknown>();
+    const fake = { thinkingLevel: "off" };
     const pi = {
         on(type: string, handler: Handler) {
             handlers.set(type, [...(handlers.get(type) ?? []), handler]);
@@ -56,6 +70,21 @@ export function fakePi(tools: FakeTool[] = []): FakePi {
         sendMessage(message: FakePi["sent"][number]["message"], options: unknown) {
             sent.push({ message, options });
         },
+        // The calls other plugins make that jig-core does not: a plugin that draws its own entries, keeps a note in the session,
+        // sends a message as the user, or reads the thinking level.
+        sendUserMessage(content: unknown, options?: unknown) {
+            userMessages.push({ content, options });
+        },
+        appendEntry(customType: string, data?: unknown) {
+            entries.push({ customType, data });
+        },
+        registerEntryRenderer(customType: string, renderer: unknown) {
+            entryRenderers.set(customType, renderer);
+        },
+        registerMessageRenderer(customType: string, renderer: unknown) {
+            messageRenderers.set(customType, renderer);
+        },
+        getThinkingLevel: () => fake.thinkingLevel,
         // Pi lists the tools extensions registered along with the ones it was given.
         getAllTools: () => [
             ...tools,
@@ -79,6 +108,16 @@ export function fakePi(tools: FakeTool[] = []): FakePi {
         emitted,
         registered,
         sent,
+        entries,
+        userMessages,
+        entryRenderers,
+        messageRenderers,
+        get thinkingLevel() {
+            return fake.thinkingLevel;
+        },
+        set thinkingLevel(level: string) {
+            fake.thinkingLevel = level;
+        },
         tools,
         async fire(type, event, ctx) {
             let answer: unknown;
@@ -104,6 +143,8 @@ export function fakeContext(
         session?: string;
         signal?: AbortSignal;
         cwd?: string;
+        /** What `sessionManager.getBranch()` returns: the entries of the conversation so far. Default none. */
+        branch?: readonly unknown[];
     } = {},
 ): FakeContext {
     const screen = fakeUi(options.ui === false ? {} : (options.ui ?? { select: () => "Allow" }));
@@ -113,7 +154,10 @@ export function fakeContext(
         ui: screen.ui,
         signal: options.signal,
         cwd: options.cwd ?? process.cwd(),
-        sessionManager: { getSessionId: () => options.session ?? "session-test" },
+        sessionManager: {
+            getSessionId: () => options.session ?? "session-test",
+            getBranch: () => [...(options.branch ?? [])],
+        },
     } as unknown as ExtensionContext;
     return { ctx, log: screen.log };
 }

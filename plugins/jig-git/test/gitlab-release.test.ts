@@ -266,7 +266,7 @@ test("tags are git: they work on a GitLab project with neither glab nor gh", asy
 
 test("on a host that is not known the releases are refused, and the tags still work", async () => {
     const r = makeRepo(h.sb, `rel${++counter}`, "acme", "gitlab.example.com");
-    const message = `origin of ${r.name} is on gitlab.example.com, which jig-git does not know as GitHub or GitLab; name it in jig.json, such as "git": { "forges": { "gitlab.example.com": "gitlab" } }`;
+    const message = `origin of ${r.name} is on gitlab.example.com, which jig-git does not know as GitHub or GitLab; name it in jig.json, such as "git": { "forges": { "gitlab.example.com": "gitlab" } }, or, when it is an ssh alias for a real host, "git": { "forges": { "gitlab.example.com": { "forge": "github", "host": "github.com" } } }`;
     assert.equal((await h.call("release", { action: "releases", repo: r.name })).error?.message, message);
     assert.equal(
         (await h.call("release", { action: "release_create", repo: r.name, tag: "v1" })).error?.message,

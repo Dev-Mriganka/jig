@@ -137,6 +137,8 @@ describe("an unknown field is an error", () => {
         bad({ rules: [{ tool: "t", decision: "ask", approval: "popup" }] }, "rules[0].approval");
         bad({ rules: [{ tool: "t", decision: "ask", effect: "delete" }] }, "rules[0].effect");
         bad({ secrets: { backends: ["pass", "vault"] } }, "secrets.backends[1]");
+        bad({ secrets: { disabledBackends: ["env", "vault"] } }, "secrets.disabledBackends[1]");
+        bad({ secrets: { disabledBackends: "env" } }, "secrets.disabledBackends");
         bad({ secrets: { commands: ["gh"] } }, "secrets.commands");
         bad({ secrets: { commands: { "gh auth": ["gh"] } } }, "secrets.commands.gh auth");
         bad({ secrets: { commands: { gh: "gh auth token" } } }, "secrets.commands.gh");
@@ -163,11 +165,25 @@ describe("an unknown field is an error", () => {
         const masking = personal({ environments: { prod: { kind: "production", mask: false } } });
         assert.ok(masking.problems.some((problem) => problem.key === "environments.prod.mask"));
         const merged = buildEnvironments([
-            { source: FILE, environments: { production: { kind: "test" }, local: { kind: "production" } } },
+            {
+                source: FILE,
+                origin: "personal",
+                environments: { production: { kind: "test" }, local: { kind: "production" } },
+            },
         ]);
         assert.equal(merged.problems.length, 2);
         assert.equal(merged.environments.kindOf("production"), "production");
         assert.equal(merged.environments.kindOf("local"), "local");
+    });
+});
+
+describe("secrets.disabledBackends", () => {
+    test("is empty by default, and lists the backends the user turns off", () => {
+        assert.deepEqual(personal({}).config.secrets.disabledBackends, []);
+        const loaded = personal({ secrets: { backends: ["pass", "env"], disabledBackends: ["env", "cmd"] } });
+        assert.deepEqual(loaded.problems, []);
+        assert.deepEqual(loaded.config.secrets.backends, ["pass", "env"]);
+        assert.deepEqual(loaded.config.secrets.disabledBackends, ["env", "cmd"]);
     });
 });
 
@@ -260,7 +276,9 @@ describe("a rule that would lower the floor is refused, with the file and the ke
     });
 
     test("floorViolation can be asked directly", () => {
-        const { environments } = buildEnvironments([{ source: FILE, environments: { prod: { kind: "production" } } }]);
+        const { environments } = buildEnvironments([
+            { source: FILE, origin: "personal", environments: { prod: { kind: "production" } } },
+        ]);
         assert.equal(floorViolation(rule({ environment: "local", effect: "write" }), environments), undefined);
         assert.notEqual(floorViolation(rule({ environment: "prod", effect: "write" }), environments), undefined);
     });

@@ -5,6 +5,7 @@ import {
     addCompanyEnvironments,
     addCompanyProtectedPaths,
     addCompanyRules,
+    addCompanySecretBackends,
     addCompanySecretCommands,
     OWN_SECTIONS,
 } from "./config.ts";
@@ -80,6 +81,7 @@ export function buildApi(state: JigState): JigApi {
 
         environments: {
             kindOf: (name) => state.policy().environments.kindOf(name),
+            list: () => state.policy().environments.list(),
         },
 
         tunnels: {
@@ -131,6 +133,10 @@ export function buildApi(state: JigState): JigApi {
             },
             addSecretCommands(commands) {
                 addCompanySecretCommands(state.company, commands);
+            },
+            enableSecretBackends(backends) {
+                // Read at each resolve, so there is no policy to rebuild.
+                addCompanySecretBackends(state.company, backends);
             },
             addMaskFields: (fields) => state.addMaskFields(fields),
             registerSection(name, validate, options) {

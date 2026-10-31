@@ -1,7 +1,8 @@
 # jig-workflow: named workflows, with stages, holds and evidence
 
-**Status: built.** Tested with the real `jig-core`, real git repositories, a fake `gh` and, where
-bubblewrap is installed, the real sandbox. `gh pr view` and a CI watch have not been tried against GitHub itself.
+**Status: built.** Tested with the real `jig-core`, real git repositories, a fake `gh` and `glab` (on recorded GitLab
+answers) and, where bubblewrap is installed, the real sandbox. `gh pr view`, `glab api` and a CI watch have not been tried
+against GitHub or GitLab themselves.
 
 `jig-workflow` takes a piece of work, such as a ticket, through a **workflow**: a named, ordered list of
 stages, each with a goal for the agent and the conditions that let the work move on. The conditions are
@@ -53,8 +54,8 @@ A fixed list, checked by the plugin itself, so a file never runs code. Each is d
 | `plan-approved` | You approved this exact `plan.md`; an edited plan needs approving again |
 | `tests-pass-at-head` | Each bound repository's tests passed, in the sandbox, at its current HEAD |
 | `review-done` | A `jig-review` approval covers each bound repository's current HEAD |
-| `pull-request-open` | Each bound repository's branch has an open pull request |
-| `checks-pass` | The pull request's head is HEAD, and its checks passed (a CI watch, or `gh pr view`) |
+| `pull-request-open` | Each bound repository's branch has an open pull request (a merge request on GitLab) |
+| `checks-pass` | The pull request's head is HEAD, and its checks passed (a CI watch, or the checks `gh` or `glab` show) |
 | `scenarios-pass` | Every numbered scenario of the approved plan passed, each with evidence |
 | `you-approve` | You answer yes to moving on, in a dialog |
 

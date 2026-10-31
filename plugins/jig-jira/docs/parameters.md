@@ -32,7 +32,7 @@ comment needs text. Usage: jira comment {key, text}`.
 | Parameter | Meaning |
 |---|---|
 | `key`, `project` | An issue key such as `PROJ-123`; a project key such as `PROJ` |
-| `jql`, `page` | The query. `page` is the value that the previous result gives after `More: repeat with page=` |
+| `jql`, `page` | The query, which `search` may leave out when `jira.projects` lists projects (it then looks in them). `page` is the value that the previous result gives after `More: repeat with page=` |
 | `limit` | How many to return (see below) |
 | `include` | Up to 10 more fields to show, by name or id |
 | `full` | Lifts the length caps on descriptions and comments. Read with it before rewriting a text |

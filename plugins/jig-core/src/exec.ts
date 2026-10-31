@@ -92,6 +92,21 @@ const GH_FIXED_ENV: Readonly<Record<string, string>> = {
     GH_PAGER: "cat",
 };
 
+/**
+ * Set for `glab` as well: no prompts, no update notice, no usage data, no colour, no pager, no hyperlinks, no editor. glab
+ * starts git in its folder, so it gets git's fixed environment too.
+ */
+const GLAB_FIXED_ENV: Readonly<Record<string, string>> = {
+    GLAB_NO_PROMPT: "1",
+    GLAB_CHECK_UPDATE: "false",
+    GLAB_SEND_TELEMETRY: "false",
+    GLAB_NOTIFY_SKILL_UPDATES: "false",
+    GLAB_SHOW_WHATS_NEW: "false",
+    GLAB_COLOR: "never",
+    GLAB_PAGER: "cat",
+    GLAB_DISPLAY_HYPERLINKS: "false",
+};
+
 /** Folders the agent's own shell can write to: the working folder of Pi and of the call. */
 function writableFolders(cwd: string | undefined): string[] {
     const folders: string[] = [];
@@ -372,7 +387,8 @@ async function spawnProgram(
 
 /**
  * Runs a program from an argument list, never a shell. The environment is a short allow-list plus `options.env`.
- * `git` and `gh` go through the same checks as `git()`, because both start git. `guard` is the sandbox, when there is one.
+ * `git`, `gh` and `glab` go through the same checks as `git()`, because all of them start git. `guard` is the sandbox, when
+ * there is one.
  */
 export async function run(
     file: string,
@@ -389,6 +405,16 @@ export async function run(
             args,
             options,
             childEnv(options, GIT_ENV, { ...GIT_FIXED_ENV, ...GH_FIXED_ENV }, guard),
+            guard,
+        );
+    }
+    if (name === "glab") {
+        refuseUnsafeRepository(options.cwd ?? process.cwd(), args, guard);
+        return spawnProgram(
+            file,
+            args,
+            options,
+            childEnv(options, GIT_ENV, { ...GIT_FIXED_ENV, ...GLAB_FIXED_ENV }, guard),
             guard,
         );
     }
@@ -429,7 +455,7 @@ async function runGit(
 
 /**
  * `.git/config` is writable from the agent's shell, but git runs here with the user's credentials. A command or a
- * redirect planted in that file would run on the next fetch or push, so before git (or `gh`, which starts git) runs
+ * redirect planted in that file would run on the next fetch or push, so before git (or `gh` or `glab`, which start git) runs
  * in a repository, its local configuration is read and a key that runs a program or redirects a remote refuses the
  * call. `git clone` makes a new repository and reads no configuration of the folder around it, so it is not checked.
  */

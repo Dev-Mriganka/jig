@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import { afterEach, describe, test } from "node:test";
 import { DEFAULTS } from "../src/defaults/index.ts";
 import { logsDefaults } from "../src/defaults/logs.ts";
+import { call } from "./support/call.ts";
 import { startWorld } from "./support/world.ts";
 import type { World } from "./support/world.ts";
 
@@ -72,6 +73,26 @@ describe("a list or a string of the user's replaces the company's", () => {
         assert.deepEqual(section(w, "git").protected, ["main"]);
         assert.equal(section(w, "memory").ticketPattern, "(ACME|PLAT)-\\d+");
         assert.equal(section(w, "git").prTitle, defaults("git").prTitle, "while the rest of git stays");
+    });
+
+    test("the Jira projects", async () => {
+        assert.deepEqual(
+            section(await withPersonal({}), "jira").projects,
+            ["ACME"],
+            "the company's, when the user says nothing",
+        );
+        await world?.close();
+        const w = await withPersonal({ jira: { projects: ["ACME", "PLAT"] } });
+        assert.deepEqual(section(w, "jira").projects, ["ACME", "PLAT"]);
+        assert.equal(section(w, "jira").site, defaults("jira").site, "while the rest of jira stays");
+    });
+
+    test("a create in a project the list leaves out is refused before anyone is asked", async () => {
+        const w = await withPersonal({});
+        const outcome = await call(w, "jira", { action: "create", project: "OTHER", type: "Bug", summary: "A bug" });
+        assert.equal(outcome.blocked, true);
+        assert.match(outcome.reason ?? "", /OTHER is not one of your projects \(ACME\)/);
+        assert.equal(w.ui.selects.length, 0, "the user was not asked");
     });
 
     test("the sandbox's denied hosts", async () => {

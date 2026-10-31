@@ -31,7 +31,7 @@ This tool lists and stops the watches of every plugin.
 
 | Command | What it does |
 |---|---|
-| `/jig` | Status: tools governed, plugins loaded, open watches, configuration problems |
+| `/jig` | Status: tools governed, plugins loaded, environments and who defined them, open watches, configuration problems |
 | `/jig rules [tool]` | The effective decision per tool and action, and where each came from |
 | `/jig records` | Where today's records are, and a one-line summary of the day |
 
@@ -74,6 +74,7 @@ All fields are optional.
 | `classify` | none | How to classify tools Jig did not write |
 | `protectedPaths` | the [defaults](../../docs/permissions.md#protected-paths) | More paths for Pi's file tools to refuse |
 | `secrets.backends` | `["pass"]` | Which backends may resolve secret references |
+| `secrets.disabledBackends` | none | Backends to keep off, even ones a company plugin turned on |
 | `secrets.commands` | none | The commands that `cmd:<name>` may run, by name |
 | `records.retentionDays` | 90 | Days record files are kept, from 1 to 3650 |
 | `spill.retentionDays` | 7 | Days spill files and rendered previews are kept |
@@ -108,8 +109,9 @@ is. Without one, `/jig` and session start say plainly that `bash` is not sandbox
   databases;
 - defaults for other plugins' sections of `jig.json` (`config.addSectionDefaults`), which your own
   section is laid over;
-- secret commands (`config.addSecretCommands`) and protected paths
-  (`config.addProtectedPaths`) for its own tools.
+- secret commands (`config.addSecretCommands`), the secret backends its references need
+  (`config.enableSecretBackends`) and protected paths (`config.addProtectedPaths`) for its own
+  tools.
 
 ## Later
 

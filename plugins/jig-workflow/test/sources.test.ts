@@ -3,8 +3,9 @@ import assert from "node:assert/strict";
 import { mkdirSync, symlinkSync } from "node:fs";
 import path from "node:path";
 import { describe, test } from "node:test";
-import { ciFromEvent, ciRecord, parseRollup, readPullRequest, reviewFromEvent } from "../src/sources.ts";
-import { NOW, fakeHost, ok, PASSED, prJson, tempFolder } from "./support.ts";
+import type { Forge } from "../src/forge.ts";
+import { ciFromEvent, ciRecord, parseJobs, parseRollup, readPullRequest, reviewFromEvent } from "../src/sources.ts";
+import { GREEN_JOBS, glabAnswers, jobJson, mrJson, NOW, fakeHost, ok, PASSED, prJson, tempFolder } from "./support.ts";
 import type { RunScript } from "./support.ts";
 
 const HEAD = "a".repeat(40);
@@ -134,6 +135,19 @@ describe("a CI watch that ended", () => {
         }
     });
 
+    test("a GitLab project's whole path is a repository, groups and all", () => {
+        const found = ciFromEvent(
+            event({ repo: "Platform/Payments/Orders-API", system: "gitlab", finish: "pipeline" }),
+        );
+        assert.deepEqual(found, {
+            repo: "platform/payments/orders-api",
+            sha: HEAD,
+            outcome: "passed",
+            finish: "pipeline",
+        });
+        assert.equal(ciFromEvent(event({ repo: `${"a/".repeat(20)}b` })), undefined, "twenty-one parts is too many");
+    });
+
     test("no commit, a short one, another outcome or another shape is dropped", () => {
         for (const bad of [
             null,
@@ -220,5 +234,195 @@ describe("reading the pull request", () => {
         );
         assert.match((await read(() => ok("not json"))).error ?? "", /Unexpected token|not valid|JSON/i);
         assert.match((await read(() => ok("[]"))).error ?? "", /does not read/);
+    });
+});
+
+describe("the jobs of a GitLab pipeline", () => {
+    test("count as the roll-up of GitHub's checks does: a job that may fail does not fail, an unfinished one is pending", () => {
+        const jobs = [
+            jobJson("build", "success"),
+            jobJson("docs", "skipped"),
+            jobJson("flaky", "failed", { allow_failure: true }),
+            jobJson("test", "failed"),
+            jobJson("e2e", "canceled"),
+            jobJson("deploy", "manual"),
+            jobJson("lint", "running"),
+            jobJson("queued", "pending"),
+            jobJson("later", "created"),
+            jobJson("strange", "quantum"),
+            "junk",
+        ];
+        assert.deepEqual(parseJobs(jobs), { pass: 3, fail: 3, pending: 4, total: 10 });
+        assert.deepEqual(parseJobs(null), { pass: 0, fail: 0, pending: 0, total: 0 });
+    });
+});
+
+describe("reading the merge request on GitLab", () => {
+    const forge: Forge = { forge: "gitlab", host: "gitlab.example.com", path: "platform/payments/orders-api" };
+    const PROJECT = "projects/platform%2Fpayments%2Forders-api";
+    const sha = "0".repeat(40);
+
+    test("glab api asks for the merge request of the branch, then the jobs of its pipeline, in the repository", async () => {
+        const host = fakeHost({
+            run: glabAnswers([
+                ["pipelines/301/jobs", GREEN_JOBS],
+                ["merge_requests", [mrJson({ sha, source_branch: "feature/PROJ-1" })]],
+            ]),
+        });
+        const seen = await readPullRequest(host, "/w/orders-api", "feature/PROJ-1", sha, undefined, forge);
+        assert.deepEqual(
+            host.ran.map((run) => [run.file, run.args, run.cwd]),
+            [
+                [
+                    "glab",
+                    [
+                        "api",
+                        "--hostname",
+                        "gitlab.example.com",
+                        `${PROJECT}/merge_requests?source_branch=feature%2FPROJ-1&state=opened&per_page=5&order_by=updated_at&sort=desc`,
+                    ],
+                    "/w/orders-api",
+                ],
+                [
+                    "glab",
+                    ["api", "--hostname", "gitlab.example.com", `${PROJECT}/pipelines/301/jobs?per_page=100`],
+                    "/w/orders-api",
+                ],
+            ],
+        );
+        assert.deepEqual(seen, {
+            at: NOW.toISOString(),
+            branch: "feature/PROJ-1",
+            head: sha,
+            pr: {
+                number: 42,
+                state: "OPEN",
+                isDraft: false,
+                headRefOid: sha,
+                url: "https://gitlab.example.com/platform/payments/orders-api/-/merge_requests/42",
+            },
+            checks: { pass: 3, fail: 0, pending: 0, total: 3 },
+        });
+    });
+
+    test("states are written as GitHub's are, and a draft is a flag or a title prefix", async () => {
+        const read = async (over: Record<string, unknown>) => {
+            const host = fakeHost({
+                run: glabAnswers([
+                    ["pipelines/301/jobs", GREEN_JOBS],
+                    [/state=opened/, []],
+                    ["merge_requests", [mrJson(over)]],
+                ]),
+            });
+            return (await readPullRequest(host, "/w/orders-api", "main", sha, undefined, forge)).pr;
+        };
+        assert.equal((await read({ state: "merged" }))?.state, "MERGED");
+        assert.equal((await read({ state: "closed" }))?.state, "CLOSED");
+        assert.equal((await read({ state: "locked" }))?.state, "LOCKED");
+        const host = fakeHost({
+            run: glabAnswers([
+                ["pipelines/301/jobs", GREEN_JOBS],
+                ["merge_requests", [mrJson({ draft: true })]],
+            ]),
+        });
+        assert.equal((await readPullRequest(host, "/w", "main", sha, undefined, forge)).pr?.isDraft, true);
+        const prefixed = fakeHost({
+            run: glabAnswers([
+                ["pipelines/301/jobs", GREEN_JOBS],
+                ["merge_requests", [mrJson({ title: "Draft: PROJ-1: x" })]],
+            ]),
+        });
+        assert.equal((await readPullRequest(prefixed, "/w", "main", sha, undefined, forge)).pr?.isDraft, true);
+    });
+
+    test("no merge request for the branch is not an error; one from a fork with the same branch name is not the branch's own", async () => {
+        const none = fakeHost({ run: glabAnswers([["merge_requests", []]]) });
+        const seen = await readPullRequest(none, "/w", "main", sha, undefined, forge);
+        assert.deepEqual([seen.pr, seen.error], [undefined, undefined]);
+        const fork = fakeHost({
+            run: glabAnswers([["merge_requests", [mrJson({ source_project_id: 99, target_project_id: 7 })]]]),
+        });
+        assert.equal((await readPullRequest(fork, "/w", "main", sha, undefined, forge)).pr, undefined);
+    });
+
+    test("a pipeline of an older commit says nothing about this head: there are no checks yet", async () => {
+        const host = fakeHost({
+            run: glabAnswers([
+                ["pipelines/301/jobs", GREEN_JOBS],
+                [
+                    "merge_requests",
+                    [mrJson({ sha, head_pipeline: { id: 301, sha: "b".repeat(40), status: "success" } })],
+                ],
+            ]),
+        });
+        const seen = await readPullRequest(host, "/w", "main", sha, undefined, forge);
+        assert.deepEqual(seen.checks, { pass: 0, fail: 0, pending: 0, total: 0 });
+        assert.equal(host.ran.length, 1, "only the merge request was asked for, and not the jobs of the old pipeline");
+    });
+
+    test("a request without a pipeline has no checks", async () => {
+        const host = fakeHost({ run: glabAnswers([["merge_requests", [mrJson({ head_pipeline: null })]]]) });
+        const seen = await readPullRequest(host, "/w", "main", sha, undefined, forge);
+        assert.deepEqual(seen.checks, { pass: 0, fail: 0, pending: 0, total: 0 });
+    });
+
+    test("a failed job is counted, and a running one is pending", async () => {
+        const host = fakeHost({
+            run: glabAnswers([
+                [
+                    "pipelines/301/jobs",
+                    [jobJson("build", "success"), jobJson("test", "failed"), jobJson("e2e", "running")],
+                ],
+                ["merge_requests", [mrJson()]],
+            ]),
+        });
+        assert.deepEqual((await readPullRequest(host, "/w", "main", sha, undefined, forge)).checks, {
+            pass: 1,
+            fail: 1,
+            pending: 1,
+            total: 3,
+        });
+    });
+
+    test("glab failing is a reason, and a missing sign-in says how to mend it", async () => {
+        const broken = fakeHost({ run: () => ok("", 1, "glab: 404 Not Found (HTTP 404)\n") });
+        assert.equal(
+            (await readPullRequest(broken, "/w", "main", sha, undefined, forge)).error,
+            "glab: 404 Not Found (HTTP 404)",
+        );
+        const signedOut = fakeHost({ run: () => ok("", 1, "glab: 401 Unauthorized (HTTP 401)\n") });
+        assert.equal(
+            (await readPullRequest(signedOut, "/w", "main", sha, undefined, forge)).error,
+            "glab: 401 Unauthorized (HTTP 401) (glab is not signed in for gitlab.example.com: run glab auth login --hostname gitlab.example.com yourself)",
+        );
+        const html = fakeHost({ run: () => ok("<html>maintenance</html>") });
+        assert.equal(
+            (await readPullRequest(html, "/w", "main", sha, undefined, forge)).error,
+            "glab api gave an answer that is not JSON",
+        );
+        const absent = fakeHost({});
+        assert.match(
+            (await readPullRequest(absent, "/w", "main", sha, undefined, forge)).error ?? "",
+            /no program glab/,
+        );
+    });
+});
+
+describe("reading the pull request of a repository whose origin is an alias", () => {
+    test("gh is told the real repository and the branch, since the alias is for git alone", async () => {
+        const host = fakeHost({ run: () => ok(prJson({ headRefOid: HEAD })) });
+        await readPullRequest(host, "/w/orders-api", "feature/PROJ-1", HEAD, undefined, {
+            forge: "github",
+            repo: "github.com/acme/orders-api",
+        });
+        assert.deepEqual(host.ran[0]?.args, [
+            "pr",
+            "view",
+            "feature/PROJ-1",
+            "-R",
+            "github.com/acme/orders-api",
+            "--json",
+            "number,state,isDraft,headRefOid,url,statusCheckRollup",
+        ]);
     });
 });

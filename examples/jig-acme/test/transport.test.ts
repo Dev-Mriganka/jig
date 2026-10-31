@@ -20,6 +20,8 @@ afterEach(async () => {
 });
 
 const ORDERS = "https://orders-api.staging.acme.example/v1/orders?page=2";
+/** What jig-core tells a transport besides the request: how much of the reply it will read, and how long it waits. */
+const LIMITS = { maxBytes: 4 * 1024 * 1024, timeoutMs: 30_000 };
 
 describe("the transport on its own", () => {
     const transport = () => createGatewayTransport({ proxy: () => new URL(gateway.address), hosts: [".acme.example"] });
@@ -36,6 +38,7 @@ describe("the transport on its own", () => {
             url: ORDERS,
             headers: { Accept: "application/json", "Content-Type": "application/json" },
             body: '{"sku":"A-1"}',
+            ...LIMITS,
         });
         const seen = gateway.seen[0];
         assert.equal(seen?.method, "POST");
@@ -46,7 +49,11 @@ describe("the transport on its own", () => {
         assert.equal(seen?.body, '{"sku":"A-1"}');
         assert.equal(reply.status, 201);
         assert.equal(reply.headers["content-type"], "application/json");
-        assert.equal(reply.headers["set-cookie"], "a=1; Path=/, b=2; Path=/");
+        assert.deepEqual(
+            reply.headers["set-cookie"],
+            ["a=1; Path=/", "b=2; Path=/"],
+            "a repeated header comes back as a list",
+        );
         assert.equal(reply.body, '{"id":7}');
     });
 
@@ -61,6 +68,7 @@ describe("the transport on its own", () => {
                 "Proxy-Authorization": "Basic x",
                 "X-Trace": "t-1",
             },
+            ...LIMITS,
         });
         const headers = gateway.seen[0]?.headers ?? {};
         assert.equal(headers.host, "orders-api.staging.acme.example");
@@ -71,7 +79,7 @@ describe("the transport on its own", () => {
 
     test("carries an error status as an answer", async () => {
         gateway.reply(() => ({ status: 503, body: "busy" }));
-        const reply = await transport().request({ system: "api:acme", method: "GET", url: ORDERS });
+        const reply = await transport().request({ system: "api:acme", method: "GET", url: ORDERS, ...LIMITS });
         assert.deepEqual([reply.status, reply.body], [503, "busy"]);
     });
 
@@ -83,7 +91,7 @@ describe("the transport on its own", () => {
             "nonsense",
         ]) {
             await assert.rejects(
-                transport().request({ system: "api:acme", method: "GET", url }),
+                transport().request({ system: "api:acme", method: "GET", url, ...LIMITS }),
                 /Acme hosts only/,
                 url,
             );
@@ -94,7 +102,7 @@ describe("the transport on its own", () => {
     test("a gateway that is down is one line with its code, and the address is not in it", async () => {
         await gateway.close();
         const down = createGatewayTransport({ proxy: () => new URL(gateway.address), hosts: [".acme.example"] });
-        const failure = await down.request({ system: "api:acme", method: "GET", url: ORDERS }).then(
+        const failure = await down.request({ system: "api:acme", method: "GET", url: ORDERS, ...LIMITS }).then(
             () => undefined,
             (error: Error) => error,
         );
@@ -102,10 +110,40 @@ describe("the transport on its own", () => {
         gateway = await fakeServer();
     });
 
+    test("reads no more of the reply than the caller will use", async () => {
+        gateway.reply(() => ({ body: "0123456789".repeat(100) }));
+        const reply = await transport().request({
+            system: "api:acme",
+            method: "GET",
+            url: ORDERS,
+            maxBytes: 25,
+            timeoutMs: 30_000,
+        });
+        assert.equal(
+            reply.body,
+            "01234567890123456789012345",
+            "one byte past the cap, so that jig-core can see there was more",
+        );
+    });
+
+    test("gives up on a gateway that says nothing for the caller's whole time, as one line", async () => {
+        gateway.reply(() => ({ hang: true }));
+        const failure = await transport()
+            .request({ system: "api:acme", method: "GET", url: ORDERS, maxBytes: 1024, timeoutMs: 80 })
+            .then(
+                () => undefined,
+                (error: Error) => error,
+            );
+        assert.match(failure?.message ?? "", /^the gateway could not be reached \(ETIMEDOUT\)$/);
+    });
+
     test("stops when the call is cancelled", async () => {
         gateway.reply(() => ({ hang: true }));
         const controller = new AbortController();
-        const pending = transport().request({ system: "api:acme", method: "GET", url: ORDERS }, controller.signal);
+        const pending = transport().request(
+            { system: "api:acme", method: "GET", url: ORDERS, ...LIMITS },
+            controller.signal,
+        );
         setTimeout(() => controller.abort(), 50);
         await assert.rejects(pending, (error: Error) => error.name === "AbortError");
     });
@@ -130,12 +168,45 @@ describe("through jig-core", () => {
         assert.equal(reply.headers["content-type"], "application/json");
     });
 
+    test("the limits of the request reach the transport: a short reply cap cuts the body and says so", async () => {
+        world = await startWorld({ personal: personal() });
+        gateway.reply(() => ({ body: "abcdefghij".repeat(50) }));
+        const reply = await world.api.http.request({
+            system: "api:acme",
+            url: ORDERS,
+            method: "GET",
+            transport: GATEWAY_TRANSPORT,
+            maxBytes: 20,
+        });
+        assert.equal(reply.body, "abcdefghijabcdefghij");
+        assert.equal(reply.truncated, true);
+    });
+
+    test("a header the gateway repeated is folded for the tool, and each cookie is kept whole", async () => {
+        world = await startWorld({ personal: personal() });
+        gateway.reply(() => ({
+            headers: {
+                "Set-Cookie": ["a=1; Expires=Wed, 21 Oct 2026 07:28:00 GMT; Path=/", "b=2; Path=/"],
+                "X-Trace": ["t-1", "t-2"],
+            },
+        }));
+        const reply = await world.api.http.request({
+            system: "api:acme",
+            url: ORDERS,
+            method: "GET",
+            transport: GATEWAY_TRANSPORT,
+        });
+        assert.deepEqual(reply.cookies, ["a=1", "b=2"]);
+        assert.equal(reply.headers["x-trace"], "t-1, t-2");
+    });
+
     test("jig-core's own call to a transport reaches it too", async () => {
         world = await startWorld({ personal: personal() });
         const reply = await world.api.transports.request(GATEWAY_TRANSPORT, {
             system: "logs",
             method: "GET",
             url: ORDERS,
+            ...LIMITS,
         });
         assert.equal(reply.status, 200);
         assert.equal(gateway.seen.length, 1);

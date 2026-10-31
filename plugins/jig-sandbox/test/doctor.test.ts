@@ -49,6 +49,28 @@ describe("the doctor, with the real sandbox", { skip }, () => {
         }
     });
 
+    test("a deny list in the open mode is a warning line, not a failed check", async () => {
+        const world = await makeWorld({
+            settings: (base) => ({ ...base, network: { ...base.network, deny: ["mongo.prod.example.com"] } }),
+        });
+        try {
+            const lines = await runDoctor(world.sandbox, {
+                cwd: world.project,
+                platform: "linux",
+                lookupName: "localhost",
+            });
+            const warning = lines.find((line) => line.check === "network.deny");
+            assert.equal(warning?.ok, true, "it is not a failure");
+            assert.match(
+                warning?.detail ?? "",
+                /^WARNING: sandbox\.network\.deny \(mongo\.prod\.example\.com\) does nothing in the open network mode/,
+            );
+            assert.deepEqual(formatDoctor(lines).at(-1), "All checks passed: the sandbox works.");
+        } finally {
+            await world.cleanup();
+        }
+    });
+
     test("in off mode the lookup and the connection to localhost must fail, and do", async () => {
         const world = await makeWorld({ settings: (base) => ({ ...base, network: { ...base.network, mode: "off" } }) });
         try {

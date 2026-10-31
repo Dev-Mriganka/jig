@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="980" height="500" viewBox="0 0 980 500" role="img" aria-label="How a jig-git call runs. The agent calls git, pr or release. jig-core classifies the action: reads and local writes run, writes to GitHub ask you. Local git actions run through exec.git, with no shell and hooks off, and refuse a repository whose own configuration runs a command. GitHub actions run through gh, and a lost reply is read once and never sent again. Guarded steps: git push asks and lists the commits, pull request writes ask on a review screen, a protected branch refuses a direct push, force push, rebase, cherry-pick, create or delete, and a merge is refused if the head changed since the preview. After a push and after a pull request is created, jig-git publishes jig-git:pushed on Pi&#x27;s event bus, and jig-ops starts a CI watch." font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="500" viewBox="0 0 980 500" role="img" aria-label="How a jig-git call runs. The agent calls git, pr or release. jig-core classifies the action: reads and local writes run, writes to GitHub or GitLab ask you. Local git actions run through exec.git, with no shell and hooks off, and refuse a repository whose own configuration runs a command. GitHub actions run through gh and GitLab actions through glab, and a lost reply is read once and never sent again. Guarded steps: git push asks and lists the commits, pull request writes ask on a review screen, a protected branch refuses a direct push, force push, rebase, cherry-pick, create or delete, and a merge is refused if the head changed since the preview. After a push and after a pull request is created, jig-git publishes jig-git:pushed on Pi&#x27;s event bus, and jig-ops starts a CI watch." font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">
   <rect x="0.5" y="0.5" width="979" height="499" rx="10" fill="#FAFBFA" stroke="#D2D9D3"/>
   <defs>
     <marker id="gitflow-head-1d3b4d-11" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#1D3B4D"/></marker>
@@ -14,15 +14,15 @@
   <text x="380.0" y="61.0" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">jig-core</text>
   <text x="380.0" y="78.0" font-size="12" fill="#FFFFFF" text-anchor="middle">classifies each action:</text>
   <text x="380.0" y="95.0" font-size="12" fill="#FFFFFF" text-anchor="middle">reads and local writes run,</text>
-  <text x="380.0" y="112.0" font-size="12" fill="#FFFFFF" text-anchor="middle">writes to GitHub ask you</text>
+  <text x="380.0" y="112.0" font-size="12" fill="#FFFFFF" text-anchor="middle">writes to GitHub/GitLab ask you</text>
   <!-- what runs -->
   <rect x="560" y="34" width="390" height="64" rx="6" fill="#5C9CAB"/>
   <text x="755.0" y="53.5" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">local git</text>
   <text x="755.0" y="70.5" font-size="12" fill="#FFFFFF" text-anchor="middle">exec.git: no shell, hooks and prompts off</text>
   <text x="755.0" y="87.5" font-size="12" fill="#FFFFFF" text-anchor="middle">refuses a repository whose config runs a command</text>
   <rect x="560" y="112" width="390" height="64" rx="6" fill="#5C9CAB"/>
-  <text x="755.0" y="131.5" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">GitHub, through gh</text>
-  <text x="755.0" y="148.5" font-size="12" fill="#FFFFFF" text-anchor="middle">pull requests, reviews, tags and releases</text>
+  <text x="755.0" y="131.5" font-size="13" fill="#FFFFFF" font-weight="700" text-anchor="middle">GitHub through gh, GitLab through glab</text>
+  <text x="755.0" y="148.5" font-size="12" fill="#FFFFFF" text-anchor="middle">pull requests (merge requests), reviews, tags, releases</text>
   <text x="755.0" y="165.5" font-size="12" fill="#FFFFFF" text-anchor="middle">a lost reply is read once, never sent again</text>
   <path d="M490 66 H560" fill="none" stroke="#1D3B4D" stroke-width="2.4" marker-end="url(#gitflow-head-1d3b4d-11)"/>
   <text x="525" y="58" font-size="12" fill="#3A4440" text-anchor="middle">git</text>

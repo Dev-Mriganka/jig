@@ -8,7 +8,7 @@ import type { ExtensionAPI, ExtensionUIContext } from "@earendil-works/pi-coding
 import { createApprovals } from "./approvals.ts";
 import type { Approvals } from "./approvals.ts";
 import type { Classification } from "./classify.ts";
-import { buildPolicy, defaultConfig, emptyAdditions, loadConfigFile } from "./config.ts";
+import { buildPolicy, defaultConfig, effectiveBackends, emptyAdditions, loadConfigFile } from "./config.ts";
 import type { CompanyAdditions, LoadedConfig, Policy, SectionCheck } from "./config.ts";
 import { JIG_EVENTS } from "./contract.ts";
 import type { ApprovalKind, Decision, EnvironmentKind, Preview, SandboxProvider, ToolDeclaration } from "./contract.ts";
@@ -184,6 +184,7 @@ export function createState(pi: ExtensionAPI, options: JigCoreOptions = {}): Jig
             problems: [],
             sections: new Map(),
             incomplete: new Map(),
+            invalid: new Set(),
         },
         company: emptyAdditions(),
         sectionChecks: new Map(),
@@ -200,7 +201,8 @@ export function createState(pi: ExtensionAPI, options: JigCoreOptions = {}): Jig
         calls: new Map(),
         redactor,
         secrets: createSecrets({
-            backends: () => state.personal.config.secrets.backends,
+            backends: () => effectiveBackends(state.personal.config.secrets, state.company).on,
+            disabled: () => state.personal.config.secrets.disabledBackends,
             // The user's own commands replace a company's of the same name.
             commands: () => ({ ...state.company.secretCommands, ...state.personal.config.secrets.commands }),
             agentDir: () => state.agentDir(),

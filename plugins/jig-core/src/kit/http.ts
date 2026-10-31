@@ -242,8 +242,20 @@ function fromTransport(reply: TransportResponse, maxBytes: number): HttpResponse
         truncated = true;
     }
     const headers: Record<string, string> = {};
-    for (const [name, value] of Object.entries(reply.headers ?? {})) headers[name.toLowerCase()] = value;
-    return responseOf(reply.status, headers, splitCookies(headers["set-cookie"]), bytes, truncated);
+    // A header the transport gave as a list was sent several times; the reply folds it as the network path does, and a
+    // `set-cookie` list is already one cookie per entry, so it is not split again.
+    let listed: string[] | undefined;
+    for (const [name, value] of Object.entries(reply.headers ?? {})) {
+        const lower = name.toLowerCase();
+        const values = typeof value === "string" ? [value] : [...value];
+        if (lower === "set-cookie" && typeof value !== "string") listed = [...(listed ?? []), ...values];
+        headers[lower] = [...(lower in headers ? [headers[lower]] : []), ...values].join(", ");
+    }
+    const cookies =
+        listed === undefined
+            ? splitCookies(headers["set-cookie"])
+            : listed.flatMap((cookie) => cookie.split(";")[0]?.trim() ?? []);
+    return responseOf(reply.status, headers, cookies, bytes, truncated);
 }
 
 /** The headers a request carries before a credential is added: the caller's defaults, replaced by its own headers of the
@@ -514,6 +526,8 @@ export function createHttp(deps: HttpDeps): JigApi["http"] {
             url: request.url,
             headers,
             ...(request.body === undefined ? {} : { body: request.body }),
+            maxBytes,
+            timeoutMs: request.timeoutMs ?? DEFAULT_TIMEOUT_MS,
         };
         try {
             const reply = await untilAborted(deps.transports.request(name, sent, signal), signal);

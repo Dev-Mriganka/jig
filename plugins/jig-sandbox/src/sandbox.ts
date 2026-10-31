@@ -10,6 +10,7 @@ import { createAllowed } from "./allowed.ts";
 import type { Allowed } from "./allowed.ts";
 import { BrokerError } from "./broker-client.ts";
 import type { Broker, BrokerEvent, BrokerLaunch } from "./broker-client.ts";
+import { denyNotApplied } from "./config.ts";
 import type { NetworkMode, SandboxSettings } from "./config.ts";
 import { scrubEnvironment } from "./env.ts";
 import { withRealCache } from "./files.ts";
@@ -250,6 +251,8 @@ export class Sandbox {
                 "sandbox.docker is not supported: the runtime cannot open the Docker socket alone. The agent can ask to run a Docker command outside the sandbox.",
             );
         }
+        const unrefused = denyNotApplied(settings);
+        if (unrefused !== undefined) this.notes.push(unrefused);
         if ((settings.network.mode === "filtered" || settings.network.mode === "ask") && deps.platform !== "linux") {
             // Fail closed: a mode that is asked for and not available never means a more open one. The bridge between
             // commands is written for Linux's network namespaces, and the Mac side has not been tried.
