@@ -101,9 +101,18 @@ in `jig-lens`.
 
 *The same ticket under two rules: today each push asks, because the approval must cover the exact commit; with `jig-workflow`, pushes need only passing tests and you approve once, with all the evidence on one page, before teammates see the pull request. Writes to a test environment such as `staging` still ask you.*
 
+## A child agent's questions
+
+A [child agent](../plugins/jig-agents/README.md) is a separate Pi, and its `jig-core` asks inside its own
+waiting call. Pi turns that dialog into a request with a random id on the child's output, and the parent
+shows it on your screen, one at a time behind its own questions, under a line the plugin writes. Your answer
+goes back on the pipe that only the parent holds, with the same id: no file, no web endpoint, no cookie.
+Every failure (no screen, no answer in time, too many questions, a request it cannot read) is a no, and a
+yes only settles what the child's rules left as "ask".
+
 ## Later
 
 - **A "waiting for you" list across sessions,** for when you work on one
   ticket while another waits.
-- **Approving from another session.** Still inside a waiting call, never through
-  the browser.
+- **Approving from another session** that you started yourself. It would still be inside
+  a waiting call, never through the browser. For a child agent this is built (above).

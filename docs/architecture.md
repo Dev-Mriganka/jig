@@ -137,7 +137,7 @@ jig (this repository, generic)
   jig-lens   observability: reads jig-core's records, local dashboard; no tools
   jig-theme  the look: palettes as Pi themes, a footer, the answer colour; no tools
   jig-sandbox the sandbox around the agent's bash, and the bash tool that replaces Pi's
-  jig-agents design (see Plugins)
+  jig-agents tool: child agents, each a separate Pi with the same plugins; their questions come to your screen, their limits are counted in the parent
 
 company plugin (separate, private repository)
   the company's environments, sign-in service, internal tools and backends

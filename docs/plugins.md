@@ -39,7 +39,7 @@ paths (see [Permissions](permissions.md#the-floor-what-configuration-cannot-chan
 | [`jig-ops`](../plugins/jig-ops/README.md) | built | `ci`, `deploy`, `runtime` | 7 |
 | [`jig-review`](../plugins/jig-review/README.md) | built | `start_interactive_code_review` and one more; `/code-review` | 8 |
 | [`jig-theme`](../plugins/jig-theme/README.md) | built | none: the `/theme` command, palettes and a footer | 8 |
-| [`jig-agents`](../plugins/jig-agents/README.md) | design | `subagent`: start, status, message, stop | 8 |
+| [`jig-agents`](../plugins/jig-agents/README.md) | built | `subagent`: start, status, message, stop; the `/agents` command | 8 |
 
 `jig-agents` is Jig's own, on Pi's RPC mode: no Pi store package keeps every child
 under `jig-core` and `jig-sandbox` (see its [Options](../plugins/jig-agents/docs/options.md)).
@@ -70,7 +70,7 @@ Each plugin's README has the full table of its tool's actions.
 - **`runtime`:** `pods`, `rollout`, `logs`, `events`, `health`.
 - **`start_interactive_code_review`, `record_interactive_review_resolution`**
   (`jig-review`).
-- **`subagent`:** start, status, message, stop (`jig-agents`, design).
+- **`subagent`:** `start`, `status`, `message`, `stop` (`jig-agents`).
 
 `jig-ops` has one adapter per system: `ci` has GitHub Actions, GitLab CI and
 Jenkins, `deploy` has Helm and `kubectl set image`, and `runtime` has
@@ -107,7 +107,7 @@ tested example that supplies a part for every plugin that has one:
 - **`jig-review`:** nothing.
 - **`jig-theme`:** a company palette, footer defaults and footer parts of its
   own, such as a model spend.
-- **`jig-agents`:** which model each role uses.
+- **`jig-agents`:** which model each role uses, its own roles, and the variable names a model provider needs in a child.
 
 ## How company parts plug in
 

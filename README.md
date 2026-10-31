@@ -6,7 +6,7 @@ Jig is a set of plugins for the [Pi](https://pi.dev) coding agent. They decide
 what the agent may do, ask you when it matters, keep secrets out of its reach,
 and record what happened so you can see it later.
 
-**Status:** thirteen of the fourteen plugins are built. Each plugin's README is the
+**Status:** fourteen of the fourteen plugins are built. Each plugin's README is the
 specification that its code follows. New to a word? See the [glossary](docs/glossary.md).
 
 ## What works today
@@ -42,7 +42,9 @@ In short:
 
 Also built: [`jig-sandbox`](plugins/jig-sandbox/README.md), which runs the
 agent's `bash` in an operating-system sandbox, with background tasks and a network that
-can be filtered or asked about. Design: `jig-agents`.
+can be filtered or asked about. And [`jig-agents`](plugins/jig-agents/README.md), which hands work to child
+agents that Jig's rules still govern: their questions come to your screen, and their turns, time and cost are
+limited.
 
 ## Install
 
@@ -103,7 +105,7 @@ first in the list, because every other plugin needs it:
 | [`jig-ops`](plugins/jig-ops/README.md) | built | CI, deploy and runtime from one service catalog; watches CI until it ends |
 | [`jig-review`](plugins/jig-review/README.md) | built | Code review in the browser, answered round by round, approved with a passkey |
 | [`jig-theme`](plugins/jig-theme/README.md) | built | Six palettes as Pi themes, your own, a one-line footer, the answer colour |
-| [`jig-agents`](plugins/jig-agents/README.md) | design | Child agents that Jig's rules still govern: their questions come to your screen, with limits on turns, time and cost |
+| [`jig-agents`](plugins/jig-agents/README.md) | built | Child agents that Jig's rules still govern: their questions come to your screen, with limits on turns, time and cost |
 
 Every plugin needs `jig-core`; otherwise they work on their own.
 

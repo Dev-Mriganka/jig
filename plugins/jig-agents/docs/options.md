@@ -64,7 +64,7 @@ August and `@deathbeam/pi-delegate` 39 since September. HazAT's package has 726 
 | `@deathbeam/pi-delegate` | Yes | Cancelled, so denied | None | Tiers in settings |
 | `@ferris1225/pi-subagents` | Yes | Cancelled, so denied | Idle time only | Yes, 4 fixed roles |
 | HazAT | Yes | Asked in the child's pane | None | Agent files |
-| **`jig-agents` (this design)** | **Always, checked at start** | **Forwarded to your screen, else denied** | **Turns, minutes, cost** | **Configuration only** |
+| **`jig-agents` (as built)** | **Always, checked at start** | **Forwarded to your screen, else denied** | **Turns, minutes, cost** | **Configuration only** |
 
 Criterion 3 is met by all of them: each sends a follow-up message when a child ends.
 Criteria 5 and 6 are in the next table.
@@ -177,7 +177,7 @@ criterion 2, and the others fail criterion 1 or 2 as well.
 forwarded, `get_session_stats`, `abort`, `steer`, and a shutdown when input ends.
 `jig-core` supplies the watch engine that returns a result. Pi's `RpcClient` delivers
 dialog requests to listeners but has no public way to answer one, so the plugin keeps
-its own client of a few hundred lines. **This is the choice** ([Decisions](../../../docs/decisions.md#2026-10-31-jig-agents-is-built-by-us-on-pis-rpc-mode)).
+its own client (`src/rpc.ts`, about 250 lines with its comments). **This is the choice** ([Decisions](../../../docs/decisions.md#2026-10-31-jig-agents-is-built-by-us-on-pis-rpc-mode)).
 
 Nothing is copied from these packages. What is borrowed is an idea each:
 - from the earlier harness: agent files only from places the model cannot write, models
@@ -189,7 +189,7 @@ Nothing is copied from these packages. What is borrowed is an idea each:
 
 ## What the earlier harness taught
 
-| Lesson | In this design |
+| Lesson | In `jig-agents` |
 |---|---|
 | Children left behind: `/new`, `/resume` and `/fork` kept them running for a result no one gets | A child ends with its parent session, for any reason |
 | A prompt that says "about 25 calls" is a request, not a limit | The parent enforces turns, minutes and cost |
@@ -214,8 +214,9 @@ Nothing is copied from these packages. What is borrowed is an idea each:
 
 - **Nothing was installed or run.** Every row above is from a README or from code, and a
   package may behave differently from its source.
-- **Pi's RPC mode with `jig-core`.** `jig-core`'s tests use a fake RPC context, and the
-  forwarding has not run against a real Pi child.
+- **Pi's RPC mode with `jig-core`.** This was true when the comparison was made. The plugin
+  has since run a real Pi child with `jig-core` loaded, and forwarded its questions (see
+  [Design](design.md#tests)); the comparison itself is unchanged.
 - **HazAT's package on Pi 1.4.** Its dependencies are the old scope; the alias is in
   Pi's source, and the package was not loaded.
 - **Packages read only by README or launch arguments** may differ in the points the

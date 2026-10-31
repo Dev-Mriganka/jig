@@ -1,16 +1,15 @@
 # Jig agent guide
 
-Thirteen of the fourteen plugins are built: `jig-core`, `jig-git`, `jig-memory`,
+Fourteen of the fourteen plugins are built: `jig-core`, `jig-git`, `jig-memory`,
 `jig-lens`, `jig-jira`, `jig-logs`, `jig-api`, `jig-ops`, `jig-review`,
-`jig-mongo`, `jig-theme`, `jig-sandbox` and `jig-workflow`. `jig-agents` is
-design. `examples/jig-acme` is an example company plugin for a fictional
-company: the one place a company plugin lives in this repository, and its tests
-run with `npm test`.
+`jig-mongo`, `jig-theme`, `jig-sandbox`, `jig-workflow` and `jig-agents`.
+`examples/jig-acme` is an example company plugin for a fictional company: the one
+place a company plugin lives in this repository, and its tests run with `npm test`.
 
 Plugin READMEs are the specifications. Code follows them, and when either
 changes, the other changes in the same commit. Tests read the tool tables of
 `jig-git`, `jig-jira` and `jig-mongo`, and the READMEs and docs of `jig-lens`,
-`jig-theme` and `jig-workflow`, so change a table and its test together.
+`jig-theme`, `jig-workflow` and `jig-agents`, so change a table and its test together.
 
 - **Read first:** [docs/architecture.md](docs/architecture.md) and
   [docs/permissions.md](docs/permissions.md).
@@ -49,6 +48,11 @@ changes, the other changes in the same commit. Tests read the tool tables of
   `JIG_SANDBOX_TEST_BWRAP`, `_SOCAT` and `_RG` name the first three when they are elsewhere. A test
   uses a fake home built at run time, hides the real home's credential paths as well,
   and never reads a file under it or contacts any host but a server of its own.
+- **`jig-agents` tests start a real Pi.** `test/real-pi.test.ts` runs the Pi installed next to Node
+  (`npm install -g @earendil-works/pi-coding-agent@1.4.0`; `JIG_AGENTS_TEST_PI` names another) as a child,
+  with this repository's `jig-core` and `jig-agents` and Pi's own scripted model, so it calls no model. It skips
+  with the reason when there is no Pi 1.x, and runs in CI, where Pi is installed. It uses a temporary agent
+  folder and home, never `~/.pi/agent`, and never the `pi` on `PATH`, which may be a wrapper that signs in.
 - **Checks:** `npm run check` (types, Biome), `npm test` and the review page's
   checks (`npm run check:web`, `npm run test:web`, `npm run check:dist`) must
   pass before a commit; CI runs all of them on every push and pull request.
