@@ -5,7 +5,7 @@ import type { ExtensionAPI, ExtensionToolContext, ToolDefinition } from "@earend
 import type { CallClass, Preview } from "../../../jig-core/src/contract.ts";
 import plugin from "../../src/index.ts";
 import { forgetDefaultBranches, setWorkingDirectory } from "../../src/repo.ts";
-import { installFakeGh } from "./fake-gh.ts";
+import { installFakeGh, installFakeGlab } from "./fake-gh.ts";
 import type { FakeGh } from "./fake-gh.ts";
 import { installFakeJig } from "./fake-jig.ts";
 import type { FakeJig } from "./fake-jig.ts";
@@ -42,6 +42,8 @@ export interface Harness {
     sb: Sandbox;
     jig: FakeJig;
     gh: FakeGh;
+    /** The fake `glab`, which answers `glab api` for GitLab as the fake `gh` answers `gh api` for GitHub. */
+    glab: FakeGh;
     tools: Map<string, ToolDefinition>;
     announced: Announced[];
     /** Forgets what earlier tests did: the programs run, the watches started, the settings, the fake gh's fixtures. */
@@ -50,7 +52,7 @@ export interface Harness {
     cleanup(): void;
 }
 
-/** What a real harness has in place of the fake gh: asking for it is a mistake in the test. */
+/** What a real harness has in place of the fake gh and glab: asking for one is a mistake in the test. */
 const NO_FAKE_GH = new Proxy(
     {},
     {
@@ -68,6 +70,7 @@ export function setupHarness(real = false): Harness {
     const sb = sandbox(real ? { github: "real" } : {});
     const jig = installFakeJig();
     const gh = real ? (NO_FAKE_GH as FakeGh) : installFakeGh(sb);
+    const glab = real ? (NO_FAKE_GH as FakeGh) : installFakeGlab(sb);
     const tools = new Map<string, ToolDefinition>();
     const announced: Announced[] = [];
     const pi = {
@@ -86,11 +89,13 @@ export function setupHarness(real = false): Harness {
         sb,
         jig,
         gh,
+        glab,
         tools,
         announced,
         reset() {
             jig.reset();
             gh.reset();
+            glab.reset();
             announced.length = 0;
             setWorkingDirectory(sb.workspace);
         },

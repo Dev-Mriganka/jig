@@ -1,5 +1,6 @@
-// The `pr` tool: GitHub pull requests and reviews, through gh. Reads are allowed. Every write asks the user first, and the
-// text of a write is shown on the review screen before it is sent.
+// The `pr` tool: pull requests and reviews on GitHub, through gh, and merge requests on GitLab, through glab. The repository's
+// origin decides which, never the call. Reads are allowed. Every write asks the user first, and the text of a write is shown on
+// the review screen before it is sent.
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import type { CallClass } from "../../jig-core/src/contract.ts";
@@ -16,6 +17,7 @@ import {
     planReview,
 } from "./pr-write.ts";
 import { planComments, planList, planView } from "./pr-read.ts";
+import { homeOf, planGitlabPr } from "./gitlab-pr.ts";
 import { planWatch } from "./pr-watch-tool.ts";
 import type { Call, Planned } from "./previews.ts";
 import { at, buildTool } from "./tool.ts";
@@ -74,7 +76,7 @@ const PrParams = Type.Object(
                     "A folder in the workspace, or an absolute path inside a work tree. Omit it for the repo Pi runs in.",
             }),
         ),
-        number: Type.Optional(Type.Integer({ minimum: 1, description: "The pull request number." })),
+        number: Type.Optional(Type.Integer({ minimum: 1, description: "The pull request (merge request) number." })),
         branch: Type.Optional(
             Type.String({
                 minLength: 1,
@@ -132,7 +134,7 @@ const PrParams = Type.Object(
         reviewers: Type.Optional(
             Type.Array(Type.String({ minLength: 1, maxLength: 100 }), {
                 maxItems: 30,
-                description: "edit: people or teams to request a review from.",
+                description: "edit: people or teams to request a review from. GitLab: usernames.",
             }),
         ),
     },
@@ -165,7 +167,12 @@ function classifyPr(input: Readonly<Record<string, unknown>>): CallClass | undef
     }
 }
 
-function planPr(params: Readonly<Record<string, unknown>>, call: Call): Promise<Planned> | Planned {
+async function planPr(params: Readonly<Record<string, unknown>>, call: Call): Promise<Planned> {
+    const home = await homeOf(params, call);
+    return home.forge === "gitlab" ? planGitlabPr(params, call, home) : planGithubPr(params, call);
+}
+
+function planGithubPr(params: Readonly<Record<string, unknown>>, call: Call): Promise<Planned> | Planned {
     const p = params as never;
     switch (params.action) {
         case "view":
@@ -201,10 +208,10 @@ export const prTool: JigTool = buildTool({
     name: "pr",
     label: "Pull request",
     description:
-        "GitHub pull requests through gh: view, list, comments; create, edit, ready, comment, reply, resolve, review, merge; watch for new comments. Every write asks the user first. It never approves a pull request.",
-    promptSnippet: "GitHub pull requests: view, comments, watch, create, review, merge",
+        "Pull requests (GitHub, through gh) and merge requests (GitLab, through glab), by the repository's origin: view, list, comments; create, edit, ready, comment, reply, resolve, review, merge; watch for new comments. Every write asks the user first. It never approves.",
+    promptSnippet: "Pull and merge requests: view, comments, watch, create, review, merge",
     promptGuidelines: [
-        "Use the pr tool for pull requests, not bash: the shell has no GitHub sign-in. Push the branch with the git tool first.",
+        "Use the pr tool for pull requests and merge requests, not bash: the shell has no GitHub or GitLab sign-in. Push the branch with the git tool first.",
     ],
     parameters: PrParams,
     table: PR_ACTIONS,

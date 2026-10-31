@@ -7,7 +7,7 @@ Back to the [jig-git overview](../README.md).
 | Not offered | Why |
 |---|---|
 | Starting a workflow by hand | A workflow can deploy; deploys belong to the `deploy` tool of `jig-ops`, with its own rules |
-| A raw GitHub API tool | Its writes cannot be classified |
+| A raw GitHub or GitLab API tool | Its writes cannot be classified |
 | Approving a pull request | Approval stays human |
 | Deleting tags, `reset --hard`, `clean` | They destroy work and are rarely needed; you can run them yourself |
 

@@ -8,6 +8,8 @@ import { githubRepo } from "./repo.ts";
 import type { Repo } from "./repo.ts";
 import { mayHaveLanded, summaryOf } from "./run.ts";
 import type { Reply } from "./previews.ts";
+import { parseApiOutput } from "./api-output.ts";
+import type { ApiResponse } from "./api-output.ts";
 
 const T_GH_READ = 30_000;
 const T_GH_WRITE = 90_000;
@@ -66,36 +68,7 @@ export async function requireSlug(repo: Repo, settings: GitSettings, signal?: Ab
 
 // ---- gh api with ETags ---------------------------------------------------------------------------------------------
 
-export interface ApiResponse {
-    /** The HTTP status, or 0 when no response came (the network failed, or gh could not start the request). */
-    status: number;
-    /** Header names in lower case. */
-    headers: Record<string, string>;
-    body: string;
-}
-
-/**
- * Reads the output of `gh api -i`: a status line, the headers, a blank line, then the body. A `304` has no body, and gh
- * then exits with 1 and says `gh: HTTP 304`; any other status from 300 up is the same. So the status is taken from the
- * status line, not from the exit code.
- */
-export function parseApiOutput(result: RunResult): ApiResponse {
-    const head = /^HTTP\/[\d.]+ (\d{3})[^\n]*\r?\n/.exec(result.stdout);
-    if (!head) {
-        const status = /HTTP (\d{3})/.exec(result.stderr)?.[1];
-        return { status: status ? Number(status) : result.code === 0 ? 200 : 0, headers: {}, body: result.stdout };
-    }
-    const rest = result.stdout.slice(head[0].length);
-    const split = rest.search(/\r?\n\r?\n/);
-    const headerText = split < 0 ? rest : rest.slice(0, split);
-    const body = split < 0 ? "" : rest.slice(split).replace(/^\r?\n\r?\n/, "");
-    const headers: Record<string, string> = {};
-    for (const line of headerText.split(/\r?\n/)) {
-        const colon = line.indexOf(":");
-        if (colon > 0) headers[line.slice(0, colon).trim().toLowerCase()] = line.slice(colon + 1).trim();
-    }
-    return { status: Number(head[1]), headers, body };
-}
+export type { ApiResponse } from "./api-output.ts";
 
 /**
  * One `GET` through `gh api`, with the ETag of the answer we already hold: GitHub answers `304` without counting it against
@@ -169,20 +142,21 @@ export async function ghWrite(what: string, args: readonly string[], options: Gh
 }
 
 /**
- * The answer to a write whose reply was lost: one read of GitHub, and what it showed. `look` returns the success text when
+ * The answer to a write whose reply was lost: one read of the forge (`where` names it), and what it showed. `look` returns the success text when
  * the change is there, and undefined when it is not. Either way nothing is sent again.
  */
 export async function afterLostReply(
     what: string,
     why: string,
     look: () => Promise<string | undefined>,
+    where = "GitHub",
 ): Promise<Reply> {
     let found: string | undefined;
     try {
         found = await look();
     } catch (error) {
         throw new Error(
-            `${what}: the reply was lost (${why}) and the check failed too (${(error as Error).message}). Look at GitHub before trying again. Nothing was sent twice.`,
+            `${what}: the reply was lost (${why}) and the check failed too (${(error as Error).message}). Look at ${where} before trying again. Nothing was sent twice.`,
         );
     }
     if (found === undefined) {

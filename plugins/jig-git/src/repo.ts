@@ -195,11 +195,40 @@ export function parseRemote(url: string | undefined): Remote | undefined {
     return { host, owner, name, slug: `${owner}/${name}` };
 }
 
+/** A remote's host and its whole path, for a forge that nests groups. GitLab's `platform/payments/orders-api` has three parts. */
+export interface RemotePath {
+    host: string;
+    /** The path without a trailing `.git`: two to twenty parts, each a name GitLab allows. */
+    path: string;
+}
+
+const PATH_PART = /^[A-Za-z0-9_][A-Za-z0-9_.-]*$/;
+/** GitLab allows a project in a subgroup of a subgroup, up to twenty parts. */
+const MAX_PATH_PARTS = 20;
+
+/**
+ * The host and the full path of a remote URL, in the same forms as `parseRemote`, but with any number of groups. A path part
+ * that could be read as an option or as a step up (`.`, `..`, `-x`) is refused, so the path is safe to put in a request.
+ */
+export function parseRemotePath(url: string | undefined): RemotePath | undefined {
+    if (!url) return undefined;
+    const match =
+        /^(?:https?:\/\/(?:[^@/]+@)?|ssh:\/\/(?:[^@/]+@)?|git:\/\/|[^@/\s]+@)([^/:\s]+)(?::\d+)?[/:]([^\s?#]+?)(?:\.git)?\/?$/.exec(
+            url.trim(),
+        );
+    if (!match) return undefined;
+    const [, host, path] = match as unknown as [string, string, string];
+    const parts = path.split("/");
+    if (parts.length < 2 || parts.length > MAX_PATH_PARTS || !parts.every((part) => PATH_PART.test(part)))
+        return undefined;
+    return { host, path: parts.join("/") };
+}
+
 /**
  * origin's URL as the repository's configuration holds it, with any embedded credentials removed. `git remote get-url` is not
  * used: it applies `insteadOf` rules, and the URL a person set is the one that says which service the repository is on.
  */
-async function originUrl(repo: Repo, signal?: AbortSignal): Promise<string | undefined> {
+export async function originUrl(repo: Repo, signal?: AbortSignal): Promise<string | undefined> {
     const out = await gitTry(repo.root, ["config", "--get", "remote.origin.url"], { signal });
     return out === undefined ? undefined : scrub(out.trim());
 }

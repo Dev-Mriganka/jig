@@ -31,10 +31,14 @@ export function sandbox(options: { github?: "folder" | "real" } = {}): Sandbox {
     const home = path.join(root, "home");
     fs.mkdirSync(workspace);
     fs.mkdirSync(home);
-    // "GitHub" is a folder: a remote URL that looks like git@github.com:acme/svc.git is a bare repository in it. The rule is in
-    // the global configuration, as a person would put it, so the repositories' own .git/config stays plain.
+    // "GitHub" is a folder: a remote URL that looks like git@github.com:acme/svc.git is a bare repository in it. So are "GitLab"
+    // (git@gitlab.com:) and a self-hosted GitLab (git@gitlab.example.com:). The rule is in the global configuration, as a person
+    // would put it, so the repositories' own .git/config stays plain.
     const remotes = path.join(root, "remotes");
-    const redirect = options.github === "real" ? "" : `[url "${remotes}/"]\n\tinsteadOf = git@github.com:\n`;
+    const redirect =
+        options.github === "real"
+            ? ""
+            : `[url "${remotes}/"]\n\tinsteadOf = git@github.com:\n\tinsteadOf = git@gitlab.com:\n\tinsteadOf = git@gitlab.example.com:\n`;
     fs.writeFileSync(
         path.join(home, ".gitconfig"),
         `[user]\n\tname = Test Author\n\temail = test@example.invalid\n[init]\n\tdefaultBranch = main\n${redirect}`,
@@ -84,10 +88,16 @@ export interface Fixture {
 
 /**
  * A clone at `<workspace>/<name>` on `main`, tracking `origin/main`. The bare origin has one commit on main, and
- * `origin/HEAD` is set, as it is after a real clone. With `owner`, origin's URL is `git@github.com:<owner>/<name>.git`, which
- * the sandbox's git configuration maps to the bare repository, so GitHub-aware code finds a GitHub repository.
+ * `origin/HEAD` is set, as it is after a real clone. With `owner`, origin's URL is `git@<host>:<owner>/<name>.git`, which
+ * the sandbox's git configuration maps to the bare repository, so forge-aware code finds a repository on a forge: GitHub by
+ * default, or `gitlab.com` or `gitlab.example.com` for `host`. An `owner` may have groups (`platform/payments`).
  */
-export function makeRepo(sb: Sandbox, name: string, owner?: string): Fixture {
+export function makeRepo(
+    sb: Sandbox,
+    name: string,
+    owner?: string,
+    host: "github.com" | "gitlab.com" | "gitlab.example.com" = "github.com",
+): Fixture {
     const origin = path.join(sb.root, "remotes", ...(owner ? [owner] : []), `${name}.git`);
     fs.mkdirSync(path.dirname(origin), { recursive: true });
     git(sb.root, "init", "-q", "--bare", "-b", "main", origin);
@@ -99,7 +109,7 @@ export function makeRepo(sb: Sandbox, name: string, owner?: string): Fixture {
     git(seed, "push", "-q", "origin", "main");
     const dir = path.join(sb.workspace, name);
     git(sb.workspace, "clone", "-q", origin, dir);
-    if (owner) git(dir, "remote", "set-url", "origin", `git@github.com:${owner}/${name}.git`);
+    if (owner) git(dir, "remote", "set-url", "origin", `git@${host}:${owner}/${name}.git`);
     return { name, dir, origin };
 }
 

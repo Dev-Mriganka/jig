@@ -72,3 +72,23 @@ Details:
 - **Stopped** with `watch stop`: nothing is sent.
 
 A watch belongs to the Pi session that started it. When Pi closes, the watch is picked up again if the session is resumed.
+
+## On GitLab
+
+The same watch, on a merge request. It is started and ended the same way, tells one message per poll, never repeats a note, skips
+your own and a bot's, and says the comments are information to weigh. What differs is where the comments come from.
+
+- **Two requests a minute or a few more,** through `glab api -i`: the merge request, and its discussions page by page (up to 5 pages
+  of 100 threads; the rest of a longer merge request is not read, and `pr comments` says so). The user `glab` is signed in as is
+  asked for once.
+- **One kind of comment, two shapes.** A note on a line of the diff is told with its file and line; any other note is told without.
+  Each carries its thread, `<number>:<id>`, which `pr reply` takes. System notes (a label added, a push) are not comments.
+- **No cursor.** GitLab has no `updated_after` for discussions, so the ids already told are remembered, and a reply in an old thread
+  is found like a new thread.
+- **Conditional requests are sent.** Each answer's ETag goes back as `If-None-Match`. GitLab answers `304` for the lists it adds an
+  ETag to, but a `304` counts against its rate limit (the `RateLimit-Remaining` header falls), so this saves the transfer and not the
+  request budget.
+- **A bot** is a note author with `bot: true`, or a username with `bot` as a word of its own, such as `renovate-bot` or
+  `project_42_bot_a1b2c3`. `git.watchBots` applies.
+- **A failure that goes away** (5xx, a `429` with `Retry-After` or `RateLimit-Reset`, a lost connection) waits 2, 4, 8 and then 10
+  minutes, as on GitHub; not signed in, or a merge request that is gone, fails the poll at once.

@@ -203,7 +203,7 @@ const MAX_CHARS = 60_000;
 const BODY_LIMIT = 6000;
 
 /** One item of the conversation, as lines. A body is shown whole up to a generous limit. */
-function entry(head: string, body: string): string {
+export function entry(head: string, body: string): string {
     const text = body.trim();
     return `${head}\n${clip(text, BODY_LIMIT).replace(/^/gm, "    ")}${text.length > BODY_LIMIT ? `\n    (${text.length - BODY_LIMIT} more characters)` : ""}`;
 }

@@ -67,7 +67,7 @@ test("programs start only through jig-core: no shell, no child_process, no spawn
     }
 });
 
-test("every git call goes through jig().exec.git and every gh call through jig().exec.run", () => {
+test("every git call goes through jig().exec.git and every gh and glab call through jig().exec.run", () => {
     const calls = sources().flatMap(({ file, text }) =>
         [...text.matchAll(/exec\.(run|git)\(\s*([^,)]*)/g)].map((match) => ({
             file,
@@ -77,7 +77,8 @@ test("every git call goes through jig().exec.git and every gh call through jig()
     );
     assert.ok(calls.length >= 4);
     for (const call of calls) {
-        if (call.kind === "run") assert.equal(call.first, '"gh"', `${call.file}: exec.run is for gh`);
+        if (call.kind === "run")
+            assert.match(call.first ?? "", /^"(gh|glab)"$/, `${call.file}: exec.run is for gh and glab`);
     }
 });
 
@@ -85,7 +86,7 @@ test("the plugin never handles a token: no token variable, no Authorization head
     for (const { file, text } of sources()) {
         assert.doesNotMatch(
             text,
-            /GH_TOKEN|GITHUB_TOKEN|GH_ENTERPRISE_TOKEN|Authorization|secrets\.resolve/,
+            /GH_TOKEN|GITHUB_TOKEN|GH_ENTERPRISE_TOKEN|GITLAB_TOKEN|GLAB_TOKEN|PRIVATE-TOKEN|JOB-TOKEN|Authorization|secrets\.resolve/,
             `${file}: handles a credential`,
         );
     }

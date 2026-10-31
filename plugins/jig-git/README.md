@@ -1,11 +1,15 @@
 # jig-git: git, pull requests and releases
 
 **Status: built.** Tested against temporary repositories and recorded GitHub
-answers, and in CI the reads are run against real GitHub. No test writes to
-GitHub (see [Not verified yet](docs/not-verified.md)).
+and GitLab answers, and in CI the reads are run against real GitHub. No test
+writes to GitHub, and GitLab itself was never reached (see
+[Not verified yet](docs/not-verified.md)).
 
 `jig-git` gives the agent three tools: `git` for the local repository, `pr` for
-GitHub pull requests and reviews, and `release` for tags and releases.
+pull requests and reviews, and `release` for tags and releases. `pr` and
+`release` work on GitHub through `gh` and on GitLab, where a pull request is a
+merge request, through `glab`. The host of `origin` decides which, never the
+model ([GitLab](docs/gitlab.md)).
 
 For example, "commit these two files, push, and open a pull request": `git
 commit` takes exact paths, `git push` shows the commits it will send and waits
@@ -20,7 +24,7 @@ reaches the agent without being asked for ([Comment watch](docs/comments-watch.m
 
 ![How a jig-git call runs: jig-core decides, local git and gh do the work, guarded steps ask or refuse, and a push is announced as jig-git:pushed for jig-ops](../../docs/img/git-flow.svg)
 
-*How a call runs. `jig-core` decides first: reads and local writes run, writes to GitHub ask you. `git push`, the `pr` writes and a protected branch each have a guard, and after a push or a new pull request the plugin announces `jig-git:pushed` for `jig-ops`.*
+*How a call runs. `jig-core` decides first: reads and local writes run, writes to GitHub or GitLab ask you. `git push`, the `pr` writes and a protected branch each have a guard, and after a push or a new pull request the plugin announces `jig-git:pushed` for `jig-ops`.*
 
 ## Tool: `git`
 
@@ -59,6 +63,9 @@ reaches the agent without being asked for ([Comment watch](docs/comments-watch.m
 | `merge` | external write, asks | Merge, squash or rebase, only while the head is still the commit you saw |
 | `watch` | local write | A background watch: new comments from people reach you in one message |
 
+On GitLab the same actions work on merge requests, with a thread named `<number>:<id>`. What GitLab has no equivalent for is
+refused in one line ([GitLab](docs/gitlab.md#what-gitlab-has-no-equivalent-for)).
+
 ## Tool: `release`
 
 | Action | Kind | What it does |
@@ -66,19 +73,22 @@ reaches the agent without being asked for ([Comment watch](docs/comments-watch.m
 | `tags`, `releases` | read | Tags (the latest matching a pattern, or those containing a commit); releases |
 | `tag_create` | local write | An annotated tag, locally |
 | `tag_push` | external write, asks | Push a tag |
-| `release_create` | external write, asks | A GitHub release |
+| `release_create` | external write, asks | A GitHub or GitLab release |
 
 The notes on single actions are in [Actions](docs/actions.md).
 
 ## Rules
 
-- **Reads and local writes run; writes to GitHub ask you.** Every tool declares
+- **Reads and local writes run; writes to GitHub or GitLab ask you.** Every tool declares
   the environment and effect of each action to `jig-core`, and a rule in your
   configuration can change any default, within the floor.
 - **Which repository.** Every action takes an optional `repo`: a folder name in
   the workspace, or an absolute path inside a work tree. Without it, a call
   means the repository Pi started in. The workspace is the folder Pi started
   in, or, inside a repository, the folder that holds it.
+- **The forge comes from the repository.** `github.com` is GitHub, `gitlab.com` is GitLab, and `git.forges` names a self-hosted
+  host. An origin on any other host is refused with the line that fixes it ([GitLab](docs/gitlab.md#which-forge-a-repository-is-on)).
+  `gh` and `glab` own the sign-in; Jig never signs in.
 - **Writes are previewed, and never repeated blindly.** A write that asks shows
   what it will do, and refuses if anything changed since. A lost reply is read
   once and never sent again (see [Writes](docs/writes.md)).
@@ -104,6 +114,7 @@ invalid field, and the defaults apply instead.
 | `cloneHost` | `github.com` | The ssh host `clone` connects to: `github.com` or a `Host` alias |
 | `watchComments` | `"after-create"` | `"after-create"`: `pr create` starts the comment watch. `"off"`: only `pr watch` does |
 | `watchBots` | `false` | Whether the watch also tells the agent about comments by bots |
+| `forges` | none | Hosts that are not github.com or gitlab.com: `{ "gitlab.example.com": "gitlab" }` |
 
 The fields in detail are in [Configuration](docs/configuration.md).
 
@@ -123,8 +134,8 @@ The fields in detail are in [Configuration](docs/configuration.md).
 
 - the `git` settings for its repositories: base and protected branches, branch,
   commit message and pull request title patterns, the pull request template, the
-  clone host;
-- later, the sign-in for a git host that is not `github.com`.
+  clone host, and the self-hosted GitLab hosts (`forges`);
+- later, the sign-in for a git host that is not `github.com` or `gitlab.com`.
 
 ## Events
 
@@ -139,16 +150,18 @@ listener that fails never undoes the push. The details are in
 ```text
 jig-git/
   src/      git.ts, pr.ts and release.ts (the three tools); the actions (git-read, git-local, git-remote, clone,
-            pr-read, pr-write); the comment watch (pr-watch, pr-watch-tool); github.ts and repo.ts; config.ts,
+            pr-read, pr-write); the comment watch (pr-watch, pr-watch-tool); github.ts, gitlab.ts and the GitLab
+            actions (gitlab-pr-read, gitlab-pr-write, gitlab-release, gitlab-watch); forge.ts and repo.ts; config.ts,
             previews.ts and events.ts (jig-git:pushed)
   skills/   git/SKILL.md: how to use the tools (status before commit, what a push announces)
-  test/     against temporary local repositories, a fake gh and a fake jig-core
+  test/     against temporary local repositories, a fake gh and glab and a fake jig-core
   docs/     the detail pages below
 ```
 
 ## More detail
 
 - [Events](docs/events.md): `jig-git:pushed`, who publishes it, and what a listener can rely on
+- [GitLab](docs/gitlab.md): the forge for a repository, how each action maps to glab, what GitLab has no equivalent for
 - [Comment watch](docs/comments-watch.md): `pr watch`, what the agent is told, what is skipped, rate limits, when it ends
 - [Actions](docs/actions.md): notes on single actions of `git` and `pr`
 - [Configuration](docs/configuration.md): the fields of the `git` section in detail

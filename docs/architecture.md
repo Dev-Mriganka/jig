@@ -125,7 +125,7 @@ What closes those gaps:
 ```text
 jig (this repository, generic)
   jig-core   tool manager: classify, rules, approvals, secrets, sign-in, transports, signed-in HTTP requests, mask, redact, cap, record; watch engine
-  jig-git    tools: local git, GitHub PRs and reviews, releases; announces a push on the event bus
+  jig-git    tools: local git, GitHub PRs and GitLab merge requests with reviews, releases; announces a push on the event bus
   jig-ops    tools: CI (GitHub Actions, GitLab, Jenkins), deploy and runtime from a service catalog; the CI watch
   jig-mongo  tool: MongoDB, with allow and deny lists
   jig-jira   tool: Jira issues, with rendered previews

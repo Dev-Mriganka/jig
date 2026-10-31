@@ -34,7 +34,7 @@ In the sessions, a "tool not found" cost the agent extra calls.
 - **A table of parameters per action,** with errors that show the correct
   usage.
 - **A hardened git runner,** now `jig-core`'s `exec.git`, which every git call
-  goes through. Every `gh` call goes through `jig-core`'s `exec.run`.
+  goes through. Every `gh` call, and every `glab` call, goes through `jig-core`'s `exec.run`.
   - They run from an argument list, never a shell, with hooks, `core.fsmonitor`
     and prompts switched off.
   - They refuse a repository whose `.git/config` would run a command.
