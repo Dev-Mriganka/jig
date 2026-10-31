@@ -7,7 +7,6 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { ApprovalService } from "./approval.ts";
 import type { ApprovalHost } from "./approval.ts";
 import { headsToRecord } from "./approval-heads.ts";
-import { isReviewableWrite } from "./code-path.ts";
 import { parseCodeReviewCommand, resolveSelectionFiles } from "./command.ts";
 import { filesOfDiff } from "./diff.ts";
 import { REVIEW_EVENTS } from "./events.ts";
@@ -17,19 +16,16 @@ import type { Git, ReviewFileSelection } from "./git.ts";
 import { openUrl as open } from "./open.ts";
 import { PasskeyStore } from "./passkey/store.ts";
 import { buildApprovalPrompt, buildReviewSubmissionPrompt } from "./prompts.ts";
-import { changedBetween, committedSince, snapshotHeads, snapshotWorkspace } from "./run-changes.ts";
-import type { WorkspaceSnapshot } from "./run-changes.ts";
 import { ReviewServer } from "./server.ts";
 import type { CommentSubmissionMode, SubmittedCommentInput } from "./server.ts";
 import { SettingsStore, workspaceDirFor } from "./settings.ts";
 import { formatSettingsOptions, passkeyToRemove, toggleSelectedSetting } from "./settings-options.ts";
 import { hashDiff, ReviewStore } from "./store.ts";
-import { TICKET_ENTRY } from "./ticket.ts";
+import { activeTicket } from "./ticket.ts";
+import { isHeadless, RunTracker } from "./run-tracker.ts";
 import { registerReviewTools } from "./tools.ts";
 import type { ApprovalMethod, ReviewRecord, ReviewSettings } from "./types.ts";
-import { repositoriesUsedBy } from "./used-repos.ts";
-import { findRepositories, WorkspaceReviewSource } from "./workspace.ts";
-import type { Repository } from "./workspace.ts";
+import { WorkspaceReviewSource } from "./workspace.ts";
 
 /** What starting a review gave: its page, or the one-line reason it could not open. */
 export type ReviewStart = { url: string } | { error: string };
@@ -46,19 +42,10 @@ export interface ReviewOptions {
 
 /** Coordinates Pi events, review state, the page's server and the agent's follow-up prompts. */
 export class ReviewCoordinator {
-    private changedSinceLastOffer = false;
     private currentReview?: ReviewRecord;
     /** The review the agent opened with start_interactive_code_review: the only one it is waiting on. */
     private agentRequestedReviewId?: string;
-    private currentTouchedFiles = new Set<string>();
     private lastSubmissionMode: CommentSubmissionMode = "review";
-    private lastTouchedFiles: string[] = [];
-    /** Each repository's HEAD when the last agent run started: the touched review starts there, so the run's commits show. */
-    private lastRunSince?: Record<string, string>;
-    /** The repositories found when the current agent run started and those its tool calls used; undefined outside a run. */
-    private runRepositories?: { found: Repository[]; used: Set<string> };
-    /** Git state of the repositories when the current agent run started (still being taken); undefined outside a run. */
-    private runStart?: Promise<{ changes?: WorkspaceSnapshot; heads: Record<string, string> } | undefined>;
     private server?: ReviewServer;
     private settings?: ReviewSettings;
     /** The latest context Pi gave: the page's approvals ask the user through it. */
@@ -71,14 +58,14 @@ export class ReviewCoordinator {
     private readonly approval: ApprovalService;
     private readonly passkeys: PasskeyStore;
     private readonly git: Git;
+    private readonly tracker: RunTracker;
     private readonly pi: ExtensionAPI;
-    private readonly cwd: string;
 
     /** `cwd` is Pi's folder: the repository, or a workspace whose repositories are reviewed together. */
     public constructor(pi: ExtensionAPI, cwd: string, options: ReviewOptions) {
         this.pi = pi;
-        this.cwd = cwd;
         this.git = options.git ?? jigGit;
+        this.tracker = new RunTracker(cwd, this.git);
         this.settingsStore = new SettingsStore(workspaceDirFor(options.root, cwd));
         this.reviewStore = new ReviewStore(this.settingsStore);
         this.workspace = new WorkspaceReviewSource(cwd, this.git);
@@ -91,7 +78,7 @@ export class ReviewCoordinator {
      * starts at once and the agent's first change comes much later; a test that changes a file at once must.
      */
     public async runStartTaken(): Promise<void> {
-        await this.runStart;
+        await this.tracker.startTaken();
     }
 
     /** Registers event handlers, the command and the tools. Touches no files: see session_start. */
@@ -103,18 +90,14 @@ export class ReviewCoordinator {
 
         this.pi.on("tool_call", (event, ctx): void => {
             this.ctx = ctx;
-            if ((event.toolName === "write" || event.toolName === "edit") && this.isCodeWrite(event.input.path)) {
-                this.changedSinceLastOffer = true;
-                this.recordTouchedFile(event.input.path);
-            }
-            this.noteUsedRepositories(event.toolName, event.input);
+            this.tracker.toolCall(event.toolName, event.input);
         });
 
         // Not awaited: the model starts at once, and the snapshot (a git status per repository) is done long before the agent's
         // first tool call can change a file. agent_end waits for it.
         this.pi.on("agent_start", (_event, ctx): void => {
             this.ctx = ctx;
-            this.snapshotRunStart(ctx);
+            this.tracker.startRun(ctx);
         });
 
         this.pi.on("agent_end", async (_event, ctx): Promise<void> => {
@@ -247,22 +230,6 @@ export class ReviewCoordinator {
         }
     }
 
-    private isCodeWrite(value: unknown): boolean {
-        if (typeof value !== "string" || value.length === 0) return false;
-        return isReviewableWrite(path.isAbsolute(value) ? value : path.resolve(this.cwd, value));
-    }
-
-    private noteUsedRepositories(toolName: string, input: unknown): void {
-        const run = this.runRepositories;
-        if (run === undefined) return;
-        for (const root of repositoriesUsedBy(toolName, input, run.found, this.cwd)) run.used.add(root);
-    }
-
-    private recordTouchedFile(value: unknown): void {
-        if (typeof value !== "string" || value.length === 0) return;
-        this.currentTouchedFiles.add(normalizeTouchedPath(value, this.cwd));
-    }
-
     private async handleCodeReviewCommand(args: string, ctx: ExtensionContext): Promise<ReviewStart | undefined> {
         const command = parseCodeReviewCommand(args);
         if (command.subcommand === "settings") {
@@ -288,64 +255,8 @@ export class ReviewCoordinator {
         return this.currentReview;
     }
 
-    /**
-     * Remembers what each repository looks like before the agent runs, so files changed through bash (not only the edit
-     * and write tools) are found afterwards. Best effort: a failure leaves the run without the git comparison.
-     */
-    private snapshotRunStart(ctx: Pick<ExtensionContext, "mode">): void {
-        this.runRepositories = undefined;
-        this.runStart = undefined;
-        if (isHeadless(ctx)) return;
-
-        // Which repositories the run will use is not known yet, so every one is snapshotted; agent_end compares only the used
-        // ones. A failure leaves the run without the git comparison; the tool events still record what was edited.
-        let found: Repository[];
-        try {
-            found = findRepositories(this.cwd);
-        } catch {
-            return;
-        }
-        this.runRepositories = { found, used: new Set() };
-        this.runStart = Promise.all([
-            snapshotWorkspace(this.cwd, () => found, undefined, this.git).catch(() => undefined),
-            snapshotHeads(this.cwd, () => found, this.git).catch(() => ({})),
-        ]).then(([changes, heads]) => ({ changes, heads }));
-    }
-
-    /**
-     * Adds the reviewable files that differ from the start of the run, whichever tool changed them, in the repositories the
-     * run used. Another Pi session may share the workspace and change its own repositories meanwhile.
-     */
-    private async recordGitChanges(ctx: Pick<ExtensionContext, "mode">): Promise<void> {
-        const start = await this.runStart;
-        const used = this.runRepositories?.found.filter((repo) => this.runRepositories?.used.has(repo.root)) ?? [];
-        this.runStart = undefined;
-        this.runRepositories = undefined;
-        this.lastRunSince = start?.heads;
-        const before = start?.changes;
-        if (before === undefined || used.length === 0 || isHeadless(ctx)) return;
-
-        try {
-            const after = await snapshotWorkspace(this.cwd, () => used, undefined, this.git);
-            const usedHeads = Object.fromEntries(
-                Object.entries(start?.heads ?? {}).filter(([root]) => used.some((repo) => repo.root === root)),
-            );
-            const committed = await committedSince(usedHeads, this.git);
-            for (const file of new Set([...changedBetween(before, after), ...committed])) {
-                if (this.isCodeWrite(file)) {
-                    this.changedSinceLastOffer = true;
-                    this.recordTouchedFile(file);
-                }
-            }
-        } catch {
-            // Best effort, as at the start of the run.
-        }
-    }
-
     private async handleAgentEnd(ctx: ExtensionContext): Promise<void> {
-        await this.recordGitChanges(ctx);
-        this.lastTouchedFiles = [...this.currentTouchedFiles];
-        this.currentTouchedFiles.clear();
+        await this.tracker.finishRun(ctx);
 
         if (this.currentReview?.status === "awaiting-agent") {
             await this.refreshReviewAfterAgent(ctx);
@@ -353,8 +264,8 @@ export class ReviewCoordinator {
         }
 
         const settings = await this.getSettings();
-        if (!this.changedSinceLastOffer || this.currentReview?.status === "awaiting-review") return;
-        this.changedSinceLastOffer = false;
+        if (!this.tracker.changed || this.currentReview?.status === "awaiting-review") return;
+        this.tracker.clearChanged();
 
         // The offer covers what the agent just changed, not the whole branch: after a two-file edit the user wants those two
         // files. The branch review before a push is `/code-review` (with a ticket, its whole branch).
@@ -368,7 +279,7 @@ export class ReviewCoordinator {
             ctx.ui.notify("The agent changed files. Run /code-review to review them.", "info");
             return;
         }
-        const count = this.lastTouchedFiles.length === 1 ? "1 file" : `${this.lastTouchedFiles.length} files`;
+        const count = this.tracker.touched.length === 1 ? "1 file" : `${this.tracker.touched.length} files`;
         const shouldReview = await ctx.ui.confirm(
             "Review generated code?",
             `The agent changed ${count}. Start an interactive browser review of those changes?`,
@@ -382,7 +293,7 @@ export class ReviewCoordinator {
         selection: ReviewFileSelection,
     ): Promise<ReviewStart> {
         try {
-            const resolvedSelection = resolveSelectionFiles(selection, this.lastTouchedFiles, this.lastRunSince);
+            const resolvedSelection = resolveSelectionFiles(selection, this.tracker.touched, this.tracker.since);
             await this.workspace.requireGitRepo(resolvedSelection);
             await this.reviewStore.cleanupInactiveReviews(this.currentReview?.id);
             const review = await this.getReviewToOpen(resolvedSelection);
@@ -555,33 +466,4 @@ export class ReviewCoordinator {
         this.settings ??= await this.settingsStore.load();
         return this.settings;
     }
-}
-
-/** The ticket jig-memory marked active in this session, if any. */
-export function activeTicket(ctx: Pick<ExtensionContext, "sessionManager">): string | undefined {
-    const entries = ctx.sessionManager.getEntries() as unknown as Array<{
-        type?: string;
-        customType?: string;
-        data?: { key?: unknown };
-    }>;
-    for (let i = entries.length - 1; i >= 0; i--) {
-        const entry = entries[i];
-        if (entry?.type === "custom" && entry.customType === TICKET_ENTRY) {
-            const key = entry.data?.key;
-            return typeof key === "string" && /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/.test(key) ? key : undefined;
-        }
-    }
-    return undefined;
-}
-
-/** A subagent child (the parent sets PI_SUBAGENT_ID; PI_SUBAGENT_CHILD=1 is the older name) or a one-shot `pi -p` / `--mode json` run. */
-function isHeadless(ctx: Pick<ExtensionContext, "mode">): boolean {
-    const { PI_SUBAGENT_CHILD, PI_SUBAGENT_ID } = process.env;
-    return Boolean(PI_SUBAGENT_ID?.trim()) || PI_SUBAGENT_CHILD === "1" || ctx.mode === "print" || ctx.mode === "json";
-}
-
-function normalizeTouchedPath(value: string, cwd: string): string {
-    const absolutePath = path.isAbsolute(value) ? value : path.resolve(cwd, value);
-    const relativePath = path.relative(cwd, absolutePath);
-    return relativePath.startsWith("..") || path.isAbsolute(relativePath) ? absolutePath : relativePath;
 }
