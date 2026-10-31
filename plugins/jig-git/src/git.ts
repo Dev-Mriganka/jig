@@ -4,17 +4,9 @@ import { Type } from "typebox";
 import type { CallClass } from "../../jig-core/src/contract.ts";
 import { planClone } from "./clone.ts";
 import { planBlame, planBranches, planDiff, planLog, planShow, planStatus } from "./git-read.ts";
-import {
-    planBranch,
-    planCherryPick,
-    planCommit,
-    planMerge,
-    planRebase,
-    planRestore,
-    planStash,
-    planSync,
-    planWorktree,
-} from "./git-local.ts";
+import { planBranch, planWorktree } from "./git-branch.ts";
+import { planCommit, planRestore, planStash } from "./git-changes.ts";
+import { planCherryPick, planMerge, planRebase, planSync } from "./git-integrate.ts";
 import { planFetch, planPush } from "./git-remote.ts";
 import { describeActions } from "./params.ts";
 import type { ActionTable } from "./params.ts";

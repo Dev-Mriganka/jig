@@ -157,6 +157,7 @@ jig-ops/
 
 ## More detail
 
+- [Code map](docs/code-map.md): every file, who calls it, and a deploy followed from call to command
 - [The catalog](docs/catalog.md): every field, and what is checked
 - [CI](docs/ci.md): what each system can do, sign-in, previews, lost replies, watches and artifacts
 - [Runtime](docs/runtime.md): the parameters, the results, health, and the Kubernetes adapter's rules

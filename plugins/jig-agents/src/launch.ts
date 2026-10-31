@@ -192,3 +192,53 @@ export function childEnvironment(
     env.PI_SKIP_VERSION_CHECK = "1";
     return env;
 }
+
+/** What a started child showed, checked against what was asked. `model` and `priced` are set only when the child reported a model. */
+export interface StartCheck {
+    /** What is wrong, as the reason the parent agent reads; undefined when the child can be used. */
+    problem?: string;
+    model?: string;
+    priced?: boolean;
+}
+
+/**
+ * Checks the answers of a child's `get_commands` and `get_state`: that no plugin failed to load, that it lists the commands the
+ * parent's own plugins give (so it loaded the same ones), and that it runs the model that was asked for. `modelSeen` is the model
+ * an earlier start of the same child showed, which stands when this one reports none.
+ */
+export function checkStarted(
+    wanted: { requireCommands: readonly string[]; model: string | undefined },
+    startErrors: readonly string[],
+    modelSeen: string,
+    commands: unknown,
+    state: unknown,
+): StartCheck {
+    if (startErrors.length > 0) return { problem: `a plugin failed to load in the child: ${startErrors[0]}` };
+    const listed = new Set(
+        ((commands as { commands?: Array<{ name?: unknown }> } | undefined)?.commands ?? []).flatMap((command) =>
+            typeof command.name === "string" ? [command.name] : [],
+        ),
+    );
+    const missing = wanted.requireCommands.filter((name) => !listed.has(name));
+    if (missing.length > 0) {
+        return {
+            problem: `the child does not list the /${missing.join(", /")} command${missing.length === 1 ? "" : "s"}, so it did not load the same plugins as this session. It was stopped before it got its task.`,
+        };
+    }
+    const reported = (
+        state as
+            | { model?: { provider?: unknown; id?: unknown; cost?: { input?: unknown; output?: unknown } } }
+            | undefined
+    )?.model;
+    const seen: StartCheck = {};
+    let model = modelSeen;
+    if (reported !== undefined && typeof reported.provider === "string" && typeof reported.id === "string") {
+        model = `${reported.provider}/${reported.id}`;
+        seen.model = model;
+        seen.priced = Number(reported.cost?.input) > 0 || Number(reported.cost?.output) > 0;
+    }
+    if (wanted.model !== undefined && model !== wanted.model) {
+        seen.problem = `the child runs ${model === "" ? "no model" : model}, not the ${wanted.model} that was asked for`;
+    }
+    return seen;
+}

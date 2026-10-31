@@ -124,6 +124,9 @@ company plugin supplies, and the order of building.
 
 ## Read in this order
 
+**New here?** [Your first hour with Jig](docs/first-hour.md) takes you from install to your first approval,
+the sandbox check and `/lens`, in plain words. Then:
+
 1. [Architecture](docs/architecture.md): how the tool manager sits over every
    tool, what it can and cannot control, and where each plugin fits.
 2. [Permissions](docs/permissions.md): environments, rules per tool, and the
@@ -139,6 +142,10 @@ company plugin supplies, and the order of building.
 8. [Glossary](docs/glossary.md): the terms these documents use.
 9. [Writing the docs](docs/writing.md): how these pages are written, if you
    add to them.
+10. **The code, with a map.** The big plugins each have a code map, with every file, who calls it and one call
+    traced through them: [`jig-core`](plugins/jig-core/docs/code-map.md), [`jig-api`](plugins/jig-api/docs/code-map.md),
+    [`jig-ops`](plugins/jig-ops/docs/code-map.md), [`jig-sandbox`](plugins/jig-sandbox/docs/code-map.md),
+    [`jig-agents`](plugins/jig-agents/docs/code-map.md) and [`jig-workflow`](plugins/jig-workflow/docs/code-map.md).
 
 ## Relationship to the existing harness
 

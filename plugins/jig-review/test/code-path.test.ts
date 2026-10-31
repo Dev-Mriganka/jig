@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { isReviewableWrite } from "../src/code-path.ts";
-import { activeTicket } from "../src/coordinator.ts";
+import { activeTicket } from "../src/ticket.ts";
 
 test("only writes inside a git work tree, outside the agent's folders, count as code", () => {
     const root = mkdtempSync(path.join(tmpdir(), "code-path-"));

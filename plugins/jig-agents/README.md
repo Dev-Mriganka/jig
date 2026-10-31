@@ -143,17 +143,17 @@ An unknown field is an error, as in `jig-core`. A company plugin sets `roles.sco
 
 ```text
 jig-agents/
-  src/      index (factory), runtime (the session's children), child (one child: process, counters, end),
-            rpc (the client), forward (questions), limits, launch (flags, environment, model), roles, config,
-            tool, commands, watch, worktree, store + orphans (run folders, the sweep), host, clean
-  agents/   scout.md, reviewer.md, worker.md
-  skills/   subagent/SKILL.md: when to delegate
+  src/      index (factory), runtime + start-plan (the session's children; what a start works out), child (one child)
+            with child-process, child-questions, child-report and child-types, rpc, forward (questions), limits,
+            launch (flags, environment, model), roles, config, tool, commands, watch, worktree, store + orphans, host, clean
+  agents/   scout.md, reviewer.md, worker.md; skills/subagent/SKILL.md: when to delegate
   test/     one file per module; world.ts runs a parent session with a fake child, real-pi.test.ts a real Pi
   docs/     the detail pages below
 ```
 
 ## More detail
 
+- [Code map](docs/code-map.md): every file, who calls it, and a child followed from `start` to its report
 - [Options](docs/options.md): the Pi store's packages compared, and what the earlier harness taught
 - [Design](docs/design.md): launch, approvals, limits, results, roles, configuration, tests
 - [Not verified](docs/not-verified.md): what only a real model run can show

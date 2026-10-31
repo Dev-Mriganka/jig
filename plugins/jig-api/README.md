@@ -138,7 +138,7 @@ example of each source, is in [Configuration](docs/configuration.md).
 ```text
 jig-api/
   src/      the tool and its checks (index, tool, params, config, ad-hoc, refresh), collections (model, template,
-            catalog, sources/ with one adapter per format), a request worked out (resolve, planning, optional, show),
+            catalog, sources/ with a few files per format), a request worked out (resolve, planning, optional, show),
             engine/ (sending through jig-core's request, previews, results)
   skills/   api/SKILL.md: list, show, then run; read before you write
   test/     fixtures of an example orders API in every format, the engine's tests, the safety tests; test/it/ against
@@ -148,6 +148,7 @@ jig-api/
 
 ## More detail
 
+- [Code map](docs/code-map.md): every file, who calls it, and a saved request followed from call to answer
 - [Postman](docs/postman.md), [`.http` files](docs/http-files.md), [Bruno](docs/bruno.md), [OpenAPI](docs/openapi.md) and
   [Postman cloud](docs/postman-cloud.md): what is read, and what is refused
 - [Variables](docs/variables.md): the order values come in, and how the agent's are written

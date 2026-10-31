@@ -18,7 +18,7 @@ import { createAsker, serialQueue } from "./ask.ts";
 import { backgroundDeclarations } from "./background/declarations.ts";
 import { registerPs } from "./background/ps.ts";
 import { Tasks } from "./background/tasks.ts";
-import type { TasksDeps } from "./background/tasks.ts";
+import type { TasksDeps } from "./background/tasks-deps.ts";
 import { backgroundTools } from "./background/tools.ts";
 import { createBashTool, sandboxedOperations } from "./bash.ts";
 import type { BashDeps, Decision } from "./bash.ts";
@@ -32,7 +32,7 @@ import { nodeFiles } from "./files.ts";
 import type { FileView } from "./files.ts";
 import { detectWsl } from "./platform.ts";
 import { Sandbox } from "./sandbox.ts";
-import type { SandboxDeps } from "./sandbox.ts";
+import type { SandboxDeps } from "./sandbox-types.ts";
 import type { ProtectedEntry } from "./rules.ts";
 
 /** The parts a test replaces, so that no test starts a sandbox it did not mean to. */

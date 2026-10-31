@@ -3,6 +3,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { jig } from "../../jig-core/src/client.ts";
 import type { Repository } from "./workspace.ts";
 
@@ -87,4 +88,21 @@ export function readBinding(ticket: string, cwd: string, env: NodeJS.ProcessEnv 
         used.add(prefix);
         return { root, prefix };
     });
+}
+
+/** The ticket jig-memory marked active in this session, if any. */
+export function activeTicket(ctx: Pick<ExtensionContext, "sessionManager">): string | undefined {
+    const entries = ctx.sessionManager.getEntries() as unknown as Array<{
+        type?: string;
+        customType?: string;
+        data?: { key?: unknown };
+    }>;
+    for (let i = entries.length - 1; i >= 0; i--) {
+        const entry = entries[i];
+        if (entry?.type === "custom" && entry.customType === TICKET_ENTRY) {
+            const key = entry.data?.key;
+            return typeof key === "string" && /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/.test(key) ? key : undefined;
+        }
+    }
+    return undefined;
 }

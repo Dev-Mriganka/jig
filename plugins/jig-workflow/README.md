@@ -139,9 +139,9 @@ variables such as `JAVA_HOME`) and `outside` (a command that needs what the sand
 ```text
 jig-workflow/
   src/        index.ts (the factory), runtime.ts (the session), config.ts, definition.ts + load.ts (workflow files),
-              store.ts (workflow.json), ticket.ts + repos.ts, conditions.ts + sources.ts + listeners.ts (evidence),
-              plan.ts, tests.ts + environment.ts + outside.ts (test runs), gate.ts (holds), tool.ts + actions.ts,
-              commands.ts, status.ts, host.ts (jig-core's programs and sandbox, behind one seam)
+              store.ts (workflow.json), ticket.ts + repos.ts, conditions.ts + sources.ts + listeners.ts + forge.ts (evidence),
+              plan.ts, tests.ts + environment.ts + outside.ts (test runs), gate.ts (holds), tool.ts + actions.ts (one
+              file for each family: action-start, -plan, -tests, -stages, -support), commands.ts, status.ts, host.ts
   skills/     workflow/SKILL.md: how to take work through its workflow
   examples/   feature.json, bugfix.json, investigation.json
   test/       one file per module; world.ts runs a whole session through the real jig-core
@@ -149,6 +149,7 @@ jig-workflow/
 
 ## More detail
 
+- [Code map](docs/code-map.md): every file, who calls it, and `advance` followed through them
 - [Files](docs/files.md): fields, matching, folders, examples, a company's files
 - [Conditions](docs/conditions.md): how each one is decided, and what makes a result stop counting
 - [Holds](docs/holds.md): the gate, what a hold matches, calls that always ask

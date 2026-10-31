@@ -1,6 +1,6 @@
 // The shapes the background module shares. Types only: nothing here runs.
 import type { ChildProcess } from "node:child_process";
-import type { Prepared } from "../sandbox.ts";
+import type { Prepared } from "../sandbox-types.ts";
 import type { TaskLog } from "./logfile.ts";
 import type { LineMatcher } from "./patterns.ts";
 

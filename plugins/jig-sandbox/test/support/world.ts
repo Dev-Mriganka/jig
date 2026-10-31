@@ -23,7 +23,7 @@ import type { SandboxSettings } from "../../src/config.ts";
 import { nodeFiles } from "../../src/files.ts";
 import { detectWsl } from "../../src/platform.ts";
 import { Sandbox } from "../../src/sandbox.ts";
-import type { SandboxDeps } from "../../src/sandbox.ts";
+import type { SandboxDeps } from "../../src/sandbox-types.ts";
 import { testPrograms } from "./programs.ts";
 
 const BROKER = path.resolve(import.meta.dirname, "../../broker/broker.mjs");

@@ -132,6 +132,7 @@ jig-core/
 
 ## More detail
 
+- [Code map](docs/code-map.md): every file, who calls it, and one tool call followed through the gate
 - [Watches](docs/watches.md): kinds, polling, finish lines, messages, saving
 - [Credential sources](docs/sign-in-and-transports.md): where a request's credential comes from, and why Jig never signs in
 - [What asks](docs/approval-screens.md): the order of a decision, and the screens
