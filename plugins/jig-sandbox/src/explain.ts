@@ -192,10 +192,14 @@ export function explainViolations(violations: ReadonlyArray<{ line: string }>): 
         // The reason often starts with the target, which the line has already said.
         const given = (parsed[2] as string).replace(/\.$/, "");
         const reason = given.startsWith(`${target} `) ? `it ${given.slice(target.length + 1)}` : given;
+        // The runtime refuses a name that resolves to this machine, whatever Pi said about it; a carried port is at 127.0.0.1.
+        const hint = /^resolved to /.test(reason)
+            ? " A port of this machine that is carried into the command is at 127.0.0.1, not at a name."
+            : "";
         seen.add(
             reason === "user denied"
                 ? `[sandbox] cannot reach ${target}: refused.`
-                : `[sandbox] cannot reach ${target}: ${reason}.`,
+                : `[sandbox] cannot reach ${target}: ${reason}.${hint}`,
         );
     }
     return [...seen].slice(0, MAX_LINES);

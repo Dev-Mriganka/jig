@@ -197,12 +197,14 @@ describe("the network", () => {
                 },
                 { line: "deny network-outbound db.example.com:5432 (user denied)" },
                 { line: "deny network-outbound db.example.com:5432 (user denied)" },
+                { line: "deny network-outbound localhost:3000 (resolved to a loopback address)" },
             ]),
             [
                 "[sandbox] cannot reach 169.254.169.254:80: it is a cloud metadata address, and those are always blocked.",
                 "[sandbox] cannot reach ::1:8080: [::1]:8080 is this machine's own address; list its port in sandbox.network.localhost to reach a service on it.",
                 "[sandbox] cannot reach api.example.com:443: it was refused: the user said no. Do not try another way round it.",
                 "[sandbox] cannot reach db.example.com:5432: refused.",
+                "[sandbox] cannot reach localhost:3000: resolved to a loopback address. A port of this machine that is carried into the command is at 127.0.0.1, not at a name.",
             ],
         );
     });

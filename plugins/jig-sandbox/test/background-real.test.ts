@@ -67,6 +67,21 @@ describe("background tasks in the real sandbox", { skip }, () => {
         assert.equal(readFileSync(path.join(s.home, ".bashrc"), "utf8"), "# fake\n");
     });
 
+    test("a command cannot swap a task's log for a link to a file it may not read: the logs are in the locked agent folder", async () => {
+        const started = await s.bash("echo log-line-$((40+2)); sleep 30", { background: true, name: "log" });
+        const id = /task (bg-\d+)/.exec(started.text)?.[1] as string;
+        await until(async () => (await s.call("bg_output", { id, tail: 3 })).text.includes("log-line-42"), 10_000);
+        const folders = readdirSync(path.join(s.agentDir, "jig-sandbox", "background"));
+        assert.equal(folders.length, 1);
+        const log = path.join(s.agentDir, "jig-sandbox", "background", folders[0] as string, `${id}.log`);
+        const attempt = await s.bash(`rm -f ${log}; ln -s ${s.home}/.ssh/id_test ${log}; echo exit=$?`);
+        assert.match(attempt.text, /Read-only file system|Permission denied/);
+        const output = await s.call("bg_output", { id, offset: 0 });
+        assert.match(output.text, /log-line-42/);
+        assert.doesNotMatch(output.text, /fake-key-text-from-test/);
+        await s.call("bg_kill", { id });
+    });
+
     test("stopping a task stops its whole tree, children inside the sandbox included", async () => {
         const started = await s.bash("sleep 311 & sleep 312 & echo children-$((40+2)); wait", { background: true });
         const id = /task (bg-\d+)/.exec(started.text)?.[1] as string;
