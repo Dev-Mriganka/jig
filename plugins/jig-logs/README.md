@@ -1,7 +1,7 @@
 # jig-logs: searching logs
 
-**Status: built.** Tested against fakes, and in CI against a real Elasticsearch 8,
-OpenSearch 2 and Grafana Loki 3. What is still unproved is in
+**Status: built.** Tested against fakes, and in CI against real Elasticsearch 9 and 8,
+OpenSearch 3 and 2, and Grafana Loki 3. What is still unproved is in
 [Not verified yet](docs/not-verified.md).
 
 `jig-logs` gives the agent one tool, `logs`, that searches the logs of one
