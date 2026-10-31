@@ -27,22 +27,22 @@ knowledge, an overlay skill the agent reads.*
 | [`src/secrets.ts`](src/secrets.ts) | The command `acme-sso`, which `cmd:acme-sso` runs, and the `cmd` backend turned on | The command-line tool that owns its login |
 | [`src/signin.ts`](src/signin.ts) | The sign-in service `acme-sso`: a bearer header from a secret reference | Whatever its gateway wants: a token, an HMAC, a cloud signature |
 | [`src/transport.ts`](src/transport.ts) | The transport `acme-gateway`: a request carried by a gateway on this machine | A sign-in proxy, a VPN gateway's API, a browser-session broker |
-| [`src/tunnel.ts`](src/tunnel.ts) | The tunnel `acme-bastion`: `ssh -L`, a forward | A jump host, a cloud port forward, a VPN client's command |
+| [`src/tunnel.ts`](src/tunnel.ts) | The tunnel `acme-bastion`: `ssh -L`, a forward, with jig-core's port helpers | A jump host, a cloud port forward, a VPN client's command |
 | [`src/masking.ts`](src/masking.ts) | Two field names for the masker: `memberAlias`, `loyaltyCardHolder` | The names that hold personal data in its own systems |
 | [`src/protection.ts`](src/protection.ts) | One secret path: `~/.acme/credentials.json` | Where its own tools keep a login |
 | [`src/status.ts`](src/status.ts) | Lines for `/jig`: the sign-in, transport and tunnel it adds, and what this user still has to set | What a user needs to see at a glance |
 | [`skills/acme-jira`](skills/acme-jira/SKILL.md) | The company's Jira conventions, read beside the `jira` skill | Its projects, fields, workflow and manners |
 | [`src/config.ts`](src/config.ts) | The `acme` section of `jig.json`, for what only one person can say | The few per-person settings |
 | [`src/hosts.ts`](src/hosts.ts) | The hosts the sign-in service and the transport serve, and no others | Its own hosts, so a credential never goes where somebody else chose |
-| [`src/jig/`](src/jig) | The global handle and the contract's types | A copy of `client.ts`, and the types from a checkout of Jig |
+| [`src/jig/`](src/jig) | The global handle, the port helpers and the contract's types | Copies of `client.ts` and `kit/ports.ts`, and the types from a checkout of Jig |
 
 [`src/index.ts`](src/index.ts) calls each of them from one `withJig` callback, so it does not matter whether Pi loads this package
 before `jig-core` or after it.
 
 ## Rules
 
-- **Public contract only.** `src/jig/client.ts` is a copy of `jig-core`'s lookup, because a separate package cannot import its
-  modules; a test fails when the copy differs. Types come from `contract.ts` with `import type`.
+- **Public contract only.** `src/jig/client.ts` is a copy of `jig-core`'s lookup, and `src/jig/ports.ts` of its port helpers,
+  because a separate package cannot import its modules; a test fails when a copy differs. Types come from `contract.ts` with `import type`.
 - **Configuration and knowledge, never a change to a tool.** A tool gets another site or another sign-in, not another behaviour.
 - **No credential in the code.** A secret is a reference (`env:`, `pass:`, `cmd:`); a value pasted in its place is refused, and
   the message does not repeat it. The company's own tool owns the login.

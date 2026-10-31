@@ -150,7 +150,8 @@ its section (`"via": { "tunnel": "acme-bastion" }` in `mongo`), and `jig-core` o
 - **Start the program with `exec.run`.** It takes an argument list, never a shell, and finds the program only in folders the
   agent cannot write. `ssh -N` does not return, so the call is not awaited: closing the tunnel aborts it with a signal.
 - **Wait until the port accepts connections,** and until a port that was just freed refuses them, or a closing listener is taken
-  for a tunnel that is up.
+  for a tunnel that is up. `jig-core`'s `kit/ports.ts` does both (`freePort`, `waitForPort`, and `socksAnswers` for a `socks`
+  tunnel), and a package of its own keeps a copy of it, as [`src/jig/ports.ts`](../examples/jig-acme/src/jig/ports.ts) does.
 - **Give ssh only what it needs:** the user's agent socket, no configuration file (`-F /dev/null`), and `BatchMode`, so an unknown
   host key is a clear failure and not a question.
 - **Say one line when it fails,** such as "the bastion's host key is not trusted", and never ssh's own words, which can hold
@@ -245,7 +246,8 @@ A company plugin is configuration, so its tests load the real thing and look at 
   `PATH` for a tunnel, in a temporary folder outside the working folder, which `exec.run` requires.
 - **Check what must not happen:** a request for another host is refused and nothing is sent; a token is not in a reply or a message;
   a program in the working folder is not run.
-- **Keep the copy of `client.ts` identical to `jig-core`'s,** and test that it is.
+- **Keep the copy of `client.ts` identical to `jig-core`'s,** and test that it is. So is the copy of `kit/ports.ts`, if you
+  write a tunnel.
 - **Build a fake credential at run time** from parts. Push protection rejects a commit that holds one, even a fake one
   ([AGENTS.md](../AGENTS.md)).
 

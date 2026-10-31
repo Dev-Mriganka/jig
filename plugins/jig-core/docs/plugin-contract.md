@@ -155,6 +155,18 @@ talks to Pi.
 - **`kit/abort.ts`:** `untilAborted(work, signal)` rejects with the signal's
   reason when it fires, even if `work` ignores its signal. It always observes
   `work`, so a late failure is never an unhandled rejection.
+- **`kit/ports.ts`:** what a tunnel that starts a program needs, using nothing but
+  `127.0.0.1`. A company plugin copies it whole, as it does `client.ts`.
+  - **`freePort()`** gives a port nothing listens on: a listener that was just
+    closed can go on accepting for a few milliseconds, which would look like a
+    tunnel that is up, so the port is handed out once it refuses connections.
+  - **`portAccepts(port)`** and **`socksAnswers(port)`** test a port: the second
+    sends a SOCKS5 greeting and wants version 5 back, so a proxy that has not
+    finished starting is not mistaken for one that has.
+  - **`waitForPort(port, options)`** asks again until the port is ready, the time
+    is over (`PortWaitError`, `timeout`), the call is cancelled (`cancelled`), or
+    the program that should have opened it has failed (what `failed()` returns is
+    thrown). `kind` is `forward` (accepts) or `socks` (answers the greeting).
 - **`kit/oauth.ts`:** the token grants and the in-memory token cache behind
   `auth: { oauth }`. **`kit/http-error.ts`** holds the `HttpError` that
   `kit/http.ts` re-exports.
