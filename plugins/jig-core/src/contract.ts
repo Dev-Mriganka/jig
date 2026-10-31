@@ -688,7 +688,8 @@ export interface JigApi {
     readonly exec: {
         /** Refuses a program whose real path is in a folder the agent's shell can write: the working folder, and with a
          *  sandbox registered, every place the sandbox lets `bash` write. A program planted there would run with your
-         *  credentials. */
+         *  credentials. `git`, `gh` and `glab` are also refused in a repository whose own `.git/config` would run a command,
+         *  because all three start git. */
         run(file: string, args: readonly string[], options?: RunOptions): Promise<RunResult>;
         /** git with hooks, `core.fsmonitor` and prompts off. Refuses to run when the repository's `.git/config`
          *  holds a setting that would run a command, because the agent's shell can write that file. */

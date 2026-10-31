@@ -47,10 +47,10 @@ and a JSON body on standard input. A request says exactly what it does, so a pre
 glab's own commands (`glab mr merge`, `glab mr create`) prompt and choose for themselves, such as turning on auto-merge while a
 pipeline runs, so none of them is used.
 
-- **glab runs in the repository.** It starts git there and reads its configuration. `jig-core` vets a repository for `git` and `gh`;
-  it does not know `glab`, so each glab call is preceded by a harmless git call through `jig-core`, which refuses a repository whose
-  own configuration would run a command.
-- **glab is told not to prompt,** check for updates, send usage data, page or colour its output.
+- **glab runs in the repository.** It starts git there and reads its configuration. `jig-core` vets the repository for `git`,
+  `gh` and `glab` alike, and refuses one whose own configuration would run a command, before glab starts.
+- **glab is told not to prompt,** check for updates, send usage data, page or colour its output. `jig-core` sets that when it
+  starts glab.
 - **A sign-in kept in the keyring** is read over the session bus, whose address is passed on (it is a path, not a secret).
 
 ## What each action does

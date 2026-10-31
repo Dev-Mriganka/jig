@@ -5,8 +5,8 @@
 // auto-merge while a pipeline runs) never decide anything. A write that may have reached GitLab without its answer reaching
 // us is checked once and never sent again.
 //
-// glab starts git too, in the folder it runs in, and reads its configuration. jig-core vets a repository for `gh` and `git` before
-// they run; it does not know glab, so `vetRepository` asks it to vet the folder with a harmless git call first.
+// glab starts git too, in the folder it runs in, and reads its configuration. jig-core vets a repository for `git`, `gh` and `glab`
+// before they run, and gives glab the fixed environment (no prompt, no update check, no telemetry, no colour or pager).
 import type { RunResult } from "../../jig-core/src/contract.ts";
 import { jig } from "../../jig-core/src/client.ts";
 import { parseApiOutput } from "./api-output.ts";
@@ -17,7 +17,6 @@ import { mayHaveLanded, summaryOf } from "./run.ts";
 
 const T_READ = 30_000;
 const T_WRITE = 90_000;
-const T_VET = 10_000;
 
 export interface GlabOptions {
     /** Written for a status a caller knows how to explain, such as the 409 of a merge whose head moved. */
@@ -30,53 +29,13 @@ export interface GlabOptions {
     maxBytes?: number | undefined;
 }
 
-/** What glab is told not to do: prompt, check for updates, send usage data, colour or page its output, open an editor. */
-const GLAB_FIXED_ENV: Readonly<Record<string, string>> = {
-    GLAB_NO_PROMPT: "1",
-    GLAB_CHECK_UPDATE: "false",
-    GLAB_SEND_TELEMETRY: "false",
-    GLAB_NOTIFY_SKILL_UPDATES: "false",
-    GLAB_SHOW_WHATS_NEW: "false",
-    GLAB_COLOR: "never",
-    GLAB_PAGER: "cat",
-    GLAB_DISPLAY_HYPERLINKS: "false",
-    NO_COLOR: "1",
-    PAGER: "cat",
-    GIT_TERMINAL_PROMPT: "0",
-    GIT_PAGER: "cat",
-    GIT_EDITOR: "true",
-    GCM_INTERACTIVE: "never",
-};
-
-/**
- * jig-core gives a program a minimal environment: HOME and the XDG folders, which is where glab keeps its sign-in. A sign-in
- * kept in the system keyring (glab's default where there is one) is read over the user's session bus, whose address is a path
- * and not a secret, so it is passed on as the ssh agent's socket is for git.
- */
-function glabEnv(): Record<string, string> {
-    const bus = process.env.DBUS_SESSION_BUS_ADDRESS;
-    return bus === undefined ? { ...GLAB_FIXED_ENV } : { ...GLAB_FIXED_ENV, DBUS_SESSION_BUS_ADDRESS: bus };
-}
-
-/**
- * jig-core refuses a repository whose own configuration would make git run a command, but only for `git` and `gh`. glab runs git
- * in its folder as well, so the folder is vetted here with a git call that reads nothing of interest. A refusal is thrown; a
- * folder that is no repository is fine.
- */
-async function vetRepository(cwd: string, signal: AbortSignal | undefined): Promise<void> {
-    await jig().exec.git(cwd, ["rev-parse", "--git-dir"], { timeoutMs: T_VET, signal });
-}
-
 export async function glab(args: readonly string[], options: GlabOptions = {}): Promise<RunResult> {
-    const cwd = options.cwd ?? process.cwd();
-    await vetRepository(cwd, options.signal);
     return jig().exec.run("glab", args, {
-        cwd,
+        cwd: options.cwd ?? process.cwd(),
         timeoutMs: options.timeoutMs ?? T_READ,
         signal: options.signal,
         input: options.input,
         maxOutputBytes: options.maxBytes,
-        env: glabEnv(),
     });
 }
 

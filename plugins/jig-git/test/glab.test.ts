@@ -18,7 +18,7 @@ import {
 } from "../src/gitlab.ts";
 import { setupHarness } from "./support/harness.ts";
 import type { Harness } from "./support/harness.ts";
-import { makeRepo } from "./support/repos.ts";
+import { git, makeRepo } from "./support/repos.ts";
 
 let h: Harness;
 before(() => {
@@ -77,7 +77,7 @@ test("a request is glab api with the host named, the method only when it is not 
     ]);
 });
 
-test("a read runs glab in the repository, after a git call there that jig-core vets, with a fixed environment", async () => {
+test("a read runs glab in the repository through jig-core, which vets it, with a fixed environment and no git call of ours", async () => {
     const r = fresh();
     h.glab.on("api", { json: { iid: 42 } }, [`${BASE}/merge_requests/42`]);
     const found = await glabJson<{ iid: number }>(HOME, "glab api (merge request)", `${BASE}/merge_requests/42`, {
@@ -85,10 +85,12 @@ test("a read runs glab in the repository, after a git call there that jig-core v
     });
     assert.deepEqual(found, { iid: 42 });
     const started = h.jig.started_processes.filter((p) => p.cwd === r.dir);
-    const vet = started.findIndex((p) => p.file === "git" && p.args.join(" ") === "rev-parse --git-dir");
-    const run = started.findIndex((p) => p.file === "glab");
-    assert.ok(vet >= 0 && run > vet, "git was run in the repository before glab");
-    const env = started[run]?.env ?? {};
+    assert.deepEqual(
+        started.map((p) => p.file),
+        ["glab"],
+        "glab alone: jig-core vets the repository for glab, so no git call is made first",
+    );
+    const env = started[0]?.env ?? {};
     for (const name of [
         "GLAB_NO_PROMPT",
         "GLAB_CHECK_UPDATE",
@@ -132,7 +134,15 @@ test("the session bus is passed on when there is one, so a sign-in kept in the k
     }
 });
 
-test("a repository whose configuration would run a command stops the call before glab starts", async () => {
+test("a repository whose own configuration would run a command stops the call before glab starts", async () => {
+    const r = fresh();
+    h.glab.on("api", { json: {} });
+    git(r.dir, "config", "core.sshCommand", "evil");
+    await assert.rejects(glabJson(HOME, "glab api", "user", { cwd: r.dir }), /sets core\.sshcommand/);
+    assert.equal(h.glab.calls().length, 0, "glab never started");
+});
+
+test("a repository whose configuration the vetting refuses stops the call before glab starts", async () => {
     const r = fresh();
     h.glab.on("api", { json: {} });
     h.jig.refuseGit(`${r.dir}/.git/config sets core.sshcommand, which would run with your credentials`);

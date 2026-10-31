@@ -43,6 +43,7 @@ const PASS_ON = [
     "GH_CONFIG_DIR",
     "GH_TOKEN",
     "GH_HOST",
+    "DBUS_SESSION_BUS_ADDRESS",
 ];
 
 export interface StartedWatch extends StartWatch<unknown> {
@@ -61,7 +62,7 @@ export interface FakeJig {
     facts: Map<string, Facts[]>;
     /**
      * Every program started, in order: the file, the arguments (git's fixed flags left out), the working directory, and the
-     * variables the call added to the minimal environment.
+     * variables the call added to the minimal environment (for glab, all it was started with, as jig-core fixes some).
      */
     started_processes: Array<{ file: string; args: string[]; cwd?: string; env?: Readonly<Record<string, string>> }>;
     /** What `config.section("git")` returns. Set with `setSection`. */
@@ -80,16 +81,30 @@ export interface FakeJig {
     remove(): void;
 }
 
-function minimalEnv(extra: Readonly<Record<string, string>> | undefined): Record<string, string> {
+/** What jig-core sets for glab besides git's own: no prompt, update check, telemetry, colour, pager or hyperlinks. */
+const GLAB_FIXED_ENV: Readonly<Record<string, string>> = {
+    GLAB_NO_PROMPT: "1",
+    GLAB_CHECK_UPDATE: "false",
+    GLAB_SEND_TELEMETRY: "false",
+    GLAB_NOTIFY_SKILL_UPDATES: "false",
+    GLAB_SHOW_WHATS_NEW: "false",
+    GLAB_COLOR: "never",
+    GLAB_PAGER: "cat",
+    GLAB_DISPLAY_HYPERLINKS: "false",
+};
+
+function minimalEnv(extra: Readonly<Record<string, string>> | undefined, glab = false): Record<string, string> {
     const env: Record<string, string> = {
         LC_ALL: "C",
         GIT_TERMINAL_PROMPT: "0",
         GIT_PAGER: "cat",
         PAGER: "cat",
         GIT_EDITOR: "true",
+        GCM_INTERACTIVE: "never",
         GH_PROMPT_DISABLED: "1",
         GH_NO_UPDATE_NOTIFIER: "1",
         NO_COLOR: "1",
+        ...(glab ? GLAB_FIXED_ENV : {}),
     };
     for (const name of PASS_ON) {
         const value = process.env[name];
@@ -116,7 +131,7 @@ export function installFakeJig(): FakeJig {
         new Promise((resolve, reject) => {
             const child = spawn(file, [...args], {
                 cwd: options.cwd,
-                env: minimalEnv(options.env),
+                env: minimalEnv(options.env, path.basename(file) === "glab"),
                 stdio: ["pipe", "pipe", "pipe"],
                 shell: false,
                 // A process group of its own, so a stop reaches ssh and the other helpers git starts.
@@ -170,25 +185,33 @@ export function installFakeJig(): FakeJig {
             child.stdin.end(options.input);
         });
 
-    const run = (file: string, args: readonly string[], options: RunOptions = {}): Promise<RunResult> => {
-        processes.push({ file, args: [...args], cwd: options.cwd, env: options.env });
-        return spawnProcess(file, args, options);
-    };
-
-    const git = async (repo: string, args: readonly string[], options: RunOptions = {}): Promise<RunResult> => {
+    /** As jig-core does before git, gh or glab runs in a folder: the repository's own configuration must not run a program. */
+    const vetRepository = async (repo: string): Promise<void> => {
         if (refusal !== undefined) {
             const message = refusal;
             refusal = undefined;
             throw new Error(message);
         }
-        if (fs.existsSync(path.join(repo, ".git"))) {
-            const keys = await spawnProcess("git", ["config", "--local", "--name-only", "--list"], { cwd: repo });
-            const hit = keys.stdout.split("\n").find((key) => DANGEROUS.has(key.trim().toLowerCase()));
-            if (hit)
-                throw new Error(
-                    `${path.join(repo, ".git", "config")} sets ${hit.trim().toLowerCase()}, which would run with your credentials: remove it or ask the user`,
-                );
-        }
+        if (!fs.existsSync(path.join(repo, ".git"))) return;
+        const keys = await spawnProcess("git", ["config", "--local", "--name-only", "--list"], { cwd: repo });
+        const hit = keys.stdout.split("\n").find((key) => DANGEROUS.has(key.trim().toLowerCase()));
+        if (hit)
+            throw new Error(
+                `${path.join(repo, ".git", "config")} sets ${hit.trim().toLowerCase()}, which would run with your credentials: remove it or ask the user`,
+            );
+    };
+
+    const run = async (file: string, args: readonly string[], options: RunOptions = {}): Promise<RunResult> => {
+        // jig-core vets the folder for glab as it does for git; gh is left as this fake always had it.
+        if (path.basename(file) === "glab") await vetRepository(options.cwd ?? process.cwd());
+        // For glab, `env` is what the program is started with besides the allow-list, jig-core's fixed variables included.
+        const env = path.basename(file) === "glab" ? minimalEnv(options.env, true) : options.env;
+        processes.push({ file, args: [...args], cwd: options.cwd, env });
+        return spawnProcess(file, args, options);
+    };
+
+    const git = async (repo: string, args: readonly string[], options: RunOptions = {}): Promise<RunResult> => {
+        await vetRepository(repo);
         processes.push({ file: "git", args: [...args], cwd: repo });
         const interception = lost?.match(args) ? lost : undefined;
         if (interception) lost = undefined;

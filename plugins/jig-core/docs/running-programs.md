@@ -46,8 +46,13 @@ options)` and never through a shell.
     key.
   - Your global and system configuration are not checked, and neither is
     `git clone`, which makes a new repository.
-- **`gh` gets the same checks.** `exec.run("git", ...)` and `exec.run("gh",
-  ...)` are checked like `exec.git`, because both start git.
+- **`gh` and `glab` get the same checks.** `exec.run("git", ...)`,
+  `exec.run("gh", ...)` and `exec.run("glab", ...)` are checked like `exec.git`,
+  because all of them start git.
+  - Both get git's fixed environment and the ssh variables, and `glab` also has its
+    prompts, update check, usage data, colour, pager and hyperlinks turned off
+    (`GLAB_NO_PROMPT`, `GLAB_CHECK_UPDATE`, `GLAB_SEND_TELEMETRY` and the rest).
+  - A tool that runs them does not make a git call of its own first.
 
 ### What the git check refuses
 
