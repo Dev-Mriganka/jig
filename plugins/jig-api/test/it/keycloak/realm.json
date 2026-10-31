@@ -1,0 +1,45 @@
+{
+    "realm": "jigit",
+    "enabled": true,
+    "sslRequired": "none",
+    "registrationAllowed": false,
+    "accessTokenLifespan": 300,
+    "clients": [
+        {
+            "clientId": "jig-service",
+            "name": "A service that signs in with its own credentials",
+            "enabled": true,
+            "protocol": "openid-connect",
+            "publicClient": false,
+            "secret": "jigit-client-secret-1",
+            "serviceAccountsEnabled": true,
+            "standardFlowEnabled": false,
+            "implicitFlowEnabled": false,
+            "directAccessGrantsEnabled": false,
+            "defaultClientScopes": ["profile", "email"]
+        },
+        {
+            "clientId": "jig-portal",
+            "name": "A client that signs a person in with a password",
+            "enabled": true,
+            "protocol": "openid-connect",
+            "publicClient": false,
+            "secret": "jigit-portal-secret-1",
+            "standardFlowEnabled": false,
+            "implicitFlowEnabled": false,
+            "directAccessGrantsEnabled": true,
+            "defaultClientScopes": ["profile", "email"]
+        }
+    ],
+    "users": [
+        {
+            "username": "jigit-user",
+            "enabled": true,
+            "emailVerified": true,
+            "email": "jigit-user@example.test",
+            "firstName": "Jig",
+            "lastName": "Tester",
+            "credentials": [{ "type": "password", "value": "jigit-user-password-1", "temporary": false }]
+        }
+    ]
+}

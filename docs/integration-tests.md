@@ -151,6 +151,21 @@ One file, `github.test.ts`, with two suites. They only read, and nothing is push
 - **Pull requests and releases** are read through `gh` for `cli/cli`, with a repository that holds nothing but an `origin`, and for the
   small repository. A run gets this by the token of `permissions`; on your machine `gh`'s own login does the same.
 
+## jig-api
+
+Two suites. `httpbin.test.ts` copies the example company's collections (Postman, `.http`, Bruno in both formats, OpenAPI in both) with their
+API address pointed at httpbin's `/anything`, which echoes the request, and runs them by name. `keycloak.test.ts` signs in with OAuth.
+
+| Variable | What it holds |
+|---|---|
+| `JIG_IT_HTTPBIN_URL` | `http://127.0.0.1:8081`: go-httpbin with `MAX_BODY_SIZE=8388608` |
+| `JIG_IT_KEYCLOAK_URL` | `http://127.0.0.1:8180`: Keycloak in dev mode, with the realm of `plugins/jig-api/test/it/keycloak/realm.json` imported |
+
+- **The realm** has a service client (`jig-service`, client credentials), a portal client (`jig-portal`, password grant) and one user. The
+  tests read their secrets from that file, so the file is the one place they are written, and all are throwaway values.
+- **Without Docker,** go-httpbin and Keycloak run from their release archives (Keycloak needs Java 21): `go-httpbin -port 8081
+  -max-body-size 8388608`, and `kc.sh start-dev --http-port=8180 --import-realm` with the realm file in `data/import`.
+
 ## Where to read a failure
 
 The job prints each service's version once it is up. When a step fails, the last step prints the logs of every container,

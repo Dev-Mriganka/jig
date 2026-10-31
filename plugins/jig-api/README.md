@@ -1,8 +1,8 @@
 # jig-api: your team's saved API requests, run safely
 
 **Status: built.** The sending engine (sign-in, OAuth, transports, previews and
-lost-reply checks) and five sources, each tried against fake APIs on this machine
-and not yet against a real service (see [Not verified yet](docs/not-verified.md)):
+lost-reply checks) and five sources, each tried against fake APIs, and in CI against
+a real HTTP server and a real OAuth server (see [Not verified yet](docs/not-verified.md)):
 - **Postman** collection files (v2.1, with environment files);
 - folders of **`.http` files**;
 - **Bruno** collections (OpenCollection YAML and `.bru`);
@@ -141,7 +141,8 @@ jig-api/
             catalog, sources/ with one adapter per format), a request worked out (resolve, planning, optional, show),
             engine/ (sending through jig-core's request, previews, results)
   skills/   api/SKILL.md: list, show, then run; read before you write
-  test/     fixtures of an example orders API in every format, the engine's tests, the safety tests
+  test/     fixtures of an example orders API in every format, the engine's tests, the safety tests; test/it/ against
+            go-httpbin and Keycloak (see the repository's docs/integration-tests.md)
   docs/     the detail pages below
 ```
 

@@ -78,6 +78,8 @@ jobs:
       OPENSEARCH_IMAGE: opensearchproject/opensearch:2.19.7@sha256:3bfa1ec74d56928c2e018033d45c460ce2c0ea65a5cedd577de3102326c31b89
       LOKI_IMAGE: grafana/loki:3.7.9@sha256:0db216b630ae1f348a1584c67f3cead8b4c1fc839169a39501db664744158e28
       MONGO_IMAGE: mongo:8.0.34@sha256:b9924c330a8bbc5800fe9c69f04a84e221eca7b28fd049a0354147d9908fa142
+      HTTPBIN_IMAGE: mccutchen/go-httpbin:2.26.0@sha256:873b4fdb27fe7cc66fa12cb9362574e1b0bf31df7ca8a71b2502988327a0b8a4
+      KEYCLOAK_IMAGE: quay.io/keycloak/keycloak:26.8.1@sha256:a78d6b79572168cb25886b80a8b5b8d4ed4390743e3eecb810538683e209dd6b
       SSH_IMAGE: linuxserver/openssh-server:10.3_p1-r1-ls240@sha256:b07414bb329b86a00525c9256711a7855fc3a369e9f62c36f1de8d1923197580
       JIG_IT_ELASTICSEARCH_PASSWORD: throwaway-elastic-password
       JIG_IT_MONGO_PASSWORD: throwaway-mongo-password
@@ -207,6 +209,22 @@ jobs:
           ssh-keyscan -v -p 2222 127.0.0.1 2>&1 | grep -i "remote software version" | head -1
           ssh -V
 
+      # go-httpbin answers every request with what it received, and takes bodies up to 8 MiB. Keycloak runs in dev mode and imports
+      # the realm of the jig-api tests, whose client secret and user password are throwaway values in that file.
+      - name: Start go-httpbin and Keycloak
+        if: ${{ !cancelled() }}
+        run: |
+          docker run -d --name jigit-httpbin -p 127.0.0.1:8081:8080 -e MAX_BODY_SIZE=8388608 "$HTTPBIN_IMAGE"
+          docker run -d --name jigit-keycloak -p 127.0.0.1:8180:8080 \
+            -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=throwaway-keycloak-admin \
+            -v "$GITHUB_WORKSPACE/plugins/jig-api/test/it/keycloak:/opt/keycloak/data/import:ro" \
+            "$KEYCLOAK_IMAGE" start-dev --import-realm
+          retry="--retry 90 --retry-delay 2 --retry-connrefused --retry-all-errors"
+          curl -fsS $retry http://127.0.0.1:8081/status/200 > /dev/null
+          echo "go-httpbin ${HTTPBIN_IMAGE%%@*}"
+          curl -fsS $retry http://127.0.0.1:8180/realms/jigit/.well-known/openid-configuration > /dev/null
+          docker logs jigit-keycloak 2>&1 | grep -m1 "Keycloak .* on JVM" || true
+
       # A Kubernetes cluster in Docker, and Helm. The actions download kind and kubectl at the versions given here.
       - name: Set up Helm
         if: ${{ !cancelled() }}
@@ -233,7 +251,7 @@ jobs:
       - name: Integration tests
         if: ${{ !cancelled() }}
         env:
-          JIG_IT_REQUIRE: elasticsearch,opensearch,loki,mongodb,mongodb-ssh,mongodb-socks,kubernetes,github-actions,github,github-gh
+          JIG_IT_REQUIRE: elasticsearch,opensearch,loki,mongodb,mongodb-ssh,mongodb-socks,kubernetes,github-actions,github,github-gh,httpbin,keycloak
           JIG_IT_ELASTICSEARCH_URL: https://127.0.0.1:9200
           NODE_EXTRA_CA_CERTS: ${{ runner.temp }}/es-ca.crt
           JIG_IT_OPENSEARCH_URL: http://127.0.0.1:9201
@@ -255,6 +273,8 @@ jobs:
           JIG_IT_GITHUB_REPOSITORY: ${{ github.repository }}
           JIG_IT_GITHUB_RUN_ID: ${{ github.run_id }}
           JIG_IT_GITHUB: "1"
+          JIG_IT_HTTPBIN_URL: http://127.0.0.1:8081
+          JIG_IT_KEYCLOAK_URL: http://127.0.0.1:8180
         run: npm run test:it
 
       # The logs of every container, so a service that failed can be read in the run.
