@@ -11,7 +11,12 @@ template, an index header, a `plan.md` heading, and a `ticket.json` with an
 empty `repositories` list. A file that exists is never overwritten.
 
 A key is a plain folder name: a letter or digit, then letters, digits, `_`, `.`
-or `-`, at most 64 characters.
+or `-`, at most 64 characters. The words `close`, `recall` and `off` are
+commands, so `/ticket` cannot activate a ticket with one of those keys.
+
+`card.md` is made at close, not at activation (see [Cards](cards.md)). The index
+`.cards.json` sits in the folder of all tickets, beside the ticket folders (see
+[Recall](recall.md#the-index)).
 
 ## Activation
 
@@ -21,8 +26,11 @@ A user message that names a key activates it when no ticket is active.
 - **When two keys are named** while none is active, that is a choice, and
   nothing activates.
 - **`/ticket KEY`** switches at once, `/ticket` shows the active ticket, and
-  `/ticket off` clears it.
+  `/ticket off` clears it. `/ticket close` and `/ticket recall` are described in
+  [Cards](cards.md) and [Recall](recall.md).
 - **Text that an extension sends** never activates a ticket.
+- **A ticket with no notes yet** also gets [recall](recall.md#when-it-runs), as a
+  second message after the notes message.
 
 Every change goes to `jig-core` as `setTicket`. The active ticket is recorded in
 the session with `appendEntry`, and `session_start` restores the last record on

@@ -120,8 +120,9 @@ is refused and you see the new preview.
 | **Gate** | A condition that holds a stage or an action until it is met, such as an approved plan. |
 | **Acceptance scenario** | A numbered check in a ticket's plan. A pass needs evidence. |
 | **Checker agent** | A read-only agent in a fresh context that reviews a change before you do. Planned. |
-| **Card** | A short summary of a closed ticket: problem, cause, fix, repositories, identifiers. Planned. |
-| **Recall** | Finding earlier tickets related to a new one, and handing the agent their cards. Planned. |
+| **Card** | A short summary of a closed ticket: problem, cause, fix, repositories, identifiers and error lines. |
+| **Recall** | Finding earlier tickets related to a new one, and handing the agent their cards. |
+| **Recall test** | Invented cards and queries that measure how many right cards recall returns, and how many wrong ones. |
 | **Memory keeper** | Planned: writes a ticket's card at close and proposes facts. You approve every one. |
 
 - **A ticket** is taken through a workflow by `jig-workflow` and remembered by
