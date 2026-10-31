@@ -258,8 +258,9 @@ In a repository of your own, Jig is a neighbour at development time and not a de
   the contract's types from it in `src/jig/types.ts`.
 - **Import the plugins and test helpers** from that link, as `world.ts` does with relative paths here.
 - **Record the Jig commit you built against,** and warn when the checkout is older.
-- **Expect to add stand-ins to the fake Pi.** It lacks a few calls that other plugins make (`registerEntryRenderer`,
-  `appendEntry`), so `world.ts` gives those stand-ins that do nothing.
+- **The fake Pi has what the Jig plugins call.** Besides `jig-core`'s own calls it has `registerEntryRenderer`, `registerMessageRenderer`,
+  `appendEntry`, `sendUserMessage`, `getThinkingLevel` and `sessionManager.getBranch`, and records what a plugin sent through
+  them, so `world.ts` needs no stand-ins. A call it still lacks is added to `plugins/jig-core/test/support/fake-pi.ts`.
 
 ## Keep it private
 
