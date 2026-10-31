@@ -149,8 +149,8 @@ listener that fails never undoes the push. The details are in
 
 ```text
 jig-git/
-  src/      git.ts, pr.ts and release.ts (the three tools); the actions (git-read, git-local, git-remote, clone,
-            pr-read, pr-write); the comment watch (pr-watch, pr-watch-tool); github.ts, gitlab.ts and the GitLab
+  src/      git.ts, pr.ts and release.ts (the three tools); the actions (git-read, git-branch + git-changes +
+            git-integrate with git-guards for the local writes, git-remote, clone, pr-read, pr-write); the comment watch (pr-watch, pr-watch-tool); github.ts, gitlab.ts and the GitLab
             actions (gitlab-pr-read, gitlab-pr-write, gitlab-release, gitlab-watch); forge.ts and repo.ts; config.ts,
             previews.ts and events.ts (jig-git:pushed)
   skills/   git/SKILL.md: how to use the tools (status before commit, what a push announces)
