@@ -31,7 +31,7 @@ knowledge, an overlay skill the agent reads.*
 | [`src/masking.ts`](src/masking.ts) | Two field names for the masker: `memberAlias`, `loyaltyCardHolder` | The names that hold personal data in its own systems |
 | [`src/protection.ts`](src/protection.ts) | One secret path: `~/.acme/credentials.json` | Where its own tools keep a login |
 | [`src/status.ts`](src/status.ts) | Lines for `/jig`: the sign-in, transport and tunnel it adds, and what this user still has to set | What a user needs to see at a glance |
-| [`skills/acme-jira`](skills/acme-jira/SKILL.md) | The company's Jira conventions, read beside the `jira` skill | Its projects, fields, workflow and manners |
+| [`skills/acme-jira`](skills/acme-jira/SKILL.md) | The company's Jira conventions, read beside the `jira` skill. `metadata: jig-tool: jira` makes a child agent see it with the `jira` tool | Its projects, fields, workflow and manners |
 | [`src/config.ts`](src/config.ts) | The `acme` section of `jig.json`, for what only one person can say | The few per-person settings |
 | [`src/hosts.ts`](src/hosts.ts) | The hosts the sign-in service and the transport serve, and no others | Its own hosts, so a credential never goes where somebody else chose |
 | [`src/jig/`](src/jig) | The global handle, the port helpers and the contract's types | Copies of `client.ts` and `kit/ports.ts`, and the types from a checkout of Jig |

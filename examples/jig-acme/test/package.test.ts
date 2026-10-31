@@ -107,6 +107,16 @@ describe("the skills", () => {
         assert.ok(text.includes("`feature/ACME-123`") && text.includes("`ACME-123: add the order filter`"));
     });
 
+    test("the Jira overlay names the tool it extends, so a child agent sees it with that tool and not without", async () => {
+        const text = readFileSync(path.join(skills, "acme-jira", "SKILL.md"), "utf8");
+        const { bodyOf, frontMatterOf, toolsNamedBy } = await import("../../../plugins/jig-agents/src/skills.ts");
+        assert.deepEqual(toolsNamedBy(frontMatterOf(text) ?? ""), ["jira"]);
+        // The field is the Agent Skills format's own `metadata`, so any reader of a skill file accepts it.
+        const front = parse(frontMatterOf(text) ?? "") as { metadata?: Record<string, unknown> };
+        assert.deepEqual(front.metadata, { "jig-tool": "jira" });
+        assert.match(bodyOf(text), /^# Jira at Acme/);
+    });
+
     test("is short enough to read before acting", () => {
         for (const name of names) {
             assert.ok(readFileSync(path.join(skills, name, "SKILL.md"), "utf8").split("\n").length <= 70, name);
