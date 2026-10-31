@@ -4,6 +4,7 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 
 ## Contents
 
+- [2026-10-31: an example company plugin, jig-acme, proves the generic plugins need no company code](#2026-10-31-an-example-company-plugin-jig-acme-proves-the-generic-plugins-need-no-company-code)
 - [2026-10-31: production reads need an index, and pull request comments reach the agent](#2026-10-31-production-reads-need-an-index-and-pull-request-comments-reach-the-agent)
 - [2026-10-31: jig-agents is built by us, on Pi's RPC mode](#2026-10-31-jig-agents-is-built-by-us-on-pis-rpc-mode)
 - [2026-10-31: jig-memory cards and recall: the agent writes the prose, keys and keywords find it](#2026-10-31-jig-memory-cards-and-recall-the-agent-writes-the-prose-keys-and-keywords-find-it)
@@ -35,6 +36,46 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 - [2026-10-30: jig-git's tools, and a watch that knows when it is done](#2026-10-30-jig-gits-tools-and-a-watch-that-knows-when-it-is-done)
 - [2026-10-30: built clean, beside the existing harness](#2026-10-30-built-clean-beside-the-existing-harness)
 - [Earlier decisions that still hold (2026-10-29)](#earlier-decisions-that-still-hold-2026-10-29)
+
+## 2026-10-31: an example company plugin, jig-acme, proves the generic plugins need no company code
+
+"Jig is generic" was a sentence in the docs. `examples/jig-acme` makes it a test: a company plugin for a made-up company, Acme
+Corp, that configures every plugin that has a section and adds a sign-in service, a transport and a tunnel, using only the public
+contract. It is also the template for a real company plugin, with [Writing a company plugin](company-plugin.md).
+
+- **Under `examples/`, not `plugins/`.** It is not part of Jig: the package manifest does not list it, so `pi install` of Jig never
+  loads it, and the generic plugins still know nothing of any company. Its names are fictional (`acme.example`, `orders-api`,
+  `ACME-123`), so the rule that nothing company-specific goes in this repository holds.
+- **The public contract only.** It reaches `jig-core` through the global handle: `src/jig/client.ts` is a copy of `client.ts`, a test
+  fails when the two differ, and the contract's types come in with `import type`. Everything it does goes through calls the contract
+  already has; what was awkward is listed below.
+- **Tested against the real thing.** The tests load the real `jig-core` and every built plugin into the fake Pi from `jig-core`'s
+  tests, so a default is checked by the plugin's own check and a user's override by the plugin's own `replace` and `oneOf` keys, not
+  by a copy of them. The sign-in service and the transport run against a fake server on `127.0.0.1`, and the tunnel against a fake
+  `ssh` first on `PATH`. CI runs them: `npm test` takes `examples/*/test/*.test.ts`.
+- **It keeps its own hands clean.** The sign-in service and the transport refuse a host that is not Acme's, and plain http to
+  anything but this machine, so a credential cannot go where somebody else chose. The gateway must be on this machine because the
+  request to it is in clear text. A secret is a reference and a pasted value is refused without being repeated.
+
+**What it found, and left as it is**
+- **Jira has no place for project keys.** The `jira` section reads the project from each call, so Acme's key is in the ticket
+  pattern, the branch rules and the overlay skill. A Cloud login is an email and a token, the email is the user's, and `auth`
+  replaces whole, so a company that wants per-person Cloud logins cannot default one; the example uses a shared automation account.
+- **`/jig` does not list the environments.** The contract has `environments.kindOf` and nothing that lists them, so a company plugin
+  keeps its own list and shows it through `status.register`.
+- **A company cannot turn a secret backend on,** which is the user's decision. A company's `cmd:` or `env:` sign-in is inert until
+  each user adds the backend, and the README has to say so.
+- **A transport is not told the caller's `maxBytes` or time limit,** and carries text only, so it reads the whole reply up to a cap
+  of its own. A repeated reply header must be folded into one string.
+- **`sandbox.network.deny` does nothing in the default `open` mode.** A company's deny list is silent until each user picks
+  `filtered` or `ask`.
+- **A tunnel needs three helpers each time:** a free port that is really free (a closed listener can still accept for a moment), a
+  wait until the port answers, and a long-lived program (`exec.run` with a signal and a long timeout). `jig-mongo` has its own copies.
+- **The fake Pi lacks calls the other plugins make** (`registerEntryRenderer`, `appendEntry`, `sendUserMessage`,
+  `getThinkingLevel`, `sessionManager.getBranch`), and `jig-sandbox` starts a real sandbox at session start. A test of "every
+  plugin" needs stand-ins and an unsupported platform for the sandbox. A shared fake, or a switch on the sandbox, would help.
+- **Defaults are untyped data,** and a mistake shows only when a session starts, so the tests must load the plugins. Defaults cannot
+  depend on the user's settings (an email, say) without being registered again after the file is read.
 
 ## 2026-10-31: production reads need an index, and pull request comments reach the agent
 
