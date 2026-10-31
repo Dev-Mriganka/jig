@@ -64,6 +64,55 @@ export async function requireSlug(repo: Repo, settings: GitSettings, signal?: Ab
     return remote.slug;
 }
 
+// ---- gh api with ETags ---------------------------------------------------------------------------------------------
+
+export interface ApiResponse {
+    /** The HTTP status, or 0 when no response came (the network failed, or gh could not start the request). */
+    status: number;
+    /** Header names in lower case. */
+    headers: Record<string, string>;
+    body: string;
+}
+
+/**
+ * Reads the output of `gh api -i`: a status line, the headers, a blank line, then the body. A `304` has no body, and gh
+ * then exits with 1 and says `gh: HTTP 304`; any other status from 300 up is the same. So the status is taken from the
+ * status line, not from the exit code.
+ */
+export function parseApiOutput(result: RunResult): ApiResponse {
+    const head = /^HTTP\/[\d.]+ (\d{3})[^\n]*\r?\n/.exec(result.stdout);
+    if (!head) {
+        const status = /HTTP (\d{3})/.exec(result.stderr)?.[1];
+        return { status: status ? Number(status) : result.code === 0 ? 200 : 0, headers: {}, body: result.stdout };
+    }
+    const rest = result.stdout.slice(head[0].length);
+    const split = rest.search(/\r?\n\r?\n/);
+    const headerText = split < 0 ? rest : rest.slice(0, split);
+    const body = split < 0 ? "" : rest.slice(split).replace(/^\r?\n\r?\n/, "");
+    const headers: Record<string, string> = {};
+    for (const line of headerText.split(/\r?\n/)) {
+        const colon = line.indexOf(":");
+        if (colon > 0) headers[line.slice(0, colon).trim().toLowerCase()] = line.slice(colon + 1).trim();
+    }
+    return { status: Number(head[1]), headers, body };
+}
+
+/**
+ * One `GET` through `gh api`, with the ETag of the answer we already hold: GitHub answers `304` without counting it against
+ * the rate limit when nothing changed. A status of 300 or more is returned, not thrown, and the caller decides.
+ */
+export async function apiGet(
+    path: string,
+    options: { etag?: string | undefined; signal?: AbortSignal | undefined } = {},
+): Promise<ApiResponse> {
+    const args = ["api", "-i", ...(options.etag ? ["-H", `If-None-Match: ${options.etag}`] : []), path];
+    const result = await gh(args, { signal: options.signal });
+    const response = parseApiOutput(result);
+    // No status line and a failure: the request never got an answer. The caller reads status 0 as "try again later".
+    if (response.status === 0) return { ...response, body: summaryOf(result.stderr || result.stdout) };
+    return response;
+}
+
 function safeJson(text: string): unknown {
     try {
         return JSON.parse(text);

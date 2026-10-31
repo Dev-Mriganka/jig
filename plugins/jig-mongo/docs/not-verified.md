@@ -16,6 +16,13 @@ and no TLS, started for the purpose. Not tried:
   production), a sharded cluster, an older server, TLS, and a user with fewer privileges than the one the test signs in as.
 - **The shapes of `explain`.** The plan summary was written from the documented shapes of a find, an aggregation and the slot-based
   engine, and tried on examples of them, not on output from a server.
+- **The index check.** It was run against one MongoDB 8.0 node: a find, the pipeline that counts, an aggregation with a `$group` first,
+  a `$unionWith`, and a `$lookup` that the planner reports as a `HashJoin` and one that it does not report at all.
+  - Not tried: a sharded cluster (a plan per shard is read from the documented shape), a server older than 6.0, Atlas, DocumentDB
+    (its `explain` differs), and a user who may run a find but not `explain`.
+  - A `$lookup` written only as a sub-pipeline is checked only where the planner reports its plan. This 8.0 node did not report one in the case tried.
+  - A `$sample` with no filter is not checked, because it reads a bounded number of documents. On a small collection the server
+    scans it to sample.
 - **`$collStats` and `$indexStats`** on a managed service: they need privileges a read-only user may lack, and a view has no storage
   statistics. The error is reported, not hidden.
 - **A `$lookup` without a pipeline in an allow list** is given one for the projection, which needs MongoDB 5.0. On an older server the

@@ -49,8 +49,14 @@ export interface DenyRules {
 
 export type AccessRules =
     | { mode: "deny"; deny: DenyRules; javascript: boolean }
-    // `db.collection` to the field paths that may be read.
-    | { mode: "allow"; allow: ReadonlyMap<string, readonly (readonly string[])[]>; javascript: boolean };
+    // `db.collection` to the field paths that may be read. `reference` names the collections of the list that are small
+    // reference data, which the index check lets be read whole.
+    | {
+          mode: "allow";
+          allow: ReadonlyMap<string, readonly (readonly string[])[]>;
+          reference?: ReadonlySet<string>;
+          javascript: boolean;
+      };
 
 const fieldPathError = (at: string, text: string): string =>
     `${at}: ${JSON.stringify(text.slice(0, 40))} is not a field path (names joined by dots, no *)`;
@@ -98,7 +104,20 @@ export function readDeny(raw: unknown, at: string, errors: string[]): DenyRules 
     return errors.length > before ? undefined : { databases, collections, fields };
 }
 
-/** Reads an allow list: collections mapped to the field paths that may be read. */
+const ALLOW_ENTRY_FIELDS: ReadonlySet<string> = new Set(["fields", "reference"]);
+const ALLOW_SHAPE = 'such as ["_id", "status", "items.sku"], or { "fields": ["_id", "code"], "reference": true }';
+
+/** The field list of an allow-list entry: the list itself, or the `fields` of the object form. */
+function fieldListOf(entry: unknown, at: string, errors: string[]): unknown {
+    if (!isObject(entry)) return entry;
+    for (const name of Object.keys(entry))
+        if (!ALLOW_ENTRY_FIELDS.has(name)) errors.push(`${at}.${name}: unknown field`);
+    if (entry.reference !== undefined && typeof entry.reference !== "boolean")
+        errors.push(`${at}.reference: must be true or false`);
+    return entry.fields;
+}
+
+/** Reads an allow list: collections mapped to the field paths that may be read. An entry is the list of fields, or `{ fields, reference? }`. */
 export function readAllow(
     raw: unknown,
     at: string,
@@ -112,7 +131,7 @@ export function readAllow(
     }
     const allow = new Map<string, (readonly string[])[]>();
     const before = errors.length;
-    for (const [key, list] of Object.entries(raw)) {
+    for (const [key, entry] of Object.entries(raw)) {
         const dot = key.indexOf(".");
         const db = key.slice(0, dot);
         const coll = key.slice(dot + 1);
@@ -120,8 +139,9 @@ export function readAllow(
             errors.push(`${at}: ${JSON.stringify(key.slice(0, 40))} is not "db.collection"`);
             continue;
         }
+        const list = fieldListOf(entry, `${at}.${key}`, errors);
         if (!Array.isArray(list) || list.length === 0 || list.length > 500) {
-            errors.push(`${at}.${key}: must list 1 to 500 field paths, such as ["_id", "status", "items.sku"]`);
+            errors.push(`${at}.${key}: must list 1 to 500 field paths, ${ALLOW_SHAPE}`);
             continue;
         }
         const paths: string[][] = [];
@@ -140,6 +160,14 @@ export function readAllow(
         allow.set(key, paths);
     }
     return errors.length > before ? undefined : allow;
+}
+
+/** The collections of a valid allow list that are marked `reference: true`: small data that the index check lets be read whole. */
+export function readReference(raw: unknown): ReadonlySet<string> {
+    const names = new Set<string>();
+    if (!isObject(raw)) return names;
+    for (const [key, entry] of Object.entries(raw)) if (isObject(entry) && entry.reference === true) names.add(key);
+    return names;
 }
 
 // ---- field paths -------------------------------------------------------------------------------------------------------
@@ -201,6 +229,8 @@ export interface Access {
     view(namespaces: readonly Ns[]): View;
     /** Allow list only: the collections of a database that are listed. */
     listed(db: string): string[];
+    /** Whether the allow list marks the collection as small reference data, which may be read whole. Never true with a deny list. */
+    isReference(db: string, coll: string): boolean;
 }
 
 /** `db.coll` as the lists name it. */
@@ -224,6 +254,7 @@ export function createAccess(rules: AccessRules): Access {
         mode: rules.mode,
         javascript,
         namespaceVisible: visible,
+        isReference: (db, coll) => rules.mode === "allow" && rules.reference?.has(`${db}.${coll}`) === true,
         listed: (db) =>
             rules.mode === "allow"
                 ? [...rules.allow.keys()]

@@ -123,7 +123,8 @@ function check(input: Readonly<Record<string, unknown>>): Checked {
         );
     }
     const access = accessFor(settings, call.environment, call.cluster);
-    const planned = planCall(call, access);
+    // Reads must use an index in production, unless the connection says otherwise; a test environment is checked only when it asks.
+    const planned = planCall(call, access, { requireIndex: connection.requireIndex ?? production });
     return { call, connection, access, production, planned };
 }
 

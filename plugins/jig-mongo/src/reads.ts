@@ -14,6 +14,8 @@ import type { Call } from "./params.ts";
 import { checkPipeline } from "./pipeline.ts";
 import type { CheckedPipeline } from "./pipeline.ts";
 import { line, plural, renderDocs } from "./render.ts";
+import { enforceIndex, indexCheckFor } from "./require-index.ts";
+import type { IndexCheck, PlanOptions } from "./require-index.ts";
 import { InputError, isObject } from "./values.ts";
 import type { Doc } from "./values.ts";
 import type { Facts } from "../../jig-core/src/contract.ts";
@@ -202,35 +204,64 @@ function planIndexes(call: Call, access: Access, usage: boolean): ReadRun {
 
 // ---- query plans -------------------------------------------------------------------------------------------------------
 
-function planExplain(call: Call, access: Access): ReadRun {
+const SAMPLE_ADVICE = "To see what the documents look like, use sample.";
+const STATS_ADVICE = "For the size of the collection, use stats.";
+const PLANNER_ADVICE = "explain with verbosity queryPlanner shows the plan without running the query.";
+
+/** The index check of one read, or undefined when this call needs none (see require-index.ts). */
+function checkOf(
+    options: PlanOptions | undefined,
+    access: Access,
+    call: Call,
+    ns: Ns,
+    query: IndexCheck["query"],
+    more: Pick<IndexCheck, "everything" | "advice"> = {},
+): IndexCheck | undefined {
+    return indexCheckFor(options, access, {
+        ns,
+        label: labelOf(call),
+        environment: call.environment,
+        maxTimeMS: call.maxTimeMS,
+        query,
+        ...more,
+    });
+}
+
+function planExplain(call: Call, access: Access, options?: PlanOptions): ReadRun {
     const ns = nsOf(call);
     access.namespace(ns.db, ns.coll);
     const ctx = newCtx(access.view([ns]));
     const verbosity = call.verbosity ?? "executionStats";
     const label = labelOf(call);
-    let query: Parameters<Backend["explain"]>[0];
+    let asked: IndexCheck["query"];
     if (call.pipeline !== undefined) {
         const checked = checkPipeline(call.pipeline, ns, access);
         if (checked.output !== undefined)
             throw new InputError(`explain a pipeline without its ${checked.output.stage} stage`);
-        query = { ...ns, verbosity, pipeline: checked.stages };
+        asked = { ...ns, pipeline: checked.stages };
     } else {
         checkFilter(emptyFilter(call), ctx);
         checkProjection(call.projection, ctx);
         const projection = projectionFor(access, ns, call.projection);
         const sort = checkSort(call.sort, ctx);
-        query = {
+        asked = {
             ...ns,
-            verbosity,
             filter: emptyFilter(call),
             limit: limitOf(call),
             ...(projection === undefined ? {} : { projection }),
             ...(sort === undefined ? {} : { sort }),
         };
     }
+    const query: Parameters<Backend["explain"]>[0] = { ...asked, verbosity };
+    // At executionStats the server runs the query, so it is checked like the read it would be. At queryPlanner nothing runs.
+    const check =
+        verbosity === "executionStats"
+            ? checkOf(options, access, call, ns, asked, { advice: PLANNER_ADVICE })
+            : undefined;
     return {
         label,
         async run(backend, signal) {
+            if (check !== undefined) await enforceIndex(backend, access, check, signal);
             const explained = await backend.explain(query, { maxTimeMS: call.maxTimeMS, signal });
             const lines = summarizeExplain(toExtended(explained) as Doc);
             return {
@@ -244,15 +275,25 @@ function planExplain(call: Call, access: Access): ReadRun {
 
 // ---- documents ---------------------------------------------------------------------------------------------------------
 
-function planCount(call: Call, access: Access): ReadRun {
+function planCount(call: Call, access: Access, options?: PlanOptions): ReadRun {
     const ns = nsOf(call);
     access.namespace(ns.db, ns.coll);
     const filter = emptyFilter(call);
     checkFilter(filter, newCtx(access.view([ns])));
     const label = labelOf(call);
+    // What `countDocuments` runs: a count with no filter goes through every document.
+    const check = checkOf(
+        options,
+        access,
+        call,
+        ns,
+        { ...ns, pipeline: [{ $match: filter }, { $group: { _id: 1, n: { $sum: 1 } } }] },
+        { everything: Object.keys(filter).length === 0, advice: STATS_ADVICE },
+    );
     return {
         label,
         async run(backend, signal) {
+            if (check !== undefined) await enforceIndex(backend, access, check, signal);
             const count = await backend.count({ ...ns, filter }, { maxTimeMS: call.maxTimeMS, signal });
             return {
                 text: `${label}: ${plural(count, "document")} match (exact)`,
@@ -263,7 +304,7 @@ function planCount(call: Call, access: Access): ReadRun {
     };
 }
 
-function planFind(call: Call, access: Access): ReadRun {
+function planFind(call: Call, access: Access, options?: PlanOptions): ReadRun {
     const ns = nsOf(call);
     access.namespace(ns.db, ns.coll);
     const view = access.view([ns]);
@@ -276,19 +317,21 @@ function planFind(call: Call, access: Access): ReadRun {
     const projection = projectionFor(access, ns, call.projection);
     const limit = limitOf(call);
     const label = labelOf(call);
+    const query = {
+        ...ns,
+        filter,
+        limit,
+        ...(projection === undefined ? {} : { projection }),
+        ...(sort === undefined ? {} : { sort }),
+    };
+    const check = checkOf(options, access, call, ns, query, {
+        ...(Object.keys(filter).length === 0 ? { advice: SAMPLE_ADVICE } : {}),
+    });
     return {
         label,
         async run(backend, signal) {
-            const docs = await backend.find(
-                {
-                    ...ns,
-                    filter,
-                    limit,
-                    ...(projection === undefined ? {} : { projection }),
-                    ...(sort === undefined ? {} : { sort }),
-                },
-                { maxTimeMS: call.maxTimeMS, signal },
-            );
+            if (check !== undefined) await enforceIndex(backend, access, check, signal);
+            const docs = await backend.find(query, { maxTimeMS: call.maxTimeMS, signal });
             const kept = docs.map((doc) => view.strip(doc));
             return {
                 text: renderDocs(label, ["document", "documents"], kept, { limit }),
@@ -299,7 +342,7 @@ function planFind(call: Call, access: Access): ReadRun {
     };
 }
 
-function planDistinct(call: Call, access: Access): ReadRun {
+function planDistinct(call: Call, access: Access, options?: PlanOptions): ReadRun {
     const ns = nsOf(call);
     access.namespace(ns.db, ns.coll);
     const view = access.view([ns]);
@@ -320,9 +363,11 @@ function planDistinct(call: Call, access: Access): ReadRun {
         { $limit: limit },
     ];
     const label = labelOf(call);
+    const check = checkOf(options, access, call, ns, { ...ns, pipeline });
     return {
         label,
         async run(backend, signal) {
+            if (check !== undefined) await enforceIndex(backend, access, check, signal);
             const rows = await backend.aggregate({ ...ns, pipeline }, { maxTimeMS: call.maxTimeMS, signal });
             const values = rows.map((row) => view.strip(isObject(row) ? row._id : row, path));
             return {
@@ -343,7 +388,18 @@ function samplePipeline(filter: Doc, projection: Doc | undefined, size: number):
     ];
 }
 
-function planSample(call: Call, access: Access): ReadRun {
+/** A random sample reads a bounded number of documents, so it is checked only when it starts from a filter that could scan. */
+const filteredCheck = (
+    options: PlanOptions | undefined,
+    access: Access,
+    call: Call,
+    ns: Ns,
+    filter: Doc,
+    pipeline: Doc[],
+): IndexCheck | undefined =>
+    Object.keys(filter).length === 0 ? undefined : checkOf(options, access, call, ns, { ...ns, pipeline });
+
+function planSample(call: Call, access: Access, options?: PlanOptions): ReadRun {
     const ns = nsOf(call);
     access.namespace(ns.db, ns.coll);
     const view = access.view([ns]);
@@ -355,9 +411,11 @@ function planSample(call: Call, access: Access): ReadRun {
     const size = limitOf(call);
     const pipeline = samplePipeline(filter, projection, size);
     const label = labelOf(call);
+    const check = filteredCheck(options, access, call, ns, filter, pipeline);
     return {
         label,
         async run(backend, signal) {
+            if (check !== undefined) await enforceIndex(backend, access, check, signal);
             const docs = (await backend.aggregate({ ...ns, pipeline }, { maxTimeMS: call.maxTimeMS, signal })).map(
                 (doc) => view.strip(doc),
             );
@@ -400,7 +458,7 @@ function collect(value: unknown, path: string, into: Map<string, Seen>, inDocume
     }
 }
 
-function planSchema(call: Call, access: Access): ReadRun {
+function planSchema(call: Call, access: Access, options?: PlanOptions): ReadRun {
     const ns = nsOf(call);
     access.namespace(ns.db, ns.coll);
     const view = access.view([ns]);
@@ -409,9 +467,11 @@ function planSchema(call: Call, access: Access): ReadRun {
     const size = limitOf(call);
     const pipeline = samplePipeline(filter, projectionFor(access, ns, undefined), size);
     const label = labelOf(call);
+    const check = filteredCheck(options, access, call, ns, filter, pipeline);
     return {
         label,
         async run(backend, signal) {
+            if (check !== undefined) await enforceIndex(backend, access, check, signal);
             const docs = (
                 await backend.aggregate({ ...ns, pipeline, typed: true }, { maxTimeMS: call.maxTimeMS, signal })
             ).map((doc) => view.strip(doc));
@@ -442,14 +502,22 @@ function planSchema(call: Call, access: Access): ReadRun {
 // ---- aggregation -------------------------------------------------------------------------------------------------------
 
 /** A pipeline that reads. The limit is a stage of its own at the end, so the result can say when it was reached. */
-export function planAggregateRead(call: Call, ns: Ns, checked: CheckedPipeline, access: Access): ReadRun {
+export function planAggregateRead(
+    call: Call,
+    ns: Ns,
+    checked: CheckedPipeline,
+    access: Access,
+    options?: PlanOptions,
+): ReadRun {
     const limit = limitOf(call);
     const pipeline: Doc[] = [...checked.stages, { $limit: limit }];
     const view = access.view(access.mode === "deny" ? checked.reads : [ns]);
     const label = labelOf(call);
+    const check = checkOf(options, access, call, ns, { ...ns, pipeline });
     return {
         label,
         async run(backend, signal) {
+            if (check !== undefined) await enforceIndex(backend, access, check, signal);
             const rows = await backend.aggregate({ ...ns, pipeline }, { maxTimeMS: call.maxTimeMS, signal });
             // With an allow list the stages were limited to listed fields, and the output has the names the pipeline gave it.
             const docs = access.mode === "deny" ? rows.map((row) => view.strip(row)) : rows.map(stripCredentials);
@@ -462,15 +530,15 @@ export function planAggregateRead(call: Call, ns: Ns, checked: CheckedPipeline, 
     };
 }
 
-/** Plans a call that only reads, other than an aggregation. */
-export function planRead(call: Call, access: Access): ReadRun {
+/** Plans a call that only reads, other than an aggregation. `options.requireIndex` makes the reads that scan a collection refuse. */
+export function planRead(call: Call, access: Access, options?: PlanOptions): ReadRun {
     switch (call.action) {
         case "databases":
             return planDatabases(call, access);
         case "collections":
             return planCollections(call, access);
         case "schema":
-            return planSchema(call, access);
+            return planSchema(call, access, options);
         case "stats":
             return planStats(call, access);
         case "indexes":
@@ -478,15 +546,15 @@ export function planRead(call: Call, access: Access): ReadRun {
         case "index-stats":
             return planIndexes(call, access, true);
         case "explain":
-            return planExplain(call, access);
+            return planExplain(call, access, options);
         case "count":
-            return planCount(call, access);
+            return planCount(call, access, options);
         case "find":
-            return planFind(call, access);
+            return planFind(call, access, options);
         case "distinct":
-            return planDistinct(call, access);
+            return planDistinct(call, access, options);
         case "sample":
-            return planSample(call, access);
+            return planSample(call, access, options);
         default:
             throw new InputError(`mongo ${call.action} is not a read`);
     }

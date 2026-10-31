@@ -19,6 +19,19 @@ export interface FakeBackend extends Backend {
     reset(): void;
 }
 
+/** What the planner says of a query that an index serves: the answer a read in production needs to be sent. */
+export const INDEX_PLAN = {
+    queryPlanner: {
+        winningPlan: { stage: "FETCH", inputStage: { stage: "IXSCAN", indexName: "status_1" } },
+        rejectedPlans: [],
+    },
+};
+
+/** What the planner says of a query that no index serves. */
+export const SCAN_PLAN = {
+    queryPlanner: { winningPlan: { stage: "LIMIT", inputStage: { stage: "COLLSCAN" } }, rejectedPlans: [] },
+};
+
 const DEFAULTS: Record<string, Answer> = {
     databases: ["admin", "config", "local", "orders", "billing", "shop"],
     collections: [
@@ -53,7 +66,7 @@ const DEFAULTS: Record<string, Answer> = {
     find: [],
     count: 3,
     aggregate: [],
-    explain: { queryPlanner: { winningPlan: { stage: "COLLSCAN" }, rejectedPlans: [] } },
+    explain: INDEX_PLAN,
     insert: (query: any) => ({ inserted: query.documents.length }),
     update: { matched: 1, modified: 1 },
     replace: { matched: 1, modified: 1 },

@@ -4,6 +4,7 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 
 ## Contents
 
+- [2026-10-31: production reads need an index, and pull request comments reach the agent](#2026-10-31-production-reads-need-an-index-and-pull-request-comments-reach-the-agent)
 - [2026-10-31: jig-agents is built by us, on Pi's RPC mode](#2026-10-31-jig-agents-is-built-by-us-on-pis-rpc-mode)
 - [2026-10-31: jig-memory cards and recall: the agent writes the prose, keys and keywords find it](#2026-10-31-jig-memory-cards-and-recall-the-agent-writes-the-prose-keys-and-keywords-find-it)
 - [2026-10-31: jig-sandbox, background tasks and the network modes, as built](#2026-10-31-jig-sandbox-background-tasks-and-the-network-modes-as-built)
@@ -34,6 +35,52 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 - [2026-10-30: jig-git's tools, and a watch that knows when it is done](#2026-10-30-jig-gits-tools-and-a-watch-that-knows-when-it-is-done)
 - [2026-10-30: built clean, beside the existing harness](#2026-10-30-built-clean-beside-the-existing-harness)
 - [Earlier decisions that still hold (2026-10-29)](#earlier-decisions-that-still-hold-2026-10-29)
+
+## 2026-10-31: production reads need an index, and pull request comments reach the agent
+
+Two gaps, closed together because both needed a small addition to `jig-core`.
+
+**jig-mongo: a production read must use an index**
+- **The planner decides, and nothing is executed.** Before a `find`, `count`, `distinct` or `aggregate` runs in production,
+  `explain` at `queryPlanner` is asked, and a winning plan with a `COLLSCAN` is refused. The refusal names up to 5 fields that
+  lead an index (only ones the access lists let the agent see), so the query can be rewritten. A scan of a big collection is slow
+  for everyone who uses the database, and a broad scan is how too much data gets read.
+- **Checked as it will run.** A `count` is explained as the pipeline `countDocuments` runs, so a count with no filter is refused
+  without asking. `sample` and `schema` are checked when they carry a filter, and `explain` at `executionStats` is checked
+  because the server runs it. These go past the four actions first listed, and each is the same hole under another name.
+- **The planner does not say everything.** On MongoDB 8.0 it reports a `$unionWith` scan and, in some plans, a `$lookup` that
+  reads the joined collection whole (`EQ_LOOKUP`); in others it says nothing of the joined side. So each `$lookup` that matches on
+  a field is also checked against the index list of the joined collection. A `$lookup` written only as a sub-pipeline is not
+  caught where the planner is silent, and [Not verified yet](../plugins/jig-mongo/docs/not-verified.md) says so.
+- **A check that cannot be made refuses.** A failed `explain` (no privilege, a dropped connection) and a plan with no stage in it
+  are refusals, not passes.
+- **On for production, per connection otherwise.** `requireIndex` turns it on for a test environment or off for one production
+  connection. Off is the user's choice, so `/jig` says so, which needed `status.register` in `jig-core` (below). A small
+  collection of an allow list is marked `{ "fields": [...], "reference": true }` and is read whole. A deny list has no way to mark
+  one, so a test environment that turns the check on and needs reference data uses an allow list.
+
+**jig-git: comments on your pull request land in the agent**
+- **A watch needed a way to speak before it ends.** `jig-core`'s engine told the agent only when a watch finished or paused. A poll
+  can now return an `update` (a summary, details and links), which is cleaned like a result and sent in a message of its own while
+  the watch goes on. A poll that is also the end sends its update first, in the same message.
+- **Polls cost nothing while quiet.** The four requests of a poll are conditional (`gh api -i` with `If-None-Match`), and GitHub
+  answers `304` without counting it against the rate limit. What was told is remembered by id, in the watch's state, which is saved
+  with the update, so a comment is told once. A crash in the second between the message and the save loses news and does not say it
+  twice.
+- **Backoff is the watch's own.** `jig-core` pauses a watch after three failed polls but does not wait longer between them. A
+  server error, a rate limit or a lost connection makes this watch wait 2, 4, 8 and 10 minutes first (longer if GitHub asks), and
+  leaves its state as it was. Only then does the poll fail and the three-in-a-row pause apply.
+- **The agent can answer.** `pr reply` takes a review thread, and GitHub's REST answer does not name it, so one GraphQL read finds
+  it when there is a line comment to tell. Without it the comment is told with how to find the thread.
+- **Comments are text from anyone who may comment,** and a public pull request may be commented on by anyone. The message says
+  they are information to weigh, not instructions to follow, and the agent's replies still ask the user on the review screen, so a
+  comment can steer the agent but cannot send anything on its own. The agent's own comments and bots' are not told.
+- **Started without asking, ended by itself.** `pr watch` is a local write like `ci watch`, since it only reads GitHub. `pr create`
+  starts it unless `git.watchComments` is `"off"`. It ends on merge or close with one last message, after 7 days, or on `watch stop`.
+  The first poll tells the newest 10 comments already there, so an old pull request does not flood the agent.
+
+**jig-core: two small additions.** `PollOutcome.update` for the watch above, and `status.register(plugin, lines)` for lines that
+`/jig` shows. The second is optional in the contract's type so that a test's stand-in for `jig-core` need not have it.
 
 ## 2026-10-31: jig-agents is built by us, on Pi's RPC mode
 

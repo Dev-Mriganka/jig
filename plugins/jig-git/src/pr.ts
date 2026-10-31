@@ -16,6 +16,7 @@ import {
     planReview,
 } from "./pr-write.ts";
 import { planComments, planList, planView } from "./pr-read.ts";
+import { planWatch } from "./pr-watch-tool.ts";
 import type { Call, Planned } from "./previews.ts";
 import { at, buildTool } from "./tool.ts";
 import type { JigTool } from "./tool.ts";
@@ -53,6 +54,10 @@ export const PR_ACTIONS = {
         summary: "merge, squash or rebase at the head you saw; or auto-merge",
         required: ["number", "method"],
         optional: ["repo", "auto"],
+    },
+    watch: {
+        summary: "tell me about new comments on a pull request, in the background",
+        optional: ["repo", "number", "branch"],
     },
 } satisfies ActionTable;
 
@@ -152,6 +157,9 @@ function classifyPr(input: Readonly<Record<string, unknown>>): CallClass | undef
         case "resolve":
         case "merge":
             return at(action, "external", "write");
+        // Starts a poll that only reads GitHub, as the ci tool's watch does: a local write, so it does not ask.
+        case "watch":
+            return at(action, "local", "write");
         default:
             return undefined;
     }
@@ -182,6 +190,8 @@ function planPr(params: Readonly<Record<string, unknown>>, call: Call): Promise<
             return planReview(p, call);
         case "merge":
             return planMerge(p, call);
+        case "watch":
+            return planWatch(p, call);
         default:
             throw new Error(`pr: unknown action ${String(params.action)}`);
     }
@@ -191,8 +201,8 @@ export const prTool: JigTool = buildTool({
     name: "pr",
     label: "Pull request",
     description:
-        "GitHub pull requests through gh: view, list, comments; create, edit, ready, comment, reply, resolve, review, merge. Every write asks the user first. It never approves a pull request.",
-    promptSnippet: "GitHub pull requests: view, comments, create, review, merge",
+        "GitHub pull requests through gh: view, list, comments; create, edit, ready, comment, reply, resolve, review, merge; watch for new comments. Every write asks the user first. It never approves a pull request.",
+    promptSnippet: "GitHub pull requests: view, comments, watch, create, review, merge",
     promptGuidelines: [
         "Use the pr tool for pull requests, not bash: the shell has no GitHub sign-in. Push the branch with the git tool first.",
     ],

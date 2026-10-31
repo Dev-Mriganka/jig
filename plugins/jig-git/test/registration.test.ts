@@ -28,11 +28,16 @@ const TABLES: Record<string, ActionTable> = {
     release: RELEASE_ACTIONS,
 };
 
-test("the plugin registers git, pr and release, and declares each to jig-core; it watches nothing and has no checks tool", () => {
+test("the plugin registers git, pr and release, and declares each to jig-core; its one watch is on pull request comments, and it has no checks tool", () => {
     assert.deepEqual([...h.tools.keys()], ["git", "pr", "release"]);
     assert.deepEqual([...h.jig.declared.keys()], ["git", "pr", "release"]);
     assert.ok(h.jig.sections.has("git"), "the git section");
-    assert.equal(h.jig.kinds.size, 0, "CI watches are jig-ops's: no watch kind is registered here");
+    assert.deepEqual(
+        [...h.jig.kinds.keys()],
+        ["pr-comments"],
+        "CI watches are jig-ops's: only the comments watch is here",
+    );
+    assert.equal(h.jig.kinds.get("pr-comments")?.plugin, "jig-git");
 });
 
 test("every tool has a short description, a prompt line, and runs one call at a time", () => {

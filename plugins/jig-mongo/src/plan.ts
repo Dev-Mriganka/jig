@@ -6,12 +6,14 @@ import type { Call } from "./params.ts";
 import { checkPipeline } from "./pipeline.ts";
 import { nsOf, planAggregateRead, planRead } from "./reads.ts";
 import type { ReadRun } from "./reads.ts";
+import type { PlanOptions } from "./require-index.ts";
 import { planAggregateWrite, planWrite } from "./writes.ts";
 import type { WriteRun } from "./writes.ts";
 
 export type Planned = { effect: "read"; run: ReadRun } | { effect: "write"; run: WriteRun };
 
-export function planCall(call: Call, access: Access): Planned {
+/** `options.requireIndex` is the connection's choice: the reads that would scan a collection are then refused when they run. */
+export function planCall(call: Call, access: Access, options?: PlanOptions): Planned {
     // Server-side JavaScript is refused wherever it is written in the call, before anything else is looked at.
     scanJavaScript(call, access.javascript);
     if (call.action === "aggregate") {
@@ -20,10 +22,10 @@ export function planCall(call: Call, access: Access): Planned {
         const checked = checkPipeline(call.pipeline, ns, access);
         // `$out` and `$merge` make a pipeline a write.
         return checked.output === undefined
-            ? { effect: "read", run: planAggregateRead(call, ns, checked, access) }
+            ? { effect: "read", run: planAggregateRead(call, ns, checked, access, options) }
             : { effect: "write", run: planAggregateWrite(call, ns, checked, access) };
     }
     return ACTIONS[call.action].effect === "write"
         ? { effect: "write", run: planWrite(call, access) }
-        : { effect: "read", run: planRead(call, access) };
+        : { effect: "read", run: planRead(call, access, options) };
 }

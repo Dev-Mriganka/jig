@@ -15,11 +15,27 @@ export interface GitSettings {
     prTitle?: string;
     prTemplate?: string;
     cloneHost: string;
+    /** Whether `pr create` starts a watch on the comments of the new pull request. */
+    watchComments: WatchComments;
+    /** Whether the watch tells the agent about comments by bots. */
+    watchBots: boolean;
 }
+
+export type WatchComments = "after-create" | "off";
 
 const DEFAULT_CLONE_HOST = "github.com";
 
-const TOP = new Set(["base", "protected", "commitMessage", "branchName", "prTitle", "prTemplate", "cloneHost"]);
+const TOP = new Set([
+    "base",
+    "protected",
+    "commitMessage",
+    "branchName",
+    "prTitle",
+    "prTemplate",
+    "cloneHost",
+    "watchComments",
+    "watchBots",
+]);
 /** Settings that moved with CI to jig-ops, and where they are now. */
 const MOVED: Readonly<Record<string, string>> = { watch: "ops.watch", artifacts: "ops.artifacts" };
 const BRANCH_PATTERN = /^[A-Za-z0-9._/*-]+$/;
@@ -70,6 +86,12 @@ export function validateGitSection(raw: unknown): string[] {
     ) {
         errors.push("git.cloneHost must be a host name or an ssh alias such as github.com");
     }
+    if (raw.watchComments !== undefined && raw.watchComments !== "after-create" && raw.watchComments !== "off") {
+        errors.push('git.watchComments must be "after-create" or "off"');
+    }
+    if (raw.watchBots !== undefined && typeof raw.watchBots !== "boolean") {
+        errors.push("git.watchBots must be true or false");
+    }
     return errors;
 }
 
@@ -84,6 +106,8 @@ export function settingsFrom(raw: unknown): GitSettings {
         prTitle: section.prTitle as string | undefined,
         prTemplate: section.prTemplate as string | undefined,
         cloneHost: (section.cloneHost as string | undefined) ?? DEFAULT_CLONE_HOST,
+        watchComments: (section.watchComments as WatchComments | undefined) ?? "after-create",
+        watchBots: (section.watchBots as boolean | undefined) ?? false,
     };
 }
 

@@ -15,7 +15,8 @@ Back to the [jig-git overview](../README.md).
 
 - **CI,** on any system: checks, runs, logs, reruns and watches. They are the
   `ci` tool of [`jig-ops`](../../jig-ops/README.md), which has GitHub Actions,
-  GitLab CI and Jenkins. Only the one-line roll-up in `pr view` stays here.
+  GitLab CI and Jenkins. Only the one-line roll-up in `pr view` stays here, and
+  the one watch that is not CI: the comments of a pull request.
 - **Deploy tools** and container registry checks. They belong to `jig-ops` or a
   company plugin.
 - **Gates on commit and push,** such as "no push without a review". They are

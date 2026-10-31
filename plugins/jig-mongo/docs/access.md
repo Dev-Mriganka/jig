@@ -53,6 +53,9 @@ and `*.profile.ssn` denies `profile.ssn` and `customer.profile.ssn.last4`.
 is allowed in part only (`items.sku`). The key is `db.collection`, and the collection may hold dots. A list may not be empty, and may
 not name a credential-like field.
 
+An entry can also be an object, `{ "fields": ["_id", "code"], "reference": true }`, which marks a small collection of reference
+data. The [index check](index-check.md#reference-data) lets it be read whole. `fields` is required, and no other key is allowed.
+
 ## Always denied
 
 These hold in every environment, and a configuration can add to them but never remove them:

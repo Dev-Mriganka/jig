@@ -35,8 +35,9 @@ the environment variables. Back to the [jig-core overview](../README.md#configur
   network mode (with no sandbox it says plainly that it is not), the plugins
   loaded, the tools still on the unknown default, and the open watches (and how many are paused or wait
   for their plugin). It also shows the configuration file with the state of each
-  plugin section, configuration errors, a failed records write, and problems
-  with saved watches.
+  plugin section, lines that plugins registered (such as `jig-mongo` saying that
+  its index check is off), configuration errors, a failed records write, and
+  problems with saved watches.
 - **`/jig rules [tool]`** shows the effective decision per tool and action,
   with where each came from: declaration, rule, hint or default.
   - A tool whose schema lists its actions gets a line for each.

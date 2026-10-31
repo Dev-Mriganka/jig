@@ -127,6 +127,8 @@ export interface JigState {
     invalidatePolicy(): void;
     /** The sandbox that runs `bash`, once a plugin registers one. */
     sandbox: SandboxProvider | undefined;
+    /** The lines plugins want `/jig` to show, by plugin name (`status.register`). */
+    statusLines: Map<string, () => readonly string[]>;
     /** The last time writing a record failed, for `/jig`. */
     recordsProblem: string | undefined;
     /** Problems from loading that are not configuration, such as a plugin whose start-up callback threw. */
@@ -263,6 +265,7 @@ export function createState(pi: ExtensionAPI, options: JigCoreOptions = {}): Jig
             policy = undefined;
         },
         sandbox: undefined,
+        statusLines: new Map(),
         recordsProblem: undefined,
         startupProblems: [],
     };

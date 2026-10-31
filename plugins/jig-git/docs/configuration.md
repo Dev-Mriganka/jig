@@ -19,6 +19,12 @@ The fields of the `git` section of `jig.json`, in detail. The table is in the
   repository.
 - **`cloneHost`:** the only host other than `github.com` that a clone request
   may name. The URL git receives is built from it; the model never names a host.
+- **`watchComments`:** `"after-create"` (the default) or `"off"`. With
+  `"after-create"`, `pr create` starts a watch on the comments of the new pull
+  request. `pr watch` works either way ([Comment watch](comments-watch.md)).
+- **`watchBots`:** `true` or `false` (the default). Whether the comment watch also
+  tells the agent about comments made by bots. It is read at each poll, so a
+  change applies to a watch that is already running.
 
 ## Moved fields
 

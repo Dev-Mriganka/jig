@@ -6,7 +6,7 @@
 //
 // The order is the one for a tool result: redact secrets, mask personal data, cut to size. Terminal escape codes go
 // first, because a code in the middle of a secret would stop the redactor from finding it.
-import type { WatchResult } from "../contract.ts";
+import type { WatchResult, WatchUpdate } from "../contract.ts";
 import { isObject } from "../kit/values.ts";
 import { cleanFacts } from "../records.ts";
 
@@ -36,6 +36,17 @@ export function isWatchResult(value: unknown): value is WatchResult {
         (value.details === undefined || typeof value.details === "string") &&
         (links === undefined || (Array.isArray(links) && links.every((link) => typeof link === "string"))) &&
         (value.facts === undefined || isObject(value.facts))
+    );
+}
+
+/** Whether a plugin's answer has the shape of an update. A poll that sends anything else is a failed poll. */
+export function isWatchUpdate(value: unknown): value is WatchUpdate {
+    if (!isObject(value)) return false;
+    const links = value.links;
+    return (
+        typeof value.summary === "string" &&
+        (value.details === undefined || typeof value.details === "string") &&
+        (links === undefined || (Array.isArray(links) && links.every((link) => typeof link === "string")))
     );
 }
 
@@ -117,4 +128,10 @@ export function cleanResult(result: WatchResult, protect: Protect): WatchResult 
         ...(links.length === 0 ? {} : { links }),
         ...(facts === undefined ? {} : { facts }),
     };
+}
+
+/** An update safe to send and show, cleaned like a result. Never throws: text that cannot be masked is replaced. */
+export function cleanUpdate(update: WatchUpdate, protect: Protect): WatchUpdate {
+    const { summary, details, links } = cleanResult({ outcome: "passed", ...update }, protect);
+    return { summary, ...(details === undefined ? {} : { details }), ...(links === undefined ? {} : { links }) };
 }
