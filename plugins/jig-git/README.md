@@ -88,6 +88,7 @@ The notes on single actions are in [Actions](docs/actions.md).
   in, or, inside a repository, the folder that holds it.
 - **The forge comes from the repository.** `github.com` is GitHub, `gitlab.com` is GitLab, and `git.forges` names a self-hosted
   host. An origin on any other host is refused with the line that fixes it ([GitLab](docs/gitlab.md#which-forge-a-repository-is-on)).
+  `gh` and `glab` own the sign-in; Jig never signs in.
 - **Writes are previewed, and never repeated blindly.** A write that asks shows
   what it will do, and refuses if anything changed since. A lost reply is read
   once and never sent again (see [Writes](docs/writes.md)).
