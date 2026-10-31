@@ -92,7 +92,7 @@ test("days outside 1 to 90, or not a whole number, is refused with the range", (
 test("the usage names every command on one line", () => {
     assert.equal(
         USAGE,
-        "Usage: /lens [ticket KEY | session [id] | days N | usage | grafana | datasette | rebuild | status]",
+        "Usage: /lens [ticket KEY | session [id] | days N | compare [days N] | usage | grafana | datasette | rebuild | status]",
     );
     for (const [word] of WORDS) assert.ok(USAGE.includes(word), word);
     assert.ok(!USAGE.includes("\n"));
@@ -101,7 +101,7 @@ test("the usage names every command on one line", () => {
 test("the completions are the first words, each with what it does", () => {
     assert.deepEqual(
         (completions("") ?? []).map((item) => item.value),
-        ["ticket", "session", "days", "usage", "grafana", "datasette", "rebuild", "status"],
+        ["ticket", "session", "days", "compare", "usage", "grafana", "datasette", "rebuild", "status"],
     );
     assert.deepEqual(completions("gr"), [
         { value: "grafana", label: "grafana", description: "open the Grafana dashboards" },

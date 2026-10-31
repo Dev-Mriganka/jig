@@ -24,6 +24,10 @@ numbers as seconds.
 - **`imported`:** `bytes` is how far the file has been read, `skipped` the lines
   that are not records, and `at` when it was last imported.
 
+- **`condition`** is the tag from `$JIG_CONDITION` (see [Records](../../jig-core/docs/records.md)), on both
+  tables. An index made before it gets the column, empty for its old rows, the next time it is opened for
+  writing, with no rebuild. Lines written without a tag stay `NULL`.
+
 Read the facts with `json_extract(facts, '$.passed')`. A field that does not
 apply is `NULL`. The tables are plain, not `STRICT`, so that Datasette can read
 the file with whatever SQLite its Python was built with.

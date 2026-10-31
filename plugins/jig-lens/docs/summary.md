@@ -11,6 +11,7 @@ What `/lens` shows inside Pi, and how it reaches the screen. Back to the
 
 `/lens ticket KEY` shows one ticket over all time, `/lens session [id]` one
 session (this one by default), and `/lens days N` the last N days, from 1 to 90.
+`/lens compare` is a table of its own, set out in [Comparing conditions](compare.md).
 A scope's text is up to five sections. A section with nothing to say is left
 out, and a scope with nothing in it is one line.
 

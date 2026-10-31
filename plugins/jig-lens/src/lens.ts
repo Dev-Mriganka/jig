@@ -4,6 +4,7 @@
 //   /lens ticket KEY     the same for one ticket, over all time
 //   /lens session [id]   the same for one session (this one by default)
 //   /lens days N         the same for the last N days
+//   /lens compare [days N]  the conditions (JIG_CONDITION) side by side over the last N days, 30 by default
 //   /lens usage          an interactive view of cost and tokens, from Pi's own session files
 //   /lens grafana        imports, starts Grafana if it is not running, and opens its dashboards
 //   /lens datasette      the same for Datasette
@@ -19,7 +20,8 @@ import { plural } from "./format.ts";
 import { importRecords } from "./import.ts";
 import type { ImportOutcome } from "./import.ts";
 import { importLine, indexLines, reason, skippedLine } from "./report.ts";
-import { summaryFor } from "./scopes.ts";
+import { briefOf } from "./compare-format.ts";
+import { compareFor, summaryFor } from "./scopes.ts";
 import { startViewer } from "./start.ts";
 import { deleteIndex, openIndex, readIndex, readStatus } from "./store.ts";
 import type { IndexStatus } from "./store.ts";
@@ -165,6 +167,28 @@ export function registerLens(pi: ExtensionAPI, deps: Deps): void {
         }
     }
 
+    /** `/lens compare`: import, then show the conditions side by side. */
+    async function compare(ctx: ExtensionContext, days: number): Promise<void> {
+        if (!ctx.hasUI) return;
+        const outcome = await importer.run();
+        let block: Block | undefined;
+        try {
+            block = readIndex(deps.paths().index, (db) => compareFor(db, deps.now(), days));
+        } catch (error) {
+            const cannot = `The index cannot be read (${reason(error)}). /lens rebuild makes it again.`;
+            tell(ctx, `${importLine(outcome)}\n${cannot}`, "warning");
+            return;
+        }
+        if (block === undefined) {
+            tell(ctx, `${importLine(outcome)}\nThere is no index to read yet.`, "warning");
+            return;
+        }
+        show(pi, ctx, [block], briefOf(block));
+        if (outcome.result === undefined || outcome.problem !== undefined || outcome.result.skipped > 0) {
+            tell(ctx, importLine(outcome), "warning");
+        }
+    }
+
     /** `/lens grafana` and `/lens datasette`: import, start the viewer if it is not running, and open its page. */
     async function openViewer(ctx: ExtensionContext, viewer: Viewer): Promise<void> {
         const settings = deps.settings();
@@ -244,7 +268,7 @@ export function registerLens(pi: ExtensionAPI, deps: Deps): void {
 
     pi.registerCommand("lens", {
         description:
-            "Jig summary of cost, failures and your waiting time: /lens, ticket KEY, session, days N; " +
+            "Jig summary of cost, failures and your waiting time: /lens, ticket KEY, session, days N; compare [days N] for conditions side by side; " +
             "usage for cost and tokens by period and model; grafana or datasette for a dashboard; rebuild, status",
         getArgumentCompletions: completions,
         handler: async (args, ctx) => {
@@ -253,6 +277,8 @@ export function registerLens(pi: ExtensionAPI, deps: Deps): void {
                 case "usage":
                     tell(ctx, command.problem === undefined ? USAGE : `${command.problem}\n${USAGE}`, "warning");
                     return;
+                case "compare":
+                    return compare(ctx, command.days);
                 case "usage-view":
                     return usage(ctx);
                 case "viewer":

@@ -89,11 +89,12 @@ export function registerDisplay(pi: ExtensionAPI): void {
     });
 }
 
-/** Shows the summary on whatever screen there is. */
-export function show(pi: ExtensionAPI, ctx: ExtensionContext, blocks: readonly Block[]): void {
+/** Shows the summary on whatever screen there is. `brief` is the text for a notification, when cutting each section to
+ *  its first line would not say enough. */
+export function show(pi: ExtensionAPI, ctx: ExtensionContext, blocks: readonly Block[], brief?: string): void {
     if (ctx.mode === "tui") {
         pi.appendEntry<SummaryEntry>(ENTRY, { blocks: [...blocks] });
     } else if (ctx.hasUI) {
-        ctx.ui.notify(short(blocks), "info");
+        ctx.ui.notify(brief ?? short(blocks), "info");
     }
 }

@@ -36,7 +36,11 @@ const FULL: CallInput = {
 const line = (record: object) => JSON.stringify(record);
 
 test("every field of a call record becomes the column of the same name", () => {
-    const record = callRecord(FULL, WHEN, { JIG_PARENT_SESSION: "parent-9", JIG_AGENT_ROLE: "reviewer" });
+    const record = callRecord(FULL, WHEN, {
+        JIG_PARENT_SESSION: "parent-9",
+        JIG_AGENT_ROLE: "reviewer",
+        JIG_CONDITION: "baseline",
+    });
     const row = parseLine(line(record));
     assert.ok(row);
     assert.equal(row.table, "call");
@@ -47,6 +51,7 @@ test("every field of a call record becomes the column of the same name", () => {
         session: "session-1",
         parentSession: "parent-9",
         agentRole: "reviewer",
+        condition: "baseline",
         ticket: "TICKET-42",
         tool: "git",
         action: "push",
@@ -83,7 +88,7 @@ test("every field of a turn record becomes the column of the same name", () => {
             cost: 0.0123,
         },
         WHEN,
-        {},
+        { JIG_CONDITION: "with-tool-x" },
     );
     const row = parseLine(line(record));
     assert.ok(row);
@@ -94,6 +99,7 @@ test("every field of a turn record becomes the column of the same name", () => {
         session: "session-1",
         parentSession: null,
         agentRole: "main",
+        condition: "with-tool-x",
         ticket: "TICKET-42",
         model: "model-a",
         input: 10,
@@ -105,7 +111,7 @@ test("every field of a turn record becomes the column of the same name", () => {
 });
 
 test("the fields of a call are the fields of jig-core's record, in its order", () => {
-    const record = callRecord(FULL, WHEN, { JIG_PARENT_SESSION: "p" });
+    const record = callRecord(FULL, WHEN, { JIG_PARENT_SESSION: "p", JIG_CONDITION: "c" });
     const names = Object.keys(record).filter((name) => name !== "kind");
     assert.deepEqual(
         CALL.map((field) => field.name),
@@ -117,9 +123,7 @@ test("the fields of a turn are the fields of jig-core's record, in its order", (
     const record = turnRecord(
         { session: "s", ticket: "T", model: "m", input: 1, output: 1, cacheRead: 0, cacheWrite: 0, cost: 0 },
         WHEN,
-        {
-            JIG_PARENT_SESSION: "p",
-        },
+        { JIG_PARENT_SESSION: "p", JIG_CONDITION: "c" },
     );
     const names = Object.keys(record).filter((name) => name !== "kind");
     assert.deepEqual(
@@ -138,6 +142,7 @@ test("a field that does not apply is null, and a call that never ran has no clas
     assert.ok(row);
     const columns = Object.fromEntries(CALL.map((field, i) => [field.name, row.values[i]]));
     assert.equal(columns.environment, null);
+    assert.equal(columns.condition, null, "a line without a condition has none");
     assert.equal(columns.decision, null);
     assert.equal(columns.waitedMs, null);
     assert.equal(columns.facts, null);

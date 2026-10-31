@@ -27,6 +27,7 @@ const LINE: readonly Field[] = [
     required("session"),
     optional("parentSession"),
     required("agentRole"),
+    optional("condition"),
     optional("ticket"),
 ];
 
@@ -65,11 +66,14 @@ export const TURN: readonly Field[] = [
 
 const SQL_TYPE: Record<Kind, string> = { text: "TEXT", count: "INTEGER", number: "REAL", time: "REAL", json: "TEXT" };
 
+/** `condition TEXT`: a column as the table declares it, for one that an older index lacks. */
+export const columnSql = (field: Field): string => `${field.name} ${SQL_TYPE[field.kind]}`;
+
 function createTable(table: string, fields: readonly Field[]): string {
     const columns = fields.map((field) => {
         // The id is the key that makes a repeated import harmless: INSERT OR IGNORE skips a line already imported.
         const rule = field.name === "id" ? " NOT NULL PRIMARY KEY" : field.required ? " NOT NULL" : "";
-        return `    ${field.name} ${SQL_TYPE[field.kind]}${rule}`;
+        return `    ${columnSql(field)}${rule}`;
     });
     return `CREATE TABLE IF NOT EXISTS ${table} (\n${columns.join(",\n")}\n);`;
 }

@@ -10,7 +10,8 @@ import type { Notice } from "./support.ts";
 // "Today" is the user's day. These tests are written for a clock on UTC.
 process.env.TZ = "UTC";
 
-const USAGE = "Usage: /lens [ticket KEY | session [id] | days N | usage | grafana | datasette | rebuild | status]";
+const USAGE =
+    "Usage: /lens [ticket KEY | session [id] | days N | compare [days N] | usage | grafana | datasette | rebuild | status]";
 
 /** Runs a command in a session of a terminal, with the sample records written and the viewers stopped. */
 async function run(t: Parameters<typeof rig>[0], args: string) {

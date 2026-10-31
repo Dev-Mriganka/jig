@@ -82,7 +82,7 @@ test("it takes no arguments: more words are the usage line, and do nothing", asy
     assert.deepEqual(notices, [
         {
             level: "warning",
-            text: "/lens usage takes no arguments.\nUsage: /lens [ticket KEY | session [id] | days N | usage | grafana | datasette | rebuild | status]",
+            text: "/lens usage takes no arguments.\nUsage: /lens [ticket KEY | session [id] | days N | compare [days N] | usage | grafana | datasette | rebuild | status]",
         },
     ]);
     assert.equal(r.pi.customs.length, 0);
