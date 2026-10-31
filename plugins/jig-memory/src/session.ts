@@ -5,6 +5,10 @@
 // The active ticket is saved with appendEntry and read back from the branch on session_start. The notes reach the
 // agent as messages, when a ticket becomes active and after each compaction, which may have folded the earlier
 // message away. They never go into the system prompt: a changed prompt rewrites the provider's cached prefix.
+//
+// Two more things are wired here and done elsewhere. /ticket close drafts a card and asks the agent to fill it (close.ts),
+// and when the agent has settled the file is read back. A ticket that becomes active with no notes yet gets recall, the
+// cards of related tickets (recall.ts), as one more message.
 import { existsSync } from "node:fs";
 import type { ExtensionAPI, ExtensionContext, SessionEntry } from "@earendil-works/pi-coding-agent";
 import { jig } from "../../jig-core/src/client.ts";

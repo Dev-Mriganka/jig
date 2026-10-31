@@ -16,38 +16,19 @@ const SCAN_LIMIT = 5000;
 
 // A key when the memory section sets no ticketPattern: letters, a dash and digits, as in jig-review.
 const GENERIC_KEY = /(?<![A-Za-z0-9])[A-Z][A-Z0-9]+-\d+(?![A-Za-z0-9])/g;
-// Words that have the shape of a key and are not one.
-const NOT_KEYS: ReadonlySet<string> = new Set([
-    "UTF",
-    "ISO",
-    "SHA",
-    "MD",
-    "RFC",
-    "HTTP",
-    "TLS",
-    "SSL",
-    "AES",
-    "RSA",
-    "TCP",
-    "UDP",
-    "IPV",
-    "ECMA",
-    "ES",
-    "PBKDF",
-    "HMAC",
-    "WPA",
-    "TLSV",
-    "SSLV",
-    "BASE",
-    "CRC",
-    "UTC",
-    "GMT",
-]);
+// Words that have the shape of a key and are not one: encodings, hashes, standards and protocols. Two cards that both
+// mention UTF-8 would otherwise share a key, which is the strongest signal recall has. They are left out even when the
+// memory section sets a ticketPattern, because a pattern that fits `ABC-123` fits `UTF-8` too.
+const NOT_KEYS: ReadonlySet<string> = new Set(
+    "UTF ISO SHA RFC HTTP TLS SSL AES RSA TCP UDP IPV TLSV SSLV ECMA PBKDF HMAC WPA CRC".split(" "),
+);
+// More that only the generic shape lets through: a company's own pattern may well mean these.
+const NOT_GENERIC_KEYS: ReadonlySet<string> = new Set("MD ES BASE UTC GMT".split(" "));
 
 /**
  * The ticket keys in the texts, in order of first appearance and each once, without `own`. With a `pattern` (the
  * memory section's, as ticketRegex builds it) only its matches count; without one, anything shaped like `ABC-123`
- * does, except words such as UTF-8 and SHA-256.
+ * does. Either way UTF-8, SHA-256 and the like are not keys.
  */
 export function extractKeys(texts: readonly string[], pattern: RegExp | undefined, own: string | undefined): string[] {
     const found = new Set<string>();
@@ -60,7 +41,8 @@ export function extractKeys(texts: readonly string[], pattern: RegExp | undefine
         for (const match of text.matchAll(regex)) {
             const key = match[0];
             if (key === own || found.has(key)) continue;
-            if (pattern === undefined && NOT_KEYS.has(key.slice(0, key.lastIndexOf("-")))) continue;
+            const prefix = key.slice(0, key.lastIndexOf("-")).toUpperCase();
+            if (NOT_KEYS.has(prefix) || (pattern === undefined && NOT_GENERIC_KEYS.has(prefix))) continue;
             // A key becomes a folder name in the index, so one that is not a safe name is left out.
             if (!/^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/.test(key)) continue;
             found.add(key);

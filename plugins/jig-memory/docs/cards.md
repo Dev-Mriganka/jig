@@ -51,7 +51,8 @@ agent.
 | `errors` | Distinct error lines from the evidence, up to 10, each cut to 160 characters |
 
 - **Keys** use the `ticketPattern` from the `memory` section. Without one, any
-  `ABC-123` shape counts, except common non-tickets such as `UTF-8` and `SHA-256`.
+  `ABC-123` shape counts. Either way `UTF-8`, `SHA-256`, `RFC-7231` and similar
+  are skipped, because two cards that both name `UTF-8` would otherwise share a key.
 - **Identifiers** come from the notes first, the most often named first, then
   from names that only the evidence holds.
 - **The patterns** are few and tested, as the table says.
@@ -68,11 +69,14 @@ dropped. Product names such as `GitHub` and file names such as `config.yaml` are
 not identifiers. A token that looks like a random string, such as a token or a
 hash, is skipped.
 
-An **error line** is a line of evidence with an exception or error name, `Caused by`,
-an upper-case level (`ERROR`, `FATAL`, `SEVERE`, `CRITICAL`, `PANIC`), or one of
-`failed`, `timed out`, `connection refused` and `permission denied`. A stack frame
-(`at ...`) is not one. A leading timestamp is dropped, and lines that differ only
-in numbers, ids or bracketed thread names count as one. The ten most frequent stay.
+An **error line** is a line of evidence that holds one of these:
+- an exception or error name, such as `NullPointerException` or `TypeError`;
+- `Caused by`, or an upper-case level: `ERROR`, `FATAL`, `SEVERE`, `CRITICAL`, `PANIC`;
+- `failed`, `timed out`, `connection refused` or `permission denied`.
+
+A stack frame (`at ...`) is not an error line. A leading timestamp is dropped, and
+lines that differ only in numbers, ids or bracketed thread names count as one. The
+ten most frequent stay.
 
 ## What the agent writes
 

@@ -37,6 +37,14 @@ test("without a pattern anything shaped like ABC-123 is a key, except words such
     );
 });
 
+test("UTF-8, SHA-256 and the like are not keys even when a pattern would match them", () => {
+    const pattern = ticketRegex({ ticketPattern: PATTERN });
+    assert.deepEqual(extractKeys(["PROJ-1 as UTF-8, SHA-256, RFC-7231, MD-4 and TLS-1"], pattern, undefined), [
+        "PROJ-1",
+        "MD-4",
+    ]);
+});
+
 test("a pattern given without the g flag still works", () => {
     assert.deepEqual(extractKeys(["PROJ-5 PROJ-6"], /PROJ-\d+/, undefined), ["PROJ-5", "PROJ-6"]);
 });
