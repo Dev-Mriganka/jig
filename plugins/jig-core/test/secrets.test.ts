@@ -65,6 +65,17 @@ describe("the allowed backends", () => {
         assert.equal(redactor.count(), 0);
     });
 
+    test("a backend the user turned off says so, and one that was never on says how to turn it on", async () => {
+        const secrets = createSecrets({
+            backends: () => ["pass"],
+            disabled: () => ["env"],
+            redactor: createRedactor(),
+            env: { X: "value" },
+        });
+        await assert.rejects(secrets.resolve("env:X"), /you turned it off in secrets\.disabledBackends in jig\.json/);
+        await assert.rejects(secrets.resolve("file:/tmp/x"), /add "file" to secrets\.backends in jig\.json/);
+    });
+
     test("each backend is refused unless it is listed", async () => {
         const { secrets } = setup([], { run: async () => ok("never"), platform: "darwin" });
         for (const ref of [

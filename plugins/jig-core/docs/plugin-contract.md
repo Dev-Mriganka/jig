@@ -89,7 +89,12 @@ closed instead of running ungoverned.
 - **`config`** is what a company plugin adds at start-up, and what a plugin
   keeps for itself.
   - A company adds `addEnvironments`, `addRules`, `addClassifyRules`,
-    `addProtectedPaths`, `addSecretCommands` and `addMaskFields`.
+    `addProtectedPaths`, `addSecretCommands`, `enableSecretBackends` and
+    `addMaskFields`.
+  - **`enableSecretBackends(["cmd", ...])`** turns secret backends on for the
+    references a company's sign-in names. It adds to your `secrets.backends`; your
+    `secrets.disabledBackends` still turns any off. See
+    [Secret references](configuration.md#secret-references).
   - A plugin registers its own section with `registerSection`, and reads it back
     with `section`.
   - A company can give defaults for any plugin's section with

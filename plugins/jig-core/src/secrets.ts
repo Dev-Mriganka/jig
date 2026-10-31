@@ -12,7 +12,8 @@
 //                             its trimmed standard output. `cmd:gh` runs `gh auth token` if that is what `gh` is
 //   file:<absolute path>      the first line of a file, trimmed (`~/` is the home folder); never from Pi's agent folder
 //
-// Only the backends listed in `secrets.backends` may resolve a reference (the default is `pass` alone).
+// Only the backends listed in `secrets.backends` (the default is `pass` alone) and the ones a company plugin enabled may
+// resolve a reference, and the user's `secrets.disabledBackends` turns any of them off.
 import { open, stat, realpath } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
@@ -43,6 +44,8 @@ export interface Secrets {
 export interface SecretsOptions {
     /** The backends allowed right now (read on every call, so a configuration reload applies). */
     backends: () => readonly string[];
+    /** The backends the user turned off, so that the message for one says so. */
+    disabled?: () => readonly string[];
     redactor: Redactor;
     /** How programs are started. Tests pass a fake. */
     run?: (file: string, args: readonly string[], options?: RunOptions) => Promise<RunResult>;
@@ -321,9 +324,12 @@ export function createSecrets(options: SecretsOptions): Secrets {
             );
         }
         if (!options.backends().includes(parsed.backend)) {
+            const turnedOff = options.disabled?.().includes(parsed.backend) === true;
             throw new SecretError(
                 "backend_disabled",
-                `the ${parsed.backend} secret backend is not enabled: add "${parsed.backend}" to secrets.backends in jig.json`,
+                turnedOff
+                    ? `the ${parsed.backend} secret backend is not enabled: you turned it off in secrets.disabledBackends in jig.json`
+                    : `the ${parsed.backend} secret backend is not enabled: add "${parsed.backend}" to secrets.backends in jig.json`,
             );
         }
         let value: string;

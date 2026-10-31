@@ -110,8 +110,11 @@ Jig never signs in. The tool that owns a login does it, and a company plugin con
 
 - **A secret is a reference,** never the secret. A value pasted where a reference belongs is refused, and the message does not
   repeat it ([`config.ts`](../examples/jig-acme/src/config.ts)).
-- **A company cannot turn a secret backend on.** `secrets.backends` is the user's decision alone, so a company plugin tells each
-  user which one to add. Without it, a request fails with `auth_failed` and says which backend is off.
+- **A company can turn a secret backend on,** with `config.enableSecretBackends(["cmd"])`, so each user need not add the one its
+  sign-in needs. The plugin already runs in Pi with the user's rights, so this gives it nothing new. The user keeps the last word:
+  `secrets.disabledBackends` in `jig.json` turns any backend off, and a request then fails with `auth_failed` and says who turned it
+  off. Without a company plugin only `pass` is on, and `/jig` lists the backends that are on and who enabled them.
+- **Enable only what your own references need.** jig-acme turns on `cmd` and leaves `env`, `file` and the rest to the user.
 - **A sign-in service is asked for every request,** with its method, address, headers and body, because it knows when a token has
   run out. `jig-core` hides what it returns from every result ([`signin.ts`](../examples/jig-acme/src/signin.ts)).
 - **Serve your own hosts only.** The service is handed the whole address of every request. `acme-sso` refuses a host that is not

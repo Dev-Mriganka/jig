@@ -24,7 +24,7 @@ knowledge, an overlay skill the agent reads.*
 |---|---|---|
 | [`src/environments.ts`](src/environments.ts) | `dev` and `staging` (test), `prod` (production) | The names its tools and logs use, and which hold live customer data |
 | [`src/defaults/`](src/defaults) | Defaults for nine plugins' sections: jira, logs, mongo, api, ops, memory, git, theme, sandbox | Where its systems are, and its conventions |
-| [`src/secrets.ts`](src/secrets.ts) | The command `acme-sso`, which `cmd:acme-sso` runs | The command-line tool that owns its login |
+| [`src/secrets.ts`](src/secrets.ts) | The command `acme-sso`, which `cmd:acme-sso` runs, and the `cmd` backend turned on | The command-line tool that owns its login |
 | [`src/signin.ts`](src/signin.ts) | The sign-in service `acme-sso`: a bearer header from a secret reference | Whatever its gateway wants: a token, an HMAC, a cloud signature |
 | [`src/transport.ts`](src/transport.ts) | The transport `acme-gateway`: a request carried by a gateway on this machine | A sign-in proxy, a VPN gateway's API, a browser-session broker |
 | [`src/tunnel.ts`](src/tunnel.ts) | The tunnel `acme-bastion`: `ssh -L`, a forward | A jump host, a cloud port forward, a VPN client's command |
@@ -60,11 +60,15 @@ writes only what they change (see [Writing a company plugin](../../docs/company-
 | `acme.bastion.host` | `bastion.acme.example` | The bastion host |
 | `acme.bastion.user` | none | Your login on the bastion, which only you know. `/jig` says when it is missing |
 
-A company plugin cannot turn a secret backend on, so each user turns on the one they use. The default token comes from the
-`acme` command, which needs `cmd`; a token in a variable needs `env`:
+The default token comes from the `acme` command, which needs the `cmd` secret backend, so jig-acme turns `cmd` on (with
+`config.enableSecretBackends`) and a user adds nothing. A token kept in a variable needs `env`, which stays the user's to turn on.
+A user who does not want `cmd` turns it off, and `/jig` lists the backends that are on and who enabled them:
 
 ```json
-{ "secrets": { "backends": ["pass", "cmd"] }, "acme": { "bastion": { "user": "jdoe" } } }
+{
+  "secrets": { "backends": ["pass", "env"], "disabledBackends": ["cmd"] },
+  "acme": { "sso": { "token": "env:ACME_SSO_TOKEN" } }
+}
 ```
 
 ## Copy it for a real company

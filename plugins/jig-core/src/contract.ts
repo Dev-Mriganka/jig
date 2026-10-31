@@ -590,6 +590,13 @@ export interface JigApi {
          *  word is the program, the rest its arguments; no shell is used. A name the user also declares in `jig.json`
          *  (`secrets.commands`) takes the user's command. They run only when `cmd` is in `secrets.backends`. */
         addSecretCommands(commands: Readonly<Record<string, readonly string[]>>): void;
+        /** Turns secret backends on (`pass`, `env`, `keychain`, `op`, `cmd`, `file`) for the references a company's sign-in and
+         *  settings name, so each user need not add them. A company plugin is code that already runs in Pi with the user's
+         *  rights, so this gives it nothing new; the user keeps the last word, because `secrets.disabledBackends` in `jig.json`
+         *  turns any backend off whoever turned it on. Without a company plugin the default stays `pass` alone, and `/jig`
+         *  lists the backends that are on and who enabled them. A name that is not a backend is a configuration problem
+         *  named `company`. */
+        enableSecretBackends(backends: readonly string[]): void;
         /** Field names that hold personal data in a company's own systems. The masker treats them like its
          *  built-in personal fields and turns their values into `personal#` tokens. */
         addMaskFields(fields: readonly string[]): void;

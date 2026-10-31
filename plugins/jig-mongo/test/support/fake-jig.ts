@@ -188,6 +188,7 @@ export function installFakeJig(): FakeJig {
             addClassifyRules: () => {},
             addProtectedPaths: () => {},
             addSecretCommands: () => {},
+            enableSecretBackends: () => {},
             addMaskFields: () => {},
             registerSection: (name, validate, options) => {
                 sections.set(name, validate);

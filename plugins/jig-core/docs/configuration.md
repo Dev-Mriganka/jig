@@ -23,6 +23,9 @@ the environment variables. Back to the [jig-core overview](../README.md#configur
   [Protected paths](#protected-paths)).
 - **`secrets.backends`:** `pass`, `env`, `keychain`, `op`, `cmd` and `file`.
   Only `pass` is on by default.
+- **`secrets.disabledBackends`:** the same names. A backend listed here is off,
+  whoever turned it on, a company plugin included (see
+  [Secret references](#secret-references)).
 - **`secrets.commands`:** the program, then its arguments, such as
   `{ "gh": ["gh", "auth", "token"] }`. Used only when `cmd` is in
   `secrets.backends`.
@@ -167,9 +170,21 @@ removes one. `/jig rules` lists them all, each with where it came from
 | `cmd:<name>` | a command you declared by name | The trimmed standard output of the command declared as `<name>`. See below |
 | `file:<absolute path>` | a file | The first line of the file, trimmed. A leading `~/` is the home folder. See below |
 
-A reference whose backend is not in `secrets.backends` is an error that says
-so. Every backend has a timeout, 60 seconds by default, which includes the time
-you need to unlock a store. An error never repeats the reference or a value.
+A reference whose backend is not on is an error that says so. Every backend has a
+timeout, 60 seconds by default, which includes the time you need to unlock a store.
+An error never repeats the reference or a value.
+
+**Which backends are on.** The ones in your `secrets.backends` (`pass` alone when you
+list none), plus the ones a company plugin turned on with
+`config.enableSecretBackends`, less the ones in your `secrets.disabledBackends`.
+- **The company only adds.** A company plugin is code that already runs in Pi with
+  your rights, so turning a backend on gives it nothing it lacked. Its `cmd`
+  backend still runs only commands that were declared by name, and `file` still
+  refuses Pi's agent folder.
+- **You have the last word.** A backend in `secrets.disabledBackends` stays off
+  whoever turned it on, and the error says you turned it off.
+- **`/jig` shows it:** `Secret backends on: pass, cmd (cmd enabled by a company
+  plugin); turned off by you: env`.
 
 ### `cmd`: a command that owns the login
 
@@ -188,7 +203,7 @@ turn the backend on:
 ```
 
 - **Off by default,** like every backend but `pass`: `cmd` must be in
-  `secrets.backends`.
+  `secrets.backends`, or a company plugin must have turned it on.
 - **A name, never a command line.** A reference names a declared command. An
   undeclared name is refused (and not repeated in the error), so a model cannot
   slip in a command of its own through a parameter.
@@ -214,7 +229,8 @@ turn the backend on:
 read the first line of a file, for a credential that another tool keeps up to
 date.
 
-- **Off by default:** `file` must be in `secrets.backends`.
+- **Off by default:** `file` must be in `secrets.backends`, or a company plugin must
+  have turned it on.
 - **A regular file,** at most 64 KiB, whose first line is not empty. The path
   must be absolute, or start with `~/`. Permission bits are not checked: files
   on a Windows drive seen from WSL all show 0777.

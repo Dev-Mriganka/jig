@@ -5,7 +5,7 @@
 import type { ExtensionAPI, ExtensionCommandContext, ToolInfo } from "@earendil-works/pi-coding-agent";
 import { classify } from "./classify.ts";
 import type { Classification, ClassSource } from "./classify.ts";
-import { describeProblem } from "./config.ts";
+import { describeProblem, effectiveBackends } from "./config.ts";
 import type { EnvironmentInfo } from "./contract.ts";
 import { decide } from "./decide.ts";
 import { errorMessage } from "./errors.ts";
@@ -103,6 +103,7 @@ export function statusLines(state: JigState): string[] {
         sandboxLine(state),
         `Plugins: ${[...plugins].join(", ")}`,
         environmentsLine(state),
+        secretBackendsLine(state),
         `Tools on the unknown default (they ask until classified): ${unclassified.length === 0 ? "none" : unclassified.join(", ")}`,
         watchesLine(state),
         ...(gates.length === 0
@@ -188,6 +189,17 @@ export function environmentsLine(state: JigState): string {
         if (names.length > 0) groups.push(`${ENVIRONMENT_SOURCE[source]}: ${names.join(", ")}`);
     }
     return `Environments (any other name counts as production): ${groups.join("; ")}`;
+}
+
+/**
+ * Which secret backends can resolve a reference, and who turned them on or off: `Secret backends on: pass, cmd (cmd enabled
+ * by a company plugin); turned off by you: env`.
+ */
+export function secretBackendsLine(state: JigState): string {
+    const { on, byCompany, off } = effectiveBackends(state.personal.config.secrets, state.company);
+    const enabled = byCompany.length === 0 ? "" : ` (${byCompany.join(", ")} enabled by a company plugin)`;
+    const disabled = off.length === 0 ? "" : `; turned off by you: ${off.join(", ")}`;
+    return `Secret backends on: ${on.length === 0 ? "none" : on.join(", ")}${enabled}${disabled}`;
 }
 
 /**
