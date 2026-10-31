@@ -166,7 +166,7 @@ function makeRule(candidate: Candidate, real: string, home: string): Rule {
 }
 
 /** Where the rules for a child agent that may not write come from, as `/sandbox` says it. */
-const ROLE_SOURCE = "the role of this agent (read-only)";
+export const ROLE_SOURCE = "the role of this agent (read-only)";
 
 const CORE_SOURCE: Record<ProtectedEntry["source"], string> = {
     default: "jig-core protected paths",

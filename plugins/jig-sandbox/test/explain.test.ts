@@ -155,6 +155,20 @@ describe("the rest of the system", () => {
         assert.match(locked[0] ?? "", /cannot write ~\/\.bashrc/);
     });
 
+    test("a redirect to a relative path names the file: the shell prints the path first", () => {
+        const home = rules(machine, { wsl: true, cwd: HOME });
+        const out = explainBlocks("/usr/bin/bash: line 1: ./.bashrc: Read-only file system", home, {
+            cwd: HOME,
+            mode: "open",
+        });
+        assert.match(out.lines[0] ?? "", /cannot write ~\/\.bashrc: your shells run it outside the sandbox/);
+    });
+
+    test("a word that only looks like the start of a path, such as Error, is not taken for a file", () => {
+        assert.deepEqual(explain("Error: something else entirely").lines, []);
+        assert.deepEqual(explain("Warning: Permission denied is a phrase").lines, []);
+    });
+
     test("a read-only line with no path gets one general line, and an ordinary permission error none", () => {
         assert.match(explain("Read-only file system").lines[0] ?? "", /a write was refused/);
         assert.deepEqual(explain("cat: /etc/shadow: Permission denied").lines, []);
@@ -167,6 +181,35 @@ describe("the rest of the system", () => {
 
     test("kernel pseudo-paths are not blamed on a rule", () => {
         assert.deepEqual(explain("bash: /proc/sys/kernel/x: Read-only file system").lines, []);
+    });
+});
+
+describe("an agent whose role may not write", () => {
+    const readOnly = rules(machine, { settings: { share: [], hide: [], lock: [], readOnly: true } });
+    const say = (output: string) => explainBlocks(output, readOnly, { cwd: CWD, mode: "open" });
+
+    test("a write to a relative path in the working folder is explained by the role's lock", () => {
+        const { lines, askFirst } = say("/usr/bin/bash: line 1: ./made.txt: Read-only file system");
+        assert.deepEqual(lines, [
+            "[sandbox] cannot write ~/work/orders/made.txt: this agent's role may not write. Report the change you would make instead of making it. /tmp is writable for scratch files.",
+        ]);
+        assert.deepEqual(askFirst, []);
+    });
+
+    test("so is a write by an absolute path, and one under a toolchain folder asks nobody", () => {
+        assert.match(
+            say(`tee: ${CWD}/src/a.ts: Read-only file system`).lines[0] ?? "",
+            /this agent's role may not write/,
+        );
+        const sdk = say(`mkdir: cannot create directory '${HOME}/.sdkman/candidates': Read-only file system`);
+        assert.match(sdk.lines[0] ?? "", /cannot write ~\/\.sdkman\/candidates: this agent's role may not write/);
+        assert.deepEqual(sdk.askFirst, []);
+    });
+
+    test("a refusal with no path does not say that the working folder is writable", () => {
+        const [line] = say("Read-only file system").lines;
+        assert.match(line ?? "", /this agent's role may not write\. Only \/tmp is writable/);
+        assert.doesNotMatch(line ?? "", /may write your home folder/);
     });
 });
 
