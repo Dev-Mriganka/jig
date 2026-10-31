@@ -1,7 +1,8 @@
 # jig-ops: build, deploy and run, on any CI and any platform
 
-**Status: `ci`, `deploy` and `runtime` are built.** Tested against fakes on this machine; not
-tried against a real CI system, cluster or address yet ([Not verified yet](docs/not-verified.md)).
+**Status: `ci`, `deploy` and `runtime` are built.** Tested against fakes, and in CI against a real
+Kubernetes cluster with Helm, real GitHub Actions runs and a real HTTPS address. GitLab and Jenkins were not
+tried against a real server ([Not verified yet](docs/not-verified.md)).
 
 `jig-ops` covers what happens after the code is written: did CI pass, can it go to a
 test environment, is it healthy, and what do the logs say. You describe each service
@@ -147,7 +148,8 @@ jig-ops/
   src/      index, catalog, values, watch (ops-rollout); runtime/ and deploy/ (kubernetes/, helm, kubectl-image);
             ci/ (the tool, the adapter interface, an adapter per system with its api and watch, request.ts, ops-ci)
   skills/   ops/ (roll out, check, read events and logs), ci/ (wait without polling, read why it failed)
-  test/     fake gh, kubectl and helm on a PATH, fake GitLab and Jenkins on 127.0.0.1, a fake jig-core
+  test/     fake gh, kubectl and helm on a PATH, fake GitLab and Jenkins on 127.0.0.1, a fake jig-core;
+            test/it/ against a kind cluster, Helm, GitHub and an HTTPS server (see the repository's docs/integration-tests.md)
 ```
 
 ## More detail

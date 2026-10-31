@@ -111,6 +111,31 @@ Each makes a database of its own and drops it at the end.
   then with `--replSet` and `--keyFile`, and use member addresses such as `127.0.0.1:27117`. The test that the members cannot be
   looked up skips, because `127.0.0.1` can.
 
+## jig-ops
+
+Three suites: `cluster.test.ts` (`deploy` and `runtime` against Kubernetes and Helm), `github.test.ts` (the `ci` tool's GitHub Actions
+adapter) and `health.test.ts` (health by address). The last needs only `openssl`.
+
+| Variable | What it holds |
+|---|---|
+| `JIG_IT_KUBE_CONTEXT` | The kubectl context of a cluster the test may create a namespace in |
+| `GH_TOKEN` | A token `gh` signs in with. Without it, `gh` uses its own login |
+| `JIG_IT_GITHUB_REPOSITORY` | `owner/name` of the repository whose workflow runs are read |
+| `JIG_IT_GITHUB_RUN_ID` | The id of one of its runs |
+| `JIG_IT_GITHUB_WORKFLOW` | Optional: the workflow file, `ci.yml` by default |
+
+- **The cluster** is made by `helm/kind-action` from a pinned kind release and node image, and Helm by `azure/setup-helm`. The workflow
+  names the context `kind-jigit`.
+- **The chart** is `plugins/jig-ops/test/it/chart`: an unprivileged nginx whose images are pinned by tag and digest. The test makes a
+  namespace of its own and deletes it at the end.
+- **The tests run in order,** each from what the one before left in the cluster: install, read, replace a pod, upgrade, roll back, be
+  refused after another deploy, break on purpose with a tag that does not exist, and recover.
+- **GitHub Actions** is read with the token the run gets. The job's `permissions` are `contents`, `actions`, `checks` and `statuses`, all
+  `read`, so nothing here can write. The run that reads is itself in progress, so it is the run the test looks at.
+- **Without Docker,** the `deploy` and `runtime` flows can be tried against a control plane made of `etcd`, `kube-apiserver`,
+  `kube-controller-manager` and `kube-scheduler` with a node object and a small program that marks scheduled pods ready. Pods then never
+  start, so `logs`, `exec` and the kubelet's events cannot be read there.
+
 ## Where to read a failure
 
 The job prints each service's version once it is up. When a step fails, the last step prints the logs of every container,

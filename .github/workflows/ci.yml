@@ -66,8 +66,12 @@ jobs:
   integration:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # Read only: the workflow runs and their checks are read for the jig-ops tests, and the run's own token is the only credential.
     permissions:
       contents: read
+      actions: read
+      checks: read
+      statuses: read
     env:
       # Every image has an exact version tag and its digest. To update one, change both together.
       ES_IMAGE: docker.elastic.co/elasticsearch/elasticsearch:8.19.23@sha256:4d0724bb8d78d7a2330693623e26ca4d621079d062ecc8a30b3e1fc180ec14c1
@@ -203,10 +207,33 @@ jobs:
           ssh-keyscan -v -p 2222 127.0.0.1 2>&1 | grep -i "remote software version" | head -1
           ssh -V
 
+      # A Kubernetes cluster in Docker, and Helm. The actions download kind and kubectl at the versions given here.
+      - name: Set up Helm
+        if: ${{ !cancelled() }}
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v3.22.1
+
+      - name: Create a kind cluster
+        if: ${{ !cancelled() }}
+        uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
+        with:
+          version: v0.33.0
+          kubectl_version: v1.36.4
+          node_image: kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed
+          cluster_name: jigit
+          wait: 120s
+
+      - name: Show the cluster
+        if: ${{ !cancelled() }}
+        run: |
+          kubectl --context kind-jigit get nodes -o wide
+          helm version --short
+
       - name: Integration tests
         if: ${{ !cancelled() }}
         env:
-          JIG_IT_REQUIRE: elasticsearch,opensearch,loki,mongodb,mongodb-ssh,mongodb-socks
+          JIG_IT_REQUIRE: elasticsearch,opensearch,loki,mongodb,mongodb-ssh,mongodb-socks,kubernetes,github-actions
           JIG_IT_ELASTICSEARCH_URL: https://127.0.0.1:9200
           NODE_EXTRA_CA_CERTS: ${{ runner.temp }}/es-ca.crt
           JIG_IT_OPENSEARCH_URL: http://127.0.0.1:9201
@@ -222,6 +249,11 @@ jobs:
           JIG_IT_SSH_PORT: "2222"
           JIG_IT_SSH_USER: jigit
           JIG_IT_SSH_KEY_FILE: ${{ runner.temp }}/jump_key
+          JIG_IT_KUBE_CONTEXT: kind-jigit
+          # The token Actions gives this run, which `gh` reads from GH_TOKEN. The permissions above make it read only.
+          GH_TOKEN: ${{ github.token }}
+          JIG_IT_GITHUB_REPOSITORY: ${{ github.repository }}
+          JIG_IT_GITHUB_RUN_ID: ${{ github.run_id }}
         run: npm run test:it
 
       # The logs of every container, so a service that failed can be read in the run.
@@ -229,6 +261,12 @@ jobs:
         if: ${{ failure() }}
         run: |
           docker ps -a
+          if command -v kubectl > /dev/null; then
+            echo "::group::kubectl get pods and events"
+            kubectl --context kind-jigit get pods --all-namespaces -o wide || true
+            kubectl --context kind-jigit get events --all-namespaces --sort-by=.lastTimestamp | tail -60 || true
+            echo "::endgroup::"
+          fi
           for name in $(docker ps -a --format '{{.Names}}'); do
             echo "::group::docker logs $name"
             docker logs --tail 300 "$name" 2>&1 || true
