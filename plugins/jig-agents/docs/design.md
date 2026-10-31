@@ -31,7 +31,8 @@ agent calls subagent {action: "start", role: "scout", task: "..."}
                 refused here when it cannot run (bash with no sandbox, a skill it lacks)
        worktree for a writer
        launch   Pi's own program with --mode rpc; stdin and stdout are pipes; JIG_ROLE_POLICY in its environment
-       verify   get_commands lists jig-core's commands, or the child is stopped
+       verify   get_commands lists the commands of jig-core, jig-agents and (if the parent has it) jig-sandbox,
+                or the child is stopped
        prompt   the task, the report format and the limits, as one prompt command
        watch    a jig-core watch of kind "subagent"; the tool returns at once
   <- tool result: the child's id, role, model and limits
@@ -76,7 +77,7 @@ builds the command line for every shipped role and fails if any of them can appe
   `PI_CODING_AGENT_DIR` (a `PI_*` name) and `HOME` reach it. Pi then loads the packages in
   the same `settings.json`, and Jig reads the same `jig.json`. A plugin the parent got
   another way, such as `-e` on its command line or a trusted project's `.pi/settings.json`,
-  is not in the child, and the check below refuses a child that lacks `jig-core` or, when
+  is not in the child, and the check below refuses a child that lacks `jig-core` or `jig-agents` or, when
   the parent has it, `jig-sandbox`.
 - **Which model.** The role's, from `agents.roles.<role>.model`; else the parent's own model
   and thinking level, passed explicitly so a model switched in the session carries over.
@@ -103,7 +104,10 @@ builds the command line for every shipped role and fails if any of them can appe
 ## Checking the child at start
 
 Before the task is sent, the plugin sends `get_commands` and `get_state` and checks:
-- the commands of `jig-core` are listed, and those of `jig-sandbox` when the parent has it;
+- the commands of `jig-core` and `jig-agents` are listed, and those of `jig-sandbox` when the parent has it.
+  `jig-core` is what governs the child; `jig-agents` is what registers the gate that enforces its role there
+  (`/agents` is its command), so a child without it would run unnarrowed. A plugin that failed to load is caught by the
+  `extension_error` check below, and this check does not rely on that;
 - the model is the one configured, or the parent's;
 - no `extension_error` arrived.
 

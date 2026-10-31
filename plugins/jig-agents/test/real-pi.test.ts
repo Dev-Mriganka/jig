@@ -401,7 +401,7 @@ describe("a real child run by the plugin, with the scripted model", { skip }, ()
         assert.equal(refused.isError, true);
         assert.match(
             refused.text,
-            /does not list the \/jig command, so it did not load the same plugins as this session/,
+            /does not list the \/jig, \/agents commands, so it did not load the same plugins as this session/,
         );
         assert.equal(w.rt.children.size, 0);
     });

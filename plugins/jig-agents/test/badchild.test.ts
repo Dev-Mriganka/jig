@@ -30,15 +30,27 @@ describe("a child that is not what was asked for is stopped before it gets its t
         assert.equal(refused.isError, true);
         assert.match(
             refused.text,
-            /does not list the \/jig command, so it did not load the same plugins as this session/,
+            /does not list the \/jig, \/agents commands, so it did not load the same plugins as this session/,
         );
         assert.equal(types(world).includes("prompt"), false, "the task was never sent");
         await until(() => !alive(world), "the child to end");
         assert.equal(world.rt.children.size, 0);
     });
 
+    test("one that did not load jig-agents is refused: its role gate would be missing, so it would run unnarrowed", {
+        timeout: 30_000,
+    }, async () => {
+        const world = await begin({ script: { commands: ["jig", "sandbox"] } });
+        const refused = await world.tool({ action: "start", role: "scout", task: "x" });
+        assert.equal(refused.isError, true);
+        assert.match(refused.text, /does not list the \/agents command, so it did not load the same plugins/);
+        assert.equal(types(world).includes("prompt"), false, "the task was never sent");
+        await until(() => !alive(world), "the child to end");
+        assert.equal(world.rt.children.size, 0);
+    });
+
     test("one that did not load jig-sandbox is refused when the parent has it", { timeout: 30_000 }, async () => {
-        const world = await begin({ commands: ["sandbox"], script: { commands: ["jig"] } });
+        const world = await begin({ commands: ["sandbox"], script: { commands: ["jig", "agents"] } });
         const refused = await world.tool({ action: "start", role: "scout", task: "x" });
         assert.match(refused.text, /does not list the \/sandbox command/);
         assert.equal(types(world).includes("prompt"), false);
@@ -48,16 +60,16 @@ describe("a child that is not what was asked for is stopped before it gets its t
         const world = await begin({
             commands: [],
             agentFiles: PLAIN,
-            script: { commands: ["jig"], steps: [{ hold: true }] },
+            script: { commands: ["jig", "agents"], steps: [{ hold: true }] },
         });
         const started = await world.tool({ action: "start", role: "plain", task: "x" });
         assert.equal(started.isError, false, started.text);
     });
 
-    test("one that loaded both is accepted", { timeout: 30_000 }, async () => {
+    test("one that loaded all three is accepted", { timeout: 30_000 }, async () => {
         const world = await begin({
             commands: ["sandbox"],
-            script: { commands: ["jig", "sandbox"], steps: [{ hold: true }] },
+            script: { commands: ["jig", "agents", "sandbox"], steps: [{ hold: true }] },
         });
         assert.equal((await world.tool({ action: "start", role: "scout", task: "x" })).isError, false);
     });

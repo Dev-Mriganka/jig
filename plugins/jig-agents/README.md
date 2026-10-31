@@ -204,7 +204,9 @@ there is no "no limit" setting.
 - **A role only narrows, and the child enforces it.** The parent passes the policy in the child's environment; the
   child reads it at start. A policy it cannot read makes the child refuse to work, and the start fail.
 - **Never fewer extensions.** The plugin never passes `--no-extensions` or `-e`, and stops a child that does
-  not list `jig-core`'s commands before it gets its task.
+  not list the commands of `jig-core` and `jig-agents` (and of `jig-sandbox`, when the parent has it) before it
+  gets its task. `jig-core` is what governs the child, and `jig-agents` is what enforces its role there: a child
+  without it would run unnarrowed.
 - **One writer per folder,** in a worktree other than the parent's.
 - **No orphans.** A child ends with its parent session, for any reason; one left by a parent that died is
   stopped at the next session start.

@@ -36,7 +36,7 @@ export interface ChildSpec {
     worktree?: string;
     generation: number;
     startedAt: string;
-    /** Commands the child must list before it gets a task: jig-core's, and jig-sandbox's when the parent has it. */
+    /** Commands the child must list before it gets a task: jig-core's and jig-agents', and jig-sandbox's when the parent has it. */
     requireCommands: readonly string[];
 }
 
