@@ -505,6 +505,13 @@ export interface JigApi {
     /** Declares how a tool's calls are classified. Declaring the same tool again replaces it. */
     declareTool(declaration: ToolDeclaration): void;
 
+    /** The tools plugins have declared, and the plugin that declared each. Lets a plugin follow the tools to the plugin they belong to,
+     *  such as a role that sees a plugin's skills only when it has one of the plugin's tools. A copy: changing it changes nothing.
+     *  Always present in `jig-core`; optional here only so that a test's stand-in for `jig-core` need not have it. */
+    readonly tools?: {
+        declared(): ReadonlyArray<{ readonly tool: string; readonly plugin: string }>;
+    };
+
     /** The preview the user approved for this call, or undefined when the call did not ask. */
     approvedPreview(toolCallId: string): Preview | undefined;
 
