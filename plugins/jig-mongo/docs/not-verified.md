@@ -14,7 +14,8 @@ against a server of your own when `JIG_TEST_MONGO_URI` is set.
 
 ## Verified in CI
 
-A three-member MongoDB 7.0 replica set with authentication, and an OpenSSH 10.3 server on the same Docker network. The members are
+A three-member MongoDB replica set with authentication (9.0 in one run, 8.0 in the other), and an OpenSSH 10.3 server on the same
+Docker network. The members are
 named `mongo1` to `mongo3`, which only that network can look up, so the routes are the only way to them.
 
 | What | Proved by |
@@ -39,15 +40,16 @@ named `mongo1` to `mongo3`, which only that network can look up, so the routes a
 
 Not tried:
 
-- **A server that is not that one.** MongoDB 8.x (CI runs 7.0, because the 8.x releases exit at start-up on Linux kernel 6.19 and later,
-  which the runner has; the same tests passed on 8.0.34 on this machine, whose kernel is older), a managed service (Atlas, DocumentDB and
-  the like), a sharded cluster, an older server, and TLS.
+- **A server that is not those.** MongoDB 7.0 and older (CI ran 7.0 until it could start 8.x and 9.x: the members run with
+  `GLIBC_TUNABLES=glibc.pthread.rseq=1`, which keeps `mongod` from refusing the runner's Linux kernel, see [MongoDB and the
+  kernel](../../../docs/integration-tests.md#mongodb-and-the-kernel)), the rapid releases (8.1 to 8.3), a managed service (Atlas,
+  DocumentDB and the like), a sharded cluster, and TLS.
 - **The shapes of `explain`** beyond a find with and without an index: an aggregation, the slot-based engine and a sort. The plan summary was
   written from the documented shapes.
 - **`$collStats` on a managed service,** and a view, which has no storage statistics.
 - **A `$lookup` without a pipeline in an allow list** on a server older than 5.0.
 - **Sharded time series.** `collections` shows a time series collection; nothing else was tried on one.
-- **The index check** beyond what CI proves (see the table above, on a MongoDB 7.0 replica set). It was also run, before the CI test, against one
+- **The index check** beyond what CI proves (see the table above, on MongoDB 9.0 and 8.0 replica sets). It was also run, before the CI test, against one
   MongoDB 8.0 node: a find, the pipeline that counts, an aggregation with a `$group` first, a `$unionWith`, and a `$lookup` that the planner
   reports as a `HashJoin` and one that it does not report at all.
   - Not tried: a sharded cluster (a plan per shard is read from the documented shape), a server older than 6.0, Atlas, DocumentDB

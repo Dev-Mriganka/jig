@@ -1,0 +1,20 @@
+# The previous line of the services whose major line changed, for the integration job's second matrix entry. It replaces only the
+# images of ../compose.yml: Compose merges the two when both are named (COMPOSE_FILE=../compose.yml:compose.yml). Dependabot
+# tracks this folder with its own entry that holds these back to their line (see docs/integration-tests.md).
+#
+# Elasticsearch 8 and OpenSearch 2 are what jig-logs claims along with 9 and 3, and MongoDB 8.0 is the line that most users run.
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.19.23@sha256:4d0724bb8d78d7a2330693623e26ca4d621079d062ecc8a30b3e1fc180ec14c1
+
+  opensearch:
+    image: opensearchproject/opensearch:2.19.7@sha256:3bfa1ec74d56928c2e018033d45c460ce2c0ea65a5cedd577de3102326c31b89
+
+  mongo1:
+    image: mongo:8.0.34@sha256:b9924c330a8bbc5800fe9c69f04a84e221eca7b28fd049a0354147d9908fa142
+
+  mongo2:
+    image: mongo:8.0.34@sha256:b9924c330a8bbc5800fe9c69f04a84e221eca7b28fd049a0354147d9908fa142
+
+  mongo3:
+    image: mongo:8.0.34@sha256:b9924c330a8bbc5800fe9c69f04a84e221eca7b28fd049a0354147d9908fa142

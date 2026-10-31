@@ -23,7 +23,7 @@ describeIt(
             "JIG_IT_MONGO_READONLY_USER",
             "JIG_IT_MONGO_PASSWORD",
         ],
-        hint: "a MongoDB 7 or 8 replica set with authentication on, and a user that writes and one that reads",
+        hint: "a MongoDB 8 or 9 replica set with authentication on, and a user that writes and one that reads",
     },
     () => {
         const db = `jigit_${randomBytes(4).toString("hex")}`;

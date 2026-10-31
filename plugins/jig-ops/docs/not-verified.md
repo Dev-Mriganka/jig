@@ -9,7 +9,7 @@ or Jenkins.
 
 ## Verified in CI
 
-A kind cluster (Kubernetes 1.36) with Helm 3.22, and the repository's own workflow runs on GitHub. The Kubernetes flows were also run on
+A kind cluster (Kubernetes 1.37) with Helm 4.3 in one run and Helm 3.22 in the other, and the repository's own workflow runs on GitHub. The Kubernetes flows were also run on
 this repository's machine against a real API server, controller manager and scheduler with Helm 3.19 and Helm 4.3.
 
 | What | Proved by |

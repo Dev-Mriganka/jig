@@ -4,6 +4,7 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 
 ## Contents
 
+- [2026-10-31: CI runs the latest and the previous line of every service, and MongoDB starts by a setting](#2026-10-31-ci-runs-the-latest-and-the-previous-line-of-every-service-and-mongodb-starts-by-a-setting)
 - [2026-10-31: big files are split by job, big plugins have a code map, and growth is a warning](#2026-10-31-big-files-are-split-by-job-big-plugins-have-a-code-map-and-growth-is-a-warning)
 - [2026-10-31: jig-workflow: test variables, tests outside the sandbox, and folders that add up](#2026-10-31-jig-workflow-test-variables-tests-outside-the-sandbox-and-folders-that-add-up)
 - [2026-10-31: small gaps the example company plugin and later builds found, closed](#2026-10-31-small-gaps-the-example-company-plugin-and-later-builds-found-closed)
@@ -42,6 +43,22 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 - [2026-10-30: jig-git's tools, and a watch that knows when it is done](#2026-10-30-jig-gits-tools-and-a-watch-that-knows-when-it-is-done)
 - [2026-10-30: built clean, beside the existing harness](#2026-10-30-built-clean-beside-the-existing-harness)
 - [Earlier decisions that still hold (2026-10-29)](#earlier-decisions-that-still-hold-2026-10-29)
+
+## 2026-10-31: CI runs the latest and the previous line of every service, and MongoDB starts by a setting
+
+- **Two lines, not one.** The `integration` job runs the latest services (Elasticsearch 9, OpenSearch 3, MongoDB 9.0, Helm 4, Node 26) and the
+  previous ones (Elasticsearch 8, OpenSearch 2, MongoDB 8.0, Helm 3, Node 24), because `jig-logs` claims both lines of each
+  backend and people run both. The runs pair the versions and do not cross them: a full cross is four runs of up to 45
+  minutes, for little more than the two pairs show. A failure that needs one combination is reproduced by hand.
+- **MongoDB starts by a setting, not by an old version.** The job ran MongoDB 7.0 because 8.x exits at start-up on GitHub's kernels
+  (6.19 to 7.0.x). Every member now sets `GLIBC_TUNABLES=glibc.pthread.rseq=1`, so TCMalloc uses per-thread caches and the start-up
+  check passes on every kernel. The upstream fix only lifts the check from kernel 7.0.14, and Ubuntu names its 7.0 kernels
+  `7.0.0-N`, so a newer image would not help. The set-up step asserts `tcmalloc.usingPerCPUCaches` is `false`, so an image that ignores
+  the setting fails with a reason.
+- **The images live in a compose file.** `.github/integration/compose.yml` and `previous/compose.yml` hold every image with its tag
+  and digest, so Dependabot's `docker-compose` support updates them. The previous folder has its own Dependabot entry that holds
+  its images to their line. The Kubernetes node image is a service that is never started, for the same reason.
+- **Actions stay pinned by commit SHA** with the version in a comment. Node moves with the LTS schedule: the current line and the one before.
 
 ## 2026-10-31: big files are split by job, big plugins have a code map, and growth is a warning
 
