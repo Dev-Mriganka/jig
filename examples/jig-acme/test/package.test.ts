@@ -46,6 +46,35 @@ describe("the package manifest", () => {
     });
 });
 
+describe("the README", () => {
+    const readme = readFileSync(path.join(root, "README.md"), "utf8");
+
+    test("names every part: each file under src/ and src/defaults/, and each skill", () => {
+        const files = [
+            ...readdirSync(path.join(root, "src")).filter((name) => name.endsWith(".ts")),
+            ...readdirSync(path.join(root, "src/defaults")).map((name) => `defaults/${name}`),
+        ].filter((name) => name !== "index.ts" && !name.startsWith("defaults/"));
+        for (const file of files)
+            assert.ok(readme.includes(`src/${file}`), `${file} is not in the README's table of parts`);
+        assert.ok(readme.includes("src/defaults/"), "the defaults folder");
+        for (const skill of readdirSync(path.join(root, "skills")))
+            assert.ok(readme.includes(`skills/${skill}`), skill);
+        assert.ok(readme.includes("src/index.ts"));
+    });
+
+    test("states the three bounds of the example: made up, uses the public contract only, and no credential in code", () => {
+        assert.match(readme, /Acme\s+Corp is made up/);
+        assert.match(readme, /Public contract only/);
+        assert.match(readme, /No credential in the code/);
+    });
+
+    test("describes each setting of the `acme` section that the code reads", () => {
+        for (const field of ["acme.sso.token", "acme.gateway.proxy", "acme.bastion.host", "acme.bastion.user"]) {
+            assert.ok(readme.includes(`\`${field}\``), field);
+        }
+    });
+});
+
 describe("the skills", () => {
     const skills = path.join(root, "skills");
     const names = readdirSync(skills);
