@@ -12,8 +12,10 @@ such as Elasticsearch, MongoDB and Kubernetes, so a fake that is wrong about the
 | Talks to | fakes on `127.0.0.1` | real services |
 | Runs in CI | the `checks` job | the `integration` job |
 
-- **In CI,** the `integration` job of `.github/workflows/ci.yml` starts the services as containers, a `kind` cluster for
-  `jig-ops`, and runs `npm run test:it` against them. It runs on every push to `main` and on every pull request.
+- **In CI,** the `integration` job of `.github/workflows/ci.yml` starts the services as containers from
+  [`.github/integration/compose.yml`](../.github/integration/compose.yml), a `kind` cluster for `jig-ops`, and runs
+  `npm run test:it` against them. It runs twice, on the latest line of the services and on the previous one (see
+  [The matrix](#the-matrix)), on every push to `main` and on every pull request.
 - **On your machine,** a suite runs when the environment variables that hold its service's address are set, and is
   skipped, naming them, when they are not. With nothing set, `npm run test:it` skips everything and passes.
 - **In CI, a missing service fails.** The workflow sets `JIG_IT_REQUIRE` to the services it starts, so a service that did
@@ -31,7 +33,7 @@ repository's workflow runs and public repositories.
 A suite uses `describeIt` from `test/support/it.ts`. It names the service and the variables that hold its address:
 
 ```ts
-describeIt("jig-logs against Elasticsearch", { service: "elasticsearch", variables: ["JIG_IT_ELASTICSEARCH_URL"], hint: "a throwaway Elasticsearch 8" }, () => {
+describeIt("jig-logs against Elasticsearch", { service: "elasticsearch", variables: ["JIG_IT_ELASTICSEARCH_URL"], hint: "a throwaway Elasticsearch 8 or 9" }, () => {
     // runs only when the variables are set; read them with must("JIG_IT_ELASTICSEARCH_URL")
 });
 ```
@@ -50,14 +52,73 @@ describeIt("jig-logs against Elasticsearch", { service: "elasticsearch", variabl
   cannot reach them without the tunnel skips anywhere else.
 - **An ssh key GitHub does not know.** `clone` over ssh to a repository a key can read was run once by hand; CI runs the refusal.
 
+## The matrix
+
+The `checks` job runs on the current Node LTS line and the previous one. The `integration` job has two entries, and each
+moves several versions together, so the lines that users run side by side are all tried without a run for every combination.
+
+| | Latest line | Previous line |
+|---|---|---|
+| Node | 26 (LTS since 2026-10-28) | 24 |
+| Elasticsearch | 9.5.5 | 8.19.23 |
+| OpenSearch | 3.9.0 | 2.19.7 |
+| MongoDB | 9.0.4 | 8.0.34 |
+| Helm | 4.3.1 | 3.22.1 |
+
+- **The same on both:** Grafana Loki 3.7.9, go-httpbin 2.26.0, Keycloak 26.8.1, OpenSSH 10.3 (the jump host), kind v0.33.0 with
+  Kubernetes 1.37.0 nodes and kubectl 1.37.2, and Pi 1.4.0. Loki, Keycloak and the rest have no older line that the plugins claim.
+- **Pi is installed at an exact version,** the latest one, because the type check and the `jig-agents` tests read its own packages.
+  When Pi releases, change the version in `ci.yml` and `AGENTS.md` together.
+- **The `checks` job** runs both Node lines, and prints `node --version` first. Node 22.19, the lowest that `package.json` allows,
+  is not run in CI.
+- **Not crossed.** Node is not crossed with the services: Node differences show in the unit tests of the `checks` job, and the
+  services differ from each other whatever the Node line. A failure that needs one combination is reproduced by hand.
+
+## MongoDB and the kernel
+
+MongoDB 8.x and 9.x run on every member with `GLIBC_TUNABLES=glibc.pthread.rseq=1`. Without it the server may exit at start-up
+on GitHub's runners.
+
+- **The cause.** `mongod` stops with "Linux kernel versions 6.19 and newer has a known incompatibility" when TCMalloc runs on per-CPU caches
+  and the kernel is 6.19 through 7.0.13 (`validateRseqKernelCompat`). The official image turns those caches on with
+  `GLIBC_TUNABLES=glibc.pthread.rseq=0`.
+- **The setting.** `glibc.pthread.rseq=1` in the service's environment makes TCMalloc use per-thread caches, which the start-up
+  check accepts on every kernel. It is set on `mongo1` to `mongo3` in `compose.yml`.
+- **Why not a newer image.** The upstream fix (SERVER-125742, in 8.0.30, 8.3.9, 9.0 and later) only lifts the check on kernels
+  7.0.14 and later. Ubuntu reports every 7.0 kernel as `7.0.0-N`, so an Ubuntu runner never passes it, and the setting is what works. The
+  analysis is in [swarmcli-charts#311](https://github.com/Eldara-Tech/swarmcli-charts/pull/311).
+- **It is asserted.** The set-up step reads `db.serverStatus().tcmalloc.usingPerCPUCaches` from each member and fails unless it
+  is `false`, so an image that ignores the setting fails the job with that reason and not by a start-up crash.
+- **The cost** is TCMalloc without per-CPU caches, which is slower for the allocator and does not matter for tests.
+
+Before this setting the job ran MongoDB 7.0, the one line that starts on every kernel.
+
 ## Pinned versions
 
-Every image in the workflow has an exact version tag and its digest, and every action a commit SHA with its version in a
-comment. To update one, change the tag and the digest together, then read the run.
+Every image has an exact version tag and its digest, and every action a commit SHA with its version in a comment. To update
+one, change the tag and the digest together, then read the run.
+
+- **The images are in `.github/integration/`.** `compose.yml` holds the latest line and `previous/compose.yml` replaces only the images
+  that have a previous line. The Kubernetes node image is a `kind-node` service that is never started, so that Dependabot's
+  `docker-compose` support tracks it too; the workflow reads its `image:` and hands it to `kind`.
+- **Dependabot has two entries for them.** One for `.github/integration`, and one for `.github/integration/previous` that ignores
+  new majors (and, for MongoDB, new minors) so that the previous line stays the previous line.
+- **Not tracked by Dependabot:** the versions given to actions as inputs, which are Helm, kind and kubectl in `ci.yml`, and the
+  Pi version. Read them when you update an image.
+- **Actions** are tracked by Dependabot's `github-actions` entry, and kept at the latest release.
 
 ## Running one on your machine
 
-Start the service, set the variables that its section below lists, and run the file:
+Start the service, set the variables that its section below lists, and run the file. To start all of them as CI does, with Docker:
+
+```bash
+eval "$(.github/integration/prepare.sh /tmp/jigit shell)"
+export JIG_IT_ELASTICSEARCH_PASSWORD=throwaway JIG_IT_MONGO_PASSWORD=throwaway
+docker compose -f .github/integration/compose.yml up -d elasticsearch opensearch loki loki-limited
+```
+
+Add `-f .github/integration/previous/compose.yml` after the first file for the previous line, and see the workflow for the replica
+set's set-up. Or start one service and run its file:
 
 ```bash
 JIG_IT_LOKI_URL=http://127.0.0.1:3100 JIG_IT_LOKI_LIMITED_URL=http://127.0.0.1:3101 \
@@ -73,10 +134,10 @@ expectations hold for every backend, and they seed their own data (`test/support
 
 | Variable | What it holds |
 |---|---|
-| `JIG_IT_ELASTICSEARCH_URL` | `https://127.0.0.1:9200`: Elasticsearch 8 with security on |
+| `JIG_IT_ELASTICSEARCH_URL` | `https://127.0.0.1:9200`: Elasticsearch 8 or 9 with security on |
 | `JIG_IT_ELASTICSEARCH_PASSWORD` | The password of its `elastic` user, which the tests use to make their own users |
 | `NODE_EXTRA_CA_CERTS` | The node's certificate authority file, `config/certs/http_ca.crt` in the container |
-| `JIG_IT_OPENSEARCH_URL` | `http://127.0.0.1:9201`: OpenSearch 2 with its security plugin off |
+| `JIG_IT_OPENSEARCH_URL` | `http://127.0.0.1:9201`: OpenSearch 2 or 3 with its security plugin off |
 | `JIG_IT_LOKI_URL` | `http://127.0.0.1:3100`: Loki 3 with tenants on |
 | `JIG_IT_LOKI_LIMITED_URL` | `http://127.0.0.1:3101`: a second Loki with tight limits |
 
@@ -109,8 +170,8 @@ allowed. `requireIndex: false` is set on one extra connection only, to show that
 | `JIG_IT_SSH_KEY_FILE` | The private key of that user, an unencrypted file |
 | `JIG_IT_MONGO_MEMBERS_HIDDEN` | Set it when this machine cannot look up the members; the check for that then must not skip |
 
-- **The replica set** is MongoDB 7.0, because the 8.x releases refuse to start on Linux kernel 6.19 and later, as the runner's is
-  (SERVER-125742). It has three members with a key file and authentication, named `mongo1` to `mongo3` on a Docker network. The
+- **The replica set** is MongoDB 9.0, or 8.0 in the previous line, with the start-up setting that
+  [MongoDB and the kernel](#mongodb-and-the-kernel) explains. It has three members with a key file and authentication, named `mongo1` to `mongo3` on a Docker network. The
   official image makes the root user when it starts, the workflow starts the set, and `agent` and `agent-readonly` are made with
   `readWriteAnyDatabase`, `dbAdminAnyDatabase` and `clusterMonitor`, and with `readAnyDatabase`.
 - **The jump host** is an OpenSSH server in a container on that network, with TCP forwarding switched on and the workflow's
@@ -143,8 +204,8 @@ adapter) and `health.test.ts` (health by address). The last needs only `openssl`
 | `JIG_IT_GITHUB_RUN_ID` | The id of one of its runs |
 | `JIG_IT_GITHUB_WORKFLOW` | Optional: the workflow file, `ci.yml` by default |
 
-- **The cluster** is made by `helm/kind-action` from a pinned kind release and node image, and Helm by `azure/setup-helm`. The workflow
-  names the context `kind-jigit`.
+- **The cluster** is made by `helm/kind-action` from a pinned kind release and the node image of `compose.yml`, and Helm (4 in the latest
+  line, 3 in the previous) by `azure/setup-helm`. The workflow names the context `kind-jigit`.
 - **The chart** is `plugins/jig-ops/test/it/chart`: an unprivileged nginx whose images are pinned by tag and digest. The test makes a
   namespace of its own and deletes it at the end.
 - **The tests run in order,** each from what the one before left in the cluster: install, read, replace a pod, upgrade, roll back, be
@@ -187,5 +248,5 @@ API address pointed at httpbin's `/anything`, which echoes the request, and runs
 
 ## Where to read a failure
 
-The job prints each service's version once it is up. When a step fails, the last step prints the logs of every container,
-each in its own group. A failed test names the backend, and its message shows the text the tool returned.
+The job prints the versions of Node, Docker and Compose and the image of every service before it starts them, and each service's
+version once it is up. When a step fails, the last step prints the logs of every container, each in its own group. A failed test names the backend, and its message shows the text the tool returned.

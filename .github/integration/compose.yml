@@ -1,0 +1,149 @@
+# The services of the integration job (docs/integration-tests.md), at their latest stable versions.
+#
+# Every image has an exact version tag and its digest. To update one, change the tag and the digest together. Dependabot
+# tracks the `image:` lines of this folder (its `docker-compose` entry), so its pull requests keep them current. The same
+# services at the previous line (Elasticsearch 8, OpenSearch 2, MongoDB 8.0) are in previous/compose.yml, which
+# replaces only the images.
+#
+# Start it with `.github/integration/prepare.sh <folder>` first: it makes the key file, the SSH key and the settings these
+# services mount, and prints the variables to export (JIG_IT_TEMP, JIG_IT_SSH_PUBLIC_KEY). The passwords are
+# throwaway values that the workflow sets (JIG_IT_ELASTICSEARCH_PASSWORD, JIG_IT_MONGO_PASSWORD). None is a secret.
+name: jigit
+
+# MongoDB's three members share everything but their name. The image is repeated on each one, because Dependabot reads the
+# `image:` of each service and not an anchor.
+x-mongo: &mongo
+  environment:
+    MONGO_INITDB_ROOT_USERNAME: root
+    MONGO_INITDB_ROOT_PASSWORD: ${JIG_IT_MONGO_PASSWORD:?set JIG_IT_MONGO_PASSWORD}
+    # Why mongod needs this: it refuses to start on Linux 6.19 through 7.0.13 (GitHub's runners are on 7.0) when TCMalloc
+    # runs on per-CPU caches, which the image turns on with glibc.pthread.rseq=0. Setting 1 makes TCMalloc use per-thread caches,
+    # which the check accepts on every kernel. Newer releases only lift the check on 7.0.14 and later, and Ubuntu names every
+    # 7.0 kernel 7.0.0-N, so the setting is what works. The workflow asserts that the per-CPU caches are off.
+    # https://github.com/Eldara-Tech/swarmcli-charts/pull/311 and SERVER-125742.
+    GLIBC_TUNABLES: glibc.pthread.rseq=1
+  volumes:
+    - ${JIG_IT_TEMP:?set JIG_IT_TEMP}/mongo-keyfile:/keyfile.src:ro
+  # The image makes the root user, then starts mongod with the key file, which it copies where mongod may read it.
+  entrypoint:
+    - bash
+    - -c
+    - install -m 400 -o mongodb -g mongodb /keyfile.src /data/keyfile && exec docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --keyFile /data/keyfile
+
+services:
+  # Security on: HTTPS with a certificate authority of its own, and a password for `elastic`.
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.5.5@sha256:13b4a40bb095774f5fda635e45fd5677cc6a26565e42b24997b0c72b88e75984
+    container_name: jigit-elasticsearch
+    ports:
+      - 127.0.0.1:9200:9200
+    environment:
+      discovery.type: single-node
+      xpack.ml.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+      ELASTIC_PASSWORD: ${JIG_IT_ELASTICSEARCH_PASSWORD:?set JIG_IT_ELASTICSEARCH_PASSWORD}
+
+  # Security plugin off, so it speaks plain HTTP.
+  opensearch:
+    image: opensearchproject/opensearch:3.9.0@sha256:3b55f6b6249cfdb92b52ee59adc8a266203ba9ef9f5d82544fad6f1af2f3609e
+    container_name: jigit-opensearch
+    ports:
+      - 127.0.0.1:9201:9200
+    environment:
+      discovery.type: single-node
+      DISABLE_SECURITY_PLUGIN: "true"
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+
+  # Two Loki nodes with tenants on: one with the defaults, and one with tight limits, to show the errors Loki words for them.
+  # Loki is told to keep past samples where it can query them, and not to report usage.
+  loki:
+    image: grafana/loki:3.7.9@sha256:0db216b630ae1f348a1584c67f3cead8b4c1fc839169a39501db664744158e28
+    container_name: jigit-loki
+    ports:
+      - 127.0.0.1:3100:3100
+    command:
+      - -config.file=/etc/loki/local-config.yaml
+      - -auth.enabled=true
+      - -reporting.enabled=false
+      - -ingester.query-store-max-look-back-period=168h
+      - -querier.query-ingesters-within=200h
+
+  loki-limited:
+    image: grafana/loki:3.7.9@sha256:0db216b630ae1f348a1584c67f3cead8b4c1fc839169a39501db664744158e28
+    container_name: jigit-loki-limited
+    ports:
+      - 127.0.0.1:3101:3100
+    command:
+      - -config.file=/etc/loki/local-config.yaml
+      - -auth.enabled=true
+      - -reporting.enabled=false
+      - -ingester.query-store-max-look-back-period=168h
+      - -querier.query-ingesters-within=200h
+      - -store.max-query-length=20m
+      - -validation.max-entries-limit=150
+
+  # A three-member replica set with authentication. The members are named mongo1, mongo2 and mongo3, and only containers on this
+  # Compose network can look those names up: the test runs on the host, so the SSH route and the SOCKS tunnel are the only way
+  # to them. mongo1 is also published on 127.0.0.1:27017 for the direct test.
+  mongo1:
+    <<: *mongo
+    image: mongo:9.0.4@sha256:452bdaf2127b8ff851e31410a267809b9829eded219979f2210e7c7efb85a058
+    container_name: mongo1
+    ports:
+      - 127.0.0.1:27017:27017
+
+  mongo2:
+    <<: *mongo
+    image: mongo:9.0.4@sha256:452bdaf2127b8ff851e31410a267809b9829eded219979f2210e7c7efb85a058
+    container_name: mongo2
+
+  mongo3:
+    <<: *mongo
+    image: mongo:9.0.4@sha256:452bdaf2127b8ff851e31410a267809b9829eded219979f2210e7c7efb85a058
+    container_name: mongo3
+
+  # An OpenSSH server with TCP forwarding switched on, and the throwaway key as the only one that signs in. It is how the tests
+  # reach mongo1 to mongo3 by name. Its settings come from sshd_config.d, which prepare.sh copies to JIG_IT_TEMP: the image
+  # reads that folder before the rest of its configuration.
+  jump:
+    image: linuxserver/openssh-server:10.3_p1-r1-ls240@sha256:b07414bb329b86a00525c9256711a7855fc3a369e9f62c36f1de8d1923197580
+    container_name: jump
+    ports:
+      - 127.0.0.1:2222:2222
+    environment:
+      USER_NAME: jigit
+      PUBLIC_KEY: ${JIG_IT_SSH_PUBLIC_KEY:?set JIG_IT_SSH_PUBLIC_KEY}
+      LOG_STDOUT: "true"
+    volumes:
+      - ${JIG_IT_TEMP:?set JIG_IT_TEMP}/sshd_config.d:/config/sshd/sshd_config.d
+
+  # go-httpbin answers every request with what it received, and takes bodies up to 8 MiB.
+  httpbin:
+    image: mccutchen/go-httpbin:2.26.0@sha256:873b4fdb27fe7cc66fa12cb9362574e1b0bf31df7ca8a71b2502988327a0b8a4
+    container_name: jigit-httpbin
+    ports:
+      - 127.0.0.1:8081:8080
+    environment:
+      MAX_BODY_SIZE: "8388608"
+
+  # Keycloak in dev mode imports the realm of the jig-api tests, whose client secret and user password are throwaway values in that file.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.1@sha256:a78d6b79572168cb25886b80a8b5b8d4ed4390743e3eecb810538683e209dd6b
+    container_name: jigit-keycloak
+    ports:
+      - 127.0.0.1:8180:8080
+    command: [start-dev, --import-realm]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: throwaway-keycloak-admin
+    volumes:
+      - ../../plugins/jig-api/test/it/keycloak:/opt/keycloak/data/import:ro
+
+  # Never started. It is here so that Dependabot tracks the Kubernetes node image, which the workflow hands to `kind`
+  # (read with `docker compose --profile tools config`).
+  kind-node:
+    image: kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
+    profiles:
+      - tools
+    command: ["true"]

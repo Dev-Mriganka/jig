@@ -1,4 +1,4 @@
-// jig-logs against OpenSearch 2, which has the same search API as Elasticsearch. The node runs with its security plugin
+// jig-logs against OpenSearch (2 or 3), which has the same search API as Elasticsearch. The node runs with its security plugin
 // off, so it speaks plain HTTP and has no sign-in, and requests travel through a transport (see loki.test.ts).
 import { before } from "node:test";
 import { describeIt, must } from "../../../../test/support/it.ts";
@@ -10,11 +10,11 @@ import { commonTests, elasticTests } from "./suite.ts";
 import type { Flavor } from "./suite.ts";
 
 describeIt(
-    "jig-logs against OpenSearch 2",
+    "jig-logs against OpenSearch",
     {
         service: "opensearch",
         variables: ["JIG_IT_OPENSEARCH_URL"],
-        hint: "a single-node OpenSearch 2 with its security plugin disabled",
+        hint: "a single-node OpenSearch 2 or 3 with its security plugin disabled",
     },
     () => {
         const run = runName();

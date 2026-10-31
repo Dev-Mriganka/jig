@@ -10,8 +10,10 @@ tests](../../../docs/integration-tests.md)); what they prove is listed first.
 
 ## Verified in CI
 
-Elasticsearch 8.19, OpenSearch 2.19 and Loki 3.7, each as a container with its version
-printed in the log. `test/it/suite.ts` holds the tests every backend must pass.
+Elasticsearch 9.5 and 8.19, OpenSearch 3.9 and 2.19, and Loki 3.7, each as a container with its
+version printed in the log. The suites run once on each line: Elasticsearch 9 and OpenSearch 3 in the
+latest run, Elasticsearch 8 and OpenSearch 2 in the previous one (see [Integration
+tests](../../../docs/integration-tests.md#the-matrix)). `test/it/suite.ts` holds the tests every backend must pass.
 
 | What | Proved by |
 |---|---|
@@ -58,8 +60,8 @@ printed in the log. `test/it/suite.ts` holds the tests every backend must pass.
 
 ## Elasticsearch and OpenSearch
 
-- **Managed services and other versions.** Elasticsearch 8.19 and OpenSearch 2.19 were
-  run. Amazon OpenSearch Service, Elastic Cloud, Elasticsearch 7 and OpenSearch 1 were
+- **Managed services and other versions.** Elasticsearch 9.5 and 8.19, and OpenSearch 3.9 and 2.19, were
+  run in CI. Amazon OpenSearch Service, Elastic Cloud, Elasticsearch 7 and OpenSearch 1 were
   not, nor were requests signed with AWS credentials.
 - **A reply that reports a timeout or lost shards.** The reply shapes come from the
   search API; a single node never times out or loses a shard, so the halving for them

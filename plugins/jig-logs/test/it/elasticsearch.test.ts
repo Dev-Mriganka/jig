@@ -1,4 +1,4 @@
-// jig-logs against Elasticsearch 8 with security on: the node is reached over HTTPS with a certificate authority of its own
+// jig-logs against Elasticsearch (8 or 9) with security on: the node is reached over HTTPS with a certificate authority of its own
 // (the run sets NODE_EXTRA_CA_CERTS) and the tool signs in with a basic-auth user. The user is made for the run, with a role
 // that reads only this run's indexes, and a second user shows what a denied sign-in looks like.
 import assert from "node:assert/strict";
@@ -12,11 +12,11 @@ import { commonTests, elasticTests, textOf, throwawayPassword } from "./suite.ts
 import type { Flavor } from "./suite.ts";
 
 describeIt(
-    "jig-logs against Elasticsearch 8",
+    "jig-logs against Elasticsearch",
     {
         service: "elasticsearch",
         variables: ["JIG_IT_ELASTICSEARCH_URL", "JIG_IT_ELASTICSEARCH_PASSWORD"],
-        hint: "a single-node Elasticsearch 8 with security on, and its elastic password",
+        hint: "a single-node Elasticsearch 8 or 9 with security on, and its elastic password",
     },
     () => {
         const run = runName();

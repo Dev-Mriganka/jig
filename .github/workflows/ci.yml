@@ -10,9 +10,16 @@ permissions:
 
 jobs:
   checks:
+    name: Checks (Node ${{ matrix.node }})
     # Pinned: jig-sandbox's tests run the real sandbox, which depends on the kernel and AppArmor settings of the image.
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    strategy:
+      # Both runs finish, so a failure that is only on one Node line is seen next to the pass on the other.
+      fail-fast: false
+      matrix:
+        # The current LTS line (26, since 2026-10-28) and the previous one (24). package.json says >=22.19.0.
+        node: [26, 24]
     steps:
       - name: Check out the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -22,18 +29,26 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version: ${{ matrix.node }}
           cache: npm
           cache-dependency-path: |
             package-lock.json
             plugins/jig-review/web/package-lock.json
 
+      - name: Show the versions
+        run: |
+          node --version
+          npm --version
+
       - name: Install dependencies
         run: npm ci
 
-      # The type check reads Pi's own types, so CI installs the Pi version Jig is built against.
+      # The type check reads Pi's own types, so CI installs the Pi version Jig is built against: exactly this one, which is
+      # the latest. When Pi has a new release, change it here and in AGENTS.md together, after the checks pass on it.
       - name: Install Pi
-        run: npm install -g @earendil-works/pi-coding-agent@1.4.0
+        run: |
+          npm install -g @earendil-works/pi-coding-agent@1.4.0
+          npm ls -g --depth=0 @earendil-works/pi-coding-agent
 
       # Tests that make commits need an author.
       - name: Set a git identity
@@ -68,13 +83,30 @@ jobs:
       - name: Review page build is current
         run: npm run check:dist
 
-  # The plugins against real services (docs/integration-tests.md). The services start as containers, and each suite
-  # finds its service by the address in an environment variable. JIG_IT_REQUIRE lists the services this job starts: a
-  # suite whose service did not come up fails, and does not skip. The passwords below are throwaway values for
-  # containers that live as long as this job, and none is a secret.
+  # The plugins against real services (docs/integration-tests.md). The services start as containers from
+  # .github/integration/compose.yml, and each suite finds its service by the address in an environment variable.
+  # JIG_IT_REQUIRE lists the services this job starts: a suite whose service did not come up fails, and does not skip.
+  # The passwords below are throwaway values for containers that live as long as this job, and none is a secret.
+  #
+  # Two runs, the latest line and the previous one. The previous line moves Node back one LTS, the services to the
+  # previous major (Elasticsearch 8, OpenSearch 2, MongoDB 8.0, from previous/compose.yml) and Helm to 3, so the
+  # versions that users run side by side are all tried, without a run for every combination.
   integration:
+    name: Integration (${{ matrix.name }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: latest services, Node 26, Helm 4
+            node: 26
+            helm: v4.3.1
+            compose_files: .github/integration/compose.yml
+          - name: previous services, Node 24, Helm 3
+            node: 24
+            helm: v3.22.1
+            compose_files: .github/integration/compose.yml:.github/integration/previous/compose.yml
     # Read only: the workflow runs and their checks are read for the jig-ops tests, and the run's own token is the only credential.
     permissions:
       contents: read
@@ -82,16 +114,7 @@ jobs:
       checks: read
       statuses: read
     env:
-      # Every image has an exact version tag and its digest. To update one, change both together.
-      ES_IMAGE: docker.elastic.co/elasticsearch/elasticsearch:8.19.23@sha256:4d0724bb8d78d7a2330693623e26ca4d621079d062ecc8a30b3e1fc180ec14c1
-      OPENSEARCH_IMAGE: opensearchproject/opensearch:2.19.7@sha256:3bfa1ec74d56928c2e018033d45c460ce2c0ea65a5cedd577de3102326c31b89
-      LOKI_IMAGE: grafana/loki:3.7.9@sha256:0db216b630ae1f348a1584c67f3cead8b4c1fc839169a39501db664744158e28
-      # MongoDB 7.0: the 8.x releases exit at start-up on the runner's Linux kernel (6.19 and later), and only 7.0 starts on every
-      # kernel (https://jira.mongodb.org/browse/SERVER-125742 has the table of versions and kernels).
-      MONGO_IMAGE: mongo:7.0.45@sha256:8bb4442761a63a8dda452744082cdac9644b429807eb977b42324a63cef59ca4
-      HTTPBIN_IMAGE: mccutchen/go-httpbin:2.26.0@sha256:873b4fdb27fe7cc66fa12cb9362574e1b0bf31df7ca8a71b2502988327a0b8a4
-      KEYCLOAK_IMAGE: quay.io/keycloak/keycloak:26.8.1@sha256:a78d6b79572168cb25886b80a8b5b8d4ed4390743e3eecb810538683e209dd6b
-      SSH_IMAGE: linuxserver/openssh-server:10.3_p1-r1-ls240@sha256:b07414bb329b86a00525c9256711a7855fc3a369e9f62c36f1de8d1923197580
+      COMPOSE_FILE: ${{ matrix.compose_files }}
       JIG_IT_ELASTICSEARCH_PASSWORD: throwaway-elastic-password
       JIG_IT_MONGO_PASSWORD: throwaway-mongo-password
     steps:
@@ -103,85 +126,75 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version: ${{ matrix.node }}
           cache: npm
 
       - name: Install dependencies
         run: npm ci
 
-      # The tests resolve Pi's own packages from the installed Pi, as `checks` does.
+      # The tests resolve Pi's own packages from the installed Pi, as `checks` does. Exactly this version, the latest.
       - name: Install Pi
-        run: npm install -g @earendil-works/pi-coding-agent@1.4.0
+        run: |
+          npm install -g @earendil-works/pi-coding-agent@1.4.0
+          npm ls -g --depth=0 @earendil-works/pi-coding-agent
 
       - name: Set a git identity
         run: |
           git config --global user.name ci
           git config --global user.email ci@example.com
 
+      # The key file of the replica set, the jump host's SSH key and its settings go to a folder of this run. The script prints
+      # JIG_IT_TEMP and JIG_IT_SSH_PUBLIC_KEY, which compose.yml reads, and the next steps get them from $GITHUB_ENV.
+      - name: Prepare the services' files
+        run: .github/integration/prepare.sh "$RUNNER_TEMP/jigit" >> "$GITHUB_ENV"
+
+      # The versions of the tools, and the images this run will start, each pinned by tag and digest.
+      - name: Show the versions
+        run: |
+          node --version
+          npm --version
+          docker --version
+          docker compose version
+          echo "Compose files: $COMPOSE_FILE"
+          docker compose config --images | sort
+          echo "Kubernetes node image: $(docker compose --profile tools config --format json | jq -r '.services["kind-node"].image')"
+
+      - name: Pull the images
+        run: docker compose pull --quiet
+
       # Elasticsearch with security on (HTTPS with a certificate authority of its own, and a password for `elastic`),
       # OpenSearch with its security plugin off, and two Loki nodes with tenants on: one with the defaults, and one with
-      # tight limits, to show the errors Loki words for them. Loki is told to keep past samples where it can query them,
-      # and not to report usage. The services are started together and waited for in the next step.
+      # tight limits, to show the errors Loki words for them. The services are started together and waited for in the next step.
       - name: Start Elasticsearch, OpenSearch and Loki
         if: ${{ !cancelled() }}
-        run: |
-          docker run -d --name jigit-elasticsearch -p 127.0.0.1:9200:9200 \
-            -e discovery.type=single-node -e xpack.ml.enabled=false -e ES_JAVA_OPTS="-Xms512m -Xmx512m" \
-            -e ELASTIC_PASSWORD="$JIG_IT_ELASTICSEARCH_PASSWORD" "$ES_IMAGE"
-          docker run -d --name jigit-opensearch -p 127.0.0.1:9201:9200 \
-            -e discovery.type=single-node -e DISABLE_SECURITY_PLUGIN=true -e DISABLE_INSTALL_DEMO_CONFIG=true \
-            -e OPENSEARCH_JAVA_OPTS="-Xms512m -Xmx512m" "$OPENSEARCH_IMAGE"
-          loki_flags="-config.file=/etc/loki/local-config.yaml -auth.enabled=true -reporting.enabled=false
-            -ingester.query-store-max-look-back-period=168h -querier.query-ingesters-within=200h"
-          docker run -d --name jigit-loki -p 127.0.0.1:3100:3100 "$LOKI_IMAGE" $loki_flags
-          docker run -d --name jigit-loki-limited -p 127.0.0.1:3101:3100 "$LOKI_IMAGE" $loki_flags \
-            -store.max-query-length=20m -validation.max-entries-limit=150
+        run: docker compose up -d elasticsearch opensearch loki loki-limited
 
       - name: Wait for Elasticsearch, OpenSearch and Loki
         if: ${{ !cancelled() }}
         run: |
           retry="--retry 90 --retry-delay 2 --retry-connrefused --retry-all-errors"
+          ca="$JIG_IT_TEMP/es-ca.crt"
           # Elasticsearch makes its certificate authority when it starts: the tests trust this file.
           for _ in $(seq 1 90); do
-            docker cp jigit-elasticsearch:/usr/share/elasticsearch/config/certs/http_ca.crt "$RUNNER_TEMP/es-ca.crt" 2>/dev/null && break
+            docker cp jigit-elasticsearch:/usr/share/elasticsearch/config/certs/http_ca.crt "$ca" 2>/dev/null && break
             sleep 2
           done
-          curl -fsS $retry --cacert "$RUNNER_TEMP/es-ca.crt" -u "elastic:$JIG_IT_ELASTICSEARCH_PASSWORD" \
+          curl -fsS $retry --cacert "$ca" -u "elastic:$JIG_IT_ELASTICSEARCH_PASSWORD" \
             "https://127.0.0.1:9200/_cluster/health?wait_for_status=yellow&timeout=60s" > /dev/null
           curl -fsS $retry "http://127.0.0.1:9201/_cluster/health?wait_for_status=yellow&timeout=60s" > /dev/null
           curl -fsS $retry http://127.0.0.1:3100/ready
           curl -fsS $retry http://127.0.0.1:3101/ready
-          echo "Elasticsearch $(curl -fsS --cacert "$RUNNER_TEMP/es-ca.crt" -u "elastic:$JIG_IT_ELASTICSEARCH_PASSWORD" https://127.0.0.1:9200 | jq -r .version.number)"
+          echo "Elasticsearch $(curl -fsS --cacert "$ca" -u "elastic:$JIG_IT_ELASTICSEARCH_PASSWORD" https://127.0.0.1:9200 | jq -r .version.number)"
           echo "OpenSearch $(curl -fsS http://127.0.0.1:9201 | jq -r .version.number)"
           echo "Loki $(curl -fsS -H 'X-Scope-OrgID: jig-it' http://127.0.0.1:3100/loki/api/v1/status/buildinfo | jq -r .version)"
 
       # A three-member replica set with authentication, and an SSH server on the same Docker network. The members are named
       # mongo1, mongo2 and mongo3, and only containers on that network can look those names up: the test runs on the host, so the
       # SSH route and the SOCKS tunnel are the only way to them. mongo1 is also published on 127.0.0.1:27017 for the direct test.
-      # The image makes the root user and then starts mongod with the key file, which it copies where mongod may read it.
+      # Each member runs with GLIBC_TUNABLES=glibc.pthread.rseq=1 (see compose.yml); the next step asserts that it took effect.
       - name: Start MongoDB and the jump host
         if: ${{ !cancelled() }}
-        run: |
-          openssl rand -base64 756 > "$RUNNER_TEMP/mongo-keyfile"
-          ssh-keygen -q -t ed25519 -N "" -C jig-it -f "$RUNNER_TEMP/jump_key"
-          # The image reads this folder before the rest of its sshd configuration, and the first value of a setting wins.
-          # PerSourcePenalties: OpenSSH 9.8 and later drop every connection from an address that has failed to sign in a few times
-          # in a few seconds, and the tests fail to sign in on purpose (a key the server does not know, a user it does not have)
-          # from the one address they all come from, so the tests that follow would find the door shut.
-          mkdir -p "$RUNNER_TEMP/sshd_config.d"
-          printf '%s\n' 'AllowTcpForwarding yes' 'PerSourcePenalties no' 'MaxStartups 100:30:200' 'LogLevel VERBOSE' > "$RUNNER_TEMP/sshd_config.d/tests.conf"
-          docker network create jigit
-          for n in 1 2 3; do
-            publish=""
-            if [ "$n" = 1 ]; then publish="-p 127.0.0.1:27017:27017"; fi
-            docker run -d --name "mongo$n" --network jigit $publish \
-              -e MONGO_INITDB_ROOT_USERNAME=root -e MONGO_INITDB_ROOT_PASSWORD="$JIG_IT_MONGO_PASSWORD" \
-              -v "$RUNNER_TEMP/mongo-keyfile:/keyfile.src:ro" --entrypoint bash "$MONGO_IMAGE" \
-              -c 'install -m 400 -o mongodb -g mongodb /keyfile.src /data/keyfile && exec docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --keyFile /data/keyfile'
-          done
-          docker run -d --name jump --network jigit -p 127.0.0.1:2222:2222 \
-            -e USER_NAME=jigit -e PUBLIC_KEY="$(cat "$RUNNER_TEMP/jump_key.pub")" -e LOG_STDOUT=true \
-            -v "$RUNNER_TEMP/sshd_config.d:/config/sshd/sshd_config.d" "$SSH_IMAGE"
+        run: docker compose up -d mongo1 mongo2 mongo3 jump
 
       - name: Set up the replica set and wait for the jump host
         if: ${{ !cancelled() }}
@@ -219,6 +232,19 @@ jobs:
             wait_until "mongo$n to finish its set-up" initialised "mongo$n"
             wait_until "mongo$n to answer" answers "mongo$n"
           done
+          # GLIBC_TUNABLES=glibc.pthread.rseq=1 makes TCMalloc use per-thread caches. If a member reports anything but false, the
+          # setting did not take effect (an image that ignores it, or a changed variable), and mongod would stop on a kernel
+          # that the check refuses, so fail here and say why.
+          for n in 1 2 3; do
+            per_cpu=$(mongo "mongo$n" 'db.serverStatus().tcmalloc.usingPerCPUCaches')
+            echo "mongo$n: tcmalloc.usingPerCPUCaches = $per_cpu"
+            if [ "$per_cpu" != false ]; then
+              echo "::error::mongo$n runs TCMalloc with per-CPU caches (got '$per_cpu'): GLIBC_TUNABLES=glibc.pthread.rseq=1 did not take effect"
+              docker exec "mongo$n" printenv GLIBC_TUNABLES || true
+              mongo "mongo$n" 'JSON.stringify(db.serverStatus().tcmalloc)' | head -c 1500
+              exit 1
+            fi
+          done
           mongo mongo1 'rs.initiate({_id: "rs0", members: [
             {_id: 0, host: "mongo1:27017", priority: 10}, {_id: 1, host: "mongo2:27017"}, {_id: 2, host: "mongo3:27017"}]}).ok'
           wait_until "mongo1 to be the primary" is_primary
@@ -231,7 +257,7 @@ jobs:
           # The users are on every member, so a read from a secondary can sign in.
           for n in 1 2 3; do wait_until "the users to reach mongo$n" reads "mongo$n"; done
           mongo mongo1 'rs.status().members.map((m) => m.name + " " + m.stateStr).join(", ")'
-          mongo mongo1 'db.version()'
+          echo "MongoDB $(mongo mongo1 'db.version()')"
           wait_until "the jump host to answer" host_key
           # What sshd settled on, so that a drop-in that was not read shows here and not as a failure of the tests.
           docker exec jump /usr/sbin/sshd.pam -T -f /config/sshd/sshd_config -h /config/ssh_host_keys/ssh_host_ed25519_key 2>&1 \
@@ -244,31 +270,33 @@ jobs:
       - name: Start go-httpbin and Keycloak
         if: ${{ !cancelled() }}
         run: |
-          docker run -d --name jigit-httpbin -p 127.0.0.1:8081:8080 -e MAX_BODY_SIZE=8388608 "$HTTPBIN_IMAGE"
-          docker run -d --name jigit-keycloak -p 127.0.0.1:8180:8080 \
-            -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=throwaway-keycloak-admin \
-            -v "$GITHUB_WORKSPACE/plugins/jig-api/test/it/keycloak:/opt/keycloak/data/import:ro" \
-            "$KEYCLOAK_IMAGE" start-dev --import-realm
+          docker compose up -d httpbin keycloak
           retry="--retry 90 --retry-delay 2 --retry-connrefused --retry-all-errors"
           curl -fsS $retry http://127.0.0.1:8081/status/200 > /dev/null
-          echo "go-httpbin ${HTTPBIN_IMAGE%%@*}"
+          echo "go-httpbin $(docker inspect -f '{{.Config.Image}}' jigit-httpbin)"
           curl -fsS $retry http://127.0.0.1:8180/realms/jigit/.well-known/openid-configuration > /dev/null
           docker logs jigit-keycloak 2>&1 | grep -m1 "Keycloak .* on JVM" || true
 
-      # A Kubernetes cluster in Docker, and Helm. The actions download kind and kubectl at the versions given here.
+      # Compose holds the Kubernetes node image (a service that is never started), so that Dependabot can track it.
+      - name: Read the Kubernetes node image
+        id: images
+        if: ${{ !cancelled() }}
+        run: echo "kind_node=$(docker compose --profile tools config --format json | jq -r '.services["kind-node"].image')" >> "$GITHUB_OUTPUT"
+
+      # A Kubernetes cluster in Docker, and Helm. The actions download kind, kubectl and Helm at the versions given here.
       - name: Set up Helm
         if: ${{ !cancelled() }}
         uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
         with:
-          version: v3.22.1
+          version: ${{ matrix.helm }}
 
       - name: Create a kind cluster
         if: ${{ !cancelled() }}
         uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
         with:
           version: v0.33.0
-          kubectl_version: v1.36.4
-          node_image: kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed
+          kubectl_version: v1.37.2
+          node_image: ${{ steps.images.outputs.kind_node }}
           cluster_name: jigit
           wait: 120s
 
@@ -276,6 +304,8 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           kubectl --context kind-jigit get nodes -o wide
+          kubectl --context kind-jigit version
+          kind version
           helm version --short
 
       - name: Integration tests
@@ -283,7 +313,7 @@ jobs:
         env:
           JIG_IT_REQUIRE: elasticsearch,opensearch,loki,mongodb,mongodb-ssh,mongodb-socks,kubernetes,github-actions,github,github-gh,httpbin,keycloak
           JIG_IT_ELASTICSEARCH_URL: https://127.0.0.1:9200
-          NODE_EXTRA_CA_CERTS: ${{ runner.temp }}/es-ca.crt
+          NODE_EXTRA_CA_CERTS: ${{ runner.temp }}/jigit/es-ca.crt
           JIG_IT_OPENSEARCH_URL: http://127.0.0.1:9201
           JIG_IT_LOKI_URL: http://127.0.0.1:3100
           JIG_IT_LOKI_LIMITED_URL: http://127.0.0.1:3101
@@ -296,7 +326,7 @@ jobs:
           JIG_IT_SSH_HOST: 127.0.0.1
           JIG_IT_SSH_PORT: "2222"
           JIG_IT_SSH_USER: jigit
-          JIG_IT_SSH_KEY_FILE: ${{ runner.temp }}/jump_key
+          JIG_IT_SSH_KEY_FILE: ${{ runner.temp }}/jigit/jump_key
           JIG_IT_KUBE_CONTEXT: kind-jigit
           # The token Actions gives this run, which `gh` reads from GH_TOKEN. The permissions above make it read only.
           GH_TOKEN: ${{ github.token }}
