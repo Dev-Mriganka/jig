@@ -80,6 +80,37 @@ expectations hold for every backend, and they seed their own data (`test/support
   only for the last three hours and the tests search windows of days. The limited node adds `-store.max-query-length=20m
   -validation.max-entries-limit=150`.
 
+## jig-mongo
+
+Three suites: `mongo.test.ts` (direct), `ssh.test.ts` (the SSH route) and `tunnel.test.ts` (a SOCKS tunnel to the replica set).
+Each makes a database of its own and drops it at the end.
+
+| Variable | What it holds |
+|---|---|
+| `JIG_IT_MONGO_DIRECT_URI` | A member that the test host can reach, with `directConnection=true` |
+| `JIG_IT_MONGO_REPLICA_URI` | The replica set's own address, with member names that only the jump host can look up |
+| `JIG_IT_MONGO_SSH_URI` | One member as the jump host names it, for the SSH forward |
+| `JIG_IT_MONGO_USER`, `JIG_IT_MONGO_READONLY_USER` | A user that reads and writes, and one that only reads |
+| `JIG_IT_MONGO_PASSWORD` | The password of both |
+| `JIG_IT_SSH_HOST`, `JIG_IT_SSH_PORT`, `JIG_IT_SSH_USER` | The jump host |
+| `JIG_IT_SSH_KEY_FILE` | The private key of that user, an unencrypted file |
+| `JIG_IT_MONGO_MEMBERS_HIDDEN` | Set it when this machine cannot look up the members; the check for that then must not skip |
+
+- **The replica set** has three members with a key file and authentication, named `mongo1` to `mongo3` on a Docker network. The
+  official image makes the root user when it starts, the workflow starts the set, and `agent` and `agent-readonly` are made with
+  `readWriteAnyDatabase`, `dbAdminAnyDatabase` and `clusterMonitor`, and with `readAnyDatabase`.
+- **The jump host** is an OpenSSH server in a container on that network, with TCP forwarding switched on and the workflow's
+  throwaway key as the only one that signs in. It is how the tests reach `mongo1` to `mongo3` by name: the test host cannot look
+  them up, so a tunnel that does not work cannot pass.
+- **The SSH route** (`ssh.test.ts`) uses an `ssh` that is the real one with a known_hosts file of the test's making, because the tool
+  starts `ssh -F /dev/null` and so would read your own `~/.ssh/known_hosts`.
+- **The SOCKS tunnel** (`tunnel.test.ts`) is opened by a provider the test registers with `jig-core`, as a company plugin would,
+  with `ssh -N -D`. The production read from a secondary is proved by asking each member how many reads of the collection it
+  served.
+- **Without Docker,** a replica set of three local `mongod` processes works: start them without `--keyFile` to make the root user,
+  then with `--replSet` and `--keyFile`, and use member addresses such as `127.0.0.1:27117`. The test that the members cannot be
+  looked up skips, because `127.0.0.1` can.
+
 ## Where to read a failure
 
 The job prints each service's version once it is up. When a step fails, the last step prints the logs of every container,

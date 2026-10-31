@@ -54,7 +54,8 @@ export interface Harness {
     close(): Promise<void>;
 }
 
-export function setupHarness(options: MongoOptions = {}): Harness {
+/** `real`: the plugin connects with the driver, as it does under Pi, and not through the fake database (the tests in `it/`). */
+export function setupHarness(options: MongoOptions = {}, real = false): Harness {
     const jig = installFakeJig();
     const backend = fakeBackend();
     const connects: ConnectTarget[] = [];
@@ -85,7 +86,7 @@ export function setupHarness(options: MongoOptions = {}): Harness {
                 connects.push(target);
                 return backend;
             };
-            void jigMongo({ connect, ...loadOptions })(pi);
+            void jigMongo({ ...(real ? {} : { connect }), ...loadOptions })(pi);
             const tool = tools[0];
             const declaration = jig.declared.get("mongo");
             if (tool === undefined || declaration === undefined)

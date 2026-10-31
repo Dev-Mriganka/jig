@@ -73,7 +73,10 @@ jobs:
       ES_IMAGE: docker.elastic.co/elasticsearch/elasticsearch:8.19.23@sha256:4d0724bb8d78d7a2330693623e26ca4d621079d062ecc8a30b3e1fc180ec14c1
       OPENSEARCH_IMAGE: opensearchproject/opensearch:2.19.7@sha256:3bfa1ec74d56928c2e018033d45c460ce2c0ea65a5cedd577de3102326c31b89
       LOKI_IMAGE: grafana/loki:3.7.9@sha256:0db216b630ae1f348a1584c67f3cead8b4c1fc839169a39501db664744158e28
+      MONGO_IMAGE: mongo:8.0.34@sha256:b9924c330a8bbc5800fe9c69f04a84e221eca7b28fd049a0354147d9908fa142
+      SSH_IMAGE: linuxserver/openssh-server:10.3_p1-r1-ls240@sha256:b07414bb329b86a00525c9256711a7855fc3a369e9f62c36f1de8d1923197580
       JIG_IT_ELASTICSEARCH_PASSWORD: throwaway-elastic-password
+      JIG_IT_MONGO_PASSWORD: throwaway-mongo-password
     steps:
       - name: Check out the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -135,15 +138,90 @@ jobs:
           echo "OpenSearch $(curl -fsS http://127.0.0.1:9201 | jq -r .version.number)"
           echo "Loki $(curl -fsS -H 'X-Scope-OrgID: jig-it' http://127.0.0.1:3100/loki/api/v1/status/buildinfo | jq -r .version)"
 
+      # A three-member replica set with authentication, and an SSH server on the same Docker network. The members are named
+      # mongo1, mongo2 and mongo3, and only containers on that network can look those names up: the test runs on the host, so the
+      # SSH route and the SOCKS tunnel are the only way to them. mongo1 is also published on 127.0.0.1:27017 for the direct test.
+      # The image makes the root user and then starts mongod with the key file, which it copies where mongod may read it.
+      - name: Start MongoDB and the jump host
+        if: ${{ !cancelled() }}
+        run: |
+          openssl rand -base64 756 > "$RUNNER_TEMP/mongo-keyfile"
+          ssh-keygen -q -t ed25519 -N "" -C jig-it -f "$RUNNER_TEMP/jump_key"
+          mkdir -p "$RUNNER_TEMP/sshd_config.d"
+          echo "AllowTcpForwarding yes" > "$RUNNER_TEMP/sshd_config.d/forwarding.conf"
+          docker network create jigit
+          for n in 1 2 3; do
+            publish=""
+            if [ "$n" = 1 ]; then publish="-p 127.0.0.1:27017:27017"; fi
+            docker run -d --name "mongo$n" --network jigit $publish \
+              -e MONGO_INITDB_ROOT_USERNAME=root -e MONGO_INITDB_ROOT_PASSWORD="$JIG_IT_MONGO_PASSWORD" \
+              -v "$RUNNER_TEMP/mongo-keyfile:/keyfile.src:ro" --entrypoint bash "$MONGO_IMAGE" \
+              -c 'install -m 400 -o mongodb -g mongodb /keyfile.src /data/keyfile && exec docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --keyFile /data/keyfile'
+          done
+          docker run -d --name jump --network jigit -p 127.0.0.1:2222:2222 \
+            -e USER_NAME=jigit -e PUBLIC_KEY="$(cat "$RUNNER_TEMP/jump_key.pub")" \
+            -v "$RUNNER_TEMP/sshd_config.d:/config/sshd/sshd_config.d" "$SSH_IMAGE"
+
+      - name: Set up the replica set and wait for the jump host
+        if: ${{ !cancelled() }}
+        run: |
+          mongo() { docker exec "$1" mongosh --quiet -u root -p "$JIG_IT_MONGO_PASSWORD" --authenticationDatabase admin --eval "$2"; }
+          # The image first starts a mongod of its own to make the root user. Only after it says so is the real one coming up.
+          for n in 1 2 3; do
+            for _ in $(seq 1 90); do
+              docker logs "mongo$n" 2>&1 | grep -q "MongoDB init process complete" && break
+              sleep 2
+            done
+            for _ in $(seq 1 60); do
+              mongo "mongo$n" 'db.hello().ok' > /dev/null 2>&1 && break
+              sleep 2
+            done
+          done
+          mongo mongo1 'rs.initiate({_id: "rs0", members: [
+            {_id: 0, host: "mongo1:27017", priority: 10}, {_id: 1, host: "mongo2:27017"}, {_id: 2, host: "mongo3:27017"}]}).ok'
+          for _ in $(seq 1 60); do
+            [ "$(mongo mongo1 'db.hello().isWritablePrimary' 2>/dev/null)" = true ] && break
+            sleep 2
+          done
+          mongo mongo1 "
+            const admin = db.getSiblingDB('admin');
+            const options = {w: 'majority'};
+            admin.createUser({user: 'agent', pwd: '$JIG_IT_MONGO_PASSWORD',
+              roles: ['readWriteAnyDatabase', 'dbAdminAnyDatabase', 'clusterMonitor']}, options);
+            admin.createUser({user: 'agent-readonly', pwd: '$JIG_IT_MONGO_PASSWORD', roles: ['readAnyDatabase']}, options);"
+          # The users are on every member, so a read from a secondary can sign in.
+          for n in 1 2 3; do
+            for _ in $(seq 1 60); do
+              docker exec "mongo$n" mongosh --quiet -u agent-readonly -p "$JIG_IT_MONGO_PASSWORD" --authenticationDatabase admin \
+                --eval 'db.hello().ok' > /dev/null 2>&1 && break
+              sleep 2
+            done
+          done
+          mongo mongo1 'rs.status().members.map((m) => m.name + " " + m.stateStr).join(", ")'
+          mongo mongo1 'db.version()'
+          for _ in $(seq 1 60); do ssh-keyscan -p 2222 127.0.0.1 > /dev/null 2>&1 && break; sleep 2; done
+          ssh-keyscan -v -p 2222 127.0.0.1 2>&1 | grep -i "remote software version" | head -1
+          ssh -V
+
       - name: Integration tests
         if: ${{ !cancelled() }}
         env:
-          JIG_IT_REQUIRE: elasticsearch,opensearch,loki
+          JIG_IT_REQUIRE: elasticsearch,opensearch,loki,mongodb,mongodb-ssh,mongodb-socks
           JIG_IT_ELASTICSEARCH_URL: https://127.0.0.1:9200
           NODE_EXTRA_CA_CERTS: ${{ runner.temp }}/es-ca.crt
           JIG_IT_OPENSEARCH_URL: http://127.0.0.1:9201
           JIG_IT_LOKI_URL: http://127.0.0.1:3100
           JIG_IT_LOKI_LIMITED_URL: http://127.0.0.1:3101
+          JIG_IT_MONGO_DIRECT_URI: mongodb://127.0.0.1:27017/?directConnection=true
+          JIG_IT_MONGO_REPLICA_URI: mongodb://mongo1:27017,mongo2:27017,mongo3:27017/?replicaSet=rs0
+          JIG_IT_MONGO_SSH_URI: mongodb://mongo1:27017
+          JIG_IT_MONGO_MEMBERS_HIDDEN: "1"
+          JIG_IT_MONGO_USER: agent
+          JIG_IT_MONGO_READONLY_USER: agent-readonly
+          JIG_IT_SSH_HOST: 127.0.0.1
+          JIG_IT_SSH_PORT: "2222"
+          JIG_IT_SSH_USER: jigit
+          JIG_IT_SSH_KEY_FILE: ${{ runner.temp }}/jump_key
         run: npm run test:it
 
       # The logs of every container, so a service that failed can be read in the run.

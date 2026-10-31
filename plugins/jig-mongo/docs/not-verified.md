@@ -2,35 +2,55 @@
 
 What the tests of `jig-mongo` do not cover. Back to the [jig-mongo overview](../README.md).
 
-The tests use these fakes:
+The tests in `test/` use these fakes:
 - a fake of the driver seam (what the tool asks of the database, recorded);
 - a fake of the driver's client (what `driver.ts` asks of the driver);
 - a fake `ssh` on `PATH`;
 - a SOCKS5 server and servers that speak a little of the wire protocol, for the proxy route.
 
-No test connects to a MongoDB unless `JIG_TEST_MONGO_URI` is set (see `test/integration.test.ts`; give it a user and password in the
-address to run the tool itself as well). It was run once, on one machine, against a single MongoDB 8.0 node with authentication on
-and no TLS, started for the purpose. Not tried:
+The tests in `test/it/` run the same code against a real MongoDB and a real SSH server, in the `integration` job of CI (see
+[Integration tests](../../../docs/integration-tests.md)). One more test, `test/integration.test.ts`, runs the driver seam alone
+against a server of your own when `JIG_TEST_MONGO_URI` is set.
 
-- **A server that is not that one.** A managed service (Atlas, DocumentDB and the like), a replica set (the secondary read preference of
-  production), a sharded cluster, an older server, TLS, and a user with fewer privileges than the one the test signs in as.
-- **The shapes of `explain`.** The plan summary was written from the documented shapes of a find, an aggregation and the slot-based
-  engine, and tried on examples of them, not on output from a server.
-- **`$collStats` and `$indexStats`** on a managed service: they need privileges a read-only user may lack, and a view has no storage
-  statistics. The error is reported, not hidden.
-- **A `$lookup` without a pipeline in an allow list** is given one for the projection, which needs MongoDB 5.0. On an older server the
-  call fails with the server's error.
-- **Time series, views and sharded clusters:** `collections` shows their types; nothing else was tried on them.
+## Verified in CI
+
+A three-member MongoDB 8.0 replica set with authentication, and an OpenSSH 10.3 server on the same Docker network. The members are
+named `mongo1` to `mongo3`, which only that network can look up, so the routes are the only way to them.
+
+| What | Proved by |
+|---|---|
+| Every action through the tool and the driver, with what a write did read back by a client of the test's own | `mongo.test.ts` |
+| Typed values both ways: a decimal, a 64-bit integer beyond 2^53, a date and an ObjectId | `mongo.test.ts` |
+| A find with and without an index in `explain`; `stats`; `indexes`; `index-stats` and its Unauthorized message for a user that only reads | `mongo.test.ts` |
+| Views and time series in `collections` | `mongo.test.ts` |
+| A preview with its count and fingerprint, "changed since the preview", the guards on an empty filter and on the cap | `mongo.test.ts` |
+| A duplicate key from `insert` as the server's rejection (it was reported as a lost reply: fixed) | `mongo.test.ts` |
+| The deny list, the allow list, a `$lookup` cut to the allowed fields on the server, `$getField` and `$unionWith` refused | `mongo.test.ts` |
+| Production lines through `jig-core`'s own masker | `mongo.test.ts` |
+| A refused sign-in, a user without the right, and an address nobody answers | `mongo.test.ts` |
+| The SSH route: the forward, the key file gone once ssh has signed in, and the forward ending with the session | `ssh.test.ts` |
+| What real ssh says for an untrusted host key, a key the server refuses, a key it cannot load (it was told as refused: fixed) and a jump host nobody answers at | `ssh.test.ts` |
+| A SOCKS tunnel from `ssh -D` to a replica set by the members' own names: reads, a write to the primary, a production read served by a secondary (counted on each member) | `tunnel.test.ts` |
+| This machine cannot look up the members, and the tool without a route fails | `tunnel.test.ts` |
+| The tunnel ending with the session, and a tunnel that cannot open told in a line | `tunnel.test.ts` |
+
+## What is still not verified
+
+Not tried:
+
+- **A server that is not that one.** A managed service (Atlas, DocumentDB and the like), a sharded cluster, an older server, and TLS.
+- **The shapes of `explain`** beyond a find with and without an index: an aggregation, the slot-based engine and a sort. The plan summary was
+  written from the documented shapes.
+- **`$collStats` on a managed service,** and a view, which has no storage statistics.
+- **A `$lookup` without a pipeline in an allow list** on a server older than 5.0.
+- **Sharded time series.** `collections` shows a time series collection; nothing else was tried on one.
 - **TLS to a real host,** including a company certificate authority, and certificate checking of a forwarded connection through the
   `servername` option.
-- **The SSH route against a real bastion:** the arguments and the key file were checked against a fake `ssh`. Real `ssh` versions differ in
-  what they print on failure, so a failure that matches none of the patterns is reported as a general failure with its exit code.
-- **A company tunnel:** the forward and the SOCKS kinds were tried with a fake provider. For SOCKS the test uses a SOCKS5 server
-  written for it, the real driver and the `socks` package, and small servers that speak enough of the wire protocol to answer a
-  replica set's handshake. Not tried: a real jump host, a real SOCKS proxy, and a `mongodb+srv` address (its DNS lookup is local).
-- **The review screen:** the preview was checked as data against a fake of `jig-core`, and not seen in the terminal.
-- **How masking treats a result:** production results are masked by `jig-core`'s backstop. That the Extended JSON lines are masked field
-  by field was not run against the real masker.
+- **A `mongodb+srv` address.** Its DNS lookup is local, and the CI replica set has no SRV record.
+- **A real SSH client other than OpenSSH 9.6** (the runner's), against OpenSSH 10.3. Another version may word a failure differently, and the
+  tool then reports a general failure with ssh's exit code.
+- **A lost reply.** The driver's retries are off, but no test cuts the connection in the middle of a write.
+- **The review screen:** the preview was checked as data, and not seen in the terminal.
 - **Large results:** the output limit was tried with documents of tens of kilobytes, not with a real cursor of thousands.
 
 ## Facts the code relies on
