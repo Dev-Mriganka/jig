@@ -43,8 +43,8 @@ In short:
 Also built: [`jig-sandbox`](plugins/jig-sandbox/README.md), which runs the
 agent's `bash` in an operating-system sandbox, with background tasks and a network that
 can be filtered or asked about. And [`jig-agents`](plugins/jig-agents/README.md), which hands work to child
-agents that Jig's rules still govern: their questions come to your screen, and their turns, time and cost are
-limited.
+agents that Jig's rules still govern: their questions come to your screen, their turns, time and cost are
+limited, and a role can only narrow what its child may do.
 
 ## Install
 
@@ -105,7 +105,7 @@ first in the list, because every other plugin needs it:
 | [`jig-ops`](plugins/jig-ops/README.md) | built | CI, deploy and runtime from one service catalog; watches CI until it ends |
 | [`jig-review`](plugins/jig-review/README.md) | built | Code review in the browser, answered round by round, approved with a passkey |
 | [`jig-theme`](plugins/jig-theme/README.md) | built | Six palettes as Pi themes, your own, a one-line footer, the answer colour |
-| [`jig-agents`](plugins/jig-agents/README.md) | built | Child agents that Jig's rules still govern: their questions come to your screen, with limits on turns, time and cost |
+| [`jig-agents`](plugins/jig-agents/README.md) | built | Child agents that Jig's rules still govern: their questions come to your screen, with limits on turns, time and cost, and roles that only narrow |
 
 Every plugin needs `jig-core`; otherwise they work on their own.
 
