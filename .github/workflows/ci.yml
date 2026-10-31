@@ -164,8 +164,12 @@ jobs:
         run: |
           openssl rand -base64 756 > "$RUNNER_TEMP/mongo-keyfile"
           ssh-keygen -q -t ed25519 -N "" -C jig-it -f "$RUNNER_TEMP/jump_key"
+          # The image reads this folder before the rest of its sshd configuration, and the first value of a setting wins.
+          # PerSourcePenalties: OpenSSH 9.8 and later drop every connection from an address that has failed to sign in a few times
+          # in a few seconds, and the tests fail to sign in on purpose (a key the server does not know, a user it does not have)
+          # from the one address they all come from, so the tests that follow would find the door shut.
           mkdir -p "$RUNNER_TEMP/sshd_config.d"
-          echo "AllowTcpForwarding yes" > "$RUNNER_TEMP/sshd_config.d/forwarding.conf"
+          printf '%s\n' 'AllowTcpForwarding yes' 'PerSourcePenalties no' 'MaxStartups 100:30:200' 'LogLevel VERBOSE' > "$RUNNER_TEMP/sshd_config.d/tests.conf"
           docker network create jigit
           for n in 1 2 3; do
             publish=""
@@ -176,7 +180,7 @@ jobs:
               -c 'install -m 400 -o mongodb -g mongodb /keyfile.src /data/keyfile && exec docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --keyFile /data/keyfile'
           done
           docker run -d --name jump --network jigit -p 127.0.0.1:2222:2222 \
-            -e USER_NAME=jigit -e PUBLIC_KEY="$(cat "$RUNNER_TEMP/jump_key.pub")" \
+            -e USER_NAME=jigit -e PUBLIC_KEY="$(cat "$RUNNER_TEMP/jump_key.pub")" -e LOG_STDOUT=true \
             -v "$RUNNER_TEMP/sshd_config.d:/config/sshd/sshd_config.d" "$SSH_IMAGE"
 
       - name: Set up the replica set and wait for the jump host
@@ -229,6 +233,9 @@ jobs:
           mongo mongo1 'rs.status().members.map((m) => m.name + " " + m.stateStr).join(", ")'
           mongo mongo1 'db.version()'
           wait_until "the jump host to answer" host_key
+          # What sshd settled on, so that a drop-in that was not read shows here and not as a failure of the tests.
+          docker exec jump /usr/sbin/sshd.pam -T -f /config/sshd/sshd_config -h /config/ssh_host_keys/ssh_host_ed25519_key 2>&1 \
+            | grep -i -E "^(persourcepenalties|allowtcpforwarding|loglevel) " || true
           ssh-keyscan -v -p 2222 127.0.0.1 2>&1 | grep -i "remote software version" | head -1
           ssh -V
 

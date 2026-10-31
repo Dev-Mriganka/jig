@@ -112,6 +112,11 @@ Each makes a database of its own and drops it at the end.
 - **The jump host** is an OpenSSH server in a container on that network, with TCP forwarding switched on and the workflow's
   throwaway key as the only one that signs in. It is how the tests reach `mongo1` to `mongo3` by name: the test host cannot look
   them up, so a tunnel that does not work cannot pass.
+  - **Its settings** come from a drop-in the workflow writes: forwarding on, `LogLevel VERBOSE`, a higher `MaxStartups` for suites that
+    connect together, and `PerSourcePenalties no`.
+  - **Why the penalties are off.** OpenSSH 9.8 and later drop all connections from an address after a few failed sign-ins, and some
+    tests fail to sign in on purpose, so the tests that ran after them found the door shut. The job prints the settings sshd settled on.
+  - **Its log** goes to the container's output (`LOG_STDOUT=true`), where the "Service logs" step of a failed job prints it.
 - **The SSH route** (`ssh.test.ts`) uses an `ssh` that is the real one with a known_hosts file of the test's making, because the tool
   starts `ssh -F /dev/null` and so would read your own `~/.ssh/known_hosts`.
 - **The SOCKS tunnel** (`tunnel.test.ts`) is opened by a provider the test registers with `jig-core`, as a company plugin would,
