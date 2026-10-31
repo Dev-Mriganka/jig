@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import { test } from "node:test";
 import { type CardFront, checkCard, draftCard, PLACEHOLDER, renderCard, SECTION_LIMIT } from "../src/card.ts";
 import {
@@ -143,6 +144,11 @@ test("when the agent has settled and the card is filled, it stays, and the activ
     pi.settle();
     assert.equal(pi.notices.at(-1)?.text, `Ticket PROJ-1 closed. Card: ${paths.card}`);
     assert.deepEqual(jig.tickets, ["PROJ-1", undefined]);
+    const index = JSON.parse(readFileSync(path.join(folder, ".cards.json"), "utf8")) as {
+        cards: Record<string, { valid: boolean; cause: string }>;
+    };
+    assert.deepEqual(Object.keys(index.cards), ["PROJ-1"], "the card is in the index at once");
+    assert.equal(index.cards["PROJ-1"]?.cause, SECTIONS.Cause);
     assert.equal(pi.sent.length, 2, "notes and the request, and nothing else");
     assert.deepEqual(
         pi.log.filter((entry) => entry.type === "custom").map((entry) => entry.data),

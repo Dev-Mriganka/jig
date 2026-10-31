@@ -18,6 +18,7 @@ import {
     requestText,
     verifyCard,
 } from "./close.ts";
+import { loadCards } from "./cards.ts";
 import { folderOf, ticketRegex } from "./config.ts";
 import type { MemorySettings } from "./config.ts";
 import { indexCount, isFileTool, saveEvidence } from "./evidence.ts";
@@ -184,6 +185,12 @@ export function registerTicketMemory(pi: ExtensionAPI): void {
         if (verdict.ok) {
             closing = undefined;
             const file = ticketPaths(mem.folder, key).card;
+            try {
+                // The card joins the index now, so the next recall finds it without reading every card.
+                loadCards(mem.folder);
+            } catch (error) {
+                note(ctx, `Card for ${key} written, but the index could not be updated: ${reason(error)}`, "warning");
+            }
             if (active === key) deactivate(ctx, `Ticket ${key} closed. Card: ${file}`);
             else note(ctx, `Card for ${key} written: ${file}`);
             return;
