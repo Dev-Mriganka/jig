@@ -76,6 +76,16 @@ describe("validating the section", () => {
         ]);
     });
 
+    test("outside: true or false, in the object form", () => {
+        assert.deepEqual(validateWorkflow({ tests: { a: { command: "x", outside: true } } }), []);
+        assert.deepEqual(validateWorkflow({ tests: { a: { command: "x", outside: false } } }), []);
+        for (const bad of ["yes", 1, null, "true"]) {
+            assert.deepEqual(validateWorkflow({ tests: { a: { command: "x", outside: bad } } }), [
+                "workflow.tests.a.outside: must be true or false",
+            ]);
+        }
+    });
+
     test("testTimeoutSeconds: a whole number of seconds from 10 to 7200", () => {
         for (const bad of [9, 7201, 1.5, "900", null]) {
             assert.match(
@@ -137,6 +147,21 @@ describe("the settings", () => {
             { key: "plain", command: "make" },
         ]);
         assert.deepEqual(Object.keys(settings.tests[0]?.env ?? {}), ["JAVA_HOME", "A"]);
+    });
+
+    test("outside is kept when it is true and left out when it is not", () => {
+        const settings = settingsFrom({
+            tests: {
+                a: { command: "x", outside: true },
+                b: { command: "y", outside: false },
+                c: { command: "z" },
+            },
+        });
+        assert.deepEqual(settings.tests, [
+            { key: "a", command: "x", outside: true },
+            { key: "b", command: "y" },
+            { key: "c", command: "z" },
+        ]);
     });
 
     test("a section with a refused variable gives the defaults, as any invalid section does", () => {

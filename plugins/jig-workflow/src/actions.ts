@@ -11,6 +11,7 @@ import type { Stage, Workflow } from "./definition.ts";
 import { environmentLines } from "./environment.ts";
 import { digest, hash } from "./host.ts";
 import { matching } from "./load.ts";
+import { outsideRunner } from "./outside.ts";
 import { fingerprintOf, MAX_PLAN_CHARS, parsePlan, repositoryWarnings } from "./plan.ts";
 import { inspect, short } from "./repos.ts";
 import type { RepoView } from "./repos.ts";
@@ -574,8 +575,11 @@ export async function runTestsAction(rt: Runtime, params: Params, call: Call): P
     for (const [index, plan] of plans.entries()) {
         const view = views[index] as RepoView;
         try {
+            // With a sandbox, a command set to run outside goes through the bash tool's own question; without one the call asked above.
+            const outside = sandboxed && plan.outside === true;
             const run = await runTests(rt.host, plan, view, {
-                sandboxed,
+                sandboxed: sandboxed && !outside,
+                ...(outside ? { outside: outsideRunner(call.ctx) } : {}),
                 ...(call.signal === undefined ? {} : { signal: call.signal }),
             });
             updateState(work.paths.dir, (state) => {
@@ -591,7 +595,7 @@ export async function runTestsAction(rt: Runtime, params: Params, call: Call): P
                 : " on a tree with uncommitted changes, which does not count: commit, then run again";
             if (run.result.passed && run.result.clean) passed++;
             lines.push(
-                `${view.name}: ${verdict} at ${short(view.head)}${note} · ${plan.command} · ${sandboxed ? "in the sandbox" : "outside the sandbox, as you approved"} · ${(run.result.durationMs / 1000).toFixed(1)} s`,
+                `${view.name}: ${verdict} at ${short(view.head)}${note} · ${plan.command} · ${run.result.sandboxed ? "in the sandbox" : "outside the sandbox, as you approved"} · ${(run.result.durationMs / 1000).toFixed(1)} s`,
                 ...(run.result.passed && run.result.clean ? [] : [indent(run.tail)]),
             );
         } catch (error) {

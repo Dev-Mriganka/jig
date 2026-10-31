@@ -1,8 +1,8 @@
 # jig-workflow: named workflows, with stages, holds and evidence
 
 **Status: built.** Tested with the real `jig-core`, real git repositories, a fake `gh` and `glab` (on recorded GitLab
-answers) and, where bubblewrap is installed, the real sandbox. `gh pr view`, `glab api` and a CI watch have not been tried
-against GitHub or GitLab themselves.
+answers) and, where bubblewrap is installed, the real sandbox. Not tried against the real services: `gh pr view`, `glab api`
+and a CI watch. Not tried in a real Pi: a test set to run outside the sandbox, which reaches `bash` through `ctx.executeTool`.
 
 `jig-workflow` takes a piece of work, such as a ticket, through a **workflow**: a named, ordered list of
 stages, each with a goal for the agent and the conditions that let the work move on. The conditions are
@@ -52,7 +52,7 @@ A fixed list, checked by the plugin itself, so a file never runs code. Each is d
 |---|---|
 | `notes-updated` | The ticket's notes changed since the stage began (see `jig-memory`) |
 | `plan-approved` | You approved this exact `plan.md`; an edited plan needs approving again |
-| `tests-pass-at-head` | Each bound repository's tests passed, in the sandbox, at its current HEAD |
+| `tests-pass-at-head` | Each bound repository's tests passed at its current HEAD, in the sandbox or outside it with your yes |
 | `review-done` | A `jig-review` approval covers each bound repository's current HEAD |
 | `pull-request-open` | Each bound repository's branch has an open pull request (a merge request on GitLab) |
 | `checks-pass` | The pull request's head is HEAD, and its checks passed (a CI watch, or the checks `gh` or `glab` show) |
@@ -92,8 +92,8 @@ At session start, a line says which stage the active ticket is in and what is mi
   (allow to ask or deny, ask to deny); the floor still applies ([Holds](docs/holds.md)).
 - **Evidence is recorded against what it is about.** A new commit ends a test result, and an edited plan
   needs approving again ([State](docs/state.md)).
-- **Tests run in the sandbox.** Without `jig-sandbox` a test run asks first, naming the commands
-  ([Tests](docs/tests.md)).
+- **Tests run in the sandbox.** Without `jig-sandbox`, or for a command set to run `outside`, a test run asks
+  first, naming the command ([Tests](docs/tests.md)).
 - **The agent cannot mark anything passed.** It asks for a run, an approval or a check, and the plugin
   records the outcome in a file that Pi's file tools and the sandbox cannot write.
 - **A broken file is reported, not guessed.** A file with an unknown field, condition or stage is skipped,
@@ -106,23 +106,20 @@ In `~/.pi/agent/jig.json`, under `workflow`. Every field is optional.
 | Field | Default | Meaning |
 |---|---|---|
 | `folders` | none | More folders to read workflow files from: absolute, or starting with `~/` |
-| `tests` | by build file | A test command per repository: a name or path pattern, then a command or `{ command, timeoutSeconds, env }` |
+| `tests` | by build file | A test command per repository: a name or path pattern, then a command or `{ command, timeoutSeconds, env, outside }` |
 | `testTimeoutSeconds` | `900` | How long one test run may take, from 10 to 7200 |
 
 ```json
-{
-  "workflow": {
-    "tests": {
-      "orders-api": { "command": "./gradlew test", "env": { "JAVA_HOME": "~/.sdkman/candidates/java/17.0.9-tem" } },
-      "libs/*": { "command": "npm test", "timeoutSeconds": 300 }
-    }
-  }
-}
+{ "workflow": { "tests": {
+    "orders-api": { "command": "./gradlew test", "env": { "JAVA_HOME": "~/.sdkman/candidates/java/17.0.9-tem" } },
+    "billing": { "command": "./gradlew test", "outside": true },
+    "libs/*": { "command": "npm test", "timeoutSeconds": 300 }
+} } }
 ```
 
 Files are read from `folders`, then `~/.pi/agent/workflows/`, then the project's `.pi/workflows/` once Pi
-trusts the project; a later file with the same name wins. Defaults per build file (`gradlew`, `pom.xml`, ...)
-and `env`, plain variables such as `JAVA_HOME` for one repository, are in [Tests](docs/tests.md).
+trusts the project; a later file with the same name wins. [Tests](docs/tests.md) has the defaults per build file,
+`env` (plain variables such as `JAVA_HOME`) and `outside` (a command that needs what the sandbox hides; it asks).
 
 ## Company part (in the company plugin)
 
@@ -141,8 +138,8 @@ and `env`, plain variables such as `JAVA_HOME` for one repository, are in [Tests
 jig-workflow/
   src/        index.ts (the factory), runtime.ts (the session), config.ts, definition.ts + load.ts (workflow files),
               store.ts (workflow.json), ticket.ts + repos.ts, conditions.ts + sources.ts + listeners.ts (evidence),
-              plan.ts, tests.ts, gate.ts (holds), tool.ts + actions.ts, commands.ts, status.ts, host.ts (jig-core's
-              programs and sandbox, behind one seam)
+              plan.ts, tests.ts + environment.ts + outside.ts (test runs), gate.ts (holds), tool.ts + actions.ts,
+              commands.ts, status.ts, host.ts (jig-core's programs and sandbox, behind one seam)
   skills/     workflow/SKILL.md: how to take work through its workflow
   examples/   feature.json, bugfix.json, investigation.json
   test/       one file per module; world.ts runs a whole session through the real jig-core

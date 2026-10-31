@@ -11,6 +11,8 @@ export interface TestRule {
     timeoutSeconds?: number;
     /** Plain variables the command runs with, `~` already written as the home folder. */
     env?: Readonly<Record<string, string>>;
+    /** True when this repository's command runs outside the sandbox, with the user's approval each time (or a rule's). */
+    outside?: boolean;
 }
 
 export interface WorkflowSettings {
@@ -28,7 +30,7 @@ export const MAX_TIMEOUT_SECONDS = 7200;
 /** The fields of the section, in the order the README's table lists them. */
 export const SECTION_FIELDS: readonly string[] = ["folders", "tests", "testTimeoutSeconds"];
 const FIELDS: ReadonlySet<string> = new Set(SECTION_FIELDS);
-const TEST_FIELDS: ReadonlySet<string> = new Set(["command", "timeoutSeconds", "env"]);
+const TEST_FIELDS: ReadonlySet<string> = new Set(["command", "timeoutSeconds", "env", "outside"]);
 const MAX_COMMAND = 1000;
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -90,9 +92,12 @@ export function validateWorkflow(raw: unknown): string[] {
                         );
                     }
                     if (value.env !== undefined) errors.push(...validateEnv(value.env, at));
+                    if (value.outside !== undefined && typeof value.outside !== "boolean") {
+                        errors.push(`${at}.outside: must be true or false`);
+                    }
                 } else if (!isCommand(value)) {
                     errors.push(
-                        `${at}: must be a command, or { "command": "...", "timeoutSeconds": 300, "env": { "JAVA_HOME": "~/jdk" } }`,
+                        `${at}: must be a command, or { "command": "...", "timeoutSeconds": 300, "env": { "JAVA_HOME": "~/jdk" }, "outside": true }`,
                     );
                 }
             }
@@ -126,6 +131,7 @@ export function settingsFrom(section: unknown, home: string = os.homedir()): Wor
                     ...(value.env === undefined
                         ? {}
                         : { env: expandedEnv(value.env as Record<string, unknown>, home) }),
+                    ...(value.outside === true ? { outside: true } : {}),
                 });
             }
         }

@@ -64,7 +64,7 @@ A repository may need its own environment, such as a JDK of the right version. G
 
 ## Where the command runs
 
-- **In the sandbox, when `jig-sandbox` is active.** `workflow test` calls `jig().sandbox.run`, which
+- **In the sandbox, when `jig-sandbox` is active** (unless the entry says `outside`, below). `workflow test` calls `jig().sandbox.run`, which
   `jig-sandbox` implements with its normal wrapping: the same rules, environment, audit and explanations
   as the agent's `bash`, with a timeout. A test that needs a hidden credential or a locked path fails with the
   sandbox's usual explanation in the output the tool returns. Your network mode applies.
@@ -77,6 +77,46 @@ A repository may need its own environment, such as a JDK of the right version. G
   time the tool runs, the tool stops and says so; it does not fall back to the unsandboxed run, which would
   need your yes.
 
+## A command that needs what the sandbox hides
+
+Some builds need a credential the sandbox hides, such as a package repository whose token comes from a cloud sign-in.
+Set `outside` on that repository's entry. It is configuration only: the `workflow` tool has no such parameter, so the
+model cannot choose it.
+
+```json
+{
+  "workflow": {
+    "tests": { "orders-api": { "command": "./gradlew test", "outside": true } }
+  }
+}
+```
+
+With `jig-sandbox` active, `workflow test` then runs that repository's command outside the sandbox, and only the way
+`bash` runs one command outside ([Running one command outside](../../jig-sandbox/docs/when-blocked.md#running-one-command-outside)).
+It calls `bash` with `outside: true` and the reason "the configured test command needs credentials the sandbox hides".
+
+- **It asks.** `jig-core` asks you in the waiting call, with the exact command line, the folder and the reason. The
+  answer "this exact command, this session" covers that line only.
+- **The line starts with `cd`.** `bash` runs in Pi's folder and takes no folder of its own, so the line is
+  `cd <repository> && export JAVA_HOME=... && ./gradlew test`: the repository, then its variables, then the command.
+- **A rule that names the command allows it.** Use the tool `bash`, the action `outside` and a pattern for the line. A
+  work tree's folder changes with the ticket, so let `*` stand for it. No wildcard rule and no default allows it.
+- **No screen means no.** The repository is reported as not run, with the reason, and the others go on.
+- **It is recorded** by `jig-core` and `jig-sandbox` as any outside run is (`/sandbox` lists it, `/lens` shows it), and
+  in `workflow.json` as `sandboxed: false`.
+- **It counts like a sandboxed run.** `tests-pass-at-head` holds for it at that HEAD on a clean tree, and `status` says
+  the run was outside the sandbox, with your approval.
+
+```json
+{ "tool": "bash", "action": "outside", "command": "cd /work/orders-api-* && ./gradlew test", "decision": "allow" }
+```
+
+The question shows the command, not the build files it runs, and the agent can edit those. Answer it as you would for
+any build that gets your credentials: look at what changed first, and give a rule only for a repository you trust.
+
+Without a sandbox that can run commands, `outside` changes nothing: the call asks once for every command, as above.
+Only a repository whose entry says `outside` is asked about this way; the others run in the sandbox without a question.
+
 ## What is recorded
 
 One result per repository, replaced by the next run, in `workflow.json`:
@@ -87,7 +127,7 @@ One result per repository, replaced by the next run, in `workflow.json`:
 | `clean` | Whether the tree had no changes, tracked or untracked, then |
 | `passed` | The command exited 0 and did not time out |
 | `command`, `exitCode`, `timedOut` | What ran, and how it ended |
-| `sandboxed` | Whether it ran in the sandbox |
+| `sandboxed` | Whether it ran in the sandbox: false for a run outside, however it was approved |
 | `at`, `durationMs` | When, and how long |
 
 The output is not saved. The tool's result carries the last 60 lines, cleaned and capped like any result,

@@ -217,6 +217,59 @@ describe("running them", () => {
         ]);
     });
 
+    test("a runner for outside replaces the sandbox and the shell, and the result is not a sandboxed one", async (t) => {
+        const host = fakeHost({ run: () => ok() });
+        const controller = new AbortController();
+        const root = makeRepo(tempFolder(t), "orders-api", "git@github.example.com:acme/orders-api.git");
+        const view = await inspect(host, root);
+        const plan = planTests(
+            settingsFrom({ tests: { "orders-api": { command: "./gradlew test", outside: true } } }),
+            view,
+            path.dirname(root),
+        );
+        assert.equal(plan.outside, true);
+        const seen: Array<{ plan: unknown; signal: AbortSignal | undefined }> = [];
+        const run = await runTests(host, plan, view, {
+            sandboxed: false,
+            signal: controller.signal,
+            outside: async (given, options) => {
+                seen.push({ plan: given, signal: options.signal });
+                return { code: 0, timedOut: false, output: "BUILD SUCCESSFUL\n", truncated: false };
+            },
+        });
+        assert.deepEqual(seen, [{ plan, signal: controller.signal }]);
+        assert.deepEqual([host.sandboxed, host.ran], [[], []], "neither the sandbox nor the shell was used");
+        assert.deepEqual(
+            [run.result.passed, run.result.sandboxed, run.result.command, run.result.head],
+            [true, false, "./gradlew test", headOf(root)],
+        );
+        assert.equal(run.tail, "BUILD SUCCESSFUL");
+        const failed = await runTests(host, plan, view, {
+            sandboxed: false,
+            outside: async () => ({ code: 2, timedOut: false, output: "", truncated: false }),
+        });
+        assert.deepEqual([failed.result.passed, failed.result.exitCode], [false, 2]);
+        await assert.rejects(
+            runTests(host, plan, view, {
+                sandboxed: false,
+                outside: async () => {
+                    throw new Error("outside the sandbox was refused: the user declined this call");
+                },
+            }),
+            /declined/,
+        );
+    });
+
+    test("a plan has no outside unless the entry says true", async (t) => {
+        const root = makeRepo(tempFolder(t), "orders-api", "git@github.example.com:acme/orders-api.git");
+        const view = await inspect(fakeHost(), root);
+        const plan = (entry: unknown) =>
+            planTests(settingsFrom({ tests: { "orders-api": entry } }), view, path.dirname(root));
+        assert.equal(plan("npm test").outside, undefined);
+        assert.equal(plan({ command: "npm test", outside: false }).outside, undefined);
+        assert.equal(plan({ command: "npm test", outside: true }).outside, true);
+    });
+
     test("an entry without variables runs the command as it is", async (t) => {
         const host = fakeHost({ run: () => ok() });
         const { view, plan } = await ready(t, host);
