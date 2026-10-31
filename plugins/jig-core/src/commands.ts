@@ -89,7 +89,12 @@ export function statusLines(state: JigState): string[] {
     const unclassified = tools
         .filter((tool) => probe(state, tool.name, {})?.source === "unknown")
         .map((tool) => tool.name);
-    const problems = [...state.policy().problems.map(describeProblem), ...state.startupProblems];
+    const problems = [
+        ...state.policy().problems.map(describeProblem),
+        ...state.startupProblems,
+        ...state.gates.problems(),
+    ];
+    const gates = state.gates.list();
 
     const lines = [
         `jig-core governs ${tools.length} tools${state.sessionId === undefined ? "" : ` in session ${state.sessionId}`}`,
@@ -97,6 +102,11 @@ export function statusLines(state: JigState): string[] {
         `Plugins: ${[...plugins].join(", ")}`,
         `Tools on the unknown default (they ask until classified): ${unclassified.length === 0 ? "none" : unclassified.join(", ")}`,
         watchesLine(state),
+        ...(gates.length === 0
+            ? []
+            : [
+                  `Gates (they can only make a decision stricter): ${gates.map((gate) => `${gate.name} (${gate.plugin})`).join(", ")}`,
+              ]),
         state.personal.found
             ? `Configuration: ${state.personal.file}`
             : `Configuration: none found (${state.personal.file || "not loaded yet"}), defaults apply`,

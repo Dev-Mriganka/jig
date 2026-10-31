@@ -20,7 +20,11 @@ before it gave:
 5. the floor: a production write is denied, an unknown tool is allowed only by
    a rule that names it exactly, an ask with no screen is denied, and a call to
    one of Pi's file tools that touches a protected path is denied (see
-   [Protected paths](configuration.md#protected-paths)).
+   [Protected paths](configuration.md#protected-paths));
+6. the gates other plugins registered, for a call that is not denied yet. They
+   can only make it stricter: an allow becomes an ask or a deny, an ask becomes
+   a deny, and an ask with no screen is a deny again (see
+   [Gates](plugin-contract.md#gates)).
 
 ## The screens
 

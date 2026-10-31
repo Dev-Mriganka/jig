@@ -122,7 +122,7 @@ is refused and you see the new preview.
 | **Stage** | A step of a workflow, such as plan or review, with a goal the agent sees. |
 | **Exit condition** | What must hold before work leaves a stage, from a fixed list such as `plan-approved`. |
 | **Hold** | A tool call a workflow keeps back until a condition holds. It only ever tightens a decision. |
-| **Gate** | A condition that holds a stage or an action until it is met, such as an approved plan. |
+| **Gate** | A check a plugin registers with `jig-core`. It sees each call after the rules and can only make the decision stricter. `jig-workflow` holds calls with one. |
 | **Acceptance scenario** | A numbered check in a ticket's plan. A pass needs evidence. |
 | **Checker agent** | A read-only agent in a fresh context that reviews a change before you do. Planned. |
 | **Card** | A short summary of a closed ticket: problem, cause, fix, repositories, identifiers and error lines. |
@@ -134,7 +134,7 @@ is refused and you see the new preview.
   `jig-memory`.
 - **A workflow** is, for example, `feature` or `bugfix`.
 - **A hold** is, for example, `git push` until the tests pass.
-- **A gate** is, for example, a passing test of the exact commit.
+- **A gate** is, for example, the check that denies `git push` until the tests passed at the exact commit.
 - **Recall** works by shared keys first, then keyword search.
 
 ## Code review

@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { createLocalBashOperations, getAgentDir, getShellConfig } from "@earendil-works/pi-coding-agent";
 import type { BashOperations, ExtensionAPI, ExtensionContext, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { jig, withJig } from "../../jig-core/src/client.ts";
-import type { SandboxProvider } from "../../jig-core/src/contract.ts";
+import type { SandboxProvider, SandboxRunOptions, SandboxRunResult } from "../../jig-core/src/contract.ts";
 import { createAftermath } from "./aftermath.ts";
 import type { Aftermath } from "./aftermath.ts";
 import { createAllowed } from "./allowed.ts";
@@ -20,8 +20,8 @@ import { registerPs } from "./background/ps.ts";
 import { Tasks } from "./background/tasks.ts";
 import type { TasksDeps } from "./background/tasks.ts";
 import { backgroundTools } from "./background/tools.ts";
-import { createBashTool } from "./bash.ts";
-import type { Decision } from "./bash.ts";
+import { createBashTool, sandboxedOperations } from "./bash.ts";
+import type { BashDeps, Decision } from "./bash.ts";
 import { startBroker } from "./broker-client.ts";
 import { registerSandboxCommand } from "./commands.ts";
 import { settingsFrom, validateSandbox } from "./config.ts";
@@ -85,6 +85,9 @@ function runtimeFolders(files: FileView): string[] {
     }
     return [...found];
 }
+
+/** The most output `sandbox.run` keeps when the caller does not say: the end of it. */
+const DEFAULT_RUN_OUTPUT_BYTES = 256 * 1024;
 
 /** What the footer says. */
 function footerText(sandbox: Sandbox): string | undefined {
@@ -186,6 +189,7 @@ export function sandbox(options: SandboxOptions = {}): ExtensionFactory {
             },
             canWrite: (place) => core.canWrite(place),
             whenReady: () => core.whenReady(),
+            run: (command, runOptions) => runForPlugin(command, runOptions),
         };
         // Where the session's commands run, for the dialog that asks about running one outside.
         let sessionFolder = process.cwd();
@@ -239,24 +243,66 @@ export function sandbox(options: SandboxOptions = {}): ExtensionFactory {
                 : { segmentBytes: options.background.segmentBytes }),
             ...(options.background?.port === undefined ? {} : { port: options.background.port }),
         });
-        pi.registerTool(
-            createBashTool({
-                sandbox: core,
-                shell: { exec },
-                aftermath,
-                decisions,
-                outsideRuns,
-                tasks,
-                now: options.now ?? (() => Date.now()),
-                jig: () => {
-                    try {
-                        return jig();
-                    } catch {
-                        return undefined;
-                    }
-                },
-            }) as never,
-        );
+        const bashDeps: BashDeps = {
+            sandbox: core,
+            shell: { exec },
+            aftermath,
+            decisions,
+            outsideRuns,
+            tasks,
+            now: options.now ?? (() => Date.now()),
+            jig: () => {
+                try {
+                    return jig();
+                } catch {
+                    return undefined;
+                }
+            },
+        };
+        pi.registerTool(createBashTool(bashDeps) as never);
+
+        /**
+         * `jig().sandbox.run`: a shell command for another plugin, wrapped as the agent's `bash` is. The same operations as the
+         * tool's, so the rules, the environment, the audit and the explanations are the same; what is not here is the tool: no
+         * parameters, no truncation file, no streaming to the screen. The sandbox being off or refusing is a rejection, never
+         * a command run bare.
+         */
+        async function runForPlugin(command: string, runOptions: SandboxRunOptions): Promise<SandboxRunResult> {
+            const ctx = screen;
+            if (ctx === undefined) throw new Error("the sandbox cannot run a command before a session has started");
+            if (core.state.kind === "off") throw new Error("the sandbox is switched off for this session");
+            const limit = Math.max(1, runOptions.maxOutputBytes ?? DEFAULT_RUN_OUTPUT_BYTES);
+            let kept: Buffer = Buffer.alloc(0);
+            let truncated = false;
+            const text = (): string => kept.toString("utf8");
+            const finish = (code: number | null, timedOut: boolean): SandboxRunResult => ({
+                code,
+                output: text(),
+                timedOut,
+                truncated,
+            });
+            const operations = sandboxedOperations(bashDeps, ctx, bashDeps.shell);
+            try {
+                const result = await operations.exec(command, runOptions.cwd, {
+                    onData: (chunk) => {
+                        kept = Buffer.concat([kept, chunk]);
+                        if (kept.length > limit) {
+                            kept = kept.subarray(kept.length - limit);
+                            truncated = true;
+                        }
+                    },
+                    ...(runOptions.signal === undefined ? {} : { signal: runOptions.signal }),
+                    ...(runOptions.timeoutMs === undefined
+                        ? {}
+                        : { timeout: Math.max(1, Math.ceil(runOptions.timeoutMs / 1000)) }),
+                });
+                return finish(result.exitCode, false);
+            } catch (error) {
+                // Pi's local operations end a command that ran out of time with this message.
+                if (error instanceof Error && error.message.startsWith("timeout:")) return finish(null, true);
+                throw error;
+            }
+        }
         for (const tool of backgroundTools(tasks)) pi.registerTool(tool as never);
         registerPs(pi, tasks);
         pi.on("message_start", (event) => {

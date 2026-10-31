@@ -50,8 +50,9 @@ it has no environment, effect or decision, and its error kind is `not-run`.
 - **`session`, `parentSession`, `agentRole`:** the parent session is
   `$JIG_PARENT_SESSION` when set, and the role is `$JIG_AGENT_ROLE` (default
   `main`). The ticket is the one set with `setTicket`.
-- **`decisionSource`** is `table`, `rule`, `tool`, `session`, `unknown` or
-  `floor`.
+- **`decisionSource`** is `table`, `rule`, `tool`, `session`, `unknown`,
+  `floor` or `gate` (a plugin's gate asked or denied; the record says only
+  that a gate held the call).
 - **`approval`** is `dialog`, `review` or `form`; **`answer`** is `allow`,
   `allow-session` or `decline`; **`waitedMs`** includes the time in the queue.
 - **`parentToolCallId`:** a nested call's id is `<parent>/<n>`.

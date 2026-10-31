@@ -80,6 +80,7 @@ example:
 | Credentials stay hidden from `bash` | That is the sandbox's job, and configuration does not reach into it. `/jig` says whether `bash` is sandboxed, and with no sandbox it says plainly that it is not |
 | `bash` run outside its sandbox asks | Only a rule naming the tool `bash`, the action `outside` and a command pattern allows it without asking; no wildcard and no default does. With no screen it is refused |
 | Pi's file tools refuse **protected paths** (see below) | A credential the agent can read leaks a login, and a folder it can write could load code or loosen a rule |
+| A plugin's **gate** can only make a decision stricter | A plugin must not be able to undo what you or the floor decided. `jig-workflow` holds calls this way |
 
 Configuration can always add strictness. For example, it can mask a test
 environment too, make every write ask, deny a tool outright, or protect more

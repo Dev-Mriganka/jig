@@ -105,9 +105,13 @@ closed instead of running ungoverned.
   copy; changing it changes nothing.
 - **`sandbox.register(provider)`** says that `bash` runs in a sandbox. The
   provider has `active`, `mode` (the network mode), a `note` for `/jig` when it
-  is not active, `canWrite(path)` and, optionally, `whenReady()`. Fields are read
+  is not active, `canWrite(path)` and, optionally, `whenReady()` and `run(command, options)`. Fields are read
   when they are needed, so they may change. Registering again replaces the
   provider. See [The sandbox](#the-sandbox).
+- **`gates.register(gate)`** adds a check to every call: a gate can make a decision stricter and never looser. See
+  [Gates](#gates).
+- **`sandbox.canRun`, `sandbox.run(command, options)`** run a shell command in the sandbox, as `bash` would. See
+  [Running a command in the sandbox](#running-a-command-in-the-sandbox).
 - **`approvals.inTurn(job)`** runs a plugin's own question in `jig-core`'s queue.
   Pi has one dialog slot, so questions are asked one at a time; a plugin that asks
   the user something (a sandbox asking about a host) calls `inTurn` with the
@@ -154,6 +158,48 @@ its login in.
   problem named `company`, and the rest still applies.
 - **It can only add:** the built-in paths and the user's cannot be removed (see
   [Protected paths](configuration.md#protected-paths)).
+
+## Gates
+
+A gate is a check that a plugin registers with `gates.register({ name, plugin, check })`. `jig-core` asks every
+gate about each call once the rules have decided ([What asks](approval-screens.md)), so a plugin can hold a
+call without any tool reading its files. `jig-workflow` holds `git push` until the tests pass this way.
+
+`check(call, signal)` gets a frozen `GateCall`:
+
+| Field | Holds |
+|---|---|
+| `toolCallId`, `tool`, `action` | Which call, as the tool declared it |
+| `environment`, `environmentKind`, `effect` | Where it acts and whether it reads or writes |
+| `decision` | What the rules decided: `allow` or `ask` (a denied call is not shown) |
+| `input`, `cwd` | The call's input as the model sent it, and Pi's working folder |
+| `paths` | For Pi's `write` and `edit`: the absolute path, and the same with links followed |
+
+It answers nothing, or `{ decision: "ask" | "deny", reason }`. That is all it can say:
+- **It cannot loosen.** `allow`, or any other answer, is no answer, and is reported once by `/jig`. A call that is
+  already denied (a rule, the floor, a protected path) is final and is not shown to gates. An `ask` with no screen
+  to ask on is still a `deny`.
+- **A `deny`** blocks the call with the reason. **An `ask`** turns an `allow` into an `ask`, and puts the reason
+  in the question. A rule that allows the call, or an earlier "allow for this session", cannot answer it: a gate
+  that asks is asked again next time, and "allow for this session" allows that one call.
+- **A failure denies.** A gate that throws or takes more than 10 seconds denies the call with "jig-core could
+  not decide", as every failure in `jig-core` does.
+- **Several gates:** the strictest answer wins, and a `deny` ends the asking. A name registered again replaces
+  the gate, because Pi loads plugins again on a reload.
+- **It is recorded** as the decision's source `gate`; the event `jig:decision` carries the gate's name, and the
+  record holds only "held by gate <name>", never the reason.
+- **The input is a copy.** A gate cannot change what the tool will run.
+
+## Running a command in the sandbox
+
+`sandbox.canRun` is true when a sandbox is registered, active, and has a `run` method.
+`sandbox.run(command, { cwd, timeoutMs?, signal?, maxOutputBytes? })` runs the shell command in it, with the rules,
+environment, audit and explanations of the agent's `bash`, and returns `{ code, output, timedOut, truncated }`. A
+command that ran and failed is a result; a command the sandbox refuses is a rejection.
+- **It never runs anywhere else.** With `canRun` false the call rejects, whatever the provider would have done.
+  A plugin that wants to run a command with no sandbox uses `exec.run` and asks the user itself.
+- **The command and the folder are checked** before the provider is asked: text without a NUL byte, an absolute
+  `cwd`, a timeout from 1 ms to 2 hours.
 
 ## The sandbox
 
@@ -209,7 +255,7 @@ On Pi's event bus:
 
 | Event | When | What it carries |
 |---|---|---|
-| `jig:decision` | After every decision on a call | The call, its classification, the decision and its source, your answer |
+| `jig:decision` | After every decision on a call | The call, its classification, the decision and its source (and the gate, if one asked or denied), your answer |
 | `jig:watch-done` | When a watch ends | The watch and its cleaned result |
 
 - **`jig:decision` carries** the tool call id, tool, action, environment and its

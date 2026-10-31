@@ -119,8 +119,9 @@ is. Without one, `/jig` and session start say plainly that `bash` is not sandbox
 
 ```text
 jig-core/
-  src/      the hooks (gate, results), classify and decide, config, approvals, secrets, sign-in, transports,
-            redact, records, exec; mask/ (the masker), watch/ (the engine and its tool), kit/ (helpers plugins import)
+  src/      the hooks (gate, results), classify and decide, gates (the checks plugins add), config, approvals,
+            secrets, sign-in, transports, redact, records, exec; mask/ (the masker), watch/ (the engine and its
+            tool), kit/ (helpers plugins import)
   test/     unit tests, and tests inside a real Pi session
   docs/     the detail pages below
 ```

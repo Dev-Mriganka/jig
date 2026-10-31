@@ -8,12 +8,27 @@ import {
     addCompanySecretCommands,
     OWN_SECTIONS,
 } from "./config.ts";
-import type { Facts, JigApi } from "./contract.ts";
+import type { Facts, JigApi, SandboxProvider } from "./contract.ts";
 import { git, run } from "./exec.ts";
 import type { ExecGuard } from "./exec.ts";
 import { ensureConfigLoaded, loadPersonalConfig } from "./state.ts";
 import type { JigState } from "./state.ts";
 import { oneOfProblem } from "./section-defaults.ts";
+import { isAbsolute } from "node:path";
+
+/** The longest a command run in the sandbox for a plugin may take. */
+const MAX_SANDBOX_RUN_MS = 2 * 60 * 60 * 1000;
+
+/** Whether the registered sandbox is on and can run a command. A provider that throws when asked counts as one that cannot. */
+function sandboxCanRun(state: JigState): boolean {
+    const provider = state.sandbox;
+    if (provider === undefined || typeof provider.run !== "function") return false;
+    try {
+        return provider.active === true;
+    } catch {
+        return false;
+    }
+}
 
 export function buildApi(state: JigState): JigApi {
     // Asked at each use: the sandbox registers after this API is built, and can be switched off and on.
@@ -186,6 +201,36 @@ export function buildApi(state: JigState): JigApi {
                 }
                 state.sandbox = provider;
             },
+            get canRun() {
+                return sandboxCanRun(state);
+            },
+            async run(command, options) {
+                // Checked here and not left to the provider: a plugin that asks for the sandbox must never get a command run
+                // anywhere else, whatever the provider does with a request it cannot honour.
+                if (!sandboxCanRun(state)) {
+                    throw new Error(
+                        "no sandbox can run this command: none is registered, it is switched off, it could not start, or it cannot run commands",
+                    );
+                }
+                if (typeof command !== "string" || command === "" || command.includes("\0")) {
+                    throw new TypeError("sandbox.run: the command must be text");
+                }
+                if (typeof options?.cwd !== "string" || !isAbsolute(options.cwd)) {
+                    throw new TypeError("sandbox.run: cwd must be an absolute path");
+                }
+                const timeoutMs = options.timeoutMs;
+                if (
+                    timeoutMs !== undefined &&
+                    (!Number.isFinite(timeoutMs) || timeoutMs < 1 || timeoutMs > MAX_SANDBOX_RUN_MS)
+                ) {
+                    throw new TypeError("sandbox.run: timeoutMs must be from 1 ms to 2 hours");
+                }
+                return (state.sandbox as Required<SandboxProvider>).run(command, options);
+            },
+        },
+
+        gates: {
+            register: (gate) => state.gates.register(gate),
         },
 
         approvals: {

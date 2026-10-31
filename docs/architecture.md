@@ -60,7 +60,9 @@ tool_execution_start → tool_call → tool_execution_update → tool_result →
                          or a default (unknown tools count as writes outside)
    3. decide     the rules table → allow / ask / deny
                    your configuration can always make it stricter,
-                   but never lower the floor (see Permissions)
+                   but never lower the floor (see Permissions);
+                   then the gates plugins registered, which can only
+                   make it stricter still
    4. ask        only when the rule says ask: the approval screen,
                    inside this waiting call (see Approvals)
    5. block, or let it run

@@ -25,11 +25,11 @@ the call's input, Pi's working folder, and for Pi's `write` and `edit` the absol
   to ask on) is final before gates run, and an `ask` with no screen still becomes a `deny` afterwards.
 - **A failure blocks the call.** A gate that throws, or takes more than 10 seconds, denies the call with
   "jig-core could not decide", as every failure in `jig-core` does.
-- **Several gates** all run, and the strictest answer wins. Their order does not matter.
+- **Several gates:** the strictest answer wins, and a `deny` ends the asking.
 - **It is recorded** as the decision's source `gate`, with the gate's name on the event, so `/lens` shows
   how often a hold stopped work. The reason goes to the model and is not written to the records.
 
-[Plugin contract](../../jig-core/docs/plugin-contract.md) has the exact types.
+[Plugin contract](../../jig-core/docs/plugin-contract.md#gates) has the exact types.
 
 ## What a hold matches
 
