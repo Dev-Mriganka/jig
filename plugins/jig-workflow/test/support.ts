@@ -81,6 +81,8 @@ export function fakeHost(
     over: {
         run?: RunScript;
         sandbox?: (command: string, options: SandboxRunOptions) => SandboxRunResult | Promise<SandboxRunResult>;
+        /** The `git` section of `jig.json`, as jig-core would give it. */
+        gitSection?: unknown;
     } = {},
 ): FakeHost {
     const host: FakeHost = {
@@ -124,6 +126,7 @@ export function fakeHost(
             },
         },
         approvedPreview: (toolCallId) => host.approved.get(toolCallId),
+        gitSection: () => over.gitSection,
         now: () => host.clock.now,
     };
     return host;
@@ -147,3 +150,59 @@ export const PASSED = [
     { __typename: "CheckRun", name: "build", status: "COMPLETED", conclusion: "SUCCESS" },
     { __typename: "StatusContext", context: "lint", state: "SUCCESS" },
 ];
+
+// ---- GitLab's answers, written down ------------------------------------------------------------------------------------
+// The fields are the ones a real merge request and pipeline job carry in GitLab's REST API (v4), trimmed to what the plugin
+// reads. Every name is made up: `platform/payments/orders-api`, `gitlab.example.com`.
+
+/** A merge request, as `GET projects/:id/merge_requests` gives it for a branch. */
+export function mrJson(over: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+        id: 90042,
+        iid: 42,
+        project_id: 7,
+        source_project_id: 7,
+        target_project_id: 7,
+        title: "PROJ-1: cache the price list",
+        state: "opened",
+        draft: false,
+        source_branch: "main",
+        target_branch: "develop",
+        sha: "0".repeat(40),
+        web_url: "https://gitlab.example.com/platform/payments/orders-api/-/merge_requests/42",
+        head_pipeline: {
+            id: 301,
+            iid: 12,
+            project_id: 7,
+            sha: "0".repeat(40),
+            ref: "main",
+            status: "success",
+            web_url: "https://gitlab.example.com/platform/payments/orders-api/-/pipelines/301",
+        },
+        ...over,
+    };
+}
+
+/** A job of a pipeline, as `GET projects/:id/pipelines/:id/jobs` gives it. */
+export function jobJson(name: string, status: string, over: Record<string, unknown> = {}): Record<string, unknown> {
+    return { id: 5000 + name.length, name, stage: "test", status, allow_failure: false, ...over };
+}
+
+export const GREEN_JOBS = [jobJson("build", "success"), jobJson("test", "success"), jobJson("lint", "success")];
+
+/** What `glab api` prints for the endpoints a merge request is read through, by what the endpoint contains. */
+export function glabAnswers(answers: Array<[match: string | RegExp, reply: unknown | RunResult]>): RunScript {
+    return (file, args) => {
+        if (file !== "glab") return ok("", 127, `no program ${file} in this test`);
+        const endpoint = args.at(-1) ?? "";
+        for (const [match, reply] of answers) {
+            if (typeof match === "string" ? endpoint.includes(match) : match.test(endpoint)) {
+                const result = reply as Partial<RunResult> & { code?: number };
+                if (typeof result === "object" && result !== null && "code" in result && "stderr" in result)
+                    return reply as RunResult;
+                return ok(JSON.stringify(reply));
+            }
+        }
+        return ok("[]");
+    };
+}

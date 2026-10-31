@@ -35,6 +35,21 @@ describe("inspecting a repository", () => {
         assert.equal(view.problem, undefined);
     });
 
+    test("a project in subgroups on GitLab is named by its whole path, and origin's host and path are kept", async (t) => {
+        const root = makeRepo(tempFolder(t), "orders-api", "git@gitlab.example.com:Platform/Payments/Orders-API.git");
+        const view = await inspect(fakeHost(), root);
+        assert.equal(view.slug, "platform/payments/orders-api");
+        assert.equal(view.remoteName, "Orders-API");
+        assert.deepEqual(view.remote, { host: "gitlab.example.com", path: "Platform/Payments/Orders-API" });
+    });
+
+    test("a local origin has no host, and keeps the name it always had", async (t) => {
+        const root = makeRepo(tempFolder(t), "orders-api", "/srv/git/acme/orders-api.git");
+        const view = await inspect(fakeHost(), root);
+        assert.equal(view.slug, "acme/orders-api");
+        assert.equal(view.remote, undefined);
+    });
+
     test("a tracked change, and an untracked file, both make the tree not clean", async (t) => {
         const root = makeRepo(tempFolder(t), "r");
         writeFileSync(path.join(root, "README.md"), "changed\n");

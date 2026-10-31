@@ -23,6 +23,9 @@ export interface Host {
     };
     /** The preview the user approved for this tool call, or undefined when the call did not ask. */
     approvedPreview(toolCallId: string): Preview | undefined;
+    /** jig-git keeps `forges` and `cloneHost` in the `git` section of `jig.json`; this is that section as
+     *  jig-core loaded it, or undefined. Read to tell GitHub from GitLab, never written. */
+    gitSection(): unknown;
     now(): Date;
 }
 
@@ -45,6 +48,13 @@ export function coreHost(): Host {
         approvedPreview: (toolCallId) => {
             try {
                 return jig().approvedPreview(toolCallId);
+            } catch {
+                return undefined;
+            }
+        },
+        gitSection: () => {
+            try {
+                return jig().config.section("git");
             } catch {
                 return undefined;
             }

@@ -11,7 +11,22 @@ import { fingerprintOf, parsePlan } from "../src/plan.ts";
 import { newState } from "../src/store.ts";
 import type { Observation, TestResult, WorkflowState } from "../src/store.ts";
 import { ticketPaths } from "../src/ticket.ts";
-import { commit, fakeHost, git, headOf, makeRepo, NOW, ok, PASSED, prJson, tempFolder } from "./support.ts";
+import {
+    commit,
+    fakeHost,
+    git,
+    GREEN_JOBS,
+    glabAnswers,
+    headOf,
+    jobJson,
+    makeRepo,
+    mrJson,
+    NOW,
+    ok,
+    PASSED,
+    prJson,
+    tempFolder,
+} from "./support.ts";
 import type { FakeHost, RunScript } from "./support.ts";
 
 const PLAN = `## Approach
@@ -522,5 +537,182 @@ describe("several at once", () => {
                 ["plan-approved", false],
             ],
         );
+    });
+});
+
+describe("a repository on GitLab", () => {
+    const REMOTE = "git@gitlab.example.com:platform/payments/orders-api.git";
+    const SECTION = { forges: { "gitlab.example.com": "gitlab" } };
+
+    type Answers = Array<[match: string | RegExp, reply: unknown]>;
+
+    /**
+     * A world whose bound repository is on GitLab, with `glab` answering from recorded answers. `answers` is given a builder of the
+     * merge request, whose head and pipeline are the repository's HEAD unless a test says otherwise.
+     */
+    function gitlab(
+        t: TestContext,
+        answers: (mr: (over?: Record<string, unknown>) => Record<string, unknown>) => Answers,
+        gitSection: unknown = SECTION,
+    ) {
+        const w = world(t);
+        git(w.orders, "remote", "set-url", "origin", REMOTE);
+        const sha = headOf(w.orders);
+        const mr = (over: Record<string, unknown> = {}) =>
+            mrJson({ sha, head_pipeline: { id: 301, sha, status: "success" }, ...over });
+        const host = fakeHost({ run: glabAnswers(answers(mr)), gitSection });
+        return { w, host, evidence: () => new Evidence({ ...w.evidence().init, host, live: true }) };
+    }
+
+    test("pull-request-open holds for an open merge request, read with glab api and not gh", async (t) => {
+        const g = gitlab(t, (mr) => [["merge_requests", [mr()]]]);
+        const result = await evaluate("pull-request-open", g.evidence());
+        assert.equal(result.ok, true);
+        assert.match(result.lines[0] ?? "", /pull request #42 is open$/);
+        assert.deepEqual(
+            g.host.ran.map((run) => run.file),
+            ["glab", "glab"],
+            "the merge request, then the jobs of its pipeline; never gh",
+        );
+        assert.deepEqual(g.host.ran[0]?.args.slice(0, 3), ["api", "--hostname", "gitlab.example.com"]);
+        assert.match(
+            g.host.ran[0]?.args[3] ?? "",
+            /^projects\/platform%2Fpayments%2Forders-api\/merge_requests\?source_branch=main&state=opened/,
+        );
+        assert.equal(g.host.ran[0]?.cwd, g.w.orders);
+    });
+
+    test("gitlab.com needs no setting", async (t) => {
+        const g = gitlab(t, (mr) => [["merge_requests", [mr()]]], undefined);
+        git(g.w.orders, "remote", "set-url", "origin", "https://gitlab.com/platform/payments/orders-api.git");
+        assert.equal((await evaluate("pull-request-open", g.evidence())).ok, true);
+        assert.equal(g.host.ran[0]?.args[2], "gitlab.com");
+    });
+
+    test("a draft is open and says so; no merge request, a closed one and a merged one each say what they are", async (t) => {
+        const draft = gitlab(t, (mr) => [["merge_requests", [mr({ draft: true })]]]);
+        assert.match((await evaluate("pull-request-open", draft.evidence())).lines[0] ?? "", /is open \(a draft\)/);
+
+        const none = gitlab(t, () => [["merge_requests", []]]);
+        const missing = await evaluate("pull-request-open", none.evidence());
+        assert.equal(missing.ok, false);
+        assert.match(missing.lines[0] ?? "", /no pull request for main: push the branch and open one with pr create/);
+
+        for (const [state, said] of [
+            ["closed", "closed"],
+            ["merged", "merged"],
+        ] as const) {
+            const g = gitlab(t, (mr) => [
+                [/state=opened/, []],
+                ["merge_requests", [mr({ state })]],
+            ]);
+            assert.match(
+                (await evaluate("pull-request-open", g.evidence())).lines[0] ?? "",
+                new RegExp(`pull request #42 is ${said}, not open`),
+            );
+        }
+    });
+
+    test("glab failing is a reason, as gh failing is", async (t) => {
+        const g = gitlab(t, () => [
+            ["merge_requests", { code: 1, stdout: "", stderr: "glab: 401 Unauthorized (HTTP 401)", timedOut: false }],
+        ]);
+        const result = await evaluate("pull-request-open", g.evidence());
+        assert.match(
+            result.lines[0] ?? "",
+            /cannot read the pull request \(glab: 401 Unauthorized \(HTTP 401\) \(glab is not signed in for gitlab\.example\.com/,
+        );
+    });
+
+    test("checks-pass holds when every job of the pipeline of HEAD passed", async (t) => {
+        const g = gitlab(t, (mr) => [
+            ["pipelines/301/jobs", GREEN_JOBS],
+            ["merge_requests", [mr()]],
+        ]);
+        const result = await evaluate("checks-pass", g.evidence());
+        assert.equal(result.ok, true);
+        assert.match(result.lines[0] ?? "", /all 3 checks of the pull request passed/);
+    });
+
+    test("a failed job, a running job and a request with no pipeline each say so", async (t) => {
+        const failed = gitlab(t, (mr) => [
+            ["pipelines/301/jobs", [...GREEN_JOBS, jobJson("e2e", "failed")]],
+            ["merge_requests", [mr()]],
+        ]);
+        assert.match(
+            (await evaluate("checks-pass", failed.evidence())).lines[0] ?? "",
+            /1 check failed at [0-9a-f]{7}: look with ci status and ci log/,
+        );
+        const running = gitlab(t, (mr) => [
+            ["pipelines/301/jobs", [...GREEN_JOBS, jobJson("e2e", "running")]],
+            ["merge_requests", [mr()]],
+        ]);
+        assert.match(
+            (await evaluate("checks-pass", running.evidence())).lines[0] ?? "",
+            /1 of 4 checks are still running/,
+        );
+        const bare = gitlab(t, (mr) => [["merge_requests", [mr({ head_pipeline: null })]]]);
+        assert.match(
+            (await evaluate("checks-pass", bare.evidence())).lines[0] ?? "",
+            /the pull request has no checks yet/,
+        );
+    });
+
+    test("not while the merge request is at an older commit: push first", async (t) => {
+        const pushed = "c".repeat(40);
+        const g = gitlab(t, (mr) => [["merge_requests", [mr({ sha: pushed })]]]);
+        const result = await evaluate("checks-pass", g.evidence());
+        assert.equal(result.ok, false);
+        assert.match(
+            result.lines[0] ?? "",
+            new RegExp(`the pull request is at ${pushed.slice(0, 7)} and HEAD is [0-9a-f]{7}: push first`),
+        );
+    });
+
+    test("a CI watch of the project passed at HEAD holds, and a project in subgroups is matched by its whole path", async (t) => {
+        const g = gitlab(t, (mr) => [
+            ["pipelines/301/jobs", [jobJson("build", "running")]],
+            ["merge_requests", [mr()]],
+        ]);
+        const head = headOf(g.w.orders);
+        g.w.state.ci.push({
+            repo: "platform/payments/orders-api",
+            sha: head,
+            outcome: "passed",
+            finish: "pipeline",
+            at: NOW.toISOString(),
+        });
+        const result = await evaluate(
+            "checks-pass",
+            new Evidence({ ...g.w.evidence().init, host: g.host, live: true }),
+        );
+        assert.equal(result.ok, true);
+        assert.match(result.lines[0] ?? "", /a CI watch passed the required checks at/);
+
+        // The last two parts alone are another project: a watch of `payments/orders-api` is not this one's.
+        g.w.state.ci.length = 0;
+        g.w.state.ci.push({ repo: "payments/orders-api", sha: head, outcome: "passed", finish: "pipeline", at: "t" });
+        const other = await evaluate("checks-pass", new Evidence({ ...g.w.evidence().init, host: g.host, live: true }));
+        assert.equal(other.ok, false);
+    });
+
+    test("a host jig.json does not name stays on gh, as it always did", async (t) => {
+        const w = world(t, { run: () => ok(prJson({ headRefOid: headOf(w.orders) })) });
+        git(w.orders, "remote", "set-url", "origin", "git@git.example.com:platform/orders-api.git");
+        const result = await evaluate("pull-request-open", w.evidence({ live: true }));
+        assert.equal(result.ok, true);
+        assert.equal(w.host.ran[0]?.file, "gh");
+    });
+
+    test("an ssh alias mapped to GitHub is read with gh against the real host", async (t) => {
+        const w = world(t);
+        git(w.orders, "remote", "set-url", "origin", "git@github.com-work:acme/orders-api.git");
+        const host = fakeHost({
+            run: () => ok(prJson({ headRefOid: headOf(w.orders) })),
+            gitSection: { forges: { "github.com-work": { forge: "github", host: "github.com" } } },
+        });
+        const result = await evaluate("pull-request-open", new Evidence({ ...w.evidence().init, host, live: true }));
+        assert.equal(result.ok, true);
+        assert.deepEqual(host.ran[0]?.args.slice(0, 5), ["pr", "view", "main", "-R", "github.com/acme/orders-api"]);
     });
 });

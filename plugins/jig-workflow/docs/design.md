@@ -82,7 +82,7 @@ Each is small, and each plugin's own documentation describes it.
 | Can a workflow start by itself? | No; the session start line suggests one | Starting writes into the ticket folder |
 | Is `back` free? | Yes, and it erases nothing | Going back to fix a plan must be easy; evidence is checked against what is now |
 | How is review evidence trusted? | An event with full commits, for a bound repository, that covers commits | The agent cannot publish on the bus; the page's passkey is what proves you |
-| `checks-pass` from where? | A CI watch for the commit, else `gh pr view`'s roll-up | The watch knows the required checks; the roll-up needs no setup |
+| `checks-pass` from where? | A CI watch for the commit, else the roll-up from `gh pr view` or, on GitLab, the pipeline's jobs | The watch knows the required checks; the roll-up needs no setup |
 
 ## Where this comes from
 

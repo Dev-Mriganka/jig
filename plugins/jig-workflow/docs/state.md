@@ -21,7 +21,7 @@ counts if the commit it names is still HEAD.
 | `tests` | By repository folder: the last result ([Tests](tests.md)) |
 | `reviews` | The `jig-review:approved` events that cover commits: review id, time, folders and commits |
 | `ci` | The `jig-ops:ci-finished` results: folder, commit, outcome, time (the last 20) |
-| `observed` | The last `gh pr view` reading per repository: pull request, head, checks, time |
+| `observed` | The last reading per repository (`gh pr view`, or the merge request on GitLab): pull request, head, checks, time |
 
 The workflow's stages and conditions are not copied into the file. The name points at the file that
 `/workflow list` shows, so fixing a workflow file mid-ticket takes effect at the next reload. If the file
