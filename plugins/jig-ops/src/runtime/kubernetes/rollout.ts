@@ -120,6 +120,14 @@ export function evaluate(pods: readonly Pod[], workloads: readonly Workload[], v
     return { verdict, failing, live, settled, wanted, tags };
 }
 
+/** Reasons a container waits for when it has never started, so that it has no log to read. */
+const NEVER_STARTED: ReadonlySet<string> = new Set([
+    "ImagePullBackOff",
+    "ErrImagePull",
+    "InvalidImageName",
+    "CreateContainerConfigError",
+]);
+
 /** The verdict as one sentence. `waited` is how long a wait ran, when it ended because time was up. */
 export function verdictLine(rollout: Rollout, target: Target, version: string | undefined, waited?: string): string {
     const { live, settled, wanted, tags } = rollout;
@@ -135,10 +143,11 @@ export function verdictLine(rollout: Rollout, target: Target, version: string | 
         }
         case "failing": {
             const pod = rollout.failing as Pod;
-            return (
-                `Failing: pod ${pod.name} is ${pod.failing} (${plural(pod.restarts, "restart")}). ` +
-                `Read why with runtime logs (pod: ${pod.name}, previous: true).`
-            );
+            // A container that never started has no log, previous or not: the events say which image or setting failed.
+            const next = NEVER_STARTED.has(pod.failing ?? "")
+                ? "Read why with runtime events."
+                : `Read why with runtime logs (pod: ${pod.name}, previous: true).`;
+            return `Failing: pod ${pod.name} is ${pod.failing} (${plural(pod.restarts, "restart")}). ${next}`;
         }
         case "no-pods":
             return `No pods${after} match ${target.selector} in namespace ${target.namespace}.`;

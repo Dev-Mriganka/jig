@@ -1,10 +1,8 @@
 # jig-mongo: MongoDB, with reads, writes, indexes and aggregation
 
-**Status: built.** Every action below, tested against a fake of the driver's seam and a fake of the driver's client, and an
-SSH route tested with a fake `ssh`. An optional test runs every action against a real MongoDB when `JIG_TEST_MONGO_URI` is
-set, and passed once against MongoDB 8.0 on one machine.
-
-Not yet tried in everyday use, or against a managed service (see [Not verified yet](docs/not-verified.md)).
+**Status: built.** Every action below is tested against fakes, and in CI against a real MongoDB 7.0 replica set, reached directly, through an
+SSH forward and through a SOCKS tunnel (`ssh -D`) to a real SSH server. What is still unproved is in
+[Not verified yet](docs/not-verified.md).
 
 `jig-mongo` gives the agent a complete MongoDB tool: exploring, querying, indexes, query plans, aggregation and writes.
 `jig-core` decides each call by environment: reads run, a write to `staging` asks you with a preview, and every write to
@@ -132,7 +130,7 @@ jig-mongo/
             writes), the index check (require-index), results (render, explain, bson, ejson), the driver seam (backend, driver),
             connections (config, session, route)
   skills/   mongo/SKILL.md: count, then find; explain before blaming the database; preview every write; never production writes
-  test/     fakes of jig-core, the database and ssh; one test file per area; an optional one against a real MongoDB
+  test/     fakes of jig-core, the database and ssh; one test file per area; test/it/ against a real MongoDB and SSH server
   docs/     the detail pages below
 ```
 

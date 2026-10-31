@@ -52,6 +52,11 @@ const BEFORE_SENDING: ReadonlySet<string> = new Set([
     "MongoClientClosedError",
 ]);
 const NETWORK: ReadonlySet<string> = new Set(["MongoNetworkError", "MongoNetworkTimeoutError"]);
+/**
+ * The names under which the driver reports an error the server answered with. A bulk write (`insertMany`, `bulkWrite`) fails
+ * with a subclass of `MongoServerError` that has a name of its own, and the same `code`, such as 11000 for a duplicate key.
+ */
+const SERVER_ERRORS: ReadonlySet<string> = new Set(["MongoServerError", "MongoBulkWriteError"]);
 
 const nameOf = (error: unknown): string => String((error as DriverError | undefined)?.name ?? "");
 const codeOf = (error: unknown): number | undefined => (error as DriverError | undefined)?.code;
@@ -64,7 +69,7 @@ export function deliveryOf(error: unknown, aborted: boolean): Delivery {
     if (aborted || isAbort(error)) return "unknown";
     const name = nameOf(error);
     if (BEFORE_SENDING.has(name)) return "not-sent";
-    if (name === "MongoServerError") {
+    if (SERVER_ERRORS.has(name)) {
         const code = codeOf(error);
         if (code === AUTH_FAILED || code === UNAUTHORIZED) return "not-sent";
         return code === MAX_TIME_EXPIRED ? "unknown" : "rejected";
@@ -80,7 +85,7 @@ export function dropsConnection(error: unknown): boolean {
         NETWORK.has(name) ||
         name === "MongoServerSelectionError" ||
         name === "MongoTopologyClosedError" ||
-        (name === "MongoServerError" && codeOf(error) === AUTH_FAILED)
+        (SERVER_ERRORS.has(name) && codeOf(error) === AUTH_FAILED)
     );
 }
 
@@ -107,7 +112,7 @@ export function describeFailure(error: unknown, context: FailureContext): Error 
         );
     }
     if (NETWORK.has(name)) return told("the connection to the database dropped");
-    if (name === "MongoServerError") {
+    if (SERVER_ERRORS.has(name)) {
         if (e.code === AUTH_FAILED)
             return told(
                 `the database refused the sign-in for ${context.environment}: check the user and the password reference`,

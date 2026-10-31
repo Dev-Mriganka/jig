@@ -8,6 +8,7 @@ import { jigOps } from "../../src/index.ts";
 import type { OpsOptions } from "../../src/index.ts";
 import { fakeClock } from "./clock.ts";
 import type { FakeClock } from "./clock.ts";
+import { forgetGhFlags } from "../../src/ci/gh.ts";
 import { installFakeGh } from "./fake-gh.ts";
 import type { FakeGh } from "./fake-gh.ts";
 import { installFakeJig } from "./fake-jig.ts";
@@ -85,11 +86,31 @@ const NO_NETWORK = async (): Promise<Response> => {
     throw new Error("a test tried to use the network: give the harness a fetch");
 };
 
-export function setupHarness(options: OpsOptions = {}): Harness {
+/** What a real harness has in place of the fake kubectl, helm and gh: asking for one is a mistake in the test. */
+const NO_FAKE_PROGRAMS = new Proxy(
+    {},
+    {
+        get() {
+            throw new Error("this harness runs the real kubectl, helm and gh, so it has no fake programs");
+        },
+    },
+);
+
+/**
+ * `real`: the programs are the ones on PATH, the clock and the sleep are the real ones, and the network is the real one (the tests
+ * in `it/`). `programEnv` is what `exec.run` adds to the environment of every program, such as the token `gh` signs in with.
+ */
+export function setupHarness(
+    options: OpsOptions = {},
+    real: false | { programEnv?: Readonly<Record<string, string>> } = false,
+): Harness {
+    // What was learned about the last gh is not true of this one.
+    forgetGhFlags();
     const jig = installFakeJig();
-    const cluster = installFakePrograms();
-    const gh = installFakeGh();
-    jig.useProgramsIn([cluster.bin, gh.bin], cluster.env);
+    const cluster = real === false ? installFakePrograms() : (NO_FAKE_PROGRAMS as FakePrograms);
+    const gh = real === false ? installFakeGh() : (NO_FAKE_PROGRAMS as FakeGh);
+    if (real === false) jig.useProgramsIn([cluster.bin, gh.bin], cluster.env);
+    else jig.useProgramsIn([], real.programEnv ?? {});
     const clock = fakeClock();
 
     // A Pi that keeps what the plugin registers, and an event bus.
@@ -117,8 +138,14 @@ export function setupHarness(options: OpsOptions = {}): Harness {
     };
 
     // The network of a CI request is the fake jig's; health checks take theirs from the plugin's options.
-    jig.setFetch(options.fetch ?? NO_NETWORK);
-    jigOps({ now: clock.now, sleep: clock.deps.sleep, fetch: NO_NETWORK, ...options })(pi as unknown as ExtensionAPI);
+    if (real === false) {
+        jig.setFetch(options.fetch ?? NO_NETWORK);
+        jigOps({ now: clock.now, sleep: clock.deps.sleep, fetch: NO_NETWORK, ...options })(
+            pi as unknown as ExtensionAPI,
+        );
+    } else {
+        jigOps(options)(pi as unknown as ExtensionAPI);
+    }
 
     const configure = (raw: Raw = section()): void => jig.setSection("ops", raw);
     configure();
@@ -210,8 +237,10 @@ export function setupHarness(options: OpsOptions = {}): Harness {
         configure,
         close() {
             jig.remove();
-            cluster.remove();
-            gh.remove();
+            if (real === false) {
+                cluster.remove();
+                gh.remove();
+            }
         },
     };
 }

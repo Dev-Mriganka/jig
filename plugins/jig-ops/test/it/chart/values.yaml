@@ -1,0 +1,11 @@
+replicaCount: 2
+
+image:
+  repository: nginxinc/nginx-unprivileged
+  # The deploy tool sets this (--set image.tag=<version>).
+  tag: 1.30.5-alpine
+  # The digest of each tag the tests deploy, so that an image is pinned by tag and by digest. A tag that is not listed is
+  # deployed without one: the tests use that for a tag that does not exist.
+  digests:
+    1.30.5-alpine: sha256:56b8272e43a0525f67aed68d1e0794a712d10e3e45a563e118e9a77c817e6f86
+    1.30.6-alpine: sha256:f5116ed4606f3eb015dd4a8e28cb9b351476dc0ad4bc6e9f93b19cec130cdf03

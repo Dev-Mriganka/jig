@@ -1,8 +1,8 @@
 # jig-git: git, pull requests and releases
 
 **Status: built.** Tested against temporary repositories and recorded GitHub
-answers. Nothing has been tried against GitHub itself yet (see
-[Not verified yet](docs/not-verified.md)).
+answers, and in CI the reads are run against real GitHub. No test writes to
+GitHub (see [Not verified yet](docs/not-verified.md)).
 
 `jig-git` gives the agent three tools: `git` for the local repository, `pr` for
 GitHub pull requests and reviews, and `release` for tags and releases.

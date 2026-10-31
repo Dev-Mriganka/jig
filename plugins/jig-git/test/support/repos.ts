@@ -21,8 +21,11 @@ export interface Sandbox {
     cleanup(): void;
 }
 
-/** A temporary root with HOME and the git configuration redirected into it, and a fixed git identity. */
-export function sandbox(): Sandbox {
+/**
+ * A temporary root with HOME and the git configuration redirected into it, and a fixed git identity. By default "GitHub" is a
+ * folder (see below); `github: "real"` leaves github.com alone, for the tests that go to the real one.
+ */
+export function sandbox(options: { github?: "folder" | "real" } = {}): Sandbox {
     const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "jig-git-")));
     const workspace = path.join(root, "ws");
     const home = path.join(root, "home");
@@ -31,9 +34,10 @@ export function sandbox(): Sandbox {
     // "GitHub" is a folder: a remote URL that looks like git@github.com:acme/svc.git is a bare repository in it. The rule is in
     // the global configuration, as a person would put it, so the repositories' own .git/config stays plain.
     const remotes = path.join(root, "remotes");
+    const redirect = options.github === "real" ? "" : `[url "${remotes}/"]\n\tinsteadOf = git@github.com:\n`;
     fs.writeFileSync(
         path.join(home, ".gitconfig"),
-        `[user]\n\tname = Test Author\n\temail = test@example.invalid\n[init]\n\tdefaultBranch = main\n[url "${remotes}/"]\n\tinsteadOf = git@github.com:\n`,
+        `[user]\n\tname = Test Author\n\temail = test@example.invalid\n[init]\n\tdefaultBranch = main\n${redirect}`,
     );
     setEnv("HOME", home);
     setEnv("XDG_CONFIG_HOME", path.join(root, "xdg"));

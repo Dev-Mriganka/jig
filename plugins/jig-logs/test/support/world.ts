@@ -94,39 +94,44 @@ export async function world(t: TestContext, options: WorldOptions = {}): Promise
     jig.api.config.registerSection("logs", validateLogsSection);
     jig.setSection("logs", options.section ?? logsSection(options));
 
-    let counter = 0;
     return {
         jig,
         tool,
         requests,
         ...(transport === undefined ? {} : { transport }),
-        async call(input, callOptions = {}) {
-            const updates: string[] = [];
-            const result: CallResult = { text: "", updates };
-            try {
-                result.cls = tool.declaration.classify(input);
-            } catch (error) {
-                result.classifyError = error as Error;
-            }
-            try {
-                const onUpdate = (partial: { content: Array<{ type: string; text?: string }> }) => {
-                    updates.push(partial.content[0]?.text ?? "");
-                };
-                const reply = await tool.definition.execute(
-                    `call-${++counter}`,
-                    input as never,
-                    callOptions.signal,
-                    onUpdate as never,
-                    {} as never,
-                );
-                const first = reply.content[0];
-                result.text = first !== undefined && first.type === "text" ? first.text : "";
-                result.details = reply.details;
-            } catch (error) {
-                result.error = error as Error;
-            }
-            return result;
-        },
+        call: caller(tool),
+    };
+}
+
+/** Runs calls of a tool the way jig-core does: classify first, then run. Shared with the tests against real backends. */
+export function caller(tool: JigTool): World["call"] {
+    let counter = 0;
+    return async (input, callOptions = {}) => {
+        const updates: string[] = [];
+        const result: CallResult = { text: "", updates };
+        try {
+            result.cls = tool.declaration.classify(input);
+        } catch (error) {
+            result.classifyError = error as Error;
+        }
+        try {
+            const onUpdate = (partial: { content: Array<{ type: string; text?: string }> }) => {
+                updates.push(partial.content[0]?.text ?? "");
+            };
+            const reply = await tool.definition.execute(
+                `call-${++counter}`,
+                input as never,
+                callOptions.signal,
+                onUpdate as never,
+                {} as never,
+            );
+            const first = reply.content[0];
+            result.text = first !== undefined && first.type === "text" ? first.text : "";
+            result.details = reply.details;
+        } catch (error) {
+            result.error = error as Error;
+        }
+        return result;
     };
 }
 

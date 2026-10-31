@@ -24,6 +24,34 @@ export function gh(args: readonly string[], options: GhOptions = {}): Promise<Ru
     });
 }
 
+let escapeFlag: Promise<boolean | undefined> | undefined;
+
+/**
+ * Whether the installed gh has `gh api --allow-escape-sequences`. gh 2.97 and later refuse to print a response that is not JSON
+ * and holds terminal escape sequences, as every CI log does, unless that flag is given; an older gh does not know the flag
+ * and fails on it. gh's own help says which one this is, and it is asked once. An answer that cannot be had (gh would not
+ * run, or timed out) is not kept, and counts as "no" for that call.
+ */
+export async function ghAllowsEscapes(options: GhOptions = {}): Promise<boolean> {
+    escapeFlag ??= (async () => {
+        try {
+            const result = await gh(["help", "api"], { signal: options.signal, timeoutMs: 15_000 });
+            if (result.code !== 0 || result.timedOut) return undefined;
+            return `${result.stdout}\n${result.stderr}`.includes("--allow-escape-sequences");
+        } catch {
+            return undefined;
+        }
+    })();
+    const answer = await escapeFlag;
+    if (answer === undefined) escapeFlag = undefined;
+    return answer === true;
+}
+
+/** Forgets what was learned about the installed gh. For tests that give the plugin another gh. */
+export function forgetGhFlags(): void {
+    escapeFlag = undefined;
+}
+
 /** Removes the user name and password from any URL in `text`, so no credential reaches the model or a message. */
 function scrub(text: string): string {
     return text.replace(/([a-z][a-z0-9+.-]*:\/\/)[^/@\s]+@/gi, "$1");

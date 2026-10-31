@@ -53,6 +53,9 @@ and `jig-theme`, so change a table and its test together.
   Run `npm run format` before committing. The page's checks need `npm ci` in
   `plugins/jig-review/web` first, and a change under its `src/` needs a rebuild
   (`npm run build` there) or `check:dist` fails.
+- **Integration tests** run the plugins against real services: `npm run test:it`, and the `integration` job in CI. A
+  suite skips when its service's address is not set, so `npm test` and `npm run check` never need a service. See
+  [Integration tests](docs/integration-tests.md).
 - **No secret-shaped literals, even fake ones.** A test value that looks like a
   real credential (a GitHub token, a Postman key, an AWS key, a private-key
   block) is built at run time from parts, such as `["PMAK", "1a2b"].join("-")`.

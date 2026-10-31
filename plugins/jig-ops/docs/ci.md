@@ -37,6 +37,8 @@ names the adapter and says what it does have.
 - **A log is capped and scrubbed.** At most 400 lines, the tail or the lines that
   match `grep`; terminal sequences and control characters out, and anything that
   looks like a credential replaced. A log of more than 8 MiB is refused.
+  - **`gh` 2.97 and later** refuse to print a log, which is text with colour codes in it, unless `--allow-escape-sequences` is given.
+    The plugin gives it when `gh help api` lists the flag (asked once), and an older `gh`, which fails on an unknown flag, is not given it.
 
 ## Classification, previews and lost replies
 

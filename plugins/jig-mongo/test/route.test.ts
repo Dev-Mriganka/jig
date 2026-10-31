@@ -8,7 +8,7 @@ import path from "node:path";
 import { after, afterEach, before, beforeEach, describe, test } from "node:test";
 import type { HostPort, SshRoute } from "../src/config.ts";
 import { RouteError } from "../src/errors.ts";
-import { freePort, probe, sshArguments, startForward } from "../src/route.ts";
+import { classifySshFailure, freePort, probe, sshArguments, startForward } from "../src/route.ts";
 import type { Forward, RouteDeps } from "../src/route.ts";
 import { fakeSsh } from "./support/fake-ssh.ts";
 import type { FakeSsh } from "./support/fake-ssh.ts";
@@ -239,6 +239,28 @@ describe("the forward", () => {
                 mode,
             );
         }
+    });
+
+    test("what OpenSSH prints for a key it cannot load ends with Permission denied, and the cause still comes first", () => {
+        // OpenSSH 9: the key is the only one given, so after "Load key" it has nothing to sign in with. Taken from a run against sshd.
+        const printed = [
+            'Load key "/tmp/jig-mongo-x/key": error in libcrypto',
+            "agent@bastion.example.com: Permission denied (publickey).",
+        ].join("\n");
+        assert.match(
+            classifySshFailure(255, printed).message,
+            /^the SSH key could not be read: it must be an unencrypted private key$/,
+        );
+        assert.match(
+            classifySshFailure(255, 'Load key "/tmp/x": invalid format\nagent@bastion: Permission denied (publickey).')
+                .message,
+            /could not be read/,
+        );
+        // A key that loads but is not the server's gets the other message.
+        assert.match(
+            classifySshFailure(255, "agent@bastion: Permission denied (publickey).").message,
+            /^the bastion refused the SSH key/,
+        );
     });
 
     test("ssh missing from PATH is reported", async () => {

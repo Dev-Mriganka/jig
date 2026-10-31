@@ -1,0 +1,6 @@
+apiVersion: v2
+name: jigit-web
+description: An unprivileged nginx, deployed by the jig-ops integration tests
+type: application
+version: 0.1.0
+appVersion: "1.30"

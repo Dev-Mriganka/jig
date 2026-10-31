@@ -32,7 +32,10 @@ In short:
 - **How Pi looks:** `jig-theme` gives six palettes, a one-line footer and your
   own colours.
 - **Checked on every push:** the type check, Biome, over 5,000 tests, the
-  review page's build and every link in these docs run on GitHub Actions.
+  review page's build and every link in these docs run on GitHub Actions. A
+  second job runs the plugins against real Elasticsearch, OpenSearch, Loki,
+  MongoDB, Kubernetes, GitHub, an SSH server and an OAuth server
+  ([Integration tests](docs/integration-tests.md)).
 
 Also built: [`jig-sandbox`](plugins/jig-sandbox/README.md), which runs the
 agent's `bash` in an operating-system sandbox, with background tasks and a network that
