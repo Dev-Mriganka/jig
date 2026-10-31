@@ -56,6 +56,26 @@ describe("validating the section", () => {
         );
     });
 
+    test("env: plain variables, each problem named by its key", () => {
+        assert.deepEqual(
+            validateWorkflow({
+                tests: { a: { command: "x", env: { JAVA_HOME: "~/.sdkman/candidates/java/17" } }, b: "y" },
+            }),
+            [],
+        );
+        assert.match(
+            validateWorkflow({ tests: { a: { command: "x", env: [] } } })[0] ?? "",
+            /^workflow.tests.a.env: must be/,
+        );
+        assert.deepEqual(validateWorkflow({ tests: { a: { command: "x", env: { NPM_TOKEN: "t" } } } }), [
+            "workflow.tests.a.env.NPM_TOKEN: this name looks like a credential, and credentials belong in a secret reference, not here",
+        ]);
+        assert.deepEqual(validateWorkflow({ tests: { a: { command: "x", env: { java: "17" } } } }).length, 1);
+        assert.deepEqual(validateWorkflow({ tests: { a: { command: "x", env: { A: 1 } } } }), [
+            "workflow.tests.a.env.A: must be text",
+        ]);
+    });
+
     test("testTimeoutSeconds: a whole number of seconds from 10 to 7200", () => {
         for (const bad of [9, 7201, 1.5, "900", null]) {
             assert.match(
@@ -93,5 +113,34 @@ describe("the settings", () => {
             { key: "c", command: "pytest" },
         ]);
         assert.equal(settings.testTimeoutSeconds, 300);
+    });
+
+    test("env: ~ is the home folder in a value, and the variables keep their order", () => {
+        const settings = settingsFrom(
+            {
+                tests: {
+                    "orders-api": {
+                        command: "./gradlew test",
+                        env: { JAVA_HOME: "~/.sdkman/candidates/java/17", A: "x" },
+                    },
+                    plain: "make",
+                },
+            },
+            "/home/me",
+        );
+        assert.deepEqual(settings.tests, [
+            {
+                key: "orders-api",
+                command: "./gradlew test",
+                env: { JAVA_HOME: "/home/me/.sdkman/candidates/java/17", A: "x" },
+            },
+            { key: "plain", command: "make" },
+        ]);
+        assert.deepEqual(Object.keys(settings.tests[0]?.env ?? {}), ["JAVA_HOME", "A"]);
+    });
+
+    test("a section with a refused variable gives the defaults, as any invalid section does", () => {
+        const settings = settingsFrom({ tests: { a: { command: "x", env: { GH_TOKEN: "t" } } } });
+        assert.deepEqual(settings.tests, []);
     });
 });

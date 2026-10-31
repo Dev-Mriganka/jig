@@ -2,12 +2,15 @@
 // checks the section with `validateWorkflow` when it loads, so the rest of the plugin reads a section that is valid, or absent.
 import os from "node:os";
 import path from "node:path";
+import { expandedEnv, validateEnv } from "./environment.ts";
 
 export interface TestRule {
     /** A repository name or a path pattern. */
     key: string;
     command: string;
     timeoutSeconds?: number;
+    /** Plain variables the command runs with, `~` already written as the home folder. */
+    env?: Readonly<Record<string, string>>;
 }
 
 export interface WorkflowSettings {
@@ -25,7 +28,7 @@ export const MAX_TIMEOUT_SECONDS = 7200;
 /** The fields of the section, in the order the README's table lists them. */
 export const SECTION_FIELDS: readonly string[] = ["folders", "tests", "testTimeoutSeconds"];
 const FIELDS: ReadonlySet<string> = new Set(SECTION_FIELDS);
-const TEST_FIELDS: ReadonlySet<string> = new Set(["command", "timeoutSeconds"]);
+const TEST_FIELDS: ReadonlySet<string> = new Set(["command", "timeoutSeconds", "env"]);
 const MAX_COMMAND = 1000;
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -86,8 +89,11 @@ export function validateWorkflow(raw: unknown): string[] {
                             `${at}.timeoutSeconds: must be a whole number from ${MIN_TIMEOUT_SECONDS} to ${MAX_TIMEOUT_SECONDS}`,
                         );
                     }
+                    if (value.env !== undefined) errors.push(...validateEnv(value.env, at));
                 } else if (!isCommand(value)) {
-                    errors.push(`${at}: must be a command, or { "command": "...", "timeoutSeconds": 300 }`);
+                    errors.push(
+                        `${at}: must be a command, or { "command": "...", "timeoutSeconds": 300, "env": { "JAVA_HOME": "~/jdk" } }`,
+                    );
                 }
             }
         }
@@ -117,6 +123,9 @@ export function settingsFrom(section: unknown, home: string = os.homedir()): Wor
                     key,
                     command: value.command as string,
                     ...(value.timeoutSeconds === undefined ? {} : { timeoutSeconds: value.timeoutSeconds as number }),
+                    ...(value.env === undefined
+                        ? {}
+                        : { env: expandedEnv(value.env as Record<string, unknown>, home) }),
                 });
             }
         }

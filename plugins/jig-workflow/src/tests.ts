@@ -4,6 +4,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { TestRule, WorkflowSettings } from "./config.ts";
+import { withEnvironment } from "./environment.ts";
 import type { Host } from "./host.ts";
 import type { RepoView } from "./repos.ts";
 import type { TestResult } from "./store.ts";
@@ -15,6 +16,8 @@ export interface TestPlan {
     /** Absent when no command is known: then `problem` says what to set. */
     command?: string;
     timeoutSeconds: number;
+    /** Plain variables the command runs with. */
+    env?: Readonly<Record<string, string>>;
     /** Where the command came from: `jig.json` or the build file that was found. */
     source?: string;
     problem?: string;
@@ -92,6 +95,7 @@ export function planTests(settings: WorkflowSettings, view: RepoView, cwd: strin
             name: view.name,
             command: rule.command,
             timeoutSeconds: rule.timeoutSeconds ?? settings.testTimeoutSeconds,
+            ...(rule.env === undefined ? {} : { env: rule.env }),
             source: `workflow.tests "${rule.key}"`,
         };
     }
@@ -111,6 +115,11 @@ export function planTests(settings: WorkflowSettings, view: RepoView, cwd: strin
         timeoutSeconds: settings.testTimeoutSeconds,
         problem: `no test command is known for ${view.name}: set workflow.tests in jig.json, such as { "${view.name}": "npm test" }`,
     };
+}
+
+/** What a user's yes to a plan rests on, besides the commits: the folder, the command, its variables and its time limit. */
+export function testIdentity(plan: TestPlan): Array<string | number | undefined> {
+    return [plan.root, plan.command, plan.timeoutSeconds, JSON.stringify(plan.env ?? {})];
 }
 
 // ---- running it ---------------------------------------------------------------------------------------------------------
@@ -149,10 +158,20 @@ export async function runTests(
     let output: string;
     let truncated = false;
     if (options.sandboxed) {
-        const ran = await host.sandbox.run(plan.command, { cwd: plan.root, timeoutMs, ...signal });
+        // The sandbox takes a command and nothing else, so the variables are set by the command line itself.
+        const ran = await host.sandbox.run(withEnvironment(plan.command, plan.env), {
+            cwd: plan.root,
+            timeoutMs,
+            ...signal,
+        });
         ({ code, timedOut, output, truncated } = ran);
     } else {
-        const ran = await host.run("/bin/sh", ["-c", plan.command], { cwd: plan.root, timeoutMs, ...signal });
+        const ran = await host.run("/bin/sh", ["-c", plan.command], {
+            cwd: plan.root,
+            timeoutMs,
+            ...(plan.env === undefined ? {} : { env: plan.env }),
+            ...signal,
+        });
         code = ran.code;
         timedOut = ran.timedOut;
         output = [ran.stdout, ran.stderr].filter((part) => part !== "").join("\n");

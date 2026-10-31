@@ -106,20 +106,23 @@ In `~/.pi/agent/jig.json`, under `workflow`. Every field is optional.
 | Field | Default | Meaning |
 |---|---|---|
 | `folders` | none | More folders to read workflow files from: absolute, or starting with `~/` |
-| `tests` | by build file | A test command per repository: a name or path pattern, then a command or `{ command, timeoutSeconds }` |
+| `tests` | by build file | A test command per repository: a name or path pattern, then a command or `{ command, timeoutSeconds, env }` |
 | `testTimeoutSeconds` | `900` | How long one test run may take, from 10 to 7200 |
 
 ```json
 {
   "workflow": {
-    "tests": { "orders-api": "./gradlew test", "libs/*": { "command": "npm test", "timeoutSeconds": 300 } }
+    "tests": {
+      "orders-api": { "command": "./gradlew test", "env": { "JAVA_HOME": "~/.sdkman/candidates/java/17.0.9-tem" } },
+      "libs/*": { "command": "npm test", "timeoutSeconds": 300 }
+    }
   }
 }
 ```
 
 Files are read from `folders`, then `~/.pi/agent/workflows/`, then the project's `.pi/workflows/` once Pi
-trusts the project; a later file with the same name wins. Defaults per build file (`gradlew`, `pom.xml`,
-`package.json`, ...) are in [Tests](docs/tests.md).
+trusts the project; a later file with the same name wins. Defaults per build file (`gradlew`, `pom.xml`, ...)
+and `env`, plain variables such as `JAVA_HOME` for one repository, are in [Tests](docs/tests.md).
 
 ## Company part (in the company plugin)
 

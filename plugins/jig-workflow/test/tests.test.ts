@@ -180,6 +180,53 @@ describe("running them", () => {
         assert.equal(run.tail, "3 passing");
     });
 
+    test("variables of the entry: set by the command line in the sandbox, and by the environment of a shell", async (t) => {
+        const host = fakeHost({ run: () => ok() });
+        const root = makeRepo(tempFolder(t), "orders-api", "git@github.example.com:acme/orders-api.git");
+        const view = await inspect(host, root);
+        const plan = planTests(
+            settingsFrom({
+                tests: {
+                    "orders-api": {
+                        command: "./gradlew test",
+                        env: { JAVA_HOME: "/opt/jdk-17", GRADLE_OPTS: "-Xmx2g -Dx=y" },
+                    },
+                },
+            }),
+            view,
+            path.dirname(root),
+        );
+        assert.deepEqual(plan.env, { JAVA_HOME: "/opt/jdk-17", GRADLE_OPTS: "-Xmx2g -Dx=y" });
+        const inside = await runTests(host, plan, view, { sandboxed: true });
+        assert.deepEqual(host.sandboxed, [
+            {
+                command: "export JAVA_HOME=/opt/jdk-17 GRADLE_OPTS='-Xmx2g -Dx=y' && ./gradlew test",
+                cwd: root,
+                timeoutMs: 900_000,
+            },
+        ]);
+        assert.equal(inside.result.command, "./gradlew test", "what is recorded is the command that was configured");
+        await runTests(host, plan, view, { sandboxed: false });
+        assert.deepEqual(host.ran, [
+            {
+                file: "/bin/sh",
+                args: ["-c", "./gradlew test"],
+                cwd: root,
+                env: { JAVA_HOME: "/opt/jdk-17", GRADLE_OPTS: "-Xmx2g -Dx=y" },
+            },
+        ]);
+    });
+
+    test("an entry without variables runs the command as it is", async (t) => {
+        const host = fakeHost({ run: () => ok() });
+        const { view, plan } = await ready(t, host);
+        assert.equal(plan.env, undefined);
+        await runTests(host, plan, view, { sandboxed: true });
+        await runTests(host, plan, view, { sandboxed: false });
+        assert.equal(host.sandboxed[0]?.command, "npm test");
+        assert.equal(host.ran[0]?.env, undefined);
+    });
+
     test("a failing command, and one that ran out of time, are not passes", async (t) => {
         const host = fakeHost({
             sandbox: () => ({ code: 1, output: "1 failing\n", timedOut: false, truncated: false }),

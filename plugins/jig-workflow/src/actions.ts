@@ -8,6 +8,7 @@ import { evaluate, evaluateAll } from "./conditions.ts";
 import type { ConditionResult } from "./conditions.ts";
 import { callText } from "./definition.ts";
 import type { Stage, Workflow } from "./definition.ts";
+import { environmentLines } from "./environment.ts";
 import { digest, hash } from "./host.ts";
 import { matching } from "./load.ts";
 import { fingerprintOf, MAX_PLAN_CHARS, parsePlan, repositoryWarnings } from "./plan.ts";
@@ -26,7 +27,7 @@ import {
     writeState,
 } from "./store.ts";
 import type { EvidenceKind, WorkflowState } from "./store.ts";
-import { planTests, runTests } from "./tests.ts";
+import { planTests, runTests, testIdentity } from "./tests.ts";
 import type { TestPlan } from "./tests.ts";
 import { addBound, isTicketKey } from "./ticket.ts";
 import { readText } from "./files.ts";
@@ -547,11 +548,7 @@ export async function plannedTests(rt: Runtime, params: Params): Promise<TestsTo
 
 /** The fingerprint of what a test call would run, which the user's yes has to carry when there is no sandbox. */
 export function testFingerprint(ticket: string, plans: readonly TestPlan[], views: readonly RepoView[]): string {
-    return digest(
-        "test",
-        ticket,
-        ...plans.flatMap((plan, index) => [plan.root, plan.command, plan.timeoutSeconds, views[index]?.head]),
-    );
+    return digest("test", ticket, ...plans.flatMap((plan, index) => [...testIdentity(plan), views[index]?.head]));
 }
 
 export async function runTestsAction(rt: Runtime, params: Params, call: Call): Promise<ActionResult> {
@@ -628,6 +625,7 @@ export function testQuestion(ticket: string, plans: readonly TestPlan[]): { summ
             ...plans.flatMap((plan) => [
                 `- ${plan.name}: ${plan.command}`,
                 `    in ${plan.root}, at most ${plan.timeoutSeconds} s (${plan.source ?? "set in jig.json"})`,
+                ...environmentLines(plan.env),
             ]),
             "",
             "A test can run anything. With jig-sandbox active, these would run inside it without asking.",

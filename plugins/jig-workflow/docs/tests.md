@@ -35,6 +35,33 @@ shell, in the repository's root.
 The first row that is found wins. With no entry and no build file, `workflow test` fails for that
 repository and says to set `workflow.tests`.
 
+## Variables for a repository
+
+A repository may need its own environment, such as a JDK of the right version. Give the object form of the entry an `env`:
+
+```json
+{
+  "workflow": {
+    "tests": {
+      "orders-api": { "command": "./gradlew test", "env": { "JAVA_HOME": "~/.sdkman/candidates/java/17.0.9-tem" } }
+    }
+  }
+}
+```
+
+- **Names and values.** A name is capital letters, digits and `_`, and not a digit first. A value is text without a NUL
+  character, at most 1000 characters. At most 20 variables.
+- **No credentials.** A name that looks like one is refused, with the key named: the same patterns `jig-sandbox` takes out
+  of a command's environment (`TOKEN`, `SECRET`, `PASSWORD`, `_KEY`, `AWS_`, `GITHUB_`, ...). Credentials belong in a
+  secret reference, not in this file.
+- **`~` is your home folder,** at the start of a value and after a `:` in a list such as `PATH`. Nothing else is
+  expanded: `$HOME` stays the text `$HOME`.
+- **They apply wherever the command runs.** In the sandbox they are set by the command line (`export JAVA_HOME=... &&
+  ./gradlew test`), because the sandbox takes a command and nothing more; the values are quoted, so the shell reads each
+  as text. Outside it, the shell gets them in its environment.
+- **The question shows them.** When a run needs your approval, each command is listed with its variables. The record
+  keeps the command as you configured it.
+
 ## Where the command runs
 
 - **In the sandbox, when `jig-sandbox` is active.** `workflow test` calls `jig().sandbox.run`, which
