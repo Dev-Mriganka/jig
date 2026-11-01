@@ -10,12 +10,11 @@ import { builtinModules } from "node:module";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { importsOf } from "./imports.mjs";
 
 // The folders of a plugin that Pi does not run: tests, the review page (its own package, built to dist/), docs, build scripts.
 const NOT_RUNTIME = new Set(["test", "web", "docs", "scripts", "dist", "skills", "themes"]);
 const CODE = /\.(?:ts|mts|cts|js|mjs|cjs)$/;
-const IMPORT =
-    /(?:^|\n)[ \t]*(?:import|export)\s+(?:type\s+)?(?:[^"';]*?\sfrom\s+)?["']([^"']+)["']|\bimport\(\s*["']([^"']+)["']\s*\)|\brequire\(\s*["']([^"']+)["']\s*\)/g;
 
 /** Every runtime source file under a plugin or example folder, relative to the root. */
 function runtimeFiles(root, folder, top = true) {
@@ -37,14 +36,9 @@ function packageOf(specifier) {
 
 /** The bare imports of a file, with their line numbers. Relative paths and `node:` modules are not listed. */
 export function bareImports(text) {
-    const found = [];
-    for (const match of text.matchAll(IMPORT)) {
-        const specifier = match[1] ?? match[2] ?? match[3] ?? "";
-        if (specifier.startsWith(".") || specifier.startsWith("/") || specifier.startsWith("node:")) continue;
-        const line = text.slice(0, (match.index ?? 0) + match[0].lastIndexOf(specifier)).split("\n").length;
-        found.push({ specifier, line });
-    }
-    return found;
+    return importsOf(text).filter(
+        ({ specifier }) => !specifier.startsWith(".") && !specifier.startsWith("/") && !specifier.startsWith("node:"),
+    );
 }
 
 export function check(root) {
