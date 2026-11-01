@@ -40,8 +40,10 @@ jobs:
           node --version
           npm --version
 
+      # No dependency of Jig has an install script (npm query ':attr(scripts, [install]), :attr(scripts, [postinstall])' is empty), so
+      # none runs: a package that gains one cannot run code on the runner unseen. The same for the review page's dependencies below.
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       # The type check reads Pi's own types, so CI installs the Pi version Jig is built against: exactly this one, which is
       # the latest. When Pi has a new release, change it here and in AGENTS.md together, after the checks pass on it.
@@ -65,7 +67,7 @@ jobs:
         run: npm test
 
       - name: Install the review page's dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
         working-directory: plugins/jig-review/web
 
       - name: Review page types
@@ -124,7 +126,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       # The tests resolve Pi's own packages from the installed Pi, as `checks` does. Exactly this version, the latest.
       - name: Install Pi
