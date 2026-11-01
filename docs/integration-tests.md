@@ -28,6 +28,24 @@ test runs, and none is shaped like a real token (see [AGENTS.md](../AGENTS.md)).
 that Actions gives each run, which the workflow hands to `gh` as `GH_TOKEN`. The job's `permissions` make it read only: it reads this
 repository's workflow runs and public repositories.
 
+## What a test can rely on
+
+Every test file starts in an isolated environment, set up by `test/support/hermetic.mjs` before the file runs, so a result does
+not depend on the machine. [`hermetic.test.ts`](../plugins/jig-core/test/hermetic.test.ts) checks each point.
+
+- **A temporary world.** `HOME`, `PI_CODING_AGENT_DIR`, `JIG_STATE_DIR`, `PASSWORD_STORE_DIR` and `GNUPGHOME` are in one temporary
+  folder, which is removed when the file ends. The `XDG_*` folders are unset, so they fall under the temporary home.
+- **Git has one identity.** `GIT_CONFIG_GLOBAL` is a file that sets `Jig Test <test@example.com>`, and `GIT_CONFIG_NOSYSTEM=1`. A test can
+  commit, and no setting of the machine reaches it. `GIT_DIR`, `GIT_WORK_TREE` and `GIT_INDEX_FILE` are removed, for a run from a git hook.
+- **Pi stays offline:** `PI_OFFLINE=1`, no version check, no telemetry.
+- **No credentials.** `AWS_*`, `AZURE_*`, `SSH_AUTH_SOCK`, `GH_TOKEN`, `GITHUB_TOKEN`, `GITLAB_TOKEN`, `NPM_TOKEN`, `KUBECONFIG` and model
+  API keys are removed.
+- **Integration suites keep what they name:** every `JIG_IT_*` variable and `NODE_EXTRA_CA_CERTS`; `GH_TOKEN` and `GITHUB_TOKEN` when
+  `JIG_IT_GITHUB` or `JIG_IT_GITHUB_REPOSITORY` is set; `KUBECONFIG` (the one set, else the real home's `.kube/config`) when
+  `JIG_IT_KUBE_CONTEXT` is set.
+- **A test that needs more sets it itself** and puts it back, as `tempState()` does. It never reads the real home. `gh` has no login of
+  its own in a test, so the GitHub suites need `GH_TOKEN` (on your machine, `GH_TOKEN=$(gh auth token)`).
+
 ## How a suite is written
 
 A suite uses `describeIt` from `test/support/it.ts`. It names the service and the variables that hold its address:
@@ -68,7 +86,7 @@ moves several versions together, so the lines that users run side by side are al
 - **The same on both:** Grafana Loki 3.7.9, go-httpbin 2.26.0, Keycloak 26.8.1, OpenSSH 10.3 (the jump host), kind v0.33.0 with
   Kubernetes 1.37.0 nodes and kubectl 1.37.2, and Pi 1.4.0. Loki, Keycloak and the rest have no older line that the plugins claim.
 - **Pi is installed at an exact version,** the latest one, because the type check and the `jig-agents` tests read its own packages.
-  When Pi releases, change the version in `ci.yml` and `AGENTS.md` together.
+  To move it, follow "Pi version" in [AGENTS.md](../AGENTS.md); [Compatibility](compatibility.md) has the table and the weekly canary.
 - **The `checks` job** runs both Node lines, and prints `node --version` first. Node 22.19, the lowest that `package.json` allows,
   is not run in CI.
 - **Not crossed.** Node is not crossed with the services: Node differences show in the unit tests of the `checks` job, and the
@@ -103,8 +121,8 @@ one, change the tag and the digest together, then read the run.
   `docker-compose` support tracks it too; the workflow reads its `image:` and hands it to `kind`.
 - **Dependabot has two entries for them.** One for `.github/integration`, and one for `.github/integration/previous` that ignores
   new majors (and, for MongoDB, new minors) so that the previous line stays the previous line.
-- **Not tracked by Dependabot:** the versions given to actions as inputs, which are Helm, kind and kubectl in `ci.yml`, and the
-  Pi version. Read them when you update an image.
+- **Not tracked by Dependabot:** the versions given to actions as inputs, which are Helm, kind and kubectl in `ci.yml`, the actionlint
+  release and its checksum, and the Pi version. Read them when you update an image.
 - **Actions** are tracked by Dependabot's `github-actions` entry, and kept at the latest release.
 
 ## Running one on your machine
@@ -199,7 +217,7 @@ adapter) and `health.test.ts` (health by address). The last needs only `openssl`
 | Variable | What it holds |
 |---|---|
 | `JIG_IT_KUBE_CONTEXT` | The kubectl context of a cluster the test may create a namespace in |
-| `GH_TOKEN` | A token `gh` signs in with. Without it, `gh` uses its own login |
+| `GH_TOKEN` | A token `gh` signs in with. A test has no login of its own, so set it |
 | `JIG_IT_GITHUB_REPOSITORY` | `owner/name` of the repository whose workflow runs are read |
 | `JIG_IT_GITHUB_RUN_ID` | The id of one of its runs |
 | `JIG_IT_GITHUB_WORKFLOW` | Optional: the workflow file, `ci.yml` by default |
@@ -223,13 +241,13 @@ One file, `github.test.ts`, with two suites. They only read, and nothing is push
 | Variable | What it holds |
 |---|---|
 | `JIG_IT_GITHUB` | Any value: this machine may reach github.com |
-| `GH_TOKEN` | A token `gh` signs in with. Without it, `gh` uses its own login |
+| `GH_TOKEN` | A token `gh` signs in with. A test has no login of its own, so set it |
 
 - **Git over https** clones `actions/hello-world-docker-action` with plain git, because the plugin's `clone` goes over ssh and a run has no
   key GitHub knows. The plugin then fetches, logs and reads that clone, and reads its tags. Its own `clone` is tried with an ssh that has no
   key, and must fail in one line and leave nothing behind.
 - **Pull requests and releases** are read through `gh` for `cli/cli`, with a repository that holds nothing but an `origin`, and for the
-  small repository. A run gets this by the token of `permissions`; on your machine `gh`'s own login does the same.
+  small repository. A run gets this by the token of `permissions`; on your machine, `GH_TOKEN=$(gh auth token)` does the same.
 
 ## jig-api
 

@@ -48,7 +48,14 @@ limited, and a role can only narrow what its child may do.
 
 ## Install
 
-Jig needs Pi 1.4 or later and Node.js 22.19 or later.
+Jig needs Pi 1.4 or later and Node.js 22.19 or later. It is tested with:
+
+| Pi | Node | Checked |
+|---|---|---|
+| 1.4.0 | 24, 26 | 2026-11-01 |
+
+A weekly run tries the newest Pi too, so a release that breaks Jig is seen early. [Compatibility](docs/compatibility.md)
+says what that covers and which names Jig keeps stable for company plugins.
 
 ```bash
 pi install git:github.com/Dev-Mriganka/jig
@@ -139,10 +146,12 @@ the sandbox check and `/lens`, in plain words. Then:
    seams in order, how your `jig.json` layers over its defaults, and the tested
    example in `examples/jig-acme`.
 7. [Decisions](docs/decisions.md): what was decided, what was rejected, and why.
-8. [Glossary](docs/glossary.md): the terms these documents use.
-9. [Writing the docs](docs/writing.md): how these pages are written, if you
-   add to them.
-10. **The code, with a map.** The big plugins each have a code map, with every file, who calls it and one call
+8. [Compatibility](docs/compatibility.md): what Jig is tested with, which names are public, and what counts as
+   breaking.
+9. [Glossary](docs/glossary.md): the terms these documents use.
+10. [Writing the docs](docs/writing.md): how these pages are written, if you
+    add to them.
+11. **The code, with a map.** The big plugins each have a code map, with every file, who calls it and one call
     traced through them: [`jig-core`](plugins/jig-core/docs/code-map.md), [`jig-api`](plugins/jig-api/docs/code-map.md),
     [`jig-ops`](plugins/jig-ops/docs/code-map.md), [`jig-sandbox`](plugins/jig-sandbox/docs/code-map.md),
     [`jig-agents`](plugins/jig-agents/docs/code-map.md) and [`jig-workflow`](plugins/jig-workflow/docs/code-map.md).
