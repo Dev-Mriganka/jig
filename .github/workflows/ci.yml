@@ -50,12 +50,6 @@ jobs:
           npm install -g @earendil-works/pi-coding-agent@1.4.0
           npm ls -g --depth=0 @earendil-works/pi-coding-agent
 
-      # Tests that make commits need an author.
-      - name: Set a git identity
-        run: |
-          git config --global user.name ci
-          git config --global user.email ci@example.com
-
       # jig-sandbox's escape and keep-working tests run the real sandbox, and fail (they are not skipped) when it cannot run.
       # Ubuntu 24.04 stops unprivileged programs from making a user namespace, which bubblewrap needs.
       - name: Install the programs the sandbox needs
@@ -137,11 +131,6 @@ jobs:
         run: |
           npm install -g @earendil-works/pi-coding-agent@1.4.0
           npm ls -g --depth=0 @earendil-works/pi-coding-agent
-
-      - name: Set a git identity
-        run: |
-          git config --global user.name ci
-          git config --global user.email ci@example.com
 
       # The key file of the replica set, the jump host's SSH key and its settings go to a folder of this run. The script prints
       # JIG_IT_TEMP and JIG_IT_SSH_PUBLIC_KEY, which compose.yml reads, and the next steps get them from $GITHUB_ENV.

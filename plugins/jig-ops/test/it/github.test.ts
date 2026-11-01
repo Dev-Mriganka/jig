@@ -30,7 +30,7 @@ describeIt(
                 },
             },
         });
-        // The token Actions gives the run. Without one, gh uses its own sign-in, as it does for a person.
+        // The token Actions gives the run. A test has no sign-in of gh's own: its home is empty.
         const harness = (t: TestContext, token = optional("GH_TOKEN")): Harness =>
             realHarness(t, section(), token === undefined ? {} : { GH_TOKEN: token });
         const jig = { service: "jig" };
