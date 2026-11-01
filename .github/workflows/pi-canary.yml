@@ -1,0 +1,65 @@
+name: Pi canary
+
+# CI pins the Pi version Jig is tested with (ci.yml, "Install Pi"). This workflow tries the newest Pi that npm has, once a week, so a Pi
+# release that would break Jig shows up before anybody moves the pin, and not when a user updates. It never runs on a pull request and is
+# not a required check: a red run means "look at the new Pi", not "this change is bad". See docs/compatibility.md.
+on:
+  schedule:
+    # Mondays, 05:17 UTC.
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  canary:
+    name: Newest Pi (Node 26)
+    # Pinned for the same reason as the checks job in ci.yml: jig-sandbox's tests run the real sandbox.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Show the versions
+        run: |
+          node --version
+          npm --version
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      # `latest` is whatever npm calls the newest release. A global install does not read this repository's .npmrc, so its
+      # min-release-age does not hold the newest Pi back.
+      - name: Install the newest Pi
+        run: |
+          npm install -g @earendil-works/pi-coding-agent@latest
+          npm ls -g --depth=0 @earendil-works/pi-coding-agent
+          version="$(node -p "require('$(npm root -g)/@earendil-works/pi-coding-agent/package.json').version")"
+          echo "Pi $version"
+          echo "Newest Pi tried: $version (CI is pinned to the version in docs/compatibility.md)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install the programs the sandbox needs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap socat ripgrep python3
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: Types and Biome
+        run: npm run check
+
+      - name: Tests
+        run: npm test
+
+      # Pi's own installer, on a copy of this repository: what a user gets from `pi install git:`.
+      - name: Install check
+        run: npm run check:install
