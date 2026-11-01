@@ -15,6 +15,7 @@
         "test": "node --import ./test/support/host.mjs --test \"plugins/*/test/*.test.ts\" \"examples/*/test/*.test.ts\"",
         "test:it": "node --import ./test/support/host.mjs --test \"plugins/*/test/it/*.test.ts\"",
         "check": "node test/support/link-host.mjs && node scripts/check-pinned-deps.mjs && node scripts/check-runtime-deps.mjs && tsc -p tsconfig.json && biome ci .",
+        "check:install": "node scripts/check-install.mjs",
         "format": "biome format --write .",
         "lint": "biome lint .",
         "check:web": "npm --prefix plugins/jig-review/web run check",

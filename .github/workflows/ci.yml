@@ -66,6 +66,11 @@ jobs:
       - name: Tests
         run: npm test
 
+      # Jig as a user gets it: `pi install git:` on a copy of the repository (only `dependencies` installed), then the stock Pi
+      # starts with that copy as its only package and every extension in package.json must have loaded (scripts/check-install.mjs).
+      - name: Install check
+        run: npm run check:install
+
       - name: Install the review page's dependencies
         run: npm ci --ignore-scripts
         working-directory: plugins/jig-review/web
