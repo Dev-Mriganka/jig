@@ -160,8 +160,11 @@ async function loadInPi(cli, env, cwd, probeOut) {
         const tools = existsSync(probeOut) ? read(probeOut).tools : [];
         return { commands: listed, tools, records, stderr };
     } finally {
+        // Pi ends when its input closes. Wait for that, so the folder is not removed under a Pi that is still shutting down.
         child.stdin.end();
-        setTimeout(() => child.kill("SIGKILL"), 10_000).unref();
+        const kill = setTimeout(() => child.kill("SIGKILL"), 10_000);
+        await exited;
+        clearTimeout(kill);
     }
 }
 
