@@ -84,6 +84,45 @@ jobs:
       - name: Review page build is current
         run: npm run check:dist
 
+      # Nothing the steps above ran may leave a file behind or change one. A file that a build writes and nobody commits is a build that is
+      # not reproducible. (node_modules and .pi-host are ignored by git.)
+      - name: The working tree is clean
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::The checks changed or left files in the working tree:"
+            git status --porcelain
+            git diff --stat
+            exit 1
+          fi
+
+  # The workflow files themselves: actionlint, with shellcheck for the scripts in `run:` (the runner image has it). The release is a
+  # pinned download whose checksum is checked, so a changed asset cannot run. Dependabot does not track it: to update, change the version
+  # and the sha256 of actionlint_<version>_linux_amd64.tar.gz from the release's checksums file together.
+  workflows:
+    name: Workflow files
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install actionlint
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        working-directory: ${{ runner.temp }}
+        run: |
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSLO "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}"
+          echo "${ACTIONLINT_SHA256}  ${archive}" | sha256sum --check
+          tar -xzf "${archive}" actionlint
+          ./actionlint -version
+
+      - name: Lint the workflows
+        run: ${{ runner.temp }}/actionlint -color
+
   # The plugins against real services (docs/integration-tests.md). The services start as containers from
   # .github/integration/compose.yml, and each suite finds its service by the address in an environment variable.
   # JIG_IT_REQUIRE lists the services this job starts: a suite whose service did not come up fails, and does not skip.
@@ -168,18 +207,18 @@ jobs:
       - name: Wait for Elasticsearch, OpenSearch and Loki
         if: ${{ !cancelled() }}
         run: |
-          retry="--retry 90 --retry-delay 2 --retry-connrefused --retry-all-errors"
+          retry=(--retry 90 --retry-delay 2 --retry-connrefused --retry-all-errors)
           ca="$JIG_IT_TEMP/es-ca.crt"
           # Elasticsearch makes its certificate authority when it starts: the tests trust this file.
           for _ in $(seq 1 90); do
             docker cp jigit-elasticsearch:/usr/share/elasticsearch/config/certs/http_ca.crt "$ca" 2>/dev/null && break
             sleep 2
           done
-          curl -fsS $retry --cacert "$ca" -u "elastic:$JIG_IT_ELASTICSEARCH_PASSWORD" \
+          curl -fsS "${retry[@]}" --cacert "$ca" -u "elastic:$JIG_IT_ELASTICSEARCH_PASSWORD" \
             "https://127.0.0.1:9200/_cluster/health?wait_for_status=yellow&timeout=60s" > /dev/null
-          curl -fsS $retry "http://127.0.0.1:9201/_cluster/health?wait_for_status=yellow&timeout=60s" > /dev/null
-          curl -fsS $retry http://127.0.0.1:3100/ready
-          curl -fsS $retry http://127.0.0.1:3101/ready
+          curl -fsS "${retry[@]}" "http://127.0.0.1:9201/_cluster/health?wait_for_status=yellow&timeout=60s" > /dev/null
+          curl -fsS "${retry[@]}" http://127.0.0.1:3100/ready
+          curl -fsS "${retry[@]}" http://127.0.0.1:3101/ready
           echo "Elasticsearch $(curl -fsS --cacert "$ca" -u "elastic:$JIG_IT_ELASTICSEARCH_PASSWORD" https://127.0.0.1:9200 | jq -r .version.number)"
           echo "OpenSearch $(curl -fsS http://127.0.0.1:9201 | jq -r .version.number)"
           echo "Loki $(curl -fsS -H 'X-Scope-OrgID: jig-it' http://127.0.0.1:3100/loki/api/v1/status/buildinfo | jq -r .version)"
@@ -267,10 +306,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           docker compose up -d httpbin keycloak
-          retry="--retry 90 --retry-delay 2 --retry-connrefused --retry-all-errors"
-          curl -fsS $retry http://127.0.0.1:8081/status/200 > /dev/null
+          retry=(--retry 90 --retry-delay 2 --retry-connrefused --retry-all-errors)
+          curl -fsS "${retry[@]}" http://127.0.0.1:8081/status/200 > /dev/null
           echo "go-httpbin $(docker inspect -f '{{.Config.Image}}' jigit-httpbin)"
-          curl -fsS $retry http://127.0.0.1:8180/realms/jigit/.well-known/openid-configuration > /dev/null
+          curl -fsS "${retry[@]}" http://127.0.0.1:8180/realms/jigit/.well-known/openid-configuration > /dev/null
           docker logs jigit-keycloak 2>&1 | grep -m1 "Keycloak .* on JVM" || true
 
       # Compose holds the Kubernetes node image (a service that is never started), so that Dependabot can track it.
@@ -349,3 +388,21 @@ jobs:
             docker logs --tail 300 "$name" 2>&1 || true
             echo "::endgroup::"
           done
+
+  # One name for branch protection to require, whatever jobs and matrix entries there are: `ci-ok` is the check to mark as required. It
+  # runs even when a job failed or was cancelled (`always()`), and fails unless every job it needs succeeded. A new job above must be
+  # added to `needs` (a test, plugins/jig-core/test/ci-config.test.ts, fails until it is).
+  ci-ok:
+    name: ci-ok
+    if: ${{ always() }}
+    needs: [checks, workflows, integration]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Every job succeeded
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          echo "$NEEDS" | jq -e 'to_entries | all(.value.result == "success")' > /dev/null

@@ -86,7 +86,7 @@ moves several versions together, so the lines that users run side by side are al
 - **The same on both:** Grafana Loki 3.7.9, go-httpbin 2.26.0, Keycloak 26.8.1, OpenSSH 10.3 (the jump host), kind v0.33.0 with
   Kubernetes 1.37.0 nodes and kubectl 1.37.2, and Pi 1.4.0. Loki, Keycloak and the rest have no older line that the plugins claim.
 - **Pi is installed at an exact version,** the latest one, because the type check and the `jig-agents` tests read its own packages.
-  When Pi releases, change the version in `ci.yml` and `AGENTS.md` together.
+  To move it, follow "Pi version" in [AGENTS.md](../AGENTS.md); [Compatibility](compatibility.md) has the table and the weekly canary.
 - **The `checks` job** runs both Node lines, and prints `node --version` first. Node 22.19, the lowest that `package.json` allows,
   is not run in CI.
 - **Not crossed.** Node is not crossed with the services: Node differences show in the unit tests of the `checks` job, and the
@@ -121,8 +121,8 @@ one, change the tag and the digest together, then read the run.
   `docker-compose` support tracks it too; the workflow reads its `image:` and hands it to `kind`.
 - **Dependabot has two entries for them.** One for `.github/integration`, and one for `.github/integration/previous` that ignores
   new majors (and, for MongoDB, new minors) so that the previous line stays the previous line.
-- **Not tracked by Dependabot:** the versions given to actions as inputs, which are Helm, kind and kubectl in `ci.yml`, and the
-  Pi version. Read them when you update an image.
+- **Not tracked by Dependabot:** the versions given to actions as inputs, which are Helm, kind and kubectl in `ci.yml`, the actionlint
+  release and its checksum, and the Pi version. Read them when you update an image.
 - **Actions** are tracked by Dependabot's `github-actions` entry, and kept at the latest release.
 
 ## Running one on your machine

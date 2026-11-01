@@ -4,6 +4,7 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 
 ## Contents
 
+- [2026-11-01: guards a person would not see break](#2026-11-01-guards-a-person-would-not-see-break)
 - [2026-11-01: a role only narrows, and the child enforces it](#2026-11-01-a-role-only-narrows-and-the-child-enforces-it)
 - [2026-10-31: every dependency is on its latest stable release, pinned, and kept there by Dependabot](#2026-10-31-every-dependency-is-on-its-latest-stable-release-pinned-and-kept-there-by-dependabot)
 - [2026-10-31: CI runs the latest and the previous line of every service, and MongoDB starts by a setting](#2026-10-31-ci-runs-the-latest-and-the-previous-line-of-every-service-and-mongodb-starts-by-a-setting)
@@ -45,6 +46,38 @@ Dated so the reasons stay attached. Each entry says what was decided, and why.
 - [2026-10-30: jig-git's tools, and a watch that knows when it is done](#2026-10-30-jig-gits-tools-and-a-watch-that-knows-when-it-is-done)
 - [2026-10-30: built clean, beside the existing harness](#2026-10-30-built-clean-beside-the-existing-harness)
 - [Earlier decisions that still hold (2026-10-29)](#earlier-decisions-that-still-hold-2026-10-29)
+
+## 2026-11-01: guards a person would not see break
+
+Jig's tests could pass while four things were broken: a new Pi, a dependency that only a full checkout has, a renamed name that
+company plugins use, and a plugin that reached into another's code. Each now has a test or a CI step, so nobody has to remember.
+
+The ideas come from how Pi, Playwright, the MCP TypeScript SDK, OpenAI's Agents SDK and Codex, Gemini CLI, Strands, TokenEconomizer
+and the Claude Agent SDK keep themselves honest. The code is ours.
+
+- **A Pi canary.** CI is on one exact Pi and the peer range is `*`, so a Pi release can break Jig unseen. A weekly job (and a manual
+  one) installs the newest Pi and runs the checks, the tests and the install check. It never runs on a pull request and is not
+  required: red means "look at the new Pi". A "Tested with" table in the README and [Compatibility](compatibility.md) says what is
+  tried, and a test keeps CI, both tables and `AGENTS.md` on the same Pi.
+- **The install is tried the way a user gets it.** `pi install git:` installs `dependencies` only, so a plugin that imports a
+  devDependency works in every test and fails for the first user. `npm run check:install` lets the stock Pi itself install a copy of
+  the working tree (a git setting points a fake address at it) and requires every extension to load; `check-runtime-deps` is the
+  static twin. Rejected: running `npm install --omit=dev` ourselves, which would drift from what Pi does.
+- **The public surface is pinned by literals.** The handle, the `JigApi` members, the exports of the contract, client and kit, every
+  tool and action, command and `jig.json` section, the record fields and the `JIG_*` variables. Adding is fine; removing or renaming
+  needs an entry here first, and a contract break a new `version` ([Compatibility](compatibility.md)). Rejected: generating the
+  expected lists from the code, because a pin that follows the code pins nothing.
+- **A plugin imports `jig-core`'s contract, client and kit, and nothing else of another plugin.** Measured first: that was already
+  true of every import, so there are no exceptions to list. The test names the file, the import and the rule.
+- **Supply chain.** `.npmrc` writes exact versions and skips releases younger than 2 days (`min-release-age`, npm 11.10 and later: CI's
+  npm has it, a lockfile install is not held back, and older npm only warns). CI uses `npm ci --ignore-scripts`, because no package
+  in either lockfile has an install script. `npm run check` fails on a version that is not exact.
+- **One name to require.** `ci-ok` needs every other job and fails unless all succeeded, so the Node matrix can change without
+  touching branch protection; a test fails when a job is not in its `needs`. The checks job ends by requiring a clean working tree.
+  actionlint runs from a pinned release whose checksum is checked, and not from a third-party action.
+- **Tests start in a world of their own.** A temporary home, git configuration with a test identity, Pi agent and state folders, no
+  cloud or forge credentials, Pi offline. CI no longer sets a global git identity; the tests bring theirs. The integration suites keep
+  their `JIG_IT_*` variables, the GitHub token and the kubeconfig they name.
 
 ## 2026-11-01: a role only narrows, and the child enforces it
 

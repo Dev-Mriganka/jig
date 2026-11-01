@@ -58,15 +58,27 @@ changes, the other changes in the same commit. Tests read the tool tables of
   with the reason when there is no Pi 1.x, and runs in CI, where Pi is installed. It uses a temporary agent
   folder and home, never `~/.pi/agent`, and never the `pi` on `PATH`, which may be a wrapper that signs in. Two tests also
   load `jig-sandbox` for a read-only `bash`, and skip with the reason when the sandbox's programs are missing.
-- **Checks:** `npm run check` (types, Biome), `npm test` and the review page's
-  checks (`npm run check:web`, `npm run test:web`, `npm run check:dist`) must
-  pass before a commit; CI runs all of them on every push and pull request.
+- **Checks:** `npm run check` (types, Biome, and the two dependency checks below), `npm test`, `npm run check:install`
+  and the review page's checks (`npm run check:web`, `npm run test:web`, `npm run check:dist`) must
+  pass before a commit; CI runs all of them on every push and pull request, and `ci-ok` is the one job to require.
   Run `npm run format` before committing. The page's checks need `npm ci` in
   `plugins/jig-review/web` first, and a change under its `src/` needs a rebuild
-  (`npm run build` there) or `check:dist` fails.
+  (`npm run build` there) or `check:dist` fails. `check:install` needs network: it lets the stock Pi install a copy of this
+  working tree as `pi install git:` does, and every extension must load.
 - **Integration tests** run the plugins against real services: `npm run test:it`, and the `integration` job in CI. A
   suite skips when its service's address is not set, so `npm test` and `npm run check` never need a service. See
-  [Integration tests](docs/integration-tests.md).
+  [Integration tests](docs/integration-tests.md). Every test file starts in an isolated environment (temporary home, a git
+  identity, no credentials): [what a test can rely on](docs/integration-tests.md#what-a-test-can-rely-on).
+- **The public surface is pinned.** `jig-core`'s contract, client and kit, every tool and action name, slash command and
+  `jig.json` section, the record fields and the `JIG_*` variables are literals in `plugins/jig-core/test/surface.test.ts` and
+  `plugin-surface.test.ts`, and a plugin may import only `jig-core`'s `contract.ts`, `client.ts` and `kit/`
+  (`boundaries.test.ts`). Adding is fine: add the name to the test. Removing or renaming needs a [Decisions](docs/decisions.md)
+  entry first, and a contract break a new `version`. Never loosen a pin to get green. See [Compatibility](docs/compatibility.md).
+- **Pi version.** The Pi that Jig is tested with is named in four places that move together: both `Install Pi` steps of
+  `.github/workflows/ci.yml`, the "Tested with" tables in `README.md` and `docs/compatibility.md` (with the date), and the install
+  command in the `jig-agents` bullet above. To move it: run the weekly Pi canary by hand (`.github/workflows/pi-canary.yml`,
+  "Run workflow") and wait for it to be green on the new release, change those places in one commit, and run `npm run check`,
+  `npm test` and `npm run check:install` on that Pi. `plugins/jig-core/test/ci-config.test.ts` fails when they disagree.
 - **No secret-shaped literals, even fake ones.** A test value that looks like a
   real credential (a GitHub token, a Postman key, an AWS key, a private-key
   block) is built at run time from parts, such as `["PMAK", "1a2b"].join("-")`.
@@ -78,6 +90,9 @@ changes, the other changes in the same commit. Tests read the tool tables of
   3 days (7 for a major) after a release before proposing it. `@anthropic-ai/sandbox-runtime` is `0.0.x` and
   security-critical: its update is its own change, with the real-sandbox tests run and the version noted in
   `plugins/jig-sandbox/docs/design.md`. TypeScript is the native 7.x compiler: it has no programmatic API, so no
-  code here may `import "typescript"`. Pi's packages stay peer dependencies (`*`).
+  code here may `import "typescript"`. Pi's packages stay peer dependencies (`*`). `.npmrc` makes `npm install` write exact
+  versions and skip releases younger than 2 days; CI uses `npm ci --ignore-scripts`. `npm run check` fails on a version that
+  is not exact (`scripts/check-pinned-deps.mjs`) and on an import in a plugin that is not a root `dependency`, a Node module or
+  a Pi package, because `pi install git:` installs `dependencies` only (`scripts/check-runtime-deps.mjs`).
 - **Git:** clear commit messages, no `Co-Authored-By` lines. Push only when
   asked.
