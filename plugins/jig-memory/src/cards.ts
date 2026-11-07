@@ -2,7 +2,7 @@
 // (in the form two tickets compare), term counts and its Cause and Fix lines. Recall reads this one file and not a
 // thousand cards. The index is a copy: it is rebuilt when it is missing or unreadable, and a card is read again only
 // when its size or modification time differs from the stamp the index holds for it.
-import { type Dirent, readdirSync, statSync } from "node:fs";
+import { type Dirent, lstatSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { countTerms, tokenize } from "./bm25.ts";
 import { checkCard, isValid } from "./card.ts";
@@ -90,7 +90,9 @@ function isEntry(value: unknown): value is CardEntry {
 /** The index as it is on disk, or undefined when it is missing, unreadable, of another version or not shaped right. */
 function readIndex(folder: string): CardIndex | undefined {
     try {
-        const raw = JSON.parse(readText(indexFile(folder))) as { version?: unknown; cards?: unknown };
+        const file = indexFile(folder);
+        if (!lstatSync(file).isFile()) return undefined;
+        const raw = JSON.parse(readText(file)) as { version?: unknown; cards?: unknown };
         if (raw.version !== INDEX_VERSION || typeof raw.cards !== "object" || raw.cards === null) return undefined;
         const cards: CardIndex = Object.create(null) as CardIndex;
         for (const [ticket, entry] of Object.entries(raw.cards)) {
@@ -122,9 +124,15 @@ export function loadCards(folder: string): CardIndex {
         const file = ticketPaths(folder, dirent.name).card;
         let stamp: { mtimeMs: number; size: number };
         try {
-            const stat = statSync(file);
+            const stat = lstatSync(file);
+            if (!stat.isFile()) {
+                // A symlink, a FIFO or a device is not a card: never open it.
+                if (stored?.[dirent.name] !== undefined) dirty = true;
+                continue;
+            }
             stamp = { mtimeMs: stat.mtimeMs, size: stat.size };
-        } catch {
+        } catch (error) {
+            if ((error as NodeJS.ErrnoException).code === "ENOENT" && stored?.[dirent.name] !== undefined) dirty = true;
             continue;
         }
         const known = stored?.[dirent.name];
@@ -132,14 +140,20 @@ export function loadCards(folder: string): CardIndex {
             cards[dirent.name] = known;
             continue;
         }
-        dirty = true;
         try {
+            // Only a card that was read can change the index; an unreadable one is retried next time without a write.
             cards[dirent.name] = entryOf(dirent.name, readText(file), stamp);
+            dirty = true;
         } catch {
-            // A card that cannot be read now is tried again next time.
+            // A card that cannot be read now is tried again next time, and the old entry stays out.
         }
     }
-    if (stored !== undefined && Object.keys(stored).some((ticket) => cards[ticket] === undefined)) dirty = true;
+    if (stored !== undefined) {
+        const dirs = new Set(
+            dirents.filter((dirent) => dirent.isDirectory() && isSafeKey(dirent.name)).map((d) => d.name),
+        );
+        for (const ticket of Object.keys(stored)) if (!dirs.has(ticket)) dirty = true;
+    }
     if (dirty) {
         try {
             replaceFile(indexFile(folder), JSON.stringify({ version: INDEX_VERSION, cards }));

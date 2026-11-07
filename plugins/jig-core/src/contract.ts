@@ -539,6 +539,19 @@ export interface JigApi {
         declared(): ReadonlyArray<{ readonly tool: string; readonly plugin: string }>;
     };
 
+    /** Records an event that is not a tool call, in the call shape jig-lens counts. It holds no text. */
+    readonly records?: {
+        /** One recall message: the caller supplies the names (tool, action, plugin), the ticket, and the counts. */
+        recall(input: {
+            tool: string;
+            action: string;
+            plugin: string;
+            ticket?: string;
+            entries: number;
+            queries?: number;
+        }): void;
+    };
+
     /** The preview the user approved for this call, or undefined when the call did not ask. */
     approvedPreview(toolCallId: string): Preview | undefined;
 

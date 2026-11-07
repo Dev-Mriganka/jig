@@ -91,10 +91,48 @@ test("a recall setting that is wrong is an error that names its key", () => {
             String(minScore),
         );
     }
+    for (const notes of [1, "yes", null]) {
+        assert.deepEqual(
+            validateMemory({ recall: { notes } }),
+            ["memory.recall.notes: must be true or false"],
+            String(notes),
+        );
+    }
+    for (const [maxNotes, max] of [
+        [-1, 3],
+        [4, 3],
+        [2.5, 3],
+        ["1", 3],
+    ] as const) {
+        assert.deepEqual(
+            validateMemory({ recall: { max, maxNotes } }),
+            [`memory.recall.maxNotes: must be a whole number from 0 to ${max}`],
+            String(maxNotes),
+        );
+    }
 });
 
 test("the recall settings take their defaults field by field", () => {
-    assert.deepEqual(recallOf(undefined), { enabled: true, max: 3, minScore: 2 });
-    assert.deepEqual(recallOf({ recall: { max: 5 } }), { enabled: true, max: 5, minScore: 2 });
-    assert.deepEqual(recallOf({ recall: { enabled: false, minScore: 4 } }), { enabled: false, max: 3, minScore: 4 });
+    assert.deepEqual(recallOf(undefined), { enabled: true, max: 3, minScore: 2, notes: false, maxNotes: 0 });
+    assert.deepEqual(recallOf({ recall: { max: 5 } }), {
+        enabled: true,
+        max: 5,
+        minScore: 2,
+        notes: false,
+        maxNotes: 0,
+    });
+    assert.deepEqual(recallOf({ recall: { enabled: false, minScore: 4 } }), {
+        enabled: false,
+        max: 3,
+        minScore: 4,
+        notes: false,
+        maxNotes: 0,
+    });
+    assert.deepEqual(recallOf({ recall: { notes: true } }), {
+        enabled: true,
+        max: 3,
+        minScore: 2,
+        notes: true,
+        maxNotes: 1,
+    });
 });

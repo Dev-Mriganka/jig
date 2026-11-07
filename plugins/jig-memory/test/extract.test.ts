@@ -70,6 +70,13 @@ test("function names: camelCase, and snake_case where it is called", () => {
     ]);
 });
 
+test("a hyphenated tool or script name is an identifier", () => {
+    assert.deepEqual(names("we ran order-sync and tools/check_orders.py, then run-tests.sh and PROJ-1"), [
+        "order-sync",
+        "run-tests.sh",
+    ]);
+});
+
 test("a single word, an acronym, a product name and a random string are not identifiers", () => {
     assert.deepEqual(names("Order HTTP GitHub JavaScript iPhone macOS eyJhbGciOiJIUzI1NiJ9 aB3dE5Fg7H9"), []);
 });

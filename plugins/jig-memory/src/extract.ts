@@ -58,6 +58,9 @@ const CLASS_NAME = /(?<![A-Za-z0-9_])[A-Z][A-Za-z0-9]*[a-z0-9][A-Z][A-Za-z0-9]*(
 const CAMEL_NAME = /(?<![A-Za-z0-9_])[a-z][a-z0-9]*[A-Z][A-Za-z0-9]*(?![A-Za-z0-9_])/g;
 const SNAKE_CALL = /(?<![A-Za-z0-9_])[a-z][a-z0-9]*(?:_[a-z0-9]+)+(?=\()/g;
 const UPPER_SNAKE = /(?<![A-Za-z0-9_])[A-Z][A-Z0-9]*(?:_[A-Z0-9]+){2,}(?![A-Za-z0-9_])/g;
+// A hyphenated tool or script name such as order-sync or run-tests.sh. A key such as PROJ-123 does not match because
+// it starts upper case; a sentence's read-only still matches and rarity decides whether it says anything.
+const HYPHEN_NAME = /(?<![A-Za-z0-9_.-])[a-z][a-z0-9]*(?:-[a-z0-9]+)+(?:\.[a-z0-9]{1,8})?(?![A-Za-z0-9_.-])/g;
 // A dotted key such as spring.datasource.url, only where it is given a value, so a package or a host name is not one.
 const DOTTED_KEY = /(?<![A-Za-z0-9_.-])[a-z][a-z0-9_-]*(?:\.[a-z][A-Za-z0-9_-]*)+(?=[ \t]*(?:=|:[ \t]))/g;
 const STATUS = /(?<![A-Za-z0-9_./-])[45]\d\d(?![A-Za-z0-9_./-])/g;
@@ -173,6 +176,7 @@ export function countIdentifiers(text: string): Map<string, number> {
     for (const match of text.matchAll(CAMEL_NAME))
         if (isNameLike(match[0]) && !PRODUCT_NAMES.has(match[0])) add(match[0]);
     for (const match of text.matchAll(SNAKE_CALL)) if (match[0].length >= 5) add(match[0]);
+    for (const match of text.matchAll(HYPHEN_NAME)) if (match[0].length >= 5) add(match[0]);
     for (const match of text.matchAll(UPPER_SNAKE)) if (match[0].length <= 60) add(match[0]);
     for (const match of text.matchAll(DOTTED_KEY)) {
         const last = match[0].slice(match[0].lastIndexOf(".") + 1).toLowerCase();

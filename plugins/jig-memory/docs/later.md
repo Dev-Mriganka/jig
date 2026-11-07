@@ -8,8 +8,11 @@ What is not built yet, and why.
   because `jig-jira` does not publish an issue's summary and description on
   Pi's event bus. If it ever does, recall can use them too.
 - **Files and keyword search first.** Embeddings or a graph come only after a
-  recall test built from real tickets shows misses. The test in
-  `test/recall-eval/` uses invented tickets, so it cannot show that yet.
+  recall test built from real tickets shows misses. `scripts/recall-eval.mjs` now
+  measures a real folder, but the current one has only four explicit links: too few
+  to decide, and enough to show the notes index is noisy (see [Recall](recall.md#measured-on-our-own-tickets)).
+  A close that writes cards automatically is also not built; only a person's
+  `/ticket close` writes one.
 
 ![Memory in five steps: write, consolidate, index, retrieve and use, with bands for protecting every write, keeping it small and measuring recall](../../../docs/img/memory-steps.svg)
 

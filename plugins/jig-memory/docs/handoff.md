@@ -17,8 +17,9 @@ both down in the ticket folder.
 | `add_check` | `text` | Adds an open check of up to 200 characters |
 | `list_checks` | nothing | The open checks, and how many are closed |
 | `close_check` | `id`, `outcome` | Closes a check, with what was found or done, up to 200 characters |
+| `recall` | `query` | Searches earlier tickets' cards and notes by text; read only, active ticket excluded, history warning |
 
-- **Every action is local.** `list_checks` reads; the others write the ticket
+- **Every action is local.** `list_checks` and `recall` read; the others write the ticket
   folder, which the rules allow by default ([Permissions](../../../docs/permissions.md)).
 - **Each needs an active ticket,** and says how to set one when there is none.
 - **Nothing is blocked.** The open checks are shown and the agent is asked to close

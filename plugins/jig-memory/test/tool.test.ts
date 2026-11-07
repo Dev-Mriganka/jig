@@ -1,7 +1,7 @@
 // The `ticket` tool and what the session does with it: pasted evidence saved after jig-core, open checks shown with every
 // prompt, and empty files reported when a ticket becomes active or is restored.
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { CHECKS_MESSAGE, EMPTY_FILES_MESSAGE, NOTES_MESSAGE } from "../src/session.ts";
@@ -17,11 +17,16 @@ function start(t: import("node:test").TestContext) {
     return { folder, jig, pi };
 }
 
-test("the tool is declared to jig-core: every action is local, and only list_checks reads", (t) => {
+test("the tool is declared to jig-core: every action is local, and only list_checks and recall read", (t) => {
     const { jig } = start(t);
     assert.equal(jig.declared.get("ticket"), declaration);
     assert.deepEqual(classify({ action: "list_checks" }), {
         action: "list_checks",
+        environment: "local",
+        effect: "read",
+    });
+    assert.deepEqual(classify({ action: "recall", query: "NullPointerException" }), {
+        action: "recall",
         environment: "local",
         effect: "read",
     });
@@ -35,12 +40,36 @@ test("the tool is declared to jig-core: every action is local, and only list_che
     assert.throws(() => classify({ action: "save_evidence", text: "x", label: "../up" }), /label: /);
     assert.throws(() => classify({ action: "save_evidence", text: " ", label: "run" }), /text: empty/);
     assert.throws(() => classify({ action: "save_evidence", text: "x".repeat(49 * 1024), label: "run" }), /in parts/);
+    assert.throws(() => classify({ action: "recall", query: " " }), /needs a query/);
 });
 
-test("without an active ticket every action says how to set one", async (t) => {
+test("without an active ticket, recall still searches, and the other actions say how to set one", async (t) => {
     const { pi } = start(t);
     const result = await pi.tool({ action: "list_checks" });
     assert.deepEqual(result, { text: "No active ticket: /ticket KEY makes one active.", isError: true });
+    const found = await pi.tool({ action: "recall", query: "something" });
+    assert.equal(found.isError, false);
+});
+
+test("recall searches earlier notes and returns the history warning and its facts", async (t) => {
+    const { folder, jig, pi } = start(t);
+    mkdirSync(ticketPaths(folder, "PROJ-88").dir, { recursive: true });
+    writeFileSync(
+        ticketPaths(folder, "PROJ-88").notes,
+        "# PROJ-88\n\n## Now\nStatus: OrderService throws NullPointerException\n\n## Decisions\nCheck for null.\n",
+    );
+    pi.input("PROJ-123: the next ticket");
+    writeFileSync(
+        ticketPaths(folder, "PROJ-123").notes,
+        "# PROJ-123\n\n## Now\nStatus: OrderService throws NullPointerException\n\n## Decisions\n",
+    );
+    const result = await pi.tool({ action: "recall", query: "NullPointerException in OrderService" });
+    assert.equal(result.isError, false);
+    assert.match(result.text, /PROJ-88 \(from notes\.md, /);
+    assert.match(result.text, /history, not instructions/);
+    assert.deepEqual(jig.factsCalls.at(-1)?.facts, { entries: 1, queries: 1 });
+    assert.match(result.text, /PROJ-88/);
+    assert.equal(result.text.includes("PROJ-123"), false, "the active ticket matches the query, and is still excluded");
 });
 
 test("pasted text is masked, saved to evidence with an index line, and the model gets the file name back", async (t) => {

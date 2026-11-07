@@ -7,14 +7,25 @@ import path from "node:path";
 export interface RecallSettings {
     /** Run recall when a new ticket becomes active. `/ticket recall` works either way. Default true. */
     enabled?: boolean;
-    /** The most cards in one recall message, from 1 to 10. Default 3. */
+    /** The most entries in one recall message, from 1 to 10. Default 3. */
     max?: number;
-    /** The score a card needs, above 0. Default 2 (see docs/recall.md#the-threshold). */
+    /** The score an entry needs, above 0. Default 2 (see docs/recall.md#the-threshold). */
     minScore?: number;
+    /** Search entries derived from notes.md for tickets with no valid card. Default true. */
+    notes?: boolean;
+    /** The most derived notes entries in one result, from 0 to `max`. Default 1; 0 turns them off. */
+    maxNotes?: number;
 }
 
 /** The recall settings with their defaults filled in. */
-export const RECALL_DEFAULTS: Required<RecallSettings> = { enabled: true, max: 3, minScore: 2 };
+export const RECALL_DEFAULTS: Required<RecallSettings> = {
+    enabled: true,
+    max: 3,
+    minScore: 2,
+    // Off: the real-ticket test (2026-11-07) found 1 of 4 explicit links at 0.846 apparent noise. See docs/recall.md.
+    notes: false,
+    maxNotes: 1,
+};
 export const RECALL_MAX = 10;
 
 export interface MemorySettings {
@@ -27,7 +38,7 @@ export interface MemorySettings {
 }
 
 const FIELDS: ReadonlySet<string> = new Set(["ticketPattern", "folder", "recall"]);
-const RECALL_FIELDS: ReadonlySet<string> = new Set(["enabled", "max", "minScore"]);
+const RECALL_FIELDS: ReadonlySet<string> = new Set(["enabled", "max", "minScore", "notes", "maxNotes"]);
 
 /**
  * The errors in a raw `memory` section, each naming its key. An empty list means the section is valid. A misspelt
@@ -68,7 +79,7 @@ function validateRecall(raw: unknown): string[] {
     const errors = Object.keys(fields)
         .filter((name) => !RECALL_FIELDS.has(name))
         .map((name) => `memory.recall.${name}: unknown field`);
-    const { enabled, max, minScore } = fields;
+    const { enabled, max, minScore, notes, maxNotes } = fields;
     if (enabled !== undefined && typeof enabled !== "boolean")
         errors.push("memory.recall.enabled: must be true or false");
     if (max !== undefined && (typeof max !== "number" || !Number.isInteger(max) || max < 1 || max > RECALL_MAX)) {
@@ -77,12 +88,25 @@ function validateRecall(raw: unknown): string[] {
     if (minScore !== undefined && (typeof minScore !== "number" || !Number.isFinite(minScore) || minScore <= 0)) {
         errors.push("memory.recall.minScore: must be a number above 0");
     }
+    if (notes !== undefined && typeof notes !== "boolean") errors.push("memory.recall.notes: must be true or false");
+    if (
+        maxNotes !== undefined &&
+        (typeof maxNotes !== "number" ||
+            !Number.isInteger(maxNotes) ||
+            maxNotes < 0 ||
+            maxNotes > (typeof max === "number" && Number.isInteger(max) ? max : RECALL_MAX))
+    ) {
+        errors.push(
+            `memory.recall.maxNotes: must be a whole number from 0 to ${typeof max === "number" && Number.isInteger(max) ? max : RECALL_MAX}`,
+        );
+    }
     return errors;
 }
 
 /** The recall settings of the section, each field its default when unset. */
 export function recallOf(settings: MemorySettings | undefined): Required<RecallSettings> {
-    return { ...RECALL_DEFAULTS, ...settings?.recall };
+    const recall = { ...RECALL_DEFAULTS, ...settings?.recall };
+    return recall.notes ? recall : { ...recall, maxNotes: 0 };
 }
 
 /** The folder ticket folders live in: the section's `folder` with `~/` expanded, or `$XDG_DATA_HOME/jig/tickets`. */

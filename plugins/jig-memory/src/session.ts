@@ -26,6 +26,7 @@ import {
     verifyCard,
 } from "./close.ts";
 import { loadCards } from "./cards.ts";
+import { loadNoteIndex } from "./notes-index.ts";
 import { CheckError, openChecks, openChecksText } from "./checks.ts";
 import { folderOf, recallOf, ticketRegex } from "./config.ts";
 import type { MemorySettings, RecallSettings } from "./config.ts";
@@ -34,7 +35,7 @@ import { indexCount, isFileTool, saveEvidence } from "./evidence.ts";
 import { hasNoNotes, readMaterial } from "./material.ts";
 import { notesMessage, REMIND_AFTER, reminderText } from "./message.ts";
 import { localDate, nowBlock } from "./notes.ts";
-import { buildQuery, formatMatches, notesText, recall, recallMessage } from "./recall.ts";
+import { buildQuery, formatRecall, notesText, recall, recallMessage } from "./recall.ts";
 import { ensureTicket, isSafeKey, mentionedTickets, settleNotes, ticketPaths } from "./store.ts";
 import { finishPasted, TOOL_NAME, ticketTool } from "./tool.ts";
 
@@ -153,7 +154,14 @@ export function registerTicketMemory(pi: ExtensionAPI): void {
             const matches = recall(
                 loadCards(mem.folder),
                 buildQuery({ ticket: key, text, pattern: mem.pattern }),
-                mem.recall,
+                {
+                    ...mem.recall,
+                    // The automatic path is deliberately capped at one derived entry even when a person set a larger
+                    // maxNotes; that setting is for the manual search.
+                    maxNotes: Math.min(mem.recall.maxNotes, 1),
+                    allowRareWords: false,
+                },
+                mem.recall.maxNotes === 0 ? undefined : loadNoteIndex(mem.folder, mem.pattern),
             );
             if (matches.length === 0) return;
             pi.sendMessage(
@@ -165,6 +173,15 @@ export function registerTicketMemory(pi: ExtensionAPI): void {
                 },
                 { triggerTurn: false },
             );
+            // Countable by jig-lens without any text: tool memory, action recall, facts.entries.
+            jig().records?.recall({
+                tool: "memory",
+                action: "recall",
+                plugin: "jig-memory",
+                ticket: key,
+                entries: matches.length,
+                queries: 1,
+            });
         } catch (error) {
             note(ctx, `Recall for ${key} failed: ${reason(error)}`, "warning");
         }
@@ -212,8 +229,16 @@ export function registerTicketMemory(pi: ExtensionAPI): void {
 
     /** `/ticket recall [text]`: the related tickets for the text, or for the active ticket, shown to the user only. */
     const recallByHand = (mem: Memory, ctx: ExtensionContext, text: string) => {
+        if (!mem.recall.enabled) {
+            note(ctx, "Recall is off (memory.recall.enabled false).");
+            return;
+        }
         try {
-            let query = buildQuery({ text, pattern: mem.pattern });
+            let query = buildQuery({
+                ...(active === undefined ? {} : { ticket: active }),
+                text,
+                pattern: mem.pattern,
+            });
             if (text === "") {
                 if (active === undefined) {
                     note(ctx, "No active ticket. Use /ticket recall <text>, or make a ticket active first.");
@@ -228,17 +253,34 @@ export function registerTicketMemory(pi: ExtensionAPI): void {
                 });
             }
             const cards = loadCards(mem.folder);
-            const searched = Object.values(cards).filter((card) => card.valid).length;
+            const notes = loadNoteIndex(mem.folder, mem.pattern);
+            const cardCount = Object.values(cards).filter((card) => card.valid).length;
+            const noteCount =
+                notes === undefined ? 0 : Object.keys(notes).filter((ticket) => cards[ticket]?.valid !== true).length;
+            const searched = cardCount + noteCount;
             if (searched === 0) {
-                note(ctx, "No cards yet: /ticket close writes one for a ticket.");
+                note(ctx, "No earlier tickets yet: a ticket is searchable once its notes.md or card.md exists.");
                 return;
             }
-            const matches = recall(cards, query, mem.recall);
+            const matches = recall(
+                cards,
+                query,
+                {
+                    ...mem.recall,
+                    maxNotes: Math.max(mem.recall.maxNotes, 1),
+                    allowRareWords: true,
+                    cardsFirst: true,
+                },
+                notes,
+            );
             note(
                 ctx,
                 matches.length === 0
-                    ? `No earlier ticket scores ${mem.recall.minScore} or more among ${searched} card${searched === 1 ? "" : "s"}.`
-                    : `Related earlier tickets (${searched} card${searched === 1 ? "" : "s"} searched):\n\n${formatMatches(matches)}`,
+                    ? `No earlier ticket scores ${mem.recall.minScore} or more among ${searched} entr${searched === 1 ? "y" : "ies"}.`
+                    : formatRecall(
+                          `Related earlier tickets (${searched} entr${searched === 1 ? "y" : "ies"} searched):`,
+                          matches,
+                      ),
             );
         } catch (error) {
             note(ctx, `Recall failed: ${reason(error)}`, "warning");
@@ -430,12 +472,50 @@ export function registerTicketMemory(pi: ExtensionAPI): void {
         };
     });
 
+    /** One pull search for the `ticket recall` action: cards and notes, cards first, rare words allowed. */
+    const searchEarlier = (mem: Memory, query: string): { text: string; entries: number } => {
+        if (!mem.recall.enabled) return { text: "Recall is off (memory.recall.enabled false).", entries: 0 };
+        const cards = loadCards(mem.folder);
+        const notes = loadNoteIndex(mem.folder, mem.pattern);
+        const matches = recall(
+            cards,
+            buildQuery({ ...(active === undefined ? {} : { ticket: active }), text: query, pattern: mem.pattern }),
+            {
+                ...mem.recall,
+                maxNotes: Math.max(mem.recall.maxNotes, 1),
+                allowRareWords: true,
+                cardsFirst: true,
+            },
+            notes,
+        );
+        const cardCount = Object.values(cards).filter((card) => card.valid).length;
+        const noteCount = Object.keys(notes).filter((ticket) => cards[ticket]?.valid !== true).length;
+        const searched = cardCount + noteCount;
+        if (matches.length === 0) {
+            return {
+                text:
+                    searched === 0
+                        ? "No earlier tickets yet: a ticket is searchable once its notes.md or card.md exists."
+                        : `No earlier ticket scores ${mem.recall.minScore} or more among ${searched} entr${searched === 1 ? "y" : "ies"}. Try an error, class name or behaviour.`,
+                entries: 0,
+            };
+        }
+        return {
+            text: formatRecall(`Earlier tickets that match (${matches.length}):`, matches),
+            entries: matches.length,
+        };
+    };
+
     registerJigTool(
         pi,
         ticketTool({
             active: () =>
                 memory === undefined || active === undefined ? undefined : { folder: memory.folder, key: active },
             now: () => new Date(),
+            search: (query) => {
+                if (memory === undefined) throw new Error("Ticket memory is not ready: no session has started.");
+                return searchEarlier(memory, query);
+            },
         }),
     );
 

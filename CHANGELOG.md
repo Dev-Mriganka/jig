@@ -4,6 +4,18 @@ What changed in Jig, newest first. Pi shows the entries newer than the version y
 
 ## [Unreleased]
 
+### Added
+
+- A ticket with notes is searchable before it is closed: `jig-memory` derives a bounded entry from its `## Now` and
+  `## Decisions`, searches it with recall, and labels it as from notes with its date and that it may be out of date.
+  Automatic recall needs a shared name, ID or error and takes at most one derived entry; `/ticket recall` and the
+  `ticket` tool's new read-only `recall` action also take a rare word and always search notes, with written cards first.
+  `memory.recall.notes` turns on automatic recall only; `memory.recall.enabled: false` stops all recall. The derived
+  entries are off by default until the hand-label numbers clear the bar. `scripts/recall-eval.mjs` measures a folder
+  without printing content, takes hand labels with `--labels`, and scores top 3 independently of the display cap.
+  Automatic and agent searches are recorded for `jig-lens` with entry and query counts, and no text. CRLF notes, symlinks
+  and FIFOs are handled safely, and recalled text is stripped of control characters.
+
 ### Changed
 
 - `logs` stops a search at 80 seconds and returns what it found, with the windows it could not search named, instead of the

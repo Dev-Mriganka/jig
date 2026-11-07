@@ -61,6 +61,7 @@ agent.
 |---|---|---|
 | Class or type | `CamelCase` of two parts or more, exception names included | `OrderService`, `NullPointerException` |
 | Function | `camelCase`, or `snake_case` followed by `(` | `handlePayment`, `process_payment(` |
+| Tool or script | Hyphenated lower-case name, optional extension | `order-sync`, `run-tests.sh` |
 | Status and path | A 4xx or 5xx status and a path on one line, within 40 characters | `502 /orders/{id}/cancel` |
 | Config key | A dotted lower-case key followed by `=` or `:`, or `UPPER_SNAKE` with two underscores | `spring.datasource.url`, `ORDERS_DB_URL` |
 

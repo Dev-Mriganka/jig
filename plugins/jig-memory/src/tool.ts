@@ -25,6 +25,10 @@ const ACTIONS = {
     add_check: { summary: "add an open check: something to do before the next step", required: ["text"] },
     list_checks: { summary: "the open checks", required: [] },
     close_check: { summary: "close a check, saying what was found or done", required: ["id", "outcome"] },
+    recall: {
+        summary: "search earlier tickets by an error, class name or behaviour",
+        required: ["query"],
+    },
 } as const satisfies Record<string, { summary: string; required: readonly string[] }>;
 
 type ActionName = keyof typeof ACTIONS;
@@ -47,6 +51,12 @@ const parameters = Type.Object(
             Type.String({ maxLength: 40, description: "save_evidence: a few words, such as batch-3-output." }),
         ),
         id: Type.Optional(Type.Integer({ minimum: 1, description: "close_check: the check's number." })),
+        query: Type.Optional(
+            Type.String({
+                maxLength: 2_000,
+                description: "recall: the error, class name or behaviour to search earlier tickets for.",
+            }),
+        ),
         outcome: Type.Optional(
             Type.String({
                 description: `close_check: what was found or done, at most ${CHECK_TEXT_LIMIT} characters.`,
@@ -61,6 +71,7 @@ const DESCRIPTION = [
     "save_evidence keeps text the user pasted (the output of a run they did) in the ticket's evidence, masked.",
     "add_check records something you said you would do before the next step; it is shown with every prompt until close_check.",
     "Before you hand the user a command for the next step, close each open check or say plainly that it is still open.",
+    "recall searches earlier tickets' notes and cards by text, without leaving the active ticket in the results.",
 ].join(" ");
 
 /** Checks a call's input against the action's table. An `InputError` blocks the call without asking anyone. */
@@ -80,9 +91,10 @@ export function checkInput(input: Readonly<Record<string, unknown>>): ActionName
     }
     const missing = required.filter((key) => input[key] === undefined);
     if (missing.length > 0) throw new InputError(`ticket ${name} needs ${missing.join(", ")}`);
-    for (const key of ["text", "label", "outcome"]) {
+    for (const key of ["text", "label", "outcome", "query"]) {
         if (input[key] !== undefined && typeof input[key] !== "string") throw new InputError(`${key} must be text`);
     }
+    if (name === "recall" && (input.query as string).trim() === "") throw new InputError("ticket recall needs a query");
     if (name === "save_evidence") {
         const problem = labelProblem(input.label as string) ?? pastedProblem(input.text as string);
         if (problem !== undefined) throw new InputError(problem);
@@ -93,7 +105,11 @@ export function checkInput(input: Readonly<Record<string, unknown>>): ActionName
 /** Every action acts on the ticket folder on this machine. Only list_checks reads. */
 export function classify(input: Readonly<Record<string, unknown>>): CallClass {
     const action = checkInput(input);
-    return { action, environment: "local", effect: action === "list_checks" ? "read" : "write" };
+    return {
+        action,
+        environment: "local",
+        effect: action === "list_checks" || action === "recall" ? "read" : "write",
+    };
 }
 
 export const declaration: ToolDeclaration = { tool: TOOL_NAME, plugin: "jig-memory", classify };
@@ -102,6 +118,8 @@ export const declaration: ToolDeclaration = { tool: TOOL_NAME, plugin: "jig-memo
 export interface TicketHost {
     active(): { folder: string; key: string } | undefined;
     now(): Date;
+    /** Search earlier tickets by text. Read only; the active ticket is excluded by the caller. */
+    search(query: string): { text: string; entries: number };
 }
 
 const text = (value: string, details: Record<string, unknown>) => ({
@@ -115,12 +133,17 @@ export function ticketTool(host: TicketHost): ToolDefinition<typeof parameters> 
         label: "Ticket",
         description: DESCRIPTION,
         promptSnippet:
-            "ticket: save pasted output as evidence (save_evidence); track open checks (add_check, list_checks, close_check)",
+            "ticket: search earlier tickets (recall); save pasted output (save_evidence); track open checks (add_check, list_checks, close_check)",
         parameters,
         executionMode: "sequential",
-        async execute(_toolCallId, params) {
+        async execute(toolCallId, params) {
             const input = params as Readonly<Record<string, unknown>>;
             const action = checkInput(input);
+            if (action === "recall") {
+                const found = host.search(input.query as string);
+                jig().addFacts(toolCallId, { entries: found.entries, queries: 1 });
+                return text(found.text, { action, entries: found.entries });
+            }
             const ticket = host.active();
             if (ticket === undefined) throw new Error("No active ticket: /ticket KEY makes one active.");
             const { folder, key } = ticket;

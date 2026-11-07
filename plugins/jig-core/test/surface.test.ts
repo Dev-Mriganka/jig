@@ -121,6 +121,7 @@ describe("the API", () => {
             "profiles.active()",
             "profiles.register()",
             "protectedPaths.list()",
+            "records.recall()",
             "sandbox.canRun",
             "sandbox.register()",
             "sandbox.run()",

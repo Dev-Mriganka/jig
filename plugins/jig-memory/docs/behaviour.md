@@ -21,7 +21,7 @@ commands, so `/ticket` cannot activate a ticket with one of those keys.
 
 `card.md` is made at close, not at activation (see [Cards](cards.md)). The index
 `.cards.json` sits in the folder of all tickets, beside the ticket folders (see
-[Recall](recall.md#the-index)).
+[Recall](recall.md#the-indexes)).
 
 ## Activation
 

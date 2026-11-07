@@ -35,7 +35,7 @@ const EXPECTED: Record<string, Given> = {
         sections: ["sandbox"],
     },
     "jig-memory": {
-        tools: { ticket: ["add_check", "close_check", "list_checks", "save_evidence"] },
+        tools: { ticket: ["add_check", "close_check", "list_checks", "recall", "save_evidence"] },
         commands: ["ticket"],
         sections: ["memory"],
     },

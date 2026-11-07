@@ -20,7 +20,9 @@ import { PROFILE_SECTION, PROFILES_SECTION } from "./profiles.ts";
 import { ensureConfigLoaded, loadPersonalConfig } from "./state.ts";
 import type { JigState } from "./state.ts";
 import { oneOfProblem } from "./section-defaults.ts";
+import { callRecord, writeRecord } from "./records.ts";
 import { isAbsolute } from "node:path";
+import { randomUUID } from "node:crypto";
 
 /** Refuses a section option that must be a list of non-empty paths, such as `first` or `union`. */
 function checkPathList(value: unknown, section: string, option: string, example: string): void {
@@ -352,6 +354,38 @@ export function buildApi(state: JigState): JigApi {
         exec: {
             run: (file, args, options) => run(file, args, options, guard),
             git: (repo, args, options) => git(repo, args, options, guard),
+        },
+        records: {
+            recall: ({ tool, action, plugin, ticket, entries, queries = 1 }) => {
+                try {
+                    const now = new Date();
+                    const count = Number.isFinite(entries) ? Math.max(0, Math.floor(entries)) : 0;
+                    const asked = Number.isFinite(queries) ? Math.max(0, Math.floor(queries)) : 1;
+                    writeRecord(
+                        callRecord(
+                            {
+                                session: state.sessionId ?? "unknown",
+                                ...(ticket === undefined ? {} : { ticket }),
+                                tool,
+                                action,
+                                plugin,
+                                environment: "local",
+                                environmentKind: "local",
+                                effect: "read",
+                                decision: "allow",
+                                decisionSource: "tool",
+                                outcome: "ok",
+                                toolCallId: `record-${randomUUID()}`,
+                                facts: { entries: count, queries: asked },
+                            },
+                            now,
+                        ),
+                        now,
+                    );
+                } catch {
+                    // A record that cannot be written must not break the message.
+                }
+            },
         },
     };
 
